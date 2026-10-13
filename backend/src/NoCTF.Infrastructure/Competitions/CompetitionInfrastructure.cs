@@ -55,6 +55,15 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ManageCompetitionBadges>();
         services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();
         services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
+        services.AddScoped<IAwdCheckerCoordinator, AwdCheckerCoordinator>();
+        services.AddScoped<IAwdCheckerTaskReader, AwdCheckerTaskReader>();
+        services.AddScoped<IAwdCheckAdjudicationStore, AwdCheckAdjudicationStore>();
+        services.AddScoped<AdjudicateAwdCheck>();
+        services.AddScoped<IAwdScoringRuleStore, AwdScoringRuleStore>();
+        services.AddScoped<IAwdPublicRulesReader, AwdPublicRulesReader>();
+        services.AddScoped<IAwdAttackInfoReader, AwdAttackInfoReader>();
+        services.AddScoped<ListAwdAttackInfo>();
+        services.AddScoped<ManageAwdScoringRules>();
         services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
         services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();
         services.AddScoped<IKohChallengeAccessReader, KohChallengeAccessReader>();

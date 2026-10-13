@@ -89,6 +89,12 @@ public sealed class NoCtfDbContext(
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdRound> AwdRounds => Set<NoCTF.Domain.Competitions.Awd.AwdRound>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdFlagKey> AwdFlagKeys => Set<NoCTF.Domain.Competitions.Awd.AwdFlagKey>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdRoundRules> AwdRoundRules => Set<NoCTF.Domain.Competitions.Awd.AwdRoundRules>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdFlagIssue> AwdFlagIssues => Set<NoCTF.Domain.Competitions.Awd.AwdFlagIssue>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdFactDetails> AwdFactDetails => Set<NoCTF.Domain.Competitions.Awd.AwdFactDetails>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity> AwdCaptureIdentities => Set<NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity>();
     public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
     public DbSet<ActiveRuntimeSlot> ActiveRuntimeSlots => Set<ActiveRuntimeSlot>();
     public DbSet<RuntimeReceipt> RuntimeReceipts => Set<RuntimeReceipt>();
@@ -221,6 +227,18 @@ public sealed class NoCtfDbContext(
             throw new InvalidOperationException(
                 "Competition events are immutable and cannot be updated or deleted.");
         }
+
+        if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdFlagKey>().Any(entry => entry.State == EntityState.Modified))
+            throw new InvalidOperationException("AWD key versions are immutable; create a new protected version.");
+
+        if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("AWD scoring rule changes are immutable.");
+
+        if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundRules>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTeamEligibility>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Issued AWD rule snapshots are immutable; create an explicit rule revision.");
 
         if (ChangeTracker.Entries<Notification>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
@@ -387,6 +405,14 @@ public sealed class NoCtfDbContext(
             if (definition.Mode != entry.Entity.Mode)
                 throw new InvalidOperationException(
                     "Challenge definition must match the challenge mode.");
+            if (entry.State == EntityState.Added && definition is AwdChallengeDefinition awd && awd.FlagStores.Count == 0)
+                awd.FlagStores.Add(new NoCTF.Domain.Competitions.Awd.AwdFlagStore
+                {
+                    Id = Guid.CreateVersion7(), ChallengeId = entry.Entity.Id,
+                    InjectionCommand = awd.FlagInjectionCommand,
+                    InjectionTimeoutSeconds = awd.FlagInjectionTimeoutSeconds ?? 30,
+                    TargetServiceName = awd.FlagInjectionServiceName
+                });
             ChallengeDefinitionGraph.AssignChallengeId(definition, entry.Entity.Id);
         }
 
@@ -433,6 +459,16 @@ public sealed class NoCtfDbContext(
             if (!validStructure)
                 throw new InvalidOperationException(
                     $"Challenge flag type {flag.Type} has an invalid relational scope.");
+            if (flag.AwdIssue is { } issue)
+            {
+                if (flag.Type != ChallengeFlagType.AwdRound || issue.FlagId != flag.Id
+                    || issue.CompetitionChallengeId != flag.CompetitionChallengeId || issue.TeamId != flag.TeamId
+                    || issue.Digest != Convert.ToHexString(flag.FlagSha256)
+                    || AwdRoundSpecificationId.FromRound(issue.RoundNumber).Value != flag.SpecificationId)
+                    throw new InvalidOperationException("AWD issuance must match its owning flag scope and digest.");
+                flag.SpecificationIdentity = $"awd:{issue.CompetitionChallengeId:N}:{issue.TeamId:N}:{issue.RoundId:N}:{issue.StoreId:N}:{issue.GenerationSlot}:{issue.Ordinal}";
+                continue;
+            }
             flag.SpecificationIdentity = flag.SpecificationKind is null
                 ? $"flag:{flag.Id:N}"
                 : flag is TeamChallengeFlag

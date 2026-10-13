@@ -69,9 +69,10 @@ public static class DatabaseStartup
                 await Task.Delay(retryDelay, cancellationToken);
             }
             catch (DbException exception) when (migrationContentionRetries < 6
-                && exception.SqlState is "42P07" or "42710" or "42701" or "23505")
+                && exception.SqlState is "42P07" or "42710" or "42701" or "23505"
+                    or "42704" or "42P01" or "42703")
             {
-                // A peer may commit after this migrator read the applied list.
+                // A peer may create or remove an object after this migrator read the applied list.
                 // Re-enter MigrateAsync so it reads history under EF's lock again.
                 // An incompatible pre-existing schema still fails after this bound.
                 migrationContentionRetries++;

@@ -1057,7 +1057,7 @@ export type NoCtfDomainGameplayGameplayFactState = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainGameplayGameplayFactResult = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
-export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38;
+export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45;
 
 export type NoCtfApplicationNotificationsRuntimeStateChangedNotificationContent = Omit<NoCtfApplicationNotificationsNotificationContent, 'type'> & {
     code?: string | null;
@@ -1556,8 +1556,21 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionCo
 export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract = {
+    flagStores?: Array<NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract>;
     flagInjection: NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract | null;
 };
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract = {
+    id?: string;
+    name?: string;
+    deliveryMode?: NoCtfapiEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol;
+    targetServiceName?: string | null;
+    injectionCommand?: string | null;
+    injectionTimeoutSeconds?: number;
+    preservesHistoricalFlags?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol = 'RunnerCommand' | 'BusinessChecker';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract = {
     command?: string;
@@ -2455,6 +2468,25 @@ export type NoCtfapiEndpointsLiveSoloUploadLiveSoloPoolAttachmentsRequest = {
 
 export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol = 'All' | 'RandomOnePerTeam';
 
+export type NoCtfapiEndpointsInternalAwdCheckTaskResponse = {
+    gameplayFactId?: string;
+    attemptId?: string;
+    deadline?: string;
+    flags?: Array<NoCtfapiEndpointsInternalAwdCheckTaskFlagResponse>;
+};
+
+export type NoCtfapiEndpointsInternalAwdCheckTaskFlagResponse = {
+    flagId?: string;
+    storeId?: string;
+    storeName?: string;
+    targetServiceName?: string | null;
+    flag?: string;
+    historical?: boolean;
+    requiresWrite?: boolean;
+    privateReadContext?: string | null;
+    publicLocator?: string | null;
+};
+
 export type NoCtfapiEndpointsInternalInternalResultResponse = {
     disposition?: NoCtfapiEndpointsInternalInternalResultDispositionProtocol;
     detail?: string | null;
@@ -2463,10 +2495,28 @@ export type NoCtfapiEndpointsInternalInternalResultResponse = {
 export type NoCtfapiEndpointsInternalInternalResultDispositionProtocol = 'Applied' | 'Duplicate' | 'Superseded' | 'Conflict';
 
 export type NoCtfapiEndpointsInternalRecordAwdCheckResultRequest = {
-    state?: NoCtfapiEndpointsInternalAwdServiceStateProtocol;
+    connection: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
+    functionality: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
+    flags: Array<NoCtfapiEndpointsInternalAwdCheckFlagRequest>;
+    observedAt: string;
 };
 
-export type NoCtfapiEndpointsInternalAwdServiceStateProtocol = 'Unknown' | 'Up' | 'Down' | 'CheckerAbnormalExit' | 'CheckerTimedOut';
+export type NoCtfapiEndpointsInternalAwdCheckProbeRequest = {
+    outcome?: NoCtfDomainCompetitionsAwdAwdProbeOutcome;
+    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdProbeOutcome = 'Unknown' | 'Passed' | 'TargetFailure' | 'PlatformFailure' | 'NotRequired';
+
+export type NoCtfDomainCompetitionsAwdAwdCheckReason = 'None' | 'ConnectionRefused' | 'ConnectTimeout' | 'RequestTimeout' | 'FunctionalCheckFailed' | 'FlagStoreFailed' | 'CurrentFlagMissing' | 'HistoricalFlagMissing' | 'CheckerCrashed' | 'CheckerTimedOut' | 'TaskNotExecuted' | 'CallbackMissing' | 'InfrastructureFailure' | 'IncompleteEvidence' | 'InvalidEvidence' | 'RuntimeSuperseded' | 'LateReceipt';
+
+export type NoCtfapiEndpointsInternalAwdCheckFlagRequest = {
+    flagId?: string;
+    write?: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
+    read?: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
+    privateReadContext?: string | null;
+    publicLocator?: string | null;
+};
 
 export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
     outcome?: NoCtfapiEndpointsInternalAwdpFixResultOutcome;
@@ -2504,6 +2554,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {
     occurredAt?: string;
     updatedAt?: string;
     timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
+    awdAttack?: NoCtfapiEndpointsGameplayFactsAwdAttackStatusResponse | null;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'FlagAttempt' | 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'AwdServiceTransition' | 'KohControlObservation' | 'AttachmentDownload' | 'WriteUpUnlock';
@@ -2512,9 +2563,24 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' 
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled' | 'RightButDue';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment' | 'FlagInvalid' | 'FlagUnknown' | 'FlagRevoked' | 'FlagNotIssued' | 'FlagNotYetActive' | 'FlagNotScorable' | 'AwdReceiptUnavailable';
 
 export type NoCtfDomainChallengesGameplayFactTimeEligibility = 'Valid' | 'NotOpened' | 'SubmissionClosed';
+
+export type NoCtfapiEndpointsGameplayFactsAwdAttackStatusResponse = {
+    flagId?: string | null;
+    generationRoundId?: string | null;
+    generationRoundNumber?: number | null;
+    receivedRoundId?: string | null;
+    receivedRoundNumber?: number | null;
+    storeId?: string | null;
+    outcome?: NoCtfDomainCompetitionsAwdAwdAttackOutcome | null;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdAttackOutcome = 'Accepted' | 'Invalid' | 'Expired' | 'Duplicate' | 'OwnFlag' | 'UnknownFlag' | 'NotScorable' | 'SystemError';
+
+export type NoCtfDomainCompetitionsAwdAwdSettlementState = 'Provisional' | 'Final' | 'PendingAdjudication' | 'Exempted';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -2676,7 +2742,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse =
     };
 };
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound' | 'ChallengeNotOpened' | 'ChallengeSubmissionClosed';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound' | 'ChallengeNotOpened' | 'ChallengeSubmissionClosed' | 'AwdHardeningActive' | 'AwdRoundGap' | 'AwdRoundUnavailable' | 'ManualAdjustmentReasonInvalid';
 
 export type NoCtfapiEndpointsGameplayFactsSubmitFlagRequest = {
     flag?: string | null;
@@ -2720,6 +2786,118 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest = {
     file: Blob | File;
 };
 
+export type NoCtfapiEndpointsCompetitionsSpectatorScreenResponse = {
+    version?: string;
+    dataAsOf?: string;
+    serverTime?: string;
+    scope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    competitionName?: string | null;
+    status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
+    hardeningEndsAt?: string | null;
+    teams?: Array<NoCtfApplicationScoringLeaderboardSpectatorScreenTeam>;
+    challenges?: Array<NoCtfApplicationScoringLeaderboardScoreboardChallengeCatalogItem>;
+    round?: NoCtfapiEndpointsCompetitionsSpectatorRoundResponse | null;
+    services?: Array<NoCtfapiEndpointsCompetitionsSpectatorServiceResponse>;
+    points?: Array<NoCtfapiEndpointsCompetitionsSpectatorPointResponse>;
+    changes?: Array<NoCtfapiEndpointsCompetitionsSpectatorChangeResponse>;
+    settlements?: Array<NoCtfApplicationScoringLeaderboardSpectatorSettlement>;
+    historyStartsAt?: string | null;
+    historyTruncated?: boolean;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
+
+export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
+
+export type NoCtfApplicationScoringLeaderboardSpectatorScreenTeam = {
+    id?: string;
+    name?: string;
+    rank?: number | null;
+    score?: number;
+};
+
+export type NoCtfApplicationScoringLeaderboardScoreboardChallengeCatalogItem = {
+    competitionChallengeId?: string;
+    title?: string;
+    direction?: string;
+    category?: string;
+    order?: number;
+    isPublished?: boolean;
+    directionIcon?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorRoundResponse = {
+    id?: string;
+    number?: number;
+    startAt?: string;
+    endAt?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorServiceResponse = {
+    teamId?: string;
+    challengeId?: string;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    checkedAt?: string | null;
+    isCompromised?: boolean;
+    enabled?: boolean;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    lastTrustedHealth?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    lastTrustedAt?: string | null;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdHealth = 'Ok' | 'Mumble' | 'Offline' | 'Recovering' | 'InternalError';
+
+export type NoCtfDomainCompetitionsAwdAwdCheckExecution = 'Pending' | 'Running' | 'Completed' | 'FailedToDetermine';
+
+export type NoCtfapiEndpointsCompetitionsSpectatorPointResponse = {
+    challengeId?: string;
+    controllerId?: string | null;
+    observedTeamId?: string | null;
+    health?: NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol;
+    checkedAt?: string | null;
+    intervalSeconds?: number;
+    pointsPerInterval?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol = 'Unknown' | 'Healthy' | 'Down';
+
+export type NoCtfapiEndpointsCompetitionsSpectatorChangeResponse = {
+    id?: string;
+    revision?: string;
+    at?: string;
+    kind?: NoCtfapiEndpointsCompetitionsSpectatorChangeProtocol;
+    challengeId?: string;
+    teamId?: string | null;
+    targetTeamId?: string | null;
+    controllerId?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorChangeProtocol = 'Attack' | 'Control' | 'Uncontrolled' | 'DetectionFailed';
+
+export type NoCtfApplicationScoringLeaderboardSpectatorSettlement = {
+    roundId?: string;
+    number?: number;
+    teamId?: string;
+    attack?: number;
+    lost?: number;
+    service?: number;
+    other?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorConflictResponse = {
+    code?: NoCtfapiEndpointsCompetitionsSpectatorConflictCode;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorConflictCode = 'CursorExpired';
+
+export type NoCtfapiEndpointsCompetitionsGetAwdSpectatorRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsGetCompetitionBadgeImageRequest = {
     [key: string]: never;
 };
@@ -2759,8 +2937,6 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     singleWriteUpDeadlineAt?: string | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
-
 export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
@@ -2770,6 +2946,10 @@ export type NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol = 'Public
 export type NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol = 'Direct' | 'DirectAndWsrx' | 'WsrxOnly';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetKohSpectatorRequest = {
     [key: string]: never;
 };
 
@@ -2841,7 +3021,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse = {
     netPoints?: number;
 };
 
-export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentKindProtocol = 'ManualAdjustment' | 'CompetitionPenalty' | 'BanRecalculation';
+export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentKindProtocol = 'ManualAdjustment' | 'CompetitionPenalty' | 'BanRecalculation' | 'ScoreFloor';
 
 export type NoCtfapiEndpointsCompetitionsScoreboardSlotResponse = {
     columnIndex?: number;
@@ -2854,6 +3034,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSlotResponse = {
     entries?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
     offenseState?: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol;
     defenseState?: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol;
+    awdComponents?: Array<NoCtfapiEndpointsCompetitionsAwdScoreComponentResponse>;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardScoreStateProtocol = 'Pending' | 'Provisional' | 'Settled';
@@ -2892,6 +3073,16 @@ export type NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol = 'FirstBlood' 
 
 export type NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol = 'None' | 'Failed' | 'Succeeded';
 
+export type NoCtfapiEndpointsCompetitionsAwdScoreComponentResponse = {
+    component?: NoCtfApplicationScoringLeaderboardAwdScoreComponent;
+    points?: number | null;
+    unroundedPoints?: number | null;
+    roundingDifference?: number | null;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+};
+
+export type NoCtfApplicationScoringLeaderboardAwdScoreComponent = 'Attack' | 'DefenseReward' | 'DefenseLoss' | 'Availability' | 'ExtraPenalty';
+
 export type NoCtfapiEndpointsCompetitionsScoreboardChallengeAchievementResponse = {
     competitionChallengeId?: string;
     kind?: NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol;
@@ -2923,8 +3114,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse
     breakScore?: number | null;
     fixScore?: number | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse = {
     competitionId?: string;
@@ -3089,6 +3278,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse = {
     actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
     items?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
     nextCursor?: string | null;
+    awdComponents?: Array<NoCtfapiEndpointsCompetitionsAwdScoreComponentResponse>;
 };
 
 export type NoCtfapiEndpointsCompetitionsGetScoreboardSlotDetailRequest = {
@@ -3154,7 +3344,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted' | 'RuntimeTrafficCaptureStored' | 'RuntimeTrafficCaptureDeleted' | 'ChallengeWriteUpSubmitted' | 'ChallengeWriteUpPublished' | 'ChallengeWriteUpWithdrawn' | 'ChallengeWriteUpRejected' | 'ChallengeWriteUpUnlocked';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted' | 'RuntimeTrafficCaptureStored' | 'RuntimeTrafficCaptureDeleted' | 'ChallengeWriteUpSubmitted' | 'ChallengeWriteUpPublished' | 'ChallengeWriteUpWithdrawn' | 'ChallengeWriteUpRejected' | 'ChallengeWriteUpUnlocked' | 'AwdScoringRulesChanged';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -3206,6 +3396,9 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     trackKey?: string | null;
     previousTrackKey?: string | null;
     occurredAt?: string;
+    awdRuleTiming?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming | null;
+    awdEffectiveFromRound?: number | null;
+    awdEffectiveThroughRound?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol = 'Public' | 'Team' | 'Staff';
@@ -3216,7 +3409,224 @@ export type NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol = 'P
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
 
+export type NoCtfDomainCompetitionsAwdAwdRuleChangeTiming = 'NextRound' | 'Immediately' | 'RecalculateHistory';
+
 export type NoCtfapiEndpointsCompetitionsEventsListCompetitionEventsRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsChallengesAwdPublicRulesResponse = {
+    serverTime?: string;
+    endsAt?: string;
+    acceptanceEndsAt?: string;
+    paused?: boolean;
+    acceptingSubmissions?: boolean;
+    roundNumber?: number | null;
+    roundId?: string | null;
+    roundStartsAt?: string | null;
+    roundEndsAt?: string | null;
+    roundDurationSeconds?: number;
+    hardeningDurationSeconds?: number;
+    competitionDefaults?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract;
+    questionOverrides?: NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract;
+    attackPointsOverridden?: boolean;
+    defensePointsOverridden?: boolean;
+    slaPointsOverridden?: boolean;
+    checkerIntervalOverridden?: boolean;
+    attackModeOverridden?: boolean;
+    issuedPolicies?: Array<NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse>;
+    nextRound?: NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse;
+    ownService?: NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse | null;
+    currentTieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract>;
+    nextTieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract = {
+    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
+    flagLifetime?: number;
+    linkHistoricalWindow?: boolean;
+    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
+    historicalLifetime?: number;
+    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol;
+    generationInterval?: number;
+    flagsPerStore?: number;
+    roundGapSeconds?: number;
+    totalRounds?: number | null;
+    submissionTailSeconds?: number;
+    finalCheckBudgetSeconds?: number;
+    retryCount?: number;
+    retryIntervalSeconds?: number;
+    callbackGraceSeconds?: number;
+    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol;
+    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol;
+    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol;
+    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol;
+    okRatio?: number;
+    recoveringRatio?: number;
+    mumbleRatio?: number;
+    offlineRatio?: number;
+    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol;
+    mumblePenalty?: number;
+    offlinePenalty?: number;
+    recoveringPenalty?: number;
+    mumblePenaltyRatio?: number;
+    offlinePenaltyRatio?: number;
+    recoveringPenaltyRatio?: number;
+    consecutiveFailureMultiplier?: number;
+    maximumRoundPenalty?: number | null;
+    minimumTotalScore?: number | null;
+    confidentialityPoints?: number;
+    minimumAttackRatio?: number;
+    scarcityAlpha?: number;
+    maximumRankMultiplier?: number;
+    composition?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol;
+    attackWeight?: number;
+    defenseWeight?: number;
+    slaWeight?: number;
+    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol = 'Rounds' | 'ActiveSeconds';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol = 'EveryRound' | 'EveryNRounds' | 'ActiveInterval';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol = 'Fixed' | 'SharedPool' | 'Scarcity' | 'TargetRank' | 'SlaMultiplier' | 'Custom';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol = 'FirstLeak' | 'PerCapture' | 'SharedPool';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol = 'StatusRatio' | 'ReadableFlags';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
+export type NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract = {
+    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
+    flagLifetime?: number | null;
+    linkHistoricalWindow?: boolean | null;
+    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
+    historicalLifetime?: number | null;
+    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol | null;
+    generationInterval?: number | null;
+    flagsPerStore?: number | null;
+    finalCheckBudgetSeconds?: number | null;
+    retryCount?: number | null;
+    retryIntervalSeconds?: number | null;
+    callbackGraceSeconds?: number | null;
+    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol | null;
+    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol | null;
+    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol | null;
+    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol | null;
+    okRatio?: number | null;
+    recoveringRatio?: number | null;
+    mumbleRatio?: number | null;
+    offlineRatio?: number | null;
+    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol | null;
+    mumblePenalty?: number | null;
+    offlinePenalty?: number | null;
+    recoveringPenalty?: number | null;
+    mumblePenaltyRatio?: number | null;
+    offlinePenaltyRatio?: number | null;
+    recoveringPenaltyRatio?: number | null;
+    consecutiveFailureMultiplier?: number | null;
+    maximumRoundPenalty?: number | null;
+    confidentialityPoints?: number | null;
+    minimumAttackRatio?: number | null;
+    scarcityAlpha?: number | null;
+    maximumRankMultiplier?: number | null;
+    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol | null;
+};
+
+export type NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse = {
+    rulesId?: string | null;
+    revision?: number | null;
+    effectiveAt?: string | null;
+    attackMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol;
+    attackPoints?: number;
+    defensePoints?: number;
+    slaPoints?: number;
+    checkerIntervalSeconds?: number;
+    options?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract;
+    stores?: Array<NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse>;
+    scoring?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    scoringChangeEventId?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
+
+export type NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse = {
+    storeId?: string;
+    name?: string;
+    weight?: number;
+    flagsPerIssue?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract = {
+    attackRewardMode?: NoCtfDomainCompetitionsAwdAttackRewardMode;
+    attackPoints?: number;
+    victimDefensePoolPoints?: number;
+    serviceHealthyPoints?: number;
+    slaSettlement?: NoCtfDomainCompetitionsAwdAwdSlaSettlement;
+    defenseMode?: NoCtfDomainCompetitionsAwdAwdDefenseMode;
+    slaBasis?: NoCtfDomainCompetitionsAwdAwdSlaBasis;
+    okRatio?: number;
+    recoveringRatio?: number;
+    mumbleRatio?: number;
+    offlineRatio?: number;
+    penaltyMode?: NoCtfDomainCompetitionsAwdAwdPenaltyMode;
+    mumblePenalty?: number;
+    offlinePenalty?: number;
+    recoveringPenalty?: number;
+    mumblePenaltyRatio?: number;
+    offlinePenaltyRatio?: number;
+    recoveringPenaltyRatio?: number;
+    consecutiveFailureMultiplier?: number;
+    maximumRoundPenalty?: number | null;
+    confidentialityPoints?: number;
+    minimumAttackRatio?: number;
+    scarcityAlpha?: number;
+    maximumRankMultiplier?: number;
+    composition?: NoCtfDomainCompetitionsAwdAwdScoreComposition;
+    attackWeight?: number;
+    defenseWeight?: number;
+    slaWeight?: number;
+    attackSettlement?: NoCtfDomainCompetitionsAwdAwdAttackSettlement;
+};
+
+export type NoCtfDomainCompetitionsAwdAttackRewardMode = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaSettlement = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
+
+export type NoCtfDomainCompetitionsAwdAwdDefenseMode = 'FirstLeak' | 'PerCapture' | 'SharedPool';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaBasis = 'StatusRatio' | 'ReadableFlags';
+
+export type NoCtfDomainCompetitionsAwdAwdPenaltyMode = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
+
+export type NoCtfDomainCompetitionsAwdAwdScoreComposition = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
+
+export type NoCtfDomainCompetitionsAwdAwdAttackSettlement = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
+export type NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse = {
+    enabled?: boolean;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    observedAt?: string | null;
+    lastTrustedHealth?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    lastTrustedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract = {
+    field?: NoCtfDomainCompetitionsAwdAwdTieBreakField;
+    direction?: NoCtfDomainCompetitionsAwdAwdSortDirection;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdTieBreakField = 'AttackPoints' | 'HealthyRounds' | 'AttackCount' | 'LastAttackAt' | 'RegistrationTime';
+
+export type NoCtfDomainCompetitionsAwdAwdSortDirection = 'Descending' | 'Ascending';
 
 export type NoCtfapiEndpointsChallengesChallengeResponse = {
     id?: string;
@@ -3284,6 +3694,25 @@ export type NoCtfDomainChallengesChallengeTimingPhase = 'NotOpened' | 'Scoring' 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
     [key: string]: never;
 };
+
+export type NoCtfapiPaginationArrayResultOfAwdAttackInfoResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsChallengesAwdAttackInfoResponse>;
+};
+
+export type NoCtfapiEndpointsChallengesAwdAttackInfoResponse = {
+    flagId?: string;
+    generationRound?: number;
+    storeId?: string;
+    storeName?: string;
+    ordinal?: number;
+    publicLocator?: string;
+    issuedAt?: string;
+    exclusiveExpiryRound?: number | null;
+    remainingActiveSeconds?: number | null;
+};
+
+export type NoCtfapiEndpointsChallengesListAwdAttackInfoRequest = NoCtfapiPaginationPaginationRequest & {};
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentListResponse = {
     deliveryPolicy?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
@@ -4811,6 +5240,61 @@ export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
     file: Blob | File;
 };
 
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse = {
+    gameplayFactId?: string;
+    competitionChallengeId?: string;
+    teamId?: string;
+    roundId?: string;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    knownTargetFailure?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+    connection?: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse;
+    functionality?: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse;
+    scheduledAt?: string | null;
+    deadline?: string | null;
+    receiptDeadline?: string | null;
+    observedAt?: string | null;
+    receivedAt?: string | null;
+    adjudicatedAt?: string | null;
+    attemptId?: string | null;
+    attemptStartedAt?: string | null;
+    attemptDeadline?: string | null;
+    attempt?: number;
+    finalScheduledCheck?: boolean;
+    manifestComplete?: boolean;
+    evidenceComplete?: boolean;
+    requiredFlags?: number;
+    readableFlags?: number;
+    flags?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse = {
+    outcome?: NoCtfDomainCompetitionsAwdAwdProbeOutcome;
+    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse = {
+    flagId?: string;
+    historical?: boolean;
+    requiresWrite?: boolean;
+    obligation?: NoCtfDomainCompetitionsAwdAwdFlagObligation;
+    write?: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse;
+    read?: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdFlagObligation = 'PlatformPending' | 'PlayerRequired' | 'Exempted';
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicateAwdCheckRequest = {
+    expectedAttemptId?: string | null;
+    expectedReceivedAt?: string | null;
+    action: NoCtfDomainCompetitionsAwdAwdCheckAdjudicationAction;
+    reason: string;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdCheckAdjudicationAction = 'AcceptEvidence' | 'Exempt';
+
 export type NoCtfapiEndpointsAdministrationGameplayFactsGameplayFactRejudgementResponse = {
     targetKind?: NoCtfapiEndpointsAdministrationGameplayFactsGameplayFactRejudgementTargetProtocol;
     targetId?: string;
@@ -4828,6 +5312,7 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsCreateManualAdjustmentRe
     teamId: string;
     competitionChallengeId: string;
     delta?: number;
+    reason?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsDownloadAdminGameplayFactPatchRequest = {
@@ -4850,6 +5335,7 @@ export type NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse = {
     patchFailure?: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode | null;
     canDownloadPatch?: boolean;
     timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
+    awdAttack?: NoCtfapiEndpointsGameplayFactsAwdAttackStatusResponse | null;
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse = {
@@ -4887,6 +5373,30 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationEv
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiPaginationArrayResultOfAwdCheckListItemResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckListItemResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckListItemResponse = {
+    gameplayFactId?: string;
+    competitionChallengeId?: string;
+    teamId?: string;
+    roundId?: string;
+    roundNumber?: number;
+    scheduledAt?: string;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+    finalScheduledCheck?: boolean;
+    receivedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsListAwdChecksRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfDomainCompetitionsAwdAwdSettlementState2 = 0 | 1 | 2 | 3;
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse>;
@@ -4951,6 +5461,19 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsQueueGameplayFactWorkRes
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsQueueGameplayFactWorkRequest = {
     competitionChallengeId: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse = {
+    eventId?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest = {
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    policy: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    reason: string;
+    previewToken: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest = {
@@ -5196,9 +5719,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAwdCompetitionModeConfigu
     checkerIntervalSeconds?: number;
     serviceHealthyPoints?: number;
     serviceUnhealthyPenalty?: number;
+    options?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract | null;
+    tieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract> | null;
 };
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol = 'FixedPerAttack' | 'SplitVictimDefensePool';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract = {
     roundDurationSeconds?: number;
@@ -5248,6 +5771,37 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilit
     canObserve?: boolean;
     canModerate?: boolean;
     canManagePermissions?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRulesResponse = {
+    roundNumber?: number;
+    roundId?: string;
+    policies?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse>;
+    recentChanges?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse = {
+    rulesId?: string;
+    revision?: number;
+    enabledAt?: string;
+    issuedPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    effectivePolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    appliedChangeEventId?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse = {
+    eventId?: string;
+    actorUserId?: string | null;
+    reason?: string | null;
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    appliedAt?: string;
+    policy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsGetAwdScoringRulesRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionsResponse = {
@@ -5445,6 +5999,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchR
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationPatchRequest = {
+    reason?: string | null;
     configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract;
 };
 
@@ -5486,6 +6041,30 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardPat
     frozenStartAt: string | null;
     hiddenStartAt: string | null;
     reason?: string | null;
+};
+
+export type NoCtfApplicationCompetitionsAwdAwdScoringRulePreview = {
+    token?: string;
+    projectedAt?: string;
+    expiresAt?: string;
+    affectedFlags?: number;
+    affectedRuleSnapshots?: number;
+    teams?: Array<NoCtfApplicationCompetitionsAwdAwdScoringTeamImpact>;
+};
+
+export type NoCtfApplicationCompetitionsAwdAwdScoringTeamImpact = {
+    teamId?: string;
+    teamName?: string;
+    scoreBefore?: number;
+    scoreAfter?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest = {
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    policy: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    reason: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse = {
@@ -5746,6 +6325,8 @@ export type NoCtfapiEndpointsAdministrationChallengesCtfCompetitionChallengeRule
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesAwdCompetitionChallengeRulesContract = {
+    overrides?: NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract | null;
+    storeRules?: Array<NoCtfapiEndpointsAdministrationChallengesAwdStoreRuleContract>;
     attackRewardMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol | null;
     attackPoints?: number | null;
     victimDefensePoolPoints?: number | null;
@@ -5753,6 +6334,12 @@ export type NoCtfapiEndpointsAdministrationChallengesAwdCompetitionChallengeRule
     serviceHealthyPoints?: number | null;
     serviceUnhealthyPenalty?: number | null;
     flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesAwdStoreRuleContract = {
+    storeId?: string;
+    weight?: number;
+    flagsPerIssue?: number | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesAwdpCompetitionChallengeRulesContract = {
@@ -5826,6 +6413,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresent
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest = {
+    reason?: string | null;
     configuration: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract;
 };
 
@@ -11052,6 +11640,37 @@ export type DownloadFixArchiveEndpointErrors = {
     404: unknown;
 };
 
+export type ReadAwdCheckTaskEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/v1/awd/check-task';
+};
+
+export type ReadAwdCheckTaskEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ReadAwdCheckTaskEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsInternalAwdCheckTaskResponse;
+};
+
+export type ReadAwdCheckTaskEndpointResponse = ReadAwdCheckTaskEndpointResponses[keyof ReadAwdCheckTaskEndpointResponses];
+
 export type RecordAwdCheckResultEndpointData = {
     body: NoCtfapiEndpointsInternalRecordAwdCheckResultRequest;
     path?: never;
@@ -11659,6 +12278,46 @@ export type UploadPatchVerificationEndpointResponses = {
 
 export type UploadPatchVerificationEndpointResponse = UploadPatchVerificationEndpointResponses[keyof UploadPatchVerificationEndpointResponses];
 
+export type GetAwdSpectatorEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        minutes: number;
+        limit: number;
+        cursor?: string | null;
+    };
+    url: '/api/v1/competitions/{competitionId}/awd-spectator';
+};
+
+export type GetAwdSpectatorEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsCompetitionsSpectatorConflictResponse;
+};
+
+export type GetAwdSpectatorEndpointError = GetAwdSpectatorEndpointErrors[keyof GetAwdSpectatorEndpointErrors];
+
+export type GetAwdSpectatorEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsSpectatorScreenResponse;
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type GetAwdSpectatorEndpointResponse = GetAwdSpectatorEndpointResponses[keyof GetAwdSpectatorEndpointResponses];
+
 export type GetCompetitionBadgeImageData = {
     body?: never;
     path: {
@@ -11716,6 +12375,46 @@ export type CompetitionPosterGetErrors = {
      */
     404: unknown;
 };
+
+export type GetKohSpectatorEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        minutes: number;
+        limit: number;
+        cursor?: string | null;
+    };
+    url: '/api/v1/competitions/{competitionId}/koh-spectator';
+};
+
+export type GetKohSpectatorEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsCompetitionsSpectatorConflictResponse;
+};
+
+export type GetKohSpectatorEndpointError = GetKohSpectatorEndpointErrors[keyof GetKohSpectatorEndpointErrors];
+
+export type GetKohSpectatorEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsSpectatorScreenResponse;
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type GetKohSpectatorEndpointResponse = GetKohSpectatorEndpointResponses[keyof GetKohSpectatorEndpointResponses];
 
 export type GetLeaderboardEndpointData = {
     body?: never;
@@ -12222,6 +12921,32 @@ export type DownloadRandomChallengeAttachmentEndpointErrors = {
     404: unknown;
 };
 
+export type GetAwdRulesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules';
+};
+
+export type GetAwdRulesErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetAwdRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesAwdPublicRulesResponse;
+};
+
+export type GetAwdRulesResponse = GetAwdRulesResponses[keyof GetAwdRulesResponses];
+
 export type GetChallengeEndpointData = {
     body?: never;
     path: {
@@ -12247,6 +12972,51 @@ export type GetChallengeEndpointResponses = {
 };
 
 export type GetChallengeEndpointResponse = GetChallengeEndpointResponses[keyof GetChallengeEndpointResponses];
+
+export type ListAwdAttackInfoData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+        teamId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info';
+};
+
+export type ListAwdAttackInfoErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListAwdAttackInfoError = ListAwdAttackInfoErrors[keyof ListAwdAttackInfoErrors];
+
+export type ListAwdAttackInfoResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfAwdAttackInfoResponse;
+};
+
+export type ListAwdAttackInfoResponse = ListAwdAttackInfoResponses[keyof ListAwdAttackInfoResponses];
 
 export type ListChallengeAttachmentsEndpointData = {
     body?: never;
@@ -17021,6 +17791,46 @@ export type AdminPlatformUploadLogoResponses = {
 
 export type AdminPlatformUploadLogoResponse = AdminPlatformUploadLogoResponses[keyof AdminPlatformUploadLogoResponses];
 
+export type AdminAdjudicateAwdCheckData = {
+    body: NoCtfapiEndpointsAdministrationGameplayFactsAdjudicateAwdCheckRequest;
+    path: {
+        competitionId: string;
+        gameplayFactId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}/adjudication';
+};
+
+export type AdminAdjudicateAwdCheckErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminAdjudicateAwdCheckError = AdminAdjudicateAwdCheckErrors[keyof AdminAdjudicateAwdCheckErrors];
+
+export type AdminAdjudicateAwdCheckResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse;
+};
+
+export type AdminAdjudicateAwdCheckResponse = AdminAdjudicateAwdCheckResponses[keyof AdminAdjudicateAwdCheckResponses];
+
 export type AdminCreateGameplayFactRejudgementData = {
     body: NoCtfapiEndpointsAdministrationGameplayFactsCreateGameplayFactRejudgementRequest;
     path: {
@@ -17171,6 +17981,40 @@ export type AdminGetGameplayFactResponses = {
 
 export type AdminGetGameplayFactResponse = AdminGetGameplayFactResponses[keyof AdminGetGameplayFactResponses];
 
+export type AdminGetAwdCheckEvidenceData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        gameplayFactId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}';
+};
+
+export type AdminGetAwdCheckEvidenceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetAwdCheckEvidenceResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse;
+};
+
+export type AdminGetAwdCheckEvidenceResponse = AdminGetAwdCheckEvidenceResponses[keyof AdminGetAwdCheckEvidenceResponses];
+
 export type AdminGetGameplayFactAdjudicationEventsData = {
     body?: never;
     path: {
@@ -17266,6 +18110,50 @@ export type AdminListGameplayFactsResponses = {
 
 export type AdminListGameplayFactsResponse = AdminListGameplayFactsResponses[keyof AdminListGameplayFactsResponses];
 
+export type AdminListAwdChecksData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState2 | null;
+        allSettlements: boolean;
+        teamId?: string | null;
+        competitionChallengeId?: string | null;
+        roundNumber?: number | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/awd/checks';
+};
+
+export type AdminListAwdChecksErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListAwdChecksError = AdminListAwdChecksErrors[keyof AdminListAwdChecksErrors];
+
+export type AdminListAwdChecksResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfAwdCheckListItemResponse;
+};
+
+export type AdminListAwdChecksResponse = AdminListAwdChecksResponses[keyof AdminListAwdChecksResponses];
+
 export type AdminPreviewHistoricalAdjudicationDifferencesData = {
     body?: never;
     path: {
@@ -17344,6 +18232,46 @@ export type AdminQueueGameplayFactEvaluationResponses = {
 };
 
 export type AdminQueueGameplayFactEvaluationResponse = AdminQueueGameplayFactEvaluationResponses[keyof AdminQueueGameplayFactEvaluationResponses];
+
+export type AdminApplyAwdScoringRulesData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring';
+};
+
+export type AdminApplyAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminApplyAwdScoringRulesError = AdminApplyAwdScoringRulesErrors[keyof AdminApplyAwdScoringRulesErrors];
+
+export type AdminApplyAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse;
+};
+
+export type AdminApplyAwdScoringRulesResponse = AdminApplyAwdScoringRulesResponses[keyof AdminApplyAwdScoringRulesResponses];
 
 export type AdminCompetitionPosterClearData = {
     body?: never;
@@ -18160,6 +19088,48 @@ export type AdminGenerateMissingFlagsResponses = {
 
 export type AdminGenerateMissingFlagsResponse = AdminGenerateMissingFlagsResponses[keyof AdminGenerateMissingFlagsResponses];
 
+export type AdminGetAwdScoringRulesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: {
+        roundNumber?: number | null;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules';
+};
+
+export type AdminGetAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetAwdScoringRulesError = AdminGetAwdScoringRulesErrors[keyof AdminGetAwdScoringRulesErrors];
+
+export type AdminGetAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRulesResponse;
+};
+
+export type AdminGetAwdScoringRulesResponse = AdminGetAwdScoringRulesResponses[keyof AdminGetAwdScoringRulesResponses];
+
 export type AdminGetCompetitionDirectionsData = {
     body?: never;
     path: {
@@ -18452,6 +19422,46 @@ export type AdminListCompetitionWebhookDeliveriesResponses = {
 };
 
 export type AdminListCompetitionWebhookDeliveriesResponse = AdminListCompetitionWebhookDeliveriesResponses[keyof AdminListCompetitionWebhookDeliveriesResponses];
+
+export type AdminPreviewAwdScoringRulesData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview';
+};
+
+export type AdminPreviewAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPreviewAwdScoringRulesError = AdminPreviewAwdScoringRulesErrors[keyof AdminPreviewAwdScoringRulesErrors];
+
+export type AdminPreviewAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationCompetitionsAwdAwdScoringRulePreview;
+};
+
+export type AdminPreviewAwdScoringRulesResponse = AdminPreviewAwdScoringRulesResponses[keyof AdminPreviewAwdScoringRulesResponses];
 
 export type AdminPreviewCompetitionHardDeleteData = {
     body?: never;

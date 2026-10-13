@@ -1,0 +1,121 @@
+{
+  "samples": [
+    {
+      "at": "2026-10-12T16:54:46.563Z",
+      "phase": "60fps-final",
+      "metrics": {
+        "cpuP95": 0.4,
+        "renderDuty": 1.03,
+        "frames": 6078,
+        "p95": 16.800000000017462,
+        "active": 0,
+        "queued": 0,
+        "geometries": 2,
+        "textures": 1,
+        "calls": 4,
+        "triangles": 3840,
+        "seconds": 196,
+        "heapMiB": 158
+      }
+    },
+    {
+      "at": "2026-10-12T17:03:14.501Z",
+      "phase": "background-return-immediate",
+      "elapsedMs": 110967,
+      "metrics": {
+        "cpuP95": 0.4,
+        "renderDuty": 0.87,
+        "frames": 6554,
+        "p95": 16.800000000046566,
+        "active": 12,
+        "queued": 18,
+        "geometries": 14,
+        "textures": 1,
+        "calls": 16,
+        "triangles": 5568,
+        "seconds": 221,
+        "heapMiB": 176
+      }
+    },
+    {
+      "at": "2026-10-12T17:08:07.337Z",
+      "phase": "60fps-final",
+      "metrics": {
+        "cpuP95": 0.4,
+        "renderDuty": 0.88,
+        "frames": 15732,
+        "p95": 16.800000000046566,
+        "active": 6,
+        "queued": 0,
+        "geometries": 8,
+        "textures": 1,
+        "calls": 10,
+        "triangles": 4704,
+        "seconds": 514,
+        "heapMiB": 181
+      }
+    }
+  ],
+  "tabSwitchProbe": {
+    "before": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.89,
+      "frames": 3096,
+      "p95": 16.800000000046566,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 110,
+      "heapMiB": 174
+    },
+    "after": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.87,
+      "frames": 6554,
+      "p95": 16.800000000046566,
+      "active": 12,
+      "queued": 18,
+      "geometries": 14,
+      "textures": 1,
+      "calls": 16,
+      "triangles": 5568,
+      "seconds": 221,
+      "heapMiB": 176
+    },
+    "elapsedMs": 110967
+  },
+  "panelHideProbe": {
+    "before": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.88,
+      "frames": 8790,
+      "p95": 16.800000000046566,
+      "active": 12,
+      "queued": 6,
+      "geometries": 14,
+      "textures": 1,
+      "calls": 16,
+      "triangles": 5568,
+      "seconds": 292,
+      "heapMiB": 167
+    },
+    "after": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.87,
+      "frames": 10543,
+      "p95": 16.800000000046566,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 349,
+      "heapMiB": 167
+    },
+    "elapsedMs": 57387
+  }
+}

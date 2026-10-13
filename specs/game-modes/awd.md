@@ -1,150 +1,44 @@
 # AWD
 
-## 配置契约
+完整规则、公式与验收标准以 [AWD 规则修正与实施规范](../awd-rules-2026.zh-CN.md) 为准。本页说明当前接入方式；AWDP 仍使用独立的 Break / Fix 协议。
 
-Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下比赛默认规则；CompetitionChallenge 的 `Rules` 可用 nullable 字段逐项覆盖：
+## 数据与时间
 
-```text
-AttackRewardMode: FixedPerAttack | SplitVictimDefensePool
-AttackPoints: bigint >= 0
-VictimDefensePoolPoints: bigint >= 0
-CheckerIntervalSeconds: int > 0
-ServiceHealthyPoints: bigint >= 0
-ServiceUnhealthyPenalty: bigint >= 0
-```
+`AwdRound` 是比赛级独立轮次事实，各题共享轮次身份。`AwdRoundRule` 保存发行时的有效规则、队伍资格与 Store 预算；`AwdFlagIssue` 记录一次正式发行，`GameplayFact.Awd` 保存检测或攻击的当前事实。Flag 接收窗口、历史读取窗口与轮次分别建模，不从 Flag 的失效时间推导轮次。
 
-`Challenge.Definition` 管理 Runtime、Checker 与 Flag 注入位置：
+默认轮长 180 秒、无加固及轮间间隔。Flag 接收寿命为包含发行轮在内的 5 轮，历史读取窗口默认联动，也可独立配置。第 10 轮发行的 Flag 在第 10..14 轮可接受，第 15 轮起过期。暂停和间隔冻结有效时间并关闭新接收；已经可靠接收的提交继续处理。收官默认立即停止新接收，已公开配置的尾期只接受仍有效的旧发行，不产生新发行或延长历史义务。
 
-```text
-Runtime: Container（1–64 个命名服务）
-  Allocation: PerTeam
-  FlagSource: AwdRotation
-  UrlBindings: 至少一个 Participants 入口
-Checker:
-  Job: RunnerJobConfiguration
-  TargetServiceName: 必须引用一个已定义服务
-FlagInjection:
-  Command: 包含 ${FLAG} 的非空模板
-  TimeoutSeconds: 1..300
-  ServiceName: 必须引用一个已定义服务
-```
+新轮次、规则、Store 与队伍资格在关系事务内固化，提交后再派发工作。Worker 接管从关系事实重建调度。Runtime 重置产生新 UUID，不修改发行身份，也不自动补回历史数据。
 
-FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
+## 题库与比赛配置
 
-Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；CompetitionChallenge.Rules
-的可选 `FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。Challenge.Definition
-只保存 Runtime/Checker/注入位置，不保存比赛的 `FlagTemplate`。模板变更只影响后续尚未生成的
-“队伍×题目×轮次”Flag；已经持久化的当轮事实保持原值并继续有效。静态和管理员手工 Flag 不读取
-该模板。
+题库模板声明 Container 命名服务、`PerTeam`、`AwdRotation`、至少一个 Participants 访问入口和 Checker。题目定义包含有序 Flag Store，每个 Store 指定 `RunnerCommand` 或 `BusinessChecker`、目标命名服务及历史保存能力。多 Store 不增加大屏服务器数量。
 
-Challenge 使用强类型 Definition 与关系化命名服务，不保存 schema-version JSON。Challenge 不声明 Docker/Kubernetes Provider 或 RunnerPool。Checker 与长期 Runtime 由平台放入同一内部网络；平台只注入 `NOCTF_TARGET_HOST`。目标由 `TargetServiceName` 与当前 provider receipt 解析。Checker 自己知道服务端口，不配置 Target URL 或 TargetPort，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
+比赛配置拥有轮长、间隔、结束策略、默认计分、检测与窗口策略、同分排序。比赛题目通过 nullable 字段覆盖；null 继承，0 和 false 为显式值。普通修改下一轮生效，既有 Flag 保留发行规则。历史计分修改必须先预览，再以理由提交重算。
 
-## 时钟与加固期
+默认 Flag 使用专用 HMAC 派生，外观为 `flag{32字符Base64URL主体}`。安全模板使用 `[SECURE]`，不可降级到低熵标识。密钥仅在平台受保护存储中；Runner 和 Checker 按当前任务领取必要材料。精确比较 Flag 字节，不做 Trim 或大小写转换。
 
-Competition 配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`。均使用 EffectiveRunningTime，Pause 冻结。
+## Checker
 
-加固期内：
+Checker 通过 `NOCTF_AWD_TASK_URL` 和当前尝试 JWT 读取固定清单，逐项报告连接、功能、Flag 写入和读取的证据。任务材料不进入环境变量或日志。当前 Flag 写入失败后仍尝试读取所要求的历史 Flag。缺失清单项、平台异常、超时或漏回执不能当作健康。
 
-- 团队只能看到自己的 Runtime 地址/凭据，不能看到对手实例；
-- 禁止攻击 FlagAttempt GameplayFact；
-- 不轮换 AWD Flag，不计攻防/服务分；
-- Checker 仍按 Interval 运行以建立真实状态。
+健康结论独立为 `Ok`、`Mumble`、`Offline`、`Recovering`、`InternalError`。Recovering 只表示当前检查通过而应保存的历史 Flag 不可读。任务执行、服务启用、攻击成果与结算状态分别展示，OK 与被捕获可同时存在。未知检查显示待检测或无法判定，上次可信状态必须带时间标签。
 
-加固期结束后，AWD targets API 才返回全部有效对手的公开 URL；只切换可见性，不重建 Runtime/URL。Ban/删除 Team 立即从 targets 消失。
+默认每 30 秒检查，轮末任务在轮末前一个执行预算内启动；内部错误最多同轮重检两次，不能超出原轮预算。期限内形成的证据有 30 秒自动接收宽限。更迟证据进入待裁定，24 小时回执令牌寿命不延长任务或提交窗口。管理员只能接受完整原始证据或明确豁免，不能任意伪造健康状态。
 
-首次配置下 Round 1 在加固结束时开始：
+## 攻击与计分
 
-```text
-round = floor((effectiveRunningTime - hardeningDuration) / roundDuration) + 1
-```
+每队对同一 `FlagId` 最多一次有效捕获，跨轮重复仍重复；其他队可各自捕获。攻击归接收轮展示，预算按发行轮归属。正式、有效且可计分的发行不因写入成功回执丢失而拒绝攻击。
 
-Round 不建表。Round 1 生成后，ChallengeFlag 的 AwdRound Specification 与 ValidStart/ValidUntil 是已发生轮次的持久化时间线；下一轮编号始终是已生成最大编号+1。Paused/Resume 顺延当前 Flag.ValidUntil。Running 中修改 RoundDuration 从当前轮 ValidUntil 后的下一轮生效；修改 HardeningDuration 只在 Round 1 尚未生成时生效，不能重新开启加固期。EndAt 绝对结束；未自然完成的最后一轮不结算服务状态分，但结束前有效攻击仍计分。
+计分支持固定、共享池、稀缺度、排名加权、SLA 乘数及受控自定义组合。预算先按 Store 权重，再按发行数拆分。默认 ATK=50、DEF 泄露预算=100、SLA 题轮预算=100；SLA 系数 OK=1、RECOVERING=0.5、MUMBLE/OFFLINE=0，INTERNAL_ERROR 保持待裁定。额外处罚默认关闭，内部高精度，完整分组后向零取整。
 
-## Runtime 与 Flag
+同分排序总是先按总分降序，接着执行已发行轮保存的有序规则，最后 TeamId 升序稳定兜底。默认依次为攻击分、正常完整题轮数、有效捕获数降序，最后攻击时间、注册时间升序；缺少时间排最后。
 
-系统为每个有效 Team/已发布 AWD 题自动保持一个 Container RuntimeInstance；OVA 因只允许固定 Flag 而禁止用于 AWD。Ban 回收，Unban 重新配置。加固期只隐藏对手地址，不停止实例。
+## 接入与可见性
 
-每个 RoundStart 后，Worker 在受唯一约束和并发校验保护的关系事务中：
+- 管理端：比赛默认、题目覆盖、Store 配置、历史计分预览、检查证据与裁定。
+- 选手：规则说明区分本轮已生效与下一轮配置，只读取本队服务状态。
+- 大屏：`awd-spectator` 提供一致快照与有界历史，服务健康灯与本轮捕获标记独立；冻结视图使用同一快照代际并应用公开受众过滤。
+- Checker 任务与结果：`GET /api/internal/v1/awd/check-task`、`POST /api/internal/v1/awd/check-results`。
 
-1. 为全部 Team/题生成缺失的当轮 Flag；
-2. SpecificationKind=AwdRound，窗口严格 RoundStart..RoundEnd；
-3. Outbox 发布 Runner 注入任务。
-
-不提前生成/注入；调度迟到仍使用原定窗口；重启只补当前轮，不补历史。注入按 raw `${FLAG}` Shell 模板，失败复用同一 Flag 重试到 ValidUntil。窗口不等待注入成功。
-
-## 攻击 GameplayFact
-
-AWD 可使用单 `flag` 或 `flags` 数组；批次数量、批次总字节数和尝试次数均无上限。每项仍必须为
-1–4096 UTF-8 bytes 且禁止 NUL，任一项非法时整批在创建任何 GameplayFact 前原子拒绝。Worker 以
-原文、CompetitionChallenge、ReceivedAt 窗口、AwdRound Specification 反查：
-
-- ChallengeFlag.TeamId 是 VictimTeamId；
-- 自己 TeamId -> Rejected/SelfAttackRejected；
-- 当前窗口无匹配 -> Wrong/FlagNotMatched；只命中其他窗口 -> Wrong/FlagExpired；
-- 匹配不同 Victim 多个 -> PlatformFailed/AmbiguousFlagMatch；
-- 唯一匹配后完成同一 FlagAttempt GameplayFact，写入 VictimTeamId 与 AwdRound Reference。
-
-攻击重复唯一维度：
-
-```text
-(CompetitionChallengeId, Round, AttackerTeamId, VictimTeamId)
-```
-
-同一攻击队对同一受害队同轮同题只首次为 Correct；之后为 Duplicate/DuplicateAttack。其他攻击队可各得一次。一次攻击只产生一条事件，投影器同时计算双方，不建 Victim 事件。
-
-## 攻击与防守分
-
-配置 `AttackRewardMode`：
-
-### FixedPerAttack
-
-每个首次有效攻击者 `+AttackPoints`。受害队在该题该轮只要至少被攻破一次，只扣一次 `VictimDefensePoolPoints`，不按攻击者重复扣。
-
-### SplitVictimDefensePool
-
-若 N 支不同攻击队首次攻破该受害队：
-
-```text
-each attacker += Floor(VictimDefensePoolPoints / N)
-victim -= VictimDefensePoolPoints once
-```
-
-余数丢弃。N 因重判变化时自动重投影。未被攻破不扣、无人瓜分。两种模式下值非负，总分可负；Competition 默认、题目覆盖。
-
-## Checker 状态机
-
-每题配置 CheckerIntervalSeconds（Competition 默认、题覆盖，正整数）。Running 时持续检查，加固期也检查；Paused 停止且不补，Resume 立即一次；同队同题最多一个在执行，前次未结束则跳过 interval。
-
-Checker 是附着到特定 Runtime UUID 的可信一次性 Container，与目标处在同一内部网络。目标由当前命名服务及 receipt 定位；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start 或新 UUID Reset。
-
-Docker Provider 从持久 receipt 与 ownership labels 解析该 Runtime 的实际 Container 网络；单服务使用部署拥有的 challenge bridge，多服务使用该 Runtime 拥有的 bridge；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
-
-Checker 通过 JWT callback：
-
-```text
-POST /api/internal/v1/awd/check-results
-body: { state: Up | Down }
-```
-
-JWT audience/permission/resource claims 固定。一次 Checker 执行可以多次调用，后一次状态覆盖前一次。服务端接收成功时间为 OccurredAt；恰好等于 RoundEnd 的变化从下一轮生效。
-
-每次 Checker 执行都预先创建一条独立 GameplayFact：
-
-```text
-Up: AwdServiceTransition/Result.ServiceUp
-Down: AwdServiceTransition/Result.ServiceDown
-```
-
-正常退出且无 callback 为 `Unknown`；异常退出为 `CheckerAbnormalExit`；超时为 `CheckerTimedOut`。异常与超时会把本次预创建事实收敛为 `ServiceDown / CheckerPlatformError`，不会留下永久 Processing 事实。
-
-每个完整轮次只看 `OccurredAt < RoundEnd` 且 `(OccurredAt, Id)` 最大的已完成状态：Up `+ServiceHealthyPoints`，Down `-ServiceUnhealthyPenalty`。不按在线时长比例；状态跨轮持续；禁用 Checker 时两项为 0/无事件。
-
-## 排名
-
-1. 总分降序；
-2. 攻击所得分降序；
-3. 完整轮次 Up 的“题×轮次”数量降序；
-4. 首次有效攻击数量降序；
-5. 最后一次有效攻击时间升序；无攻击为无穷大；
-6. Team.RegisteredAt 升序；
-7. TeamId 升序。
+可运行镜像与证据示例见 [AWD Starter Kit](../challenge-authoring-templates/starter-kits/awd/README.md)，制作流程见 [出题规范](../challenge-authoring-awd-awdp.md)。

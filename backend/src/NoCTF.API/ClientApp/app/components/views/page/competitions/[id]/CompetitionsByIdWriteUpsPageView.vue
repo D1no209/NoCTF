@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { activeTab, ChallengeWriteUpReview, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
+const { activeTab, ChallengeWriteUpReview, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentReason, adjustmentReasonRequired, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -194,6 +194,11 @@ const { activeTab, ChallengeWriteUpReview, Download, FileSearch, MessageCircleQu
                   <FieldDescription>{{ $t('writeUp.adjustmentDescription') }}</FieldDescription>
                   <FieldError v-if="adjustmentError">{{ $message(adjustmentError) }}</FieldError>
                 </Field>
+                <Field>
+                  <FieldLabel for="writeup-adjustment-reason">{{ $t('administration.label.adjustmentReason') }}</FieldLabel>
+                  <Textarea id="writeup-adjustment-reason" v-model="adjustmentReason" :maxlength="512" :required="adjustmentReasonRequired" :disabled="adjustmentBusy" @update:model-value="clearAdjustmentError" />
+                  <FieldDescription v-if="adjustmentReasonRequired">{{ $t('administration.description.awdAdjustmentReason') }}</FieldDescription>
+                </Field>
                 <div class="flex flex-wrap gap-2">
                   <Button type="submit" :disabled="!selectedChallengeId || adjustmentDelta === 0 || adjustmentBusy">
                     <Spinner v-if="adjustmentPending" data-icon="inline-start" />{{ $t('writeUp.applyAdjustment') }}
@@ -218,6 +223,11 @@ const { activeTab, ChallengeWriteUpReview, Download, FileSearch, MessageCircleQu
             {{ $t('writeUp.confirmDeductionDescription', { challenge: deduction?.title ?? '', score: deduction?.netPoints ?? 0 }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <Field>
+          <FieldLabel for="writeup-deduction-reason">{{ $t('administration.label.adjustmentReason') }}</FieldLabel>
+          <Textarea id="writeup-deduction-reason" v-model="adjustmentReason" :maxlength="512" :required="adjustmentReasonRequired" :disabled="adjustmentPending" />
+          <FieldDescription v-if="adjustmentReasonRequired">{{ $t('administration.description.awdAdjustmentReason') }}</FieldDescription>
+        </Field>
         <Alert v-if="adjustmentError" variant="destructive">
           <AlertDescription>{{ $message(adjustmentError) }}</AlertDescription>
         </Alert>

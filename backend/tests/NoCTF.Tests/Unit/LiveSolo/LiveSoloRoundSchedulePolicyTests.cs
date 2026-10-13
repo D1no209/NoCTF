@@ -13,12 +13,13 @@ public sealed class LiveSoloRoundSchedulePolicyTests
         await Assert.That(LiveSoloRoundSchedulePolicy.FitsRuntimeQuota(64, 0)).IsTrue();
     }
     [Test]
-    public async Task Failed_readiness_after_countdown_uses_bounded_recovery_instead_of_an_immediate_spin()
+    public async Task Failed_readiness_after_countdown_waits_for_explicit_recovery()
     {
         var now = DateTimeOffset.UtcNow;
         var round = new LiveSoloRound { State = LiveSoloRoundState.Countdown, CountdownAt = now.AddSeconds(-10), CountdownSeconds = 5,
             Questions = [new() { Position = 0, Readiness = LiveSoloQuestionReadiness.Failed }] };
-        await Assert.That(LiveSoloRoundSchedulePolicy.NextWakeup(round, now)).IsEqualTo(now.AddSeconds(2));
+        await Assert.That(LiveSoloRoundSchedulePolicy.NextWakeup(round, now)).IsNull();
+        await Assert.That(LiveSoloRoundSchedulePolicy.PreparationCandidates(round, now)).IsEmpty();
     }
     [Test]
     public async Task Preparation_is_limited_to_the_first_or_next_due_question_and_wakeups_use_the_timeline()

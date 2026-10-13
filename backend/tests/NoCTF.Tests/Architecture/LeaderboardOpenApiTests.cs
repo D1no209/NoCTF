@@ -105,6 +105,7 @@ public sealed class LeaderboardOpenApiTests
             "entryCount",
             "breakdown",
             "entries",
+            "awdComponents",
             "offenseState",
             "defenseState"
         ]);
@@ -210,6 +211,7 @@ public sealed class LeaderboardOpenApiTests
             "breakdown",
             "actors",
             "items",
+            "awdComponents",
             "nextCursor"
         ]);
     }

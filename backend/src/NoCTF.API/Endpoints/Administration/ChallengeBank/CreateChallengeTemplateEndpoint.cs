@@ -13,6 +13,7 @@ using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions.Awd;
 using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
@@ -124,8 +125,15 @@ public sealed class CtfChallengeDefinitionContract
 {
     public required NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol InteractionKind { get; set; }
 }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdFlagDeliveryModeProtocol>))]
+public enum AwdFlagDeliveryModeProtocol { RunnerCommand, BusinessChecker }
+public sealed record AwdFlagStoreContract(Guid Id, string Name, AwdFlagDeliveryModeProtocol DeliveryMode,
+    string? TargetServiceName = null, string? InjectionCommand = null,
+    int InjectionTimeoutSeconds = 30, bool PreservesHistoricalFlags = true);
+
 public sealed class AwdChallengeDefinitionContract
 {
+    public IReadOnlyList<AwdFlagStoreContract> FlagStores { get; set; } = [];
     public required FlagInjectionContract? FlagInjection { get; set; }
 }
 public sealed class AwdpChallengeDefinitionContract;
@@ -328,7 +336,8 @@ public static class ChallengeDefinitionContractMapper
             && (contract.Mode switch
             {
                 GameModeProtocol.Ctf => contract.Ctf is not null,
-                GameModeProtocol.Awd => contract.Awd is not null,
+                GameModeProtocol.Awd => contract.Awd is { FlagStores: not null }
+                    && contract.Awd.FlagStores.All(item => item is not null),
                 GameModeProtocol.Awdp => contract.Awdp is not null,
                 GameModeProtocol.Koh => contract.Koh is not null,
                 GameModeProtocol.LiveSolo => contract.LiveSolo is not null,
@@ -383,6 +392,9 @@ public static class ChallengeDefinitionContractMapper
                 Mode = GameModeProtocol.Awd,
                 Awd = new AwdChallengeDefinitionContract
                 {
+                    FlagStores = awd.FlagStores.OrderBy(item => item.Position).Select(item =>
+                        new AwdFlagStoreContract(item.Id, item.Name, (AwdFlagDeliveryModeProtocol)item.DeliveryMode,
+                            item.TargetServiceName, item.InjectionCommand, item.InjectionTimeoutSeconds, item.PreservesHistoricalFlags)).ToArray(),
                     FlagInjection = awd.FlagInjectionCommand is null
                         ? null
                         : new FlagInjectionContract(
@@ -440,6 +452,13 @@ public static class ChallengeDefinitionContractMapper
             },
             GameModeProtocol.Awd => new AwdChallengeDefinition
             {
+                FlagStores = value.Awd!.FlagStores.Select((item, position) => new AwdFlagStore
+                {
+                    ChallengeId = challengeId, Id = item.Id, Position = position, Name = item.Name,
+                    DeliveryMode = (AwdFlagDeliveryMode)item.DeliveryMode, TargetServiceName = item.TargetServiceName,
+                    InjectionCommand = item.InjectionCommand, InjectionTimeoutSeconds = item.InjectionTimeoutSeconds,
+                    PreservesHistoricalFlags = item.PreservesHistoricalFlags
+                }).ToList(),
                 FlagInjectionCommand = value.Awd!.FlagInjection?.Command,
                 FlagInjectionTimeoutSeconds = value.Awd.FlagInjection?.TimeoutSeconds,
                 FlagInjectionServiceName = value.Awd.FlagInjection?.ServiceName

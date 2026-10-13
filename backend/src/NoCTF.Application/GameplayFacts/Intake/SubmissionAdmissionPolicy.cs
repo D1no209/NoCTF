@@ -26,12 +26,22 @@ public enum GameplayFactAdmissionFailureCode
     GameplayFactConcurrency,
     PatchUploadNotFound,
     ChallengeNotOpened,
-    ChallengeSubmissionClosed
+    ChallengeSubmissionClosed,
+    AwdHardeningActive,
+    AwdRoundGap,
+    AwdRoundUnavailable,
+    ManualAdjustmentReasonInvalid
 }
 
 /// <summary>Applies transport-independent admission rules using the trusted receive time.</summary>
 public static class GameplayFactAdmissionPolicy
 {
+    public static bool IsAwdAcceptanceWindow(GameplayFactAdmissionSnapshot snapshot, GameplayFactKind kind,
+        DateTimeOffset receivedAt) => snapshot.Mode == GameMode.Awd && kind == GameplayFactKind.FlagAttempt
+        && snapshot.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Finished
+        && (snapshot.CompetitionStatus != CompetitionStatus.Finished || receivedAt >= snapshot.OfficialEndAt)
+        && snapshot.AwdAcceptanceEndsAt is { } end && receivedAt >= snapshot.StartAt && receivedAt < end;
+
     public static bool IsPracticeFlagAttempt(
         GameplayFactAdmissionSnapshot snapshot,
         GameplayFactKind kind,
@@ -62,12 +72,13 @@ public static class GameplayFactAdmissionPolicy
             || kind == GameplayFactKind.FixAttempt && !rules.AllowsFix)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported, "This game mode does not accept this gameplay fact kind.");
         var practice = IsPracticeFlagAttempt(snapshot, kind, receivedAt);
+        var awdWindow = IsAwdAcceptanceWindow(snapshot, kind, receivedAt);
         var timeEligibility = snapshot.Timing?.Eligibility(receivedAt, practice) ?? NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid;
         if (timeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.NotOpened)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ChallengeNotOpened, "The challenge has not opened.");
         if (timeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.SubmissionClosed)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ChallengeSubmissionClosed, "The challenge submission deadline has passed.");
-        if (!practice && snapshot.CompetitionStatus != CompetitionStatus.Running)
+        if (!practice && !awdWindow && snapshot.CompetitionStatus != CompetitionStatus.Running)
             return snapshot.CompetitionStatus switch
             {
                 CompetitionStatus.Paused => OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionPaused, "The competition is paused."),
@@ -80,7 +91,7 @@ public static class GameplayFactAdmissionPolicy
         {
             if (receivedAt < snapshot.StartAt)
                 return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionNotStarted, "The competition has not started.");
-            if (receivedAt >= (snapshot.OfficialEndAt ?? snapshot.EndAt))
+            if (receivedAt >= (snapshot.AwdAcceptanceEndsAt ?? snapshot.OfficialEndAt ?? snapshot.EndAt))
                 return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionFinished, "The submission arrived after the deadline.");
         }
         else if (snapshot.PracticeRuntimeState == PracticeRuntimeAdmissionState.Unsupported)

@@ -702,6 +702,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasKey("Id")
                         .HasName("pk_competition_challenges");
 
+                    b.HasAlternateKey("Id", "CompetitionId")
+                        .HasName("ak_competition_challenges_id_competition_id");
+
                     b.HasIndex("NormalizedCustomTitle")
                         .HasDatabaseName("ix_competition_challenges_normalized_custom_title");
 
@@ -1254,6 +1257,1040 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("command_receipt_gameplay_fact_results", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity", b =>
+                {
+                    b.Property<Guid>("FlagId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flag_id");
+
+                    b.Property<Guid>("AttackingTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attacking_team_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.HasKey("FlagId", "AttackingTeamId")
+                        .HasName("pk_awd_capture_identities");
+
+                    b.HasIndex("GameplayFactId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_capture_identities_gameplay_fact_id");
+
+                    b.HasIndex("AttackingTeamId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_capture_identities_attacking_team_id_competition_id");
+
+                    b.HasIndex("FlagId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_capture_identities_flag_id_competition_id");
+
+                    b.ToTable("awd_capture_identities", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCompetitionTieBreak", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<short>("Direction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("direction");
+
+                    b.Property<short>("Field")
+                        .HasColumnType("smallint")
+                        .HasColumnName("field");
+
+                    b.HasKey("CompetitionId", "Position")
+                        .HasName("pk_awd_competition_tie_breaks");
+
+                    b.HasIndex("CompetitionId", "Field")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_competition_tie_breaks_competition_id_field");
+
+                    b.ToTable("awd_competition_tie_breaks", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFactDetails", b =>
+                {
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<long?>("AdjudicatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("adjudicated_at");
+
+                    b.Property<short?>("AttackOutcome")
+                        .HasColumnType("smallint")
+                        .HasColumnName("attack_outcome");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt");
+
+                    b.Property<long?>("AttemptDeadline")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_deadline");
+
+                    b.Property<Guid?>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<long?>("AttemptStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_started_at");
+
+                    b.Property<short>("Connection")
+                        .HasColumnType("smallint")
+                        .HasColumnName("connection");
+
+                    b.Property<short>("ConnectionReason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("connection_reason");
+
+                    b.Property<long?>("Deadline")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deadline");
+
+                    b.Property<bool>("EvidenceComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("evidence_complete");
+
+                    b.Property<short>("Execution")
+                        .HasColumnType("smallint")
+                        .HasColumnName("execution");
+
+                    b.Property<bool>("FinalScheduledCheck")
+                        .HasColumnType("boolean")
+                        .HasColumnName("final_scheduled_check");
+
+                    b.Property<Guid?>("FlagId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flag_id");
+
+                    b.Property<short>("Functionality")
+                        .HasColumnType("smallint")
+                        .HasColumnName("functionality");
+
+                    b.Property<short>("FunctionalityReason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("functionality_reason");
+
+                    b.Property<Guid?>("GenerationRoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_round_id");
+
+                    b.Property<short?>("Health")
+                        .HasColumnType("smallint")
+                        .HasColumnName("health");
+
+                    b.Property<short?>("KnownTargetFailure")
+                        .HasColumnType("smallint")
+                        .HasColumnName("known_target_failure");
+
+                    b.Property<bool>("ManifestComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("manifest_complete");
+
+                    b.Property<long?>("ObservedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("observed_at");
+
+                    b.Property<int>("ReadableFlags")
+                        .HasColumnType("integer")
+                        .HasColumnName("readable_flags");
+
+                    b.Property<short>("Reason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("reason");
+
+                    b.Property<long?>("ReceiptDeadline")
+                        .HasColumnType("bigint")
+                        .HasColumnName("receipt_deadline");
+
+                    b.Property<bool?>("ReceiptScorable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("receipt_scorable");
+
+                    b.Property<long?>("ReceivedActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_active_ticks");
+
+                    b.Property<long?>("ReceivedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid?>("ReceivedRoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("received_round_id");
+
+                    b.Property<int?>("ReceivedRoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("received_round_number");
+
+                    b.Property<int>("RequiredFlags")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_flags");
+
+                    b.Property<Guid?>("RulesId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rules_id");
+
+                    b.Property<Guid?>("RuntimeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runtime_id");
+
+                    b.Property<long?>("SampleActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_active_ticks");
+
+                    b.Property<long?>("SampleDeadlineActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_deadline_active_ticks");
+
+                    b.Property<long?>("ScheduledAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheduled_at");
+
+                    b.Property<short>("Settlement")
+                        .HasColumnType("smallint")
+                        .HasColumnName("settlement");
+
+                    b.HasKey("GameplayFactId")
+                        .HasName("pk_awd_fact_details");
+
+                    b.HasIndex("FlagId")
+                        .HasDatabaseName("ix_awd_fact_details_flag_id");
+
+                    b.HasIndex("GenerationRoundId")
+                        .HasDatabaseName("ix_awd_fact_details_generation_round_id");
+
+                    b.HasIndex("RulesId")
+                        .HasDatabaseName("ix_awd_fact_details_rules_id");
+
+                    b.HasIndex("ReceivedRoundId", "FinalScheduledCheck", "Execution")
+                        .HasDatabaseName("ix_awd_fact_details_received_round_id_final_scheduled_check_ex");
+
+                    b.ToTable("awd_fact_details", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", b =>
+                {
+                    b.Property<Guid>("FlagId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flag_id");
+
+                    b.Property<long?>("ActiveExpiryTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("active_expiry_ticks");
+
+                    b.Property<long>("ActiveStartTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("active_start_ticks");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid?>("DeliveryAttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_attempt_id");
+
+                    b.Property<int>("DeliveryAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("delivery_attempts");
+
+                    b.Property<short>("DeliveryReason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("delivery_reason");
+
+                    b.Property<Guid?>("DeliveryRuntimeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_runtime_id");
+
+                    b.Property<short>("DeliveryState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("delivery_state");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("digest");
+
+                    b.Property<int?>("ExpiryRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("expiry_round");
+
+                    b.Property<long>("GenerationSlot")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation_slot");
+
+                    b.Property<long?>("HistoricalActiveExpiryTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("historical_active_expiry_ticks");
+
+                    b.Property<int?>("HistoricalExpiryRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("historical_expiry_round");
+
+                    b.Property<long>("IssuedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issued_at");
+
+                    b.Property<int>("KeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("key_version");
+
+                    b.Property<short>("Obligation")
+                        .HasColumnType("smallint")
+                        .HasColumnName("obligation");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("ProtectedReadContext")
+                        .HasMaxLength(32768)
+                        .HasColumnType("character varying(32768)")
+                        .HasColumnName("protected_read_context");
+
+                    b.Property<int>("ProtocolVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("protocol_version");
+
+                    b.Property<string>("PublicLocator")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_locator");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_number");
+
+                    b.Property<Guid>("RulesId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rules_id");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("FlagId")
+                        .HasName("pk_awd_flag_issues");
+
+                    b.HasAlternateKey("FlagId", "CompetitionId")
+                        .HasName("ak_awd_flag_issues_flag_id_competition_id");
+
+                    b.HasIndex("Digest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_flag_issues_digest");
+
+                    b.HasIndex("CompetitionId", "KeyVersion")
+                        .HasDatabaseName("ix_awd_flag_issues_competition_id_key_version");
+
+                    b.HasIndex("RulesId", "StoreId")
+                        .HasDatabaseName("ix_awd_flag_issues_rules_id_store_id");
+
+                    b.HasIndex("TeamId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_flag_issues_team_id_competition_id");
+
+                    b.HasIndex("CompetitionId", "State", "DeliveryState")
+                        .HasDatabaseName("ix_awd_flag_issues_competition_id_state_delivery_state");
+
+                    b.HasIndex("RulesId", "RoundId", "CompetitionChallengeId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_flag_issues_rules_id_round_id_competition_challenge_id_");
+
+                    b.HasIndex("CompetitionId", "CompetitionChallengeId", "TeamId", "RoundId", "StoreId", "GenerationSlot", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_flag_issues_competition_id_competition_challenge_id_tea");
+
+                    b.ToTable("awd_flag_issues", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<byte[]>("ProtectedSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("bytea")
+                        .HasColumnName("protected_secret");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_awd_flag_keys");
+
+                    b.HasAlternateKey("CompetitionId", "Version")
+                        .HasName("ak_awd_flag_keys_competition_id_version");
+
+                    b.ToTable("awd_flag_keys", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ActiveEndTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("active_end_ticks");
+
+                    b.Property<long>("ActiveStartTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("active_start_ticks");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("EndsAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ends_at");
+
+                    b.Property<int>("GapSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("gap_seconds");
+
+                    b.Property<bool>("Missed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("missed");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<bool>("Partial")
+                        .HasColumnType("boolean")
+                        .HasColumnName("partial");
+
+                    b.Property<long>("StartsAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("starts_at");
+
+                    b.Property<int>("SubmissionTailSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("submission_tail_seconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_awd_rounds");
+
+                    b.HasAlternateKey("Id", "CompetitionId")
+                        .HasName("ak_awd_rounds_id_competition_id");
+
+                    b.HasIndex("CompetitionId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_rounds_competition_id_number");
+
+                    b.HasIndex("CompetitionId", "StartsAt", "EndsAt")
+                        .HasDatabaseName("ix_awd_rounds_competition_id_starts_at_ends_at");
+
+                    b.ToTable("awd_rounds", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundRules", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AttackPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attack_points");
+
+                    b.Property<short>("AttackRewardMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("attack_reward_mode");
+
+                    b.Property<int>("CheckerIntervalSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("checker_interval_seconds");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<long>("EffectiveAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("effective_at");
+
+                    b.Property<int>("EligibleTeamCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("eligible_team_count");
+
+                    b.Property<string>("FlagBodyTemplate")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("flag_body_template");
+
+                    b.Property<string>("FlagHeader")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("flag_header");
+
+                    b.Property<long>("GenerationEpochActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation_epoch_active_ticks");
+
+                    b.Property<Guid>("GenerationEpochId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_epoch_id");
+
+                    b.Property<int>("GenerationEpochRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation_epoch_round");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<long>("ServiceHealthyPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_healthy_points");
+
+                    b.Property<long>("VictimDefensePoolPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("victim_defense_pool_points");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Options", "NoCTF.Domain.Competitions.Awd.AwdRoundRules.Options#AwdRuleOptions", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("AttackSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_attack_settlement");
+
+                            b1.Property<decimal>("AttackWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_attack_weight");
+
+                            b1.Property<int>("CallbackGraceSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_callback_grace_seconds");
+
+                            b1.Property<short>("Composition")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_composition");
+
+                            b1.Property<long>("ConfidentialityPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_confidentiality_points");
+
+                            b1.Property<decimal>("ConsecutiveFailureMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_consecutive_failure_multiplier");
+
+                            b1.Property<short>("DefenseMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_defense_mode");
+
+                            b1.Property<decimal>("DefenseWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_defense_weight");
+
+                            b1.Property<int>("FinalCheckBudgetSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_final_check_budget_seconds");
+
+                            b1.Property<int>("FlagLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_flag_lifetime");
+
+                            b1.Property<short>("FlagLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_flag_lifetime_unit");
+
+                            b1.Property<int>("FlagsPerStore")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_flags_per_store");
+
+                            b1.Property<int>("GenerationInterval")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_generation_interval");
+
+                            b1.Property<short>("GenerationPolicy")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_generation_policy");
+
+                            b1.Property<int>("HistoricalLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_historical_lifetime");
+
+                            b1.Property<short>("HistoricalLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_historical_lifetime_unit");
+
+                            b1.Property<bool>("LinkHistoricalWindow")
+                                .HasColumnType("boolean")
+                                .HasColumnName("options_link_historical_window");
+
+                            b1.Property<decimal>("MaximumRankMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_maximum_rank_multiplier");
+
+                            b1.Property<long?>("MaximumRoundPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_maximum_round_penalty");
+
+                            b1.Property<decimal>("MinimumAttackRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_minimum_attack_ratio");
+
+                            b1.Property<long?>("MinimumTotalScore")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_minimum_total_score");
+
+                            b1.Property<long>("MumblePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_mumble_penalty");
+
+                            b1.Property<decimal>("MumblePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_mumble_penalty_ratio");
+
+                            b1.Property<decimal>("MumbleRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_mumble_ratio");
+
+                            b1.Property<long>("OfflinePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_offline_penalty");
+
+                            b1.Property<decimal>("OfflinePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_offline_penalty_ratio");
+
+                            b1.Property<decimal>("OfflineRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_offline_ratio");
+
+                            b1.Property<decimal>("OkRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_ok_ratio");
+
+                            b1.Property<short>("PenaltyMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_penalty_mode");
+
+                            b1.Property<short>("Preset")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_preset");
+
+                            b1.Property<long>("RecoveringPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("options_recovering_penalty");
+
+                            b1.Property<decimal>("RecoveringPenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_recovering_penalty_ratio");
+
+                            b1.Property<decimal>("RecoveringRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_recovering_ratio");
+
+                            b1.Property<int>("RetryCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_retry_count");
+
+                            b1.Property<int>("RetryIntervalSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_retry_interval_seconds");
+
+                            b1.Property<int>("RoundGapSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_round_gap_seconds");
+
+                            b1.Property<decimal>("ScarcityAlpha")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_scarcity_alpha");
+
+                            b1.Property<short>("SlaBasis")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_sla_basis");
+
+                            b1.Property<short>("SlaSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("options_sla_settlement");
+
+                            b1.Property<decimal>("SlaWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("options_sla_weight");
+
+                            b1.Property<int>("SubmissionTailSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_submission_tail_seconds");
+
+                            b1.Property<int?>("TotalRounds")
+                                .HasColumnType("integer")
+                                .HasColumnName("options_total_rounds");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_awd_round_rules");
+
+                    b.HasAlternateKey("Id", "RoundId", "CompetitionChallengeId", "CompetitionId")
+                        .HasName("ak_awd_round_rules_id_round_id_competition_challenge_id_compet");
+
+                    b.HasIndex("CompetitionChallengeId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_round_rules_competition_challenge_id_competition_id");
+
+                    b.HasIndex("RoundId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_round_rules_round_id_competition_id");
+
+                    b.HasIndex("RoundId", "CompetitionChallengeId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_round_rules_round_id_competition_challenge_id_revision");
+
+                    b.ToTable("awd_round_rules", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget", b =>
+                {
+                    b.Property<Guid>("RulesId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rules_id");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<short>("DeliveryMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("delivery_mode");
+
+                    b.Property<int>("FlagsPerIssue")
+                        .HasColumnType("integer")
+                        .HasColumnName("flags_per_issue");
+
+                    b.Property<string>("InjectionCommand")
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)")
+                        .HasColumnName("injection_command");
+
+                    b.Property<int>("InjectionTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("injection_timeout_seconds");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("PreservesHistoricalFlags")
+                        .HasColumnType("boolean")
+                        .HasColumnName("preserves_historical_flags");
+
+                    b.Property<string>("TargetServiceName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_service_name");
+
+                    b.Property<decimal>("Weight")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("weight");
+
+                    b.HasKey("RulesId", "StoreId")
+                        .HasName("ak_awd_round_store_budget_rules_id_store_id");
+
+                    b.ToTable("awd_round_store_budgets", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak", b =>
+                {
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<short>("Direction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("direction");
+
+                    b.Property<short>("Field")
+                        .HasColumnType("smallint")
+                        .HasColumnName("field");
+
+                    b.HasKey("RoundId", "Position")
+                        .HasName("pk_awd_round_tie_breaks");
+
+                    b.HasIndex("RoundId", "Field")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_round_tie_breaks_round_id_field");
+
+                    b.ToTable("awd_round_tie_breaks", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<long>("AppliedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applied_at");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("FirstRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("first_round");
+
+                    b.Property<int>("LastRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_round");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<short>("Timing")
+                        .HasColumnType("smallint")
+                        .HasColumnName("timing");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Policy", "NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange.Policy#AwdScoringPolicy", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<long>("AttackPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_attack_points");
+
+                            b1.Property<short>("AttackRewardMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_attack_reward_mode");
+
+                            b1.Property<short>("AttackSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_attack_settlement");
+
+                            b1.Property<decimal>("AttackWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_attack_weight");
+
+                            b1.Property<short>("Composition")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_composition");
+
+                            b1.Property<long>("ConfidentialityPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_confidentiality_points");
+
+                            b1.Property<decimal>("ConsecutiveFailureMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_consecutive_failure_multiplier");
+
+                            b1.Property<short>("DefenseMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_defense_mode");
+
+                            b1.Property<decimal>("DefenseWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_defense_weight");
+
+                            b1.Property<decimal>("MaximumRankMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_maximum_rank_multiplier");
+
+                            b1.Property<long?>("MaximumRoundPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_maximum_round_penalty");
+
+                            b1.Property<decimal>("MinimumAttackRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_minimum_attack_ratio");
+
+                            b1.Property<long>("MumblePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_mumble_penalty");
+
+                            b1.Property<decimal>("MumblePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_mumble_penalty_ratio");
+
+                            b1.Property<decimal>("MumbleRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_mumble_ratio");
+
+                            b1.Property<long>("OfflinePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_offline_penalty");
+
+                            b1.Property<decimal>("OfflinePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_offline_penalty_ratio");
+
+                            b1.Property<decimal>("OfflineRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_offline_ratio");
+
+                            b1.Property<decimal>("OkRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_ok_ratio");
+
+                            b1.Property<short>("PenaltyMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_penalty_mode");
+
+                            b1.Property<long>("RecoveringPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_recovering_penalty");
+
+                            b1.Property<decimal>("RecoveringPenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_recovering_penalty_ratio");
+
+                            b1.Property<decimal>("RecoveringRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_recovering_ratio");
+
+                            b1.Property<decimal>("ScarcityAlpha")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_scarcity_alpha");
+
+                            b1.Property<long>("ServiceHealthyPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_service_healthy_points");
+
+                            b1.Property<short>("SlaBasis")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_sla_basis");
+
+                            b1.Property<short>("SlaSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("policy_sla_settlement");
+
+                            b1.Property<decimal>("SlaWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("policy_sla_weight");
+
+                            b1.Property<long>("VictimDefensePoolPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("policy_victim_defense_pool_points");
+                        });
+
+                    b.HasKey("EventId")
+                        .HasName("pk_awd_scoring_rule_changes");
+
+                    b.HasIndex("CompetitionChallengeId", "CompetitionId")
+                        .HasDatabaseName("ix_awd_scoring_rule_changes_competition_challenge_id_competiti");
+
+                    b.HasIndex("CompetitionChallengeId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_scoring_rule_changes_competition_challenge_id_sequence");
+
+                    b.HasIndex("CompetitionId", "AppliedAt")
+                        .HasDatabaseName("ix_awd_scoring_rule_changes_competition_id_applied_at");
+
+                    b.ToTable("awd_scoring_rule_changes", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1605,6 +2642,30 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("automatic");
 
+                    b.Property<short?>("AwdAdjudicationAction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_adjudication_action");
+
+                    b.Property<int?>("AwdEffectiveFromRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("awd_effective_from_round");
+
+                    b.Property<int?>("AwdEffectiveThroughRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("awd_effective_through_round");
+
+                    b.Property<short?>("AwdHealth")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_health");
+
+                    b.Property<short?>("AwdRuleTiming")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_rule_timing");
+
+                    b.Property<short?>("AwdSettlement")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_settlement");
+
                     b.Property<short?>("AwdpFixOutcome")
                         .HasColumnType("smallint")
                         .HasColumnName("awdp_fix_outcome");
@@ -1697,6 +2758,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("PatchUploadId")
                         .HasColumnType("uuid")
                         .HasColumnName("patch_upload_id");
+
+                    b.Property<short?>("PreviousAwdHealth")
+                        .HasColumnType("smallint")
+                        .HasColumnName("previous_awd_health");
+
+                    b.Property<short?>("PreviousAwdSettlement")
+                        .HasColumnType("smallint")
+                        .HasColumnName("previous_awd_settlement");
 
                     b.Property<short?>("PreviousCompetitionAccessMode")
                         .HasColumnType("smallint")
@@ -6273,6 +7342,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasKey("Id")
                         .HasName("pk_teams");
 
+                    b.HasAlternateKey("Id", "CompetitionId")
+                        .HasName("ak_teams_id_competition_id");
+
                     b.HasIndex("AvatarFileId")
                         .HasDatabaseName("ix_teams_avatar_file_id");
 
@@ -8221,6 +9293,158 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AwdOverrides", "NoCTF.Domain.Challenges.AwdCompetitionChallengeRules.AwdOverrides#AwdRuleOverrides", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short?>("AttackSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_attack_settlement");
+
+                            b1.Property<int?>("CallbackGraceSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_callback_grace_seconds");
+
+                            b1.Property<long?>("ConfidentialityPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_overrides_confidentiality_points");
+
+                            b1.Property<decimal?>("ConsecutiveFailureMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_consecutive_failure_multiplier");
+
+                            b1.Property<short?>("DefenseMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_defense_mode");
+
+                            b1.Property<int?>("FinalCheckBudgetSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_final_check_budget_seconds");
+
+                            b1.Property<int?>("FlagLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_flag_lifetime");
+
+                            b1.Property<short?>("FlagLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_flag_lifetime_unit");
+
+                            b1.Property<int?>("FlagsPerStore")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_flags_per_store");
+
+                            b1.Property<int?>("GenerationInterval")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_generation_interval");
+
+                            b1.Property<short?>("GenerationPolicy")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_generation_policy");
+
+                            b1.Property<int?>("HistoricalLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_historical_lifetime");
+
+                            b1.Property<short?>("HistoricalLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_historical_lifetime_unit");
+
+                            b1.Property<bool?>("LinkHistoricalWindow")
+                                .HasColumnType("boolean")
+                                .HasColumnName("awd_overrides_link_historical_window");
+
+                            b1.Property<decimal?>("MaximumRankMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_maximum_rank_multiplier");
+
+                            b1.Property<long?>("MaximumRoundPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_overrides_maximum_round_penalty");
+
+                            b1.Property<decimal?>("MinimumAttackRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_minimum_attack_ratio");
+
+                            b1.Property<long?>("MumblePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_overrides_mumble_penalty");
+
+                            b1.Property<decimal?>("MumblePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_mumble_penalty_ratio");
+
+                            b1.Property<decimal?>("MumbleRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_mumble_ratio");
+
+                            b1.Property<long?>("OfflinePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_overrides_offline_penalty");
+
+                            b1.Property<decimal?>("OfflinePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_offline_penalty_ratio");
+
+                            b1.Property<decimal?>("OfflineRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_offline_ratio");
+
+                            b1.Property<decimal?>("OkRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_ok_ratio");
+
+                            b1.Property<short?>("PenaltyMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_penalty_mode");
+
+                            b1.Property<short?>("Preset")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_preset");
+
+                            b1.Property<long?>("RecoveringPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_overrides_recovering_penalty");
+
+                            b1.Property<decimal?>("RecoveringPenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_recovering_penalty_ratio");
+
+                            b1.Property<decimal?>("RecoveringRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_recovering_ratio");
+
+                            b1.Property<int?>("RetryCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_retry_count");
+
+                            b1.Property<int?>("RetryIntervalSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_overrides_retry_interval_seconds");
+
+                            b1.Property<decimal?>("ScarcityAlpha")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_overrides_scarcity_alpha");
+
+                            b1.Property<short?>("SlaBasis")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_sla_basis");
+
+                            b1.Property<short?>("SlaSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_overrides_sla_settlement");
+                        });
+
                     b.ToTable("competition_challenge_rules", (string)null);
 
                     b.HasDiscriminator().HasValue("awd");
@@ -8418,6 +9642,193 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("VictimDefensePoolPoints")
                         .HasColumnType("bigint")
                         .HasColumnName("victim_defense_pool_points");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AwdOptions", "NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration.AwdOptions#AwdRuleOptions", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("AttackSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_attack_settlement");
+
+                            b1.Property<decimal>("AttackWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_attack_weight");
+
+                            b1.Property<int>("CallbackGraceSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_callback_grace_seconds");
+
+                            b1.Property<short>("Composition")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_composition");
+
+                            b1.Property<long>("ConfidentialityPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_confidentiality_points");
+
+                            b1.Property<decimal>("ConsecutiveFailureMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_consecutive_failure_multiplier");
+
+                            b1.Property<short>("DefenseMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_defense_mode");
+
+                            b1.Property<decimal>("DefenseWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_defense_weight");
+
+                            b1.Property<int>("FinalCheckBudgetSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_final_check_budget_seconds");
+
+                            b1.Property<int>("FlagLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_flag_lifetime");
+
+                            b1.Property<short>("FlagLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_flag_lifetime_unit");
+
+                            b1.Property<int>("FlagsPerStore")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_flags_per_store");
+
+                            b1.Property<int>("GenerationInterval")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_generation_interval");
+
+                            b1.Property<short>("GenerationPolicy")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_generation_policy");
+
+                            b1.Property<int>("HistoricalLifetime")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_historical_lifetime");
+
+                            b1.Property<short>("HistoricalLifetimeUnit")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_historical_lifetime_unit");
+
+                            b1.Property<bool>("LinkHistoricalWindow")
+                                .HasColumnType("boolean")
+                                .HasColumnName("awd_options_link_historical_window");
+
+                            b1.Property<decimal>("MaximumRankMultiplier")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_maximum_rank_multiplier");
+
+                            b1.Property<long?>("MaximumRoundPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_maximum_round_penalty");
+
+                            b1.Property<decimal>("MinimumAttackRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_minimum_attack_ratio");
+
+                            b1.Property<long?>("MinimumTotalScore")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_minimum_total_score");
+
+                            b1.Property<long>("MumblePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_mumble_penalty");
+
+                            b1.Property<decimal>("MumblePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_mumble_penalty_ratio");
+
+                            b1.Property<decimal>("MumbleRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_mumble_ratio");
+
+                            b1.Property<long>("OfflinePenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_offline_penalty");
+
+                            b1.Property<decimal>("OfflinePenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_offline_penalty_ratio");
+
+                            b1.Property<decimal>("OfflineRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_offline_ratio");
+
+                            b1.Property<decimal>("OkRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_ok_ratio");
+
+                            b1.Property<short>("PenaltyMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_penalty_mode");
+
+                            b1.Property<short>("Preset")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_preset");
+
+                            b1.Property<long>("RecoveringPenalty")
+                                .HasColumnType("bigint")
+                                .HasColumnName("awd_options_recovering_penalty");
+
+                            b1.Property<decimal>("RecoveringPenaltyRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_recovering_penalty_ratio");
+
+                            b1.Property<decimal>("RecoveringRatio")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_recovering_ratio");
+
+                            b1.Property<int>("RetryCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_retry_count");
+
+                            b1.Property<int>("RetryIntervalSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_retry_interval_seconds");
+
+                            b1.Property<int>("RoundGapSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_round_gap_seconds");
+
+                            b1.Property<decimal>("ScarcityAlpha")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_scarcity_alpha");
+
+                            b1.Property<short>("SlaBasis")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_sla_basis");
+
+                            b1.Property<short>("SlaSettlement")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_options_sla_settlement");
+
+                            b1.Property<decimal>("SlaWeight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("awd_options_sla_weight");
+
+                            b1.Property<int>("SubmissionTailSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_submission_tail_seconds");
+
+                            b1.Property<int?>("TotalRounds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_options_total_rounds");
+                        });
 
                     b.ToTable("competition_mode_configurations", null, t =>
                         {
@@ -8660,6 +10071,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competition_events", (string)null);
 
                     b.HasDiscriminator().HasValue((short)46);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.AwdScoringRulesChangedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)68);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.AwdpBreakAttemptedEvent", b =>
@@ -10232,6 +11652,287 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_command_receipt_gameplay_fact_results_command_receipts_comm");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany()
+                        .HasForeignKey("GameplayFactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_capture_identities_gameplay_facts_gameplay_fact_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("AttackingTeamId", "CompetitionId")
+                        .HasPrincipalKey("Id", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_capture_identities_teams_attacking_team_id_competition_");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", null)
+                        .WithMany()
+                        .HasForeignKey("FlagId", "CompetitionId")
+                        .HasPrincipalKey("FlagId", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_capture_identities_awd_flag_issues_flag_id_competition_");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCompetitionTieBreak", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", null)
+                        .WithMany("TieBreakers")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_competition_tie_breaks_competition_mode_configuration_c");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFactDetails", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                        .WithMany()
+                        .HasForeignKey("FlagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_fact_details_challenge_flags_flag_id");
+
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithOne("Awd")
+                        .HasForeignKey("NoCTF.Domain.Competitions.Awd.AwdFactDetails", "GameplayFactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_fact_details_gameplay_facts_gameplay_fact_id");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRound", null)
+                        .WithMany()
+                        .HasForeignKey("GenerationRoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_fact_details_awd_rounds_generation_round_id");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRound", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivedRoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_fact_details_awd_rounds_received_round_id");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRoundRules", null)
+                        .WithMany()
+                        .HasForeignKey("RulesId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_fact_details_awd_round_rules_rules_id");
+
+                    b.OwnsMany("NoCTF.Domain.Competitions.Awd.AwdFactFlagEvidence", "Flags", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("gameplay_fact_id");
+
+                            b1.Property<Guid>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<bool>("Historical")
+                                .HasColumnType("boolean")
+                                .HasColumnName("historical");
+
+                            b1.Property<short>("Obligation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("obligation");
+
+                            b1.Property<short>("Read")
+                                .HasColumnType("smallint")
+                                .HasColumnName("read");
+
+                            b1.Property<short>("ReadReason")
+                                .HasColumnType("smallint")
+                                .HasColumnName("read_reason");
+
+                            b1.Property<bool>("RequiresWrite")
+                                .HasColumnType("boolean")
+                                .HasColumnName("requires_write");
+
+                            b1.Property<short>("Write")
+                                .HasColumnType("smallint")
+                                .HasColumnName("write");
+
+                            b1.Property<short>("WriteReason")
+                                .HasColumnType("smallint")
+                                .HasColumnName("write_reason");
+
+                            b1.HasKey("GameplayFactId", "FlagId")
+                                .HasName("pk_awd_check_flag_evidence");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_awd_check_flag_evidence_flag_id");
+
+                            b1.ToTable("awd_check_flag_evidence", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_awd_check_flag_evidence_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId")
+                                .HasConstraintName("fk_awd_check_flag_evidence_awd_fact_details_gameplay_fact_id");
+                        });
+
+                    b.Navigation("Flags");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                        .WithOne("AwdIssue")
+                        .HasForeignKey("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", "FlagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_challenge_flags_flag_id");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdFlagKey", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId", "KeyVersion")
+                        .HasPrincipalKey("CompetitionId", "Version")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_awd_flag_keys_competition_id_key_version");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget", null)
+                        .WithMany()
+                        .HasForeignKey("RulesId", "StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_awd_round_store_budget_rules_id_store_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId", "CompetitionId")
+                        .HasPrincipalKey("Id", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_teams_team_id_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRoundRules", null)
+                        .WithMany()
+                        .HasForeignKey("RulesId", "RoundId", "CompetitionChallengeId", "CompetitionId")
+                        .HasPrincipalKey("Id", "RoundId", "CompetitionChallengeId", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_awd_round_rules_rules_id_round_id_competiti");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagKey", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_keys_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_rounds_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundRules", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId", "CompetitionId")
+                        .HasPrincipalKey("Id", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_round_rules_competition_challenges_competition_challeng");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "CompetitionId")
+                        .HasPrincipalKey("Id", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_round_rules_awd_rounds_round_id_competition_id");
+
+                    b.OwnsMany("NoCTF.Domain.Competitions.Awd.AwdRoundTeamEligibility", "Teams", b1 =>
+                        {
+                            b1.Property<Guid>("RulesId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("rules_id");
+
+                            b1.Property<Guid>("TeamId")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasColumnName("team_id");
+
+                            b1.Property<bool>("Competitive")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(true)
+                                .HasColumnName("competitive");
+
+                            b1.Property<int?>("SettledRank")
+                                .HasColumnType("integer")
+                                .HasColumnName("settled_rank");
+
+                            b1.HasKey("RulesId", "TeamId")
+                                .HasName("pk_awd_round_team_eligibility");
+
+                            b1.ToTable("awd_round_team_eligibility", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("RulesId")
+                                .HasConstraintName("fk_awd_round_team_eligibility_awd_round_rules_rules_id");
+                        });
+
+                    b.Navigation("Teams");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRoundRules", null)
+                        .WithMany("Stores")
+                        .HasForeignKey("RulesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_round_store_budgets_awd_round_rules_rules_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRound", null)
+                        .WithMany("TieBreakers")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_round_tie_breaks_awd_rounds_round_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Events.CompetitionEvent", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_scoring_rule_changes_competition_events_event_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId", "CompetitionId")
+                        .HasPrincipalKey("Id", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_scoring_rule_changes_competition_challenges_competition");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
@@ -12859,6 +14560,107 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallengeDefinition", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Competitions.Awd.AwdFlagStore", "FlagStores", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<short>("DeliveryMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("delivery_mode");
+
+                            b1.Property<string>("InjectionCommand")
+                                .HasMaxLength(8192)
+                                .HasColumnType("character varying(8192)")
+                                .HasColumnName("injection_command");
+
+                            b1.Property<int>("InjectionTimeoutSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("injection_timeout_seconds");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(64)
+                                .HasColumnType("character varying(64)")
+                                .HasColumnName("name");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<bool>("PreservesHistoricalFlags")
+                                .HasColumnType("boolean")
+                                .HasColumnName("preserves_historical_flags");
+
+                            b1.Property<string>("TargetServiceName")
+                                .HasMaxLength(64)
+                                .HasColumnType("character varying(64)")
+                                .HasColumnName("target_service_name");
+
+                            b1.HasKey("ChallengeId", "Id")
+                                .HasName("pk_awd_flag_stores");
+
+                            b1.HasIndex("ChallengeId", "Name")
+                                .IsUnique()
+                                .HasDatabaseName("ix_awd_flag_stores_challenge_id_name");
+
+                            b1.HasIndex("ChallengeId", "Position")
+                                .IsUnique()
+                                .HasDatabaseName("ix_awd_flag_stores_challenge_id_position");
+
+                            b1.ToTable("awd_flag_stores", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId")
+                                .HasConstraintName("fk_awd_flag_stores_challenge_definition_challenge_id");
+                        });
+
+                    b.Navigation("FlagStores");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdCompetitionChallengeRules", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Competitions.Awd.AwdStoreRule", "StoreRules", b1 =>
+                        {
+                            b1.Property<Guid>("CompetitionChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("competition_challenge_id");
+
+                            b1.Property<Guid>("StoreId")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasColumnName("store_id");
+
+                            b1.Property<int?>("FlagsPerIssue")
+                                .HasColumnType("integer")
+                                .HasColumnName("flags_per_issue");
+
+                            b1.Property<decimal>("Weight")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("weight");
+
+                            b1.HasKey("CompetitionChallengeId", "StoreId")
+                                .HasName("pk_awd_store_rules");
+
+                            b1.ToTable("awd_store_rules", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionChallengeId")
+                                .HasConstraintName("fk_awd_store_rules_competition_challenge_rules_competition_cha");
+                        });
+
+                    b.Navigation("StoreRules");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.BadgeProgressionNode", b =>
                 {
                     b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionBadge", null)
@@ -12897,6 +14699,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("StringItems");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
+                {
+                    b.Navigation("AwdIssue");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeService", b =>
                 {
                     b.Navigation("Commands");
@@ -12931,6 +14738,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("GameplayFactResults");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>
+                {
+                    b.Navigation("TieBreakers");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundRules", b =>
+                {
+                    b.Navigation("Stores");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
                     b.Navigation("Collaborators");
@@ -12945,6 +14762,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Edges");
 
                     b.Navigation("Nodes");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
+                {
+                    b.Navigation("Awd");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.Passkeys.UserPasskey", b =>
@@ -13112,6 +14934,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", b =>
                 {
                     b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", b =>
+                {
+                    b.Navigation("TieBreakers");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.CtfCompetitionModeConfiguration", b =>

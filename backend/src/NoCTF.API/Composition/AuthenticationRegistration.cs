@@ -115,11 +115,22 @@ public static class AuthenticationRegistration
             options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
                 .RequireAuthenticatedUser()
                 .Build();
+            options.AddPolicy("AwdCheckTask", policy => policy
+                .AddAuthenticationSchemes(InternalScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
+                .RequireClaim("permission", "awd:check-task:read")
+                .RequireClaim("attempt_id")
+                .RequireClaim("resource")
+                .RequireClaim("runtime_instance_id")
+                .RequireClaim("gameplay_fact_id"));
             options.AddPolicy("AwdCheckResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awd:check-result:write")
+                .RequireClaim("attempt_id")
+                .RequireClaim("receipt_deadline")
                 .RequireClaim("resource")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("gameplay_fact_id")

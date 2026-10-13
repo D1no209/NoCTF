@@ -256,6 +256,7 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/ru
 PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 DELETE /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets
+GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state
 ```
 
@@ -271,6 +272,8 @@ CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期
 `awdp-state` 仅用于 AWDP schema v4 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最近一次防御 Target 的 TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
 
 `targets` 只用于 AWD：加固期只返回本队 TeamId/Name/Running urls；加固期结束后返回所有 Approved、未 Ban、未删除队伍的 TeamId/Name 与其 Running `Exposure=Participants` urls，未 Running 的目标保留 Team 条目但 urls 为空。本队仍可从 Runtime GET 取得 OwnerOnly urls。排序 Team.RegisteredAt/TeamId。targets 永不返回 Flag、服务状态、Provider receipt 或内部地址；其他模式返回 404。
+
+`targets/{teamId}/attack-info` 要求已登录且具备本比赛选手题目读取权限和合格队伍，按 `offset/limit/total` 分页返回指定合格目标队伍的公开定位信息。加固期仅能读本队，未发布/已删除题目不可读。仅返回已发行、未撤销、未过期且有 PublicLocator 的条目，包含 FlagId、生成轮次、Store、序号、发行时刻和有效窗口；不包含 Flag、私有读取上下文或 Checker 诊断。暂停与轮间间隔不消耗剩余活跃时间，接收尾窗结束后返回空集合。响应使用 `private,no-store`。
 
 ## Admin Competition
 
@@ -885,3 +888,38 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 - 正确而不计分返回 `RightButDue`。`timeEligibility=Valid` 时算完成及闯关，正式解题人数和血榜不受益；`NotOpened` 或 `SubmissionClosed` 表示历史记录按最新时间无效，不计分、不算完成、不占有效次数。错误记录仍保留 `Wrong`。
 - 首次受理、迟到评测与历史回算都比较原 `OccurredAt` 和最新配置。回算不运行 Checker，不新增尝试，也不冻结旧时间规则。队伍提示费用和人工调分不受计分结束时间影响。
 - 开放任务在暂停时挂起，恢复补执行；重启后从关系数据重建。LiveSolo 不使用这些字段控制 Round。
+
+## AWD 判定、规则与公开观战
+
+```text
+GET /api/internal/v1/awd/check-task
+GET /api/v1/admin/competitions/{competitionId}/awd/checks
+GET /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}
+GET /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules
+GET /api/v1/competitions/{competitionId}/awd-spectator
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules
+GET /api/v1/competitions/{competitionId}/koh-spectator
+POST /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}/adjudication
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview
+```
+
+## LiveSolo 当前工作区与题库扩展
+
+```text
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/workspace
+GET /api/v1/competitions/{competitionId}/live-solo/question-pool
+PATCH /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}
+POST /api/v1/admin/challenges/live-solo/copies
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}/browser-download
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/deploy
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank
+```

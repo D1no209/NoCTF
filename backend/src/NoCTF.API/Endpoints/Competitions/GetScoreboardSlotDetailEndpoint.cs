@@ -48,7 +48,10 @@ public sealed record ScoreboardSlotDetailResponse(
     IReadOnlyList<ScoreboardBreakdownResponse> Breakdown,
     IReadOnlyList<ScoreboardActorResponse> Actors,
     IReadOnlyList<ScoreboardEntryResponse> Items,
-    string? NextCursor);
+    string? NextCursor)
+{
+    public IReadOnlyList<AwdScoreComponentResponse> AwdComponents { get; init; } = [];
+}
 
 public sealed class GetScoreboardSlotDetailEndpoint(
     ILeaderboardCache leaderboard,
@@ -202,7 +205,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 item.NetPoints)).ToArray(),
             actors,
             mapped,
-            nextCursor));
+            nextCursor) { AwdComponents = slot.AwdComponents.Select(ScoreboardProtocolMapper.ToResponse).ToArray() });
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(Guid competitionId)

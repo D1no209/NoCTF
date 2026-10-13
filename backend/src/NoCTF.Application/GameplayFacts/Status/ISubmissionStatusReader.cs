@@ -13,7 +13,13 @@ public sealed record GameplayFactStatusView(
     GameplayFactFailureCode? FailureCode,
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt,
-    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
+    AwdAttackStatusView? AwdAttack = null);
+
+public sealed record AwdAttackStatusView(Guid? FlagId, Guid? GenerationRoundId, int? GenerationRoundNumber,
+    Guid? ReceivedRoundId, int? ReceivedRoundNumber, Guid? StoreId,
+    NoCTF.Domain.Competitions.Awd.AwdAttackOutcome? Outcome,
+    NoCTF.Domain.Competitions.Awd.AwdSettlementState Settlement);
 
 public interface IGameplayFactStatusReader
 {

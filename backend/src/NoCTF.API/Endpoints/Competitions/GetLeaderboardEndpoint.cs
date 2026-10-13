@@ -53,7 +53,13 @@ public enum ScoreboardEntryOutcomeProtocol { Pending, Succeeded, Failed, Rejecte
 public enum ScoreboardAwardProtocol { FirstBlood, SecondBlood, ThirdBlood }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardAdjustmentKindProtocol>))]
-public enum ScoreboardAdjustmentKindProtocol { ManualAdjustment, CompetitionPenalty, BanRecalculation }
+public enum ScoreboardAdjustmentKindProtocol { ManualAdjustment, CompetitionPenalty, BanRecalculation, ScoreFloor }
+
+public sealed record AwdScoreComponentResponse(
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdScoreComponent>))] AwdScoreComponent Component,
+    long? Points, decimal? UnroundedPoints, decimal? RoundingDifference,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Competitions.Awd.AwdSettlementState>))]
+    NoCTF.Domain.Competitions.Awd.AwdSettlementState Settlement);
 
 public sealed record ScoreboardActorResponse(int Index, Guid UserId, string DisplayName);
 
@@ -98,7 +104,10 @@ public sealed record ScoreboardSlotResponse(
     IReadOnlyList<ScoreboardBreakdownResponse> Breakdown,
     IReadOnlyList<ScoreboardEntryResponse> Entries,
     ScoreboardOperationStateProtocol OffenseState,
-    ScoreboardOperationStateProtocol DefenseState);
+    ScoreboardOperationStateProtocol DefenseState)
+{
+    public IReadOnlyList<AwdScoreComponentResponse> AwdComponents { get; init; } = [];
+}
 
 public sealed record ScoreboardChallengeScoreResponse(
     Guid CompetitionChallengeId,
@@ -255,7 +264,7 @@ internal static partial class ScoreboardProtocolMapper
                 item.EarnedPoints, item.DeductedPoints, item.NetPoints)).ToArray(),
             slot.Entries.Select(ToResponse).ToArray(),
             ToProtocol(slot.OffenseState),
-            ToProtocol(slot.DefenseState))).ToArray())
+            ToProtocol(slot.DefenseState)) { AwdComponents = slot.AwdComponents.Select(ToResponse).ToArray() }).ToArray())
     {
         ChallengeBenefits = value.ChallengeBenefits,
         TheoryScore = value.TheoryScore,
@@ -263,6 +272,9 @@ internal static partial class ScoreboardProtocolMapper
         Achievements = value.Achievements?.Select(item => new ScoreboardChallengeAchievementResponse(
             item.CompetitionChallengeId, ToProtocol(item.Kind), item.UserId, item.DisplayName, item.OccurredAt)).ToArray()
     };
+
+    public static AwdScoreComponentResponse ToResponse(AwdScoreComponentProjection value) =>
+        new(value.Component, value.Points, value.UnroundedPoints, value.RoundingDifference, value.Settlement);
 
     public static LeaderboardDataScopeProtocol ToProtocol(LeaderboardDataScope value) => value switch
     {

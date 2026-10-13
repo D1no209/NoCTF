@@ -46,6 +46,7 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
         />
 
         <component :is="FlagSubmit" :timing="challenge.timing"
+          completion="Break"
           :dock-target="flagDockTarget"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"

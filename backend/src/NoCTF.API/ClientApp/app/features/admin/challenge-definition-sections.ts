@@ -29,6 +29,7 @@ export function mergeChallengeModeDefinition(
   persisted.interactionKind = savedDraft.interactionKind
   persisted.checker = savedDraft.checker
   persisted.checkerJob = savedDraft.checkerJob
+  persisted.awdFlagStores = savedDraft.awdFlagStores
   persisted.flagInjection = savedDraft.flagInjection
   persisted.flagTemplate = savedDraft.flagTemplate
   persisted.patchEntrypoint = savedDraft.patchEntrypoint

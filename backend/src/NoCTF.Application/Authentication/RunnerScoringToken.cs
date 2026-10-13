@@ -5,7 +5,9 @@ public sealed record AwdCheckerTokenRequest(
     Guid RuntimeInstanceId,
     Guid GameplayFactId,
     DateTimeOffset Deadline,
-    DateTimeOffset IssuedAt);
+    DateTimeOffset IssuedAt,
+    Guid AttemptId,
+    DateTimeOffset ReceiptDeadline);
 
 public sealed record AwdpFixResultTokenRequest(
     string RunnerId,

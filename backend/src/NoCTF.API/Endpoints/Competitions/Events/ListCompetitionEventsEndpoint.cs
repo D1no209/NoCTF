@@ -45,7 +45,7 @@ public enum CompetitionEventKindProtocol
     CompetitionAudienceChanged, TeamWriteUpSubmitted,
     RuntimeTrafficCaptureStored, RuntimeTrafficCaptureDeleted,
     ChallengeWriteUpSubmitted, ChallengeWriteUpPublished, ChallengeWriteUpWithdrawn,
-    ChallengeWriteUpRejected, ChallengeWriteUpUnlocked
+    ChallengeWriteUpRejected, ChallengeWriteUpUnlocked, AwdScoringRulesChanged
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -156,7 +156,10 @@ public sealed record CompetitionEventResponse(
     string? Reason,
     string? TrackKey,
     string? PreviousTrackKey,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming>))]
+    NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming? AwdRuleTiming = null,
+    int? AwdEffectiveFromRound = null, int? AwdEffectiveThroughRound = null);
 
 public sealed record CompetitionEventListResponse(
     CompetitionEventAccessLevelProtocol AccessLevel,

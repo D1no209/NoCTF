@@ -1,0 +1,91 @@
+[
+  {
+    "at": "2026-10-12T16:16:26.872Z",
+    "metrics": {
+      "cpuP95": 0.4,
+      "renderDuty": 1.05,
+      "frames": 4584,
+      "p95": 24.10000000000582,
+      "active": 12,
+      "queued": 18,
+      "geometries": 14,
+      "textures": 1,
+      "calls": 16,
+      "triangles": 5568,
+      "seconds": 161,
+      "heapMiB": 137
+    }
+  },
+  {
+    "at": "2026-10-12T16:19:54.232Z",
+    "phase": "60fps",
+    "metrics": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.99,
+      "frames": 10683,
+      "p95": 24,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 368,
+      "heapMiB": 131
+    }
+  },
+  {
+    "at": "2026-10-12T16:22:01.916Z",
+    "phase": "30fps",
+    "metrics": {
+      "cpuP95": 0.4,
+      "renderDuty": 0.88,
+      "frames": 12680,
+      "p95": 40.699999999953434,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 496,
+      "heapMiB": 132
+    }
+  },
+  {
+    "at": "2026-10-12T16:30:22.319Z",
+    "phase": "30fps",
+    "metrics": {
+      "cpuP95": 0.5,
+      "renderDuty": 0.73,
+      "frames": 20215,
+      "p95": 40.79999999993015,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 996,
+      "heapMiB": 134
+    }
+  },
+  {
+    "at": "2026-10-12T16:32:12.198Z",
+    "phase": "60fps",
+    "metrics": {
+      "cpuP95": 0.5,
+      "renderDuty": 0.75,
+      "frames": 23316,
+      "p95": 24.199999999953434,
+      "active": 0,
+      "queued": 0,
+      "geometries": 2,
+      "textures": 1,
+      "calls": 4,
+      "triangles": 3840,
+      "seconds": 1106,
+      "heapMiB": 139
+    }
+  }
+]

@@ -14,6 +14,8 @@ const competitionTitles = {
   events: 'administration.label.activity',
   teams: 'common.label.teams',
   live: 'leaderboard.ctf.liveTitle',
+  'awd-live': 'spectator.awd',
+  'koh-live': 'spectator.koh',
   'awdp-live': 'administration.label.controlScreen',
 } satisfies Record<string, MessageKey>
 

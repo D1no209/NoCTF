@@ -713,24 +713,12 @@ internal static class RuntimeWriteBackOperations
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var currentAwdFlag = instance.TeamId is null
-            ? null
-            : await db.ChallengeFlags.AsNoTracking()
-                .Where(flag => flag.CompetitionChallengeId == instance.CompetitionChallengeId
-                    && flag.TeamId == instance.TeamId
-                    && flag.SpecificationKind == NoCTF.Domain.Challenges.SpecificationKind.AwdRound
-                    && flag.ValidStart <= now
-                    && flag.ValidUntil > now
-                    && flag.DeletedAt == null)
-                .SingleOrDefaultAsync(cancellationToken);
-        if (currentAwdFlag is not null)
+        if (instance.CompetitionId is { } awdCompetitionId && instance.TeamId is not null
+            && await db.Competitions.AnyAsync(competition => competition.Id == awdCompetitionId
+                && competition.Mode == GameMode.Awd, cancellationToken))
         {
-            await outbox.PublishToRunnerNodeAsync(new InjectAwdFlag(
-                instance.Id,
-                instance.CompetitionChallengeId!.Value,
-                currentAwdFlag.Id,
-                currentAwdFlag.ValidUntil!.Value,
-                message.RunnerId));
+            // The coordinator dispatches only pending current issuances. Resetting a runtime must not refill history.
+            await outbox.PublishAsync(new AdvanceAwdRound(awdCompetitionId, now));
         }
         await RecordRuntimeStateAsync(
             events,

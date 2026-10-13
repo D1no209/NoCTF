@@ -1,4 +1,5 @@
 {
+  "awd.rules.changedEvent": "{actor} changed scoring rules for {challenge}",
   "competitions.competitionBroadcast.description.liveSolo": "Competition notices appear here",
   "competitions.label.backToAdministration": "Back to administration",
   "progression.title": "Progression & badges",
@@ -417,5 +418,6 @@
   "competitions.deletion.soloMatches": "LiveSolo matches",
   "competitions.deletion.soloQuestionLists": "LiveSolo question lists",
   "competitions.deletion.soloOwnedMaterials": "LiveSolo competition-owned materials",
-  "competitions.deletion.activeSoloMediaResources": "LiveSolo media awaiting cleanup"
+  "competitions.deletion.activeSoloMediaResources": "LiveSolo media awaiting cleanup",
+  "competitions.label.spectator": "Spectator screen"
 }

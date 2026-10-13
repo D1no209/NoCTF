@@ -37,7 +37,7 @@ describe('administrator destructive action wiring', () => {
   test('lets judges ban teams and resolve appeals without exposing manager-only reversal and registration actions', async () => {
     const page = await readPage('teams')
 
-    expect(page).toContain('const { competitionId, canJudge, canWrite } = useCompetitionAdmin()')
+    expect(page).toContain('const { competitionId, competition, canJudge, canWrite } = useCompetitionAdmin()')
     expect(page).toContain('v-if="canWrite || canJudge"')
     expect(page).toContain('<DropdownMenu v-if="canWrite">')
     expect(page).toContain('v-for="option in registrationStatusOptions"')

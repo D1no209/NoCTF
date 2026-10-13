@@ -13,13 +13,15 @@ public static class CompetitionModeConfigurationDefaults
             GameMode.Awd => new AwdCompetitionModeConfiguration
             {
                 HardeningDurationSeconds = 0,
-                RoundDurationSeconds = 300,
+                RoundDurationSeconds = 180,
                 AttackRewardMode = AwdAttackRewardMode.FixedPerAttack,
                 AttackPoints = 50,
                 VictimDefensePoolPoints = 100,
                 CheckerIntervalSeconds = 30,
                 ServiceHealthyPoints = 100,
-                ServiceUnhealthyPenalty = 50
+                ServiceUnhealthyPenalty = 0,
+                TieBreakers = Awd.AwdTieBreakPolicy.Default.Select((item, position) => new Awd.AwdCompetitionTieBreak
+                    { CompetitionId = competitionId, Position = position, Field = item.Field, Direction = item.Direction }).ToList()
             },
             GameMode.Awdp => new AwdpCompetitionModeConfiguration
             {
@@ -40,7 +42,8 @@ public static class CompetitionModeConfigurationDefaults
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         configuration.CompetitionId = competitionId;
-        configuration.FlagTemplate = new FlagTemplateValue();
+        configuration.FlagTemplate = mode == GameMode.Awd
+            ? new FlagTemplateValue { BodyTemplate = "[SECURE]" } : new FlagTemplateValue();
         return configuration;
     }
 

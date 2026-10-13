@@ -24,10 +24,6 @@ public sealed class AuxiliaryRuntimeCapacity(
     IOptions<RunnerOptions> runnerOptions,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceMutationCoordinator mutations,
-    NoCtfDbContext db,
-    IPostCommitMessagePublisher outbox,
-    ICompetitionEventRecorder events,
-    TimeProvider clock,
     ILogger<AuxiliaryRuntimeCapacity> logger,
     RuntimeExecutionOptions? executionOptions = null)
 {
@@ -39,14 +35,22 @@ public sealed class AuxiliaryRuntimeCapacity(
         var claim = await capacity.TryClaimForRunnerAsync(new(identity.RuntimeInstanceId, runnerOptions.Value.Pool,
             limits.MemoryBytes, limits.CpuMillicores, limits.PidsLimit, identity, factId, ProcessesPerService: executionOptions?.ProcessesPerService ?? 256), runnerOptions.Value.Id, ct);
         if (claim.Availability != RunnerCapacityAvailability.Claimed)
+        {
+            logger.LogDebug("Auxiliary admission declined for {GameplayFactId} attempt {OperationId}: {Availability}, {Failure}; memory {MemoryBytes}, CPU {CpuMillicores}, PIDs {PidsLimit}.",
+                factId, identity.OperationId, claim.Availability, claim.Failure, limits.MemoryBytes, limits.CpuMillicores, limits.PidsLimit);
             throw new RunnerCapacityUnavailableException(claim.Failure ?? RunnerAdmissionFailure.NoEligibleRunner);
+        }
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         labels["noctf.io/operation-id"] = identity.OperationId.ToString("N");
         labels["noctf.io/workload-kind"] = ((short)identity.Kind).ToString(System.Globalization.CultureInfo.InvariantCulture);
         try
         {
             if (!await capacity.CanCreateWorkloadAsync(identity, factId, runnerOptions.Value.Id, ct))
+            {
+                logger.LogDebug("Auxiliary admission permit no longer valid for {GameplayFactId} attempt {OperationId} after claim {ClaimState}.",
+                    factId, identity.OperationId, claim.State);
                 throw new RunnerCapacityUnavailableException(RunnerAdmissionFailure.NoEligibleRunner);
+            }
             return await execute(request with { Labels = labels }, ct);
         }
         finally
@@ -67,24 +71,4 @@ public sealed class AuxiliaryRuntimeCapacity(
         }
     }
 
-    public async Task RecordAwdAdmissionFailureAsync(Guid factId, CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(item => item.Id == factId, ct);
-        if (fact is null || fact.Kind != GameplayFactKind.AwdServiceTransition
-            || fact.State != GameplayFactState.Processing)
-            return;
-        fact.State = GameplayFactState.PlatformFailed;
-        fact.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
-        fact.UpdatedAt = clock.GetUtcNow();
-        await events.RecordAsync(new(fact.CompetitionId, CompetitionEventKind.GameplayFactAdjudicated,
-            CompetitionEventLevel.Error, CompetitionEventVisibility.Staff, fact.UpdatedAt,
-            TeamId: fact.TeamId, CompetitionChallengeId: fact.CompetitionChallengeId,
-            GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State,
-            GameplayFactResult: fact.Result), ct);
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await outbox.FlushCommittedMessagesAsync();
-    }
 }

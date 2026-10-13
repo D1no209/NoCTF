@@ -65,10 +65,9 @@ namespace Internal.Generated.WolverineHandlers
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
-            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider, _loggerOfAuxiliaryRuntimeCapacity, _runtimeExecutionOptions1);
-            var awdCheckerExecutor = new NoCTF.Runner.Messages.AwdCheckerExecutor(_oneShotRuntimeProviderCatalog, _httpClientFactory, auxiliaryRuntimeCapacity, _runtimeExecutionOptions2);
+            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, _loggerOfAuxiliaryRuntimeCapacity, _runtimeExecutionOptions1);
+            var awdCheckerExecutor = new NoCTF.Runner.Messages.AwdCheckerExecutor(_oneShotRuntimeProviderCatalog, _httpClientFactory, auxiliaryRuntimeCapacity, _runtimeExecutionOptions2, _timeProvider);
             // The actual message body
             var runAwdChecker = (NoCTF.Application.Messaging.RunAwdChecker)context.Envelope.Message;
 

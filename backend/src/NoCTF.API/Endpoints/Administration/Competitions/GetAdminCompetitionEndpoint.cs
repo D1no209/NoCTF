@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Competitions.Permissions;
@@ -12,6 +13,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using System.Text.Json.Serialization;
 using NoCTF.API.Endpoints.LiveSolo;
 using NoCTF.Domain.LiveSolo;
@@ -25,9 +27,166 @@ public enum CtfScoreSettlementModeProtocol { DynamicRecalculation, AtSolve }
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<BloodRewardPolicyProtocol>))]
 public enum BloodRewardPolicyProtocol { FixedPoints, InitialPointsPercentage, SolveTimePointsPercentage, CurrentPointsPercentage }
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdAttackRewardModeProtocol>))]
-public enum AwdAttackRewardModeProtocol { FixedPerAttack, SplitVictimDefensePool }
+public enum AwdAttackRewardModeProtocol { FixedPerAttack, SplitVictimDefensePool, Scarcity, TargetRank }
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<EvaluationDispatchModeProtocol>))]
 public enum EvaluationDispatchModeProtocol { Automatic, Manual }
+
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdLifetimeUnitProtocol>))]
+public enum AwdLifetimeUnitProtocol { Rounds, ActiveSeconds }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdGenerationPolicyProtocol>))]
+public enum AwdGenerationPolicyProtocol { EveryRound, EveryNRounds, ActiveInterval }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdScoringPresetProtocol>))]
+public enum AwdScoringPresetProtocol { Fixed, SharedPool, Scarcity, TargetRank, SlaMultiplier, Custom }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdDefenseModeProtocol>))]
+public enum AwdDefenseModeProtocol { FirstLeak, PerCapture, SharedPool }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdSlaBasisProtocol>))]
+public enum AwdSlaBasisProtocol { StatusRatio, ReadableFlags }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdSlaSettlementProtocol>))]
+public enum AwdSlaSettlementProtocol { FinalScheduledCheck, SampleAverage, TimeWeighted }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdPenaltyModeProtocol>))]
+public enum AwdPenaltyModeProtocol { SlaRewardOnly, Fixed, Proportional, Combined }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdScoreCompositionProtocol>))]
+public enum AwdScoreCompositionProtocol { Additive, Weighted, PositiveSlaMultiplier }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdAttackSettlementProtocol>))]
+public enum AwdAttackSettlementProtocol { Immediate, RoundEnd, FlagExpiry }
+
+public sealed record AwdRuleOptionsContract
+{
+    public AwdLifetimeUnitProtocol FlagLifetimeUnit { get; init; }
+    public int FlagLifetime { get; init; } = 5;
+    public bool LinkHistoricalWindow { get; init; } = true;
+    public AwdLifetimeUnitProtocol HistoricalLifetimeUnit { get; init; }
+    public int HistoricalLifetime { get; init; } = 5;
+    public AwdGenerationPolicyProtocol GenerationPolicy { get; init; }
+    public int GenerationInterval { get; init; } = 1;
+    public int FlagsPerStore { get; init; } = 1;
+    public int RoundGapSeconds { get; init; }
+    public int? TotalRounds { get; init; }
+    public int SubmissionTailSeconds { get; init; }
+    public int FinalCheckBudgetSeconds { get; init; } = 30;
+    public int RetryCount { get; init; } = 2;
+    public int RetryIntervalSeconds { get; init; } = 5;
+    public int CallbackGraceSeconds { get; init; } = 30;
+    public AwdSlaSettlementProtocol SlaSettlement { get; init; }
+    public AwdScoringPresetProtocol Preset { get; init; }
+    public AwdDefenseModeProtocol DefenseMode { get; init; }
+    public AwdSlaBasisProtocol SlaBasis { get; init; }
+    public decimal OkRatio { get; init; } = 1m;
+    public decimal RecoveringRatio { get; init; } = 0.5m;
+    public decimal MumbleRatio { get; init; }
+    public decimal OfflineRatio { get; init; }
+    public AwdPenaltyModeProtocol PenaltyMode { get; init; }
+    public long MumblePenalty { get; init; }
+    public long OfflinePenalty { get; init; }
+    public long RecoveringPenalty { get; init; }
+    public decimal MumblePenaltyRatio { get; init; }
+    public decimal OfflinePenaltyRatio { get; init; }
+    public decimal RecoveringPenaltyRatio { get; init; }
+    public decimal ConsecutiveFailureMultiplier { get; init; } = 1m;
+    public long? MaximumRoundPenalty { get; init; }
+    public long? MinimumTotalScore { get; init; }
+    public long ConfidentialityPoints { get; init; }
+    public decimal MinimumAttackRatio { get; init; } = 0.1m;
+    public decimal ScarcityAlpha { get; init; } = 0.705m;
+    public decimal MaximumRankMultiplier { get; init; } = 2m;
+    public AwdScoreCompositionProtocol Composition { get; init; }
+    public decimal AttackWeight { get; init; } = 1m;
+    public decimal DefenseWeight { get; init; } = 1m;
+    public decimal SlaWeight { get; init; } = 1m;
+    public AwdAttackSettlementProtocol AttackSettlement { get; init; }
+
+    public AwdRuleOptions ToDomain() => new()
+    {
+        FlagLifetimeUnit = (AwdLifetimeUnit)FlagLifetimeUnit,
+        FlagLifetime = FlagLifetime,
+        LinkHistoricalWindow = LinkHistoricalWindow,
+        HistoricalLifetimeUnit = (AwdLifetimeUnit)HistoricalLifetimeUnit,
+        HistoricalLifetime = HistoricalLifetime,
+        GenerationPolicy = (AwdGenerationPolicy)GenerationPolicy,
+        GenerationInterval = GenerationInterval,
+        FlagsPerStore = FlagsPerStore,
+        RoundGapSeconds = RoundGapSeconds,
+        TotalRounds = TotalRounds,
+        SubmissionTailSeconds = SubmissionTailSeconds,
+        FinalCheckBudgetSeconds = FinalCheckBudgetSeconds,
+        RetryCount = RetryCount,
+        RetryIntervalSeconds = RetryIntervalSeconds,
+        CallbackGraceSeconds = CallbackGraceSeconds,
+        SlaSettlement = (AwdSlaSettlement)SlaSettlement,
+        Preset = (AwdScoringPreset)Preset,
+        DefenseMode = (AwdDefenseMode)DefenseMode,
+        SlaBasis = (AwdSlaBasis)SlaBasis,
+        OkRatio = OkRatio,
+        RecoveringRatio = RecoveringRatio,
+        MumbleRatio = MumbleRatio,
+        OfflineRatio = OfflineRatio,
+        PenaltyMode = (AwdPenaltyMode)PenaltyMode,
+        MumblePenalty = MumblePenalty,
+        OfflinePenalty = OfflinePenalty,
+        RecoveringPenalty = RecoveringPenalty,
+        MumblePenaltyRatio = MumblePenaltyRatio,
+        OfflinePenaltyRatio = OfflinePenaltyRatio,
+        RecoveringPenaltyRatio = RecoveringPenaltyRatio,
+        ConsecutiveFailureMultiplier = ConsecutiveFailureMultiplier,
+        MaximumRoundPenalty = MaximumRoundPenalty,
+        MinimumTotalScore = MinimumTotalScore,
+        ConfidentialityPoints = ConfidentialityPoints,
+        MinimumAttackRatio = MinimumAttackRatio,
+        ScarcityAlpha = ScarcityAlpha,
+        MaximumRankMultiplier = MaximumRankMultiplier,
+        Composition = (AwdScoreComposition)Composition,
+        AttackWeight = AttackWeight,
+        DefenseWeight = DefenseWeight,
+        SlaWeight = SlaWeight,
+        AttackSettlement = (AwdAttackSettlement)AttackSettlement,
+    };
+
+    public static AwdRuleOptionsContract FromDomain(AwdRuleOptions value) => new()
+    {
+        FlagLifetimeUnit = (AwdLifetimeUnitProtocol)value.FlagLifetimeUnit,
+        FlagLifetime = value.FlagLifetime,
+        LinkHistoricalWindow = value.LinkHistoricalWindow,
+        HistoricalLifetimeUnit = (AwdLifetimeUnitProtocol)value.HistoricalLifetimeUnit,
+        HistoricalLifetime = value.HistoricalLifetime,
+        GenerationPolicy = (AwdGenerationPolicyProtocol)value.GenerationPolicy,
+        GenerationInterval = value.GenerationInterval,
+        FlagsPerStore = value.FlagsPerStore,
+        RoundGapSeconds = value.RoundGapSeconds,
+        TotalRounds = value.TotalRounds,
+        SubmissionTailSeconds = value.SubmissionTailSeconds,
+        FinalCheckBudgetSeconds = value.FinalCheckBudgetSeconds,
+        RetryCount = value.RetryCount,
+        RetryIntervalSeconds = value.RetryIntervalSeconds,
+        CallbackGraceSeconds = value.CallbackGraceSeconds,
+        SlaSettlement = (AwdSlaSettlementProtocol)value.SlaSettlement,
+        Preset = (AwdScoringPresetProtocol)value.Preset,
+        DefenseMode = (AwdDefenseModeProtocol)value.DefenseMode,
+        SlaBasis = (AwdSlaBasisProtocol)value.SlaBasis,
+        OkRatio = value.OkRatio,
+        RecoveringRatio = value.RecoveringRatio,
+        MumbleRatio = value.MumbleRatio,
+        OfflineRatio = value.OfflineRatio,
+        PenaltyMode = (AwdPenaltyModeProtocol)value.PenaltyMode,
+        MumblePenalty = value.MumblePenalty,
+        OfflinePenalty = value.OfflinePenalty,
+        RecoveringPenalty = value.RecoveringPenalty,
+        MumblePenaltyRatio = value.MumblePenaltyRatio,
+        OfflinePenaltyRatio = value.OfflinePenaltyRatio,
+        RecoveringPenaltyRatio = value.RecoveringPenaltyRatio,
+        ConsecutiveFailureMultiplier = value.ConsecutiveFailureMultiplier,
+        MaximumRoundPenalty = value.MaximumRoundPenalty,
+        MinimumTotalScore = value.MinimumTotalScore,
+        ConfidentialityPoints = value.ConfidentialityPoints,
+        MinimumAttackRatio = value.MinimumAttackRatio,
+        ScarcityAlpha = value.ScarcityAlpha,
+        MaximumRankMultiplier = value.MaximumRankMultiplier,
+        Composition = (AwdScoreCompositionProtocol)value.Composition,
+        AttackWeight = value.AttackWeight,
+        DefenseWeight = value.DefenseWeight,
+        SlaWeight = value.SlaWeight,
+        AttackSettlement = (AwdAttackSettlementProtocol)value.AttackSettlement,
+    };
+}
 
 public sealed record ScoreCurveContract(
     long InitialPoints,
@@ -53,6 +212,10 @@ public sealed record CtfCompetitionModeConfigurationContract(
     IReadOnlyList<BloodRewardContract> BloodRewards,
     long WrongSubmissionPenalty,
     CtfScoreSettlementModeProtocol ScoreSettlementMode = CtfScoreSettlementModeProtocol.DynamicRecalculation);
+public sealed record AwdTieBreakContract(
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdTieBreakField>))] AwdTieBreakField Field,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdSortDirection>))] AwdSortDirection Direction);
+
 public sealed record AwdCompetitionModeConfigurationContract(
     int HardeningDurationSeconds,
     int RoundDurationSeconds,
@@ -61,7 +224,9 @@ public sealed record AwdCompetitionModeConfigurationContract(
     long VictimDefensePoolPoints,
     int CheckerIntervalSeconds,
     long ServiceHealthyPoints,
-    long ServiceUnhealthyPenalty);
+    long ServiceUnhealthyPenalty,
+    AwdRuleOptionsContract? Options = null,
+    IReadOnlyList<AwdTieBreakContract>? TieBreakers = null);
 public sealed record AwdpCompetitionModeConfigurationContract(
     int RoundDurationSeconds,
     ScoreCurveContract BreakScoreCurve,
@@ -113,7 +278,9 @@ public static class CompetitionModeConfigurationContractMapper
                 { DefaultScoreCurve: not null, BloodRewards: not null }
                 && Enum.IsDefined(contract.Ctf.ScoreSettlementMode)
                 && contract.Ctf.BloodRewards.All(item => item is not null),
-            GameModeProtocol.Awd => contract.Awd is not null,
+            GameModeProtocol.Awd => contract.Awd is not null && (contract.Awd.TieBreakers is null
+                || contract.Awd.TieBreakers.All(item => item is not null) && AwdTieBreakPolicy.IsValid(
+                    contract.Awd.TieBreakers.Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)).ToArray())),
             GameModeProtocol.Awdp => contract.Awdp is
                 { BreakScoreCurve: not null, FixScoreCurve: not null },
             GameModeProtocol.Koh => contract.Koh is not null,
@@ -160,7 +327,11 @@ public static class CompetitionModeConfigurationContractMapper
                     awd.HardeningDurationSeconds, awd.RoundDurationSeconds,
                     (AwdAttackRewardModeProtocol)awd.AttackRewardMode, awd.AttackPoints,
                     awd.VictimDefensePoolPoints, awd.CheckerIntervalSeconds,
-                    awd.ServiceHealthyPoints, awd.ServiceUnhealthyPenalty);
+                    awd.ServiceHealthyPoints, awd.ServiceUnhealthyPenalty,
+                    AwdRuleOptionsContract.FromDomain(awd.AwdOptions),
+                    AwdTieBreakPolicy.Resolve(awd.TieBreakers.OrderBy(item => item.Position)
+                        .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)))
+                        .Select(item => new AwdTieBreakContract(item.Field, item.Direction)).ToArray());
                 break;
             case AwdpCompetitionModeConfiguration awdp:
                 result.Awdp = new(
@@ -213,7 +384,11 @@ public static class CompetitionModeConfigurationContractMapper
                 VictimDefensePoolPoints = value.Awd.VictimDefensePoolPoints,
                 CheckerIntervalSeconds = value.Awd.CheckerIntervalSeconds,
                 ServiceHealthyPoints = value.Awd.ServiceHealthyPoints,
-                ServiceUnhealthyPenalty = value.Awd.ServiceUnhealthyPenalty
+                ServiceUnhealthyPenalty = value.Awd.ServiceUnhealthyPenalty,
+                AwdOptions = value.Awd.Options?.ToDomain() ?? new(),
+                TieBreakers = (value.Awd.TieBreakers?.Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))
+                    ?? AwdTieBreakPolicy.Default).Select((item, position) => new AwdCompetitionTieBreak
+                    { CompetitionId = competitionId, Position = position, Field = item.Field, Direction = item.Direction }).ToList()
             },
             GameModeProtocol.Awdp => new AwdpCompetitionModeConfiguration
             {

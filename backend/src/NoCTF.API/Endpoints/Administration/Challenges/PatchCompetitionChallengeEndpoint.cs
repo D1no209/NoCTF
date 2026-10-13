@@ -70,6 +70,7 @@ public sealed class CompetitionChallengePresentationPatchRequest
 
 public sealed class CompetitionChallengeRulesPatchRequest
 {
+    public string? Reason { get; set; }
     public required CompetitionChallengeRulesContract Configuration { get; set; }
 }
 
@@ -120,6 +121,7 @@ public sealed class PatchCompetitionChallengeValidator
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionChallengeValidationUseMostNonblankTags)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionChallengeValidationUseMostNonblankTags));
         RuleFor(request => request.Presentation!.Order).GreaterThanOrEqualTo(0)
             .When(request => request.Presentation is not null);
+        RuleFor(request => request.Rules!.Reason).MaximumLength(512).When(request => request.Rules is not null);
         RuleFor(request => request.Rules!.Configuration).NotNull()
             .When(request => request.Rules is not null);
         RuleFor(request => request.Rules!.Configuration)
@@ -162,6 +164,7 @@ public static partial class CompetitionChallengePatchMapper
         [MappingTarget] CompetitionChallenge target);
 
     [MapperIgnoreTarget(nameof(CompetitionChallenge.DirectionId))]
+    [MapperIgnoreSource(nameof(CompetitionChallengeRulesPatchRequest.Reason))]
     [MapperIgnoreSource(nameof(CompetitionChallengeRulesPatchRequest.Configuration))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Direction))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Rules))]
@@ -330,7 +333,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                     competitionChallengeId,
                     target.Rules!,
                     timeProvider.GetUtcNow(),
-                    transactionCt);
+                    transactionCt, target.Mode == NoCTF.Domain.Competitions.GameMode.Awd
+                        ? new NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit(user.UserId, request.Rules!.Reason) : null);
                 if (!result.Succeeded)
                 {
                     Results<Ok<AdminCompetitionChallengeResponse>, NotFound,

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { AwdScoringRuleChanges, ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, awdStores, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentReason, adjustmentReasonRequired, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -102,9 +102,11 @@ const { ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adm
             </CardHeader>
             <CardContent>
               <component :is="ChallengeRulesEditor"
+          :competition-status="competition?.status"
                 :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
                 :rules="config?.rules"
                 :inherited-configuration="inheritedConfiguration"
+                  :awd-stores="awdStores"
                 :readonly="!canWrite"
                 :loading="configLoading"
                 :saving="savingConfig"
@@ -113,6 +115,10 @@ const { ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adm
               />
             </CardContent>
           </Card>
+        </section>
+
+        <section v-else-if="activeSection === 'awdScoring' && competition?.mode === 'Awd' && canWrite">
+          <component :is="AwdScoringRuleChanges" :competition-id="competitionId" :competition-challenge-id="ccId" :can-write="canWrite" />
         </section>
 
         <section v-else-if="activeSection === 'hints'">
@@ -267,6 +273,11 @@ const { ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adm
               <FieldLabel for="challenge-score-delta">{{ $t('administration.label.scoreDelta') }}</FieldLabel>
               <NumberInput id="challenge-score-delta" v-model.number="adjustmentDelta"  step="1" />
               <FieldDescription>{{ $t('administration.competitionsBy.description.enterNonZeroInteger') }}</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel for="challenge-score-reason">{{ $t('administration.label.adjustmentReason') }}</FieldLabel>
+              <Textarea id="challenge-score-reason" v-model="adjustmentReason" :maxlength="512" :required="adjustmentReasonRequired" :disabled="adjustmentPending" />
+              <FieldDescription v-if="adjustmentReasonRequired">{{ $t('administration.description.awdAdjustmentReason') }}</FieldDescription>
             </Field>
           </FieldGroup>
           <DialogFooter>

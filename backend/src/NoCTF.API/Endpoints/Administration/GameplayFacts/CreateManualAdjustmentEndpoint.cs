@@ -13,6 +13,7 @@ public sealed class CreateManualAdjustmentRequest
     public Guid TeamId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public int Delta { get; set; }
+    public string? Reason { get; set; }
 }
 
 public sealed class CreateManualAdjustmentValidator : Validator<CreateManualAdjustmentRequest>
@@ -22,6 +23,7 @@ public sealed class CreateManualAdjustmentValidator : Validator<CreateManualAdju
         RuleFor(request => request.TeamId).NotEmpty();
         RuleFor(request => request.CompetitionChallengeId).NotEmpty();
         RuleFor(request => request.Delta).NotEqual(0);
+        RuleFor(request => request.Reason).MaximumLength(512);
     }
 }
 
@@ -59,12 +61,14 @@ public sealed class CreateManualAdjustmentEndpoint(
             request.CompetitionChallengeId,
             request.Delta,
             user.UserId,
-            timeProvider.GetUtcNow()), ct);
+            timeProvider.GetUtcNow(), request.Reason), ct);
         if (!result.Succeeded)
             return ApiProblems.Problem(
-                statusCode: StatusCodes.Status404NotFound,
+                statusCode: result.FailureCode == GameplayFactAdmissionFailureCode.ManualAdjustmentReasonInvalid
+                    ? StatusCodes.Status422UnprocessableEntity : StatusCodes.Status404NotFound,
                 title: ApiMessages.Get(ApiMessageId.CreateManualAdjustmentTitleManualAdjustmentWasAccepted),
-                detail: ApiMessages.Get(ApiMessageId.CreateManualAdjustmentTitleManualAdjustmentWasAccepted));
+                detail: ApiMessages.For(result.FailureCode),
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode.ToString() });
         var accepted = result.Value!;
         var statusUrl =
             $"/api/v1/competitions/{competitionId}/gameplay-facts/{accepted.GameplayFactId}";

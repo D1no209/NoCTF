@@ -274,6 +274,9 @@ public sealed class CompetitionLifecyclePersistenceTests
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Running);
+            await Assert.That(competition.EndAt).IsGreaterThan(fixture.Now.AddHours(1).AddMinutes(4));
+            var round = await verify.AwdRounds.AsNoTracking().SingleAsync(cancellationToken);
+            await Assert.That(round.EndsAt).IsGreaterThan(fixture.OriginalValidUntil.AddMinutes(4));
             var runtime = await verify.RuntimeInstances.AsNoTracking().AsSplitQuery().SingleAsync(
                 item => item.Id == fixture.RuntimeId,
                 cancellationToken);
@@ -471,6 +474,12 @@ public sealed class CompetitionLifecyclePersistenceTests
             ValidStart = now.AddMinutes(-10),
             ValidUntil = originalValidUntil,
             CreatedAt = now
+        });
+        db.AwdRounds.Add(new NoCTF.Domain.Competitions.Awd.AwdRound
+        {
+            Id = Guid.CreateVersion7(), CompetitionId = competitionId, Number = 1,
+            StartsAt = now.AddMinutes(-10), EndsAt = originalValidUntil,
+            ActiveStartTicks = 0, ActiveEndTicks = TimeSpan.FromMinutes(15).Ticks
         });
         await db.SaveChangesAsync(cancellationToken);
         return new(

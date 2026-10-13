@@ -1,30 +1,24 @@
-# AWD 平台配置抄录表
+# AWD 样例平台配置
 
-本文件用于把已经在 NoCTF 管理界面中确认的配置随题目一同交付，不是可导入的内部 JSON。不要手写 `schemaVersion`、比赛 ID、队伍 ID、规格 ID、Runner Pool 或 Runtime Provider。
+这是管理界面配置抄录表，不是直接导入 JSON。正式交付补全 `NOCTF-DELIVERY.md`。
 
-## 题库模板
+- Runtime：Container，PerTeam，AwdRotation。
+- 服务 `main`：构建 `runtime/` 的镜像，0.1 核、64 MiB，内部端口 8080。
+- Runtime 访问入口：`main:8080`，Participants，`http://{HOST}:{PORT}/`。Docker 自动随机发布宿主端口。
+- Store `sample`：编辑器生成稳定 ID，BusinessChecker，目标服务 `main`，支持历史保存。
+- Checker：构建 `checker/` 的镜像，目标服务 `main`，建议 15 秒执行预算。
+- 比赛默认：轮长 180 秒，Flag 接收 5 轮，历史窗口联动，1 Store/1 Flag；ATK/DEF/SLA=50/100/100。
+- Flag 模板：留空使用安全默认，或正文 `[SECURE]`；不用 `[GUID]` 替代 AWD 安全派生。
 
-- 游戏模式：`AWD`
-- 分配方式：`PerTeam`
-- Flag 来源：`AwdRotation`
-- Runtime：Container 或 Compose
-- Runtime 镜像：`待填写`
-- 对外端口：容器 `8080` / host `0` / Exposure `Participants`
-- URL：`http://{HOST}:{PORT}/`
-- Flag 注入命令：`printf '%s' '${FLAG}' > /dev/shm/flag`
-- Compose ServiceName：Container 不适用；Compose 待填写
-- Checker 镜像：`待填写`
-- Checker 目标：Container 使用 `target`；Compose 使用目标 service
-- Checker 目标端口：`8080`
-- Checker 超时：`待填写`
+样例 Checker 从任务清单取得 StoreId/FlagId，以 PUT `/flags/{storeId}/{flagId}` 写入当前 Flag，以 GET 同路径读取全部要求的历史。样例为无认证存储，故意可直接读取，仅用于协议验证；正式题替换业务与漏洞流程。
 
-至少一个攻防入口必须使用 `Participants`。Flag 注入超时范围为 1～300 秒。保存后先使用题库测试容器
-验证并预热镜像，再加入比赛。
+若改为 RunnerCommand，Store 注入命令使用：
 
-## 比赛题目规则
+```sh
+mkdir -p "/dev/shm/flags/${STORE_ID}"
+printf '%s' "${FLAG}" > "/dev/shm/flags/${STORE_ID}/${FLAG_ID}"
+```
 
-- Flag 前缀：`待填写`；留空时平台使用 `flag`
-- Flag 正文：`待填写`；留空时平台使用随机 `[GUID]`
-- 攻击奖励、受害方防守池、Checker 周期、服务分：继承比赛或逐项记录覆盖值
+样例路径中的 StoreId/FlagId 使用不带连字符的小写 UUID，与 Runner 导出的变量一致。
 
-完整字段和边界以包内 `NOCTF-DELIVERY.md` 及平台当前管理界面为准。
+Checker 会依据 `requiresWrite` 自动只读该投放方式的材料。服务启动不清空目录；正式 Runtime 重置后历史丢失必须如实检测。不要配置 Compose、固定宿主端口、作者安全策略、Provider 或 Runner Pool。

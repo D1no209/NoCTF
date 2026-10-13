@@ -29,7 +29,9 @@ public sealed class LiveSoloFoundationPersistenceTests
             var foundation = Array.FindIndex(migrations, x => x.Contains("LiveSoloFoundation", StringComparison.Ordinal));
             await Assert.That(foundation).IsGreaterThan(0);
             var previous = migrations[foundation - 1];
-            await db.GetService<IMigrator>().MigrateAsync(previous, ct);
+            // Seed with the current typed ORM, then use EF's generated downgrade to obtain the historical schema.
+            // The current AWD owned columns cannot be inserted directly into the pre-LiveSolo schema.
+            await db.Database.MigrateAsync(ct);
             var now = DateTimeOffset.UtcNow;
             var user = new User { Id = Guid.NewGuid(), UserName = "livesolo-owner", Email = "livesolo@example.test", PasswordHash = "unused",
                 Role = UserRole.Administrator, AccountStatus = UserAccountStatus.Active, CreatedAt = now };
@@ -41,6 +43,7 @@ public sealed class LiveSoloFoundationPersistenceTests
                 competition.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(mode, competition.Id); return competition;
             }).ToArray();
             db.Competitions.AddRange(old); await db.SaveChangesAsync(ct);
+            await db.GetService<IMigrator>().MigrateAsync(previous, ct);
             db.ChangeTracker.Clear(); await db.Database.MigrateAsync(ct);
             await Assert.That(await db.Competitions.Select(x => x.Mode).ToArrayAsync(ct)).IsEquivalentTo(old.Select(x => x.Mode));
             var live = new LiveSoloCompetition { Id = Guid.NewGuid(), OwnerId = user.Id, Title = "LiveSolo", StartAt = now, EndAt = now.AddHours(1),

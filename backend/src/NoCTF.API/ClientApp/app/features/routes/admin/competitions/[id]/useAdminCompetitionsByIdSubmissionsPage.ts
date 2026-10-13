@@ -1,3 +1,5 @@
+import AwdCheckReviewComponent from '~/features/admin/awd/AwdCheckReview.vue'
+import { markRaw } from 'vue'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
@@ -426,6 +428,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const viewBindings = {
       competitionId, isSolo, canRejudge, soloResults,
+      isAwd: computed(() => competition.value?.mode === 'Awd'), AwdCheckReview: markRaw(AwdCheckReviewComponent),
       adminUserPath, adminTeamPath, adminChallengePath,
       previewIncludeInformational, previewScanned, previewCounts,
       evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence,

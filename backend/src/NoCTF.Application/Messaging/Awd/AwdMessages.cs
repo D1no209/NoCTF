@@ -13,7 +13,6 @@ public static class AwdFlagInjectionExecutionBudget
 
 public sealed record AdvanceAwdRound(
     Guid CompetitionId,
-    Guid CompetitionChallengeId,
     DateTimeOffset At);
 
 public sealed record GenerateAwdFlags(
@@ -43,15 +42,19 @@ public sealed record RunAwdChecker(
     Guid CompetitionChallengeId,
     Guid GameplayFactId,
     string RunnerId,
-    DateTimeOffset Deadline) : IRunnerNodeMessage;
+    DateTimeOffset Deadline,
+    Guid AttemptId,
+    DateTimeOffset ReceiptDeadline,
+    Guid DispatchAttemptId = default) : IRunnerNodeMessage;
 
 public sealed record DispatchAwdCheckers(
     DateTimeOffset At,
-    Guid? AfterRuntimeInstanceId = null);
+    Guid? AfterGameplayFactId = null);
 
 public sealed record AwdCheckerCallbackMissing(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid RuntimeInstanceId,
     Guid GameplayFactId,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    Guid AttemptId);

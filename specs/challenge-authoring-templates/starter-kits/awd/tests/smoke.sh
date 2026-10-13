@@ -25,9 +25,6 @@ docker run -d --name "${runtime}" --network "${network}" --network-alias target 
 docker run -d --name "${callback}" --network "${network}" --network-alias callback \
     -e EXPECTED_TOKEN=starter-kit-token "${callback_image}" >/dev/null
 
-test_flag='flag{starter-kit-测试}'
-printf '%s' "${test_flag}" | docker exec -i "${runtime}" sh -c 'cat > /dev/shm/flag'
-
 attempt=0
 until docker exec "${callback}" python -c \
     "from urllib.request import urlopen; urlopen('http://127.0.0.1:8090/health', timeout=1)" \
@@ -37,15 +34,17 @@ until docker exec "${callback}" python -c \
     sleep 1
 done
 
-actual_flag="$(docker exec "${runtime}" python -c \
-    "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:8080/flag').read().decode())")"
-[ "${actual_flag}" = "${test_flag}" ]
-
-docker run --rm --network "${network}" \
-    -e NOCTF_TARGET_HOST=target \
-    -e NOCTF_CALLBACK_URL=http://callback:8090/result \
-    -e NOCTF_CALLBACK_TOKEN=starter-kit-token \
-    "${checker_image}"
-
-docker logs "${callback}" 2>&1 | grep -q '"state":"Up"'
-printf '%s\n' 'AWD starter kit smoke test passed.'
+for phase in 1 2 3; do
+    if [ "${phase}" = 3 ]; then
+        docker exec "${runtime}" python -c "from pathlib import Path; Path('/dev/shm/flags/dddddddd000000000000000000000001/aaaaaaaa000000000000000000000001').unlink()"
+    fi
+    docker run --rm --network "${network}" \
+        -e NOCTF_TARGET_HOST=target \
+        -e 'NOCTF_AWD_TARGETS={"main":"target"}' \
+        -e "NOCTF_AWD_TASK_URL=http://callback:8090/task/${phase}" \
+        -e "NOCTF_CALLBACK_URL=http://callback:8090/result/${phase}" \
+        -e NOCTF_CALLBACK_TOKEN=starter-kit-token \
+        "${checker_image}"
+    docker logs "${callback}" 2>&1 | grep -q "validated phase ${phase}"
+done
+printf '%s\n' 'AWD starter kit: current write, historical read, and recovery evidence passed.'

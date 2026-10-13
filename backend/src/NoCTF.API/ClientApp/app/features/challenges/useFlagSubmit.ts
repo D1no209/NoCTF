@@ -25,6 +25,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
+    completion: 'Solved' | 'Repeatable' | 'Break'
     title?: string
     description?: string
     practice?: boolean
@@ -39,6 +40,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
+    completion: 'Solved' | 'Repeatable' | 'Break'
     title?: string
     description?: string
     practice?: boolean
@@ -71,7 +73,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const persistentResult = ref<{ correct: boolean | null; message: UiMessage } | null>(null)
 
-  const solved = ref(props.initiallySolved || solvedChallengeKeys.has(challengeKey()))
+  const solved = ref(props.completion !== 'Repeatable' && (props.initiallySolved || solvedChallengeKeys.has(challengeKey())))
 
   let requestGeneration = 0
 
@@ -96,6 +98,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   })
 
   watch(() => props.initiallySolved, value => {
+    if (props.completion === 'Repeatable') return
     if (!value) { solvedChallengeKeys.delete(challengeKey()); solved.value = false; return }
     solvedChallengeKeys.add(challengeKey())
     solved.value = true
@@ -107,7 +110,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
   const { submissionsClosed, judgementOnly } = useSubmissionTiming(() => props.timing, () => props.practice)
-  const inputDisabled = computed(() => solved.value && !judgementOnly.value || attemptsExhausted.value || submissionsClosed.value)
+  const inputDisabled = computed(() => props.completion === 'Break' && solved.value
+    && !props.readOnlyJudgement && !judgementOnly.value || attemptsExhausted.value || submissionsClosed.value)
 
   function showResult(correct: boolean, message: UiMessage): void {
     persistentResult.value = { correct, message }
@@ -171,12 +175,16 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
       toasted.add(id)
       if ((data.result === 'Correct' || data.result === 'RightButDue') && data.timeEligibility !== 'NotOpened' && data.timeEligibility !== 'SubmissionClosed') {
-        solvedChallengeKeys.add(challengeKey())
-        solved.value = true
+        if (props.completion !== 'Repeatable') {
+          solvedChallengeKeys.add(challengeKey())
+          solved.value = true
+        }
         if (data.result === 'RightButDue')
           showResult(true, translate('challenges.flagSubmit.correctWithoutScore'))
         else if (props.practice)
           showResult(true, translate("challenges.flagSubmit.description.correctFlagPracticeAttempts"))
+        else if (props.completion === 'Repeatable')
+          showResult(true, translate('challenges.label.flagCorrect'))
         else
           showResult(true, translate('terminal.challengeSolved'))
         celebrateCorrectFlag()
@@ -205,9 +213,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     const generation = requestGeneration
     persistentResult.value = null
     try {
-    const lines = props.multiple
-      ? input.value.split('\n').map((line) => line.trim()).filter(Boolean)
-      : [input.value.trim()].filter(Boolean)
+    const rawLines = props.multiple ? input.value.split(/\r?\n/) : [input.value]
+    const lines = (props.completion === 'Repeatable' ? rawLines : rawLines.map(line => line.trim())).filter(Boolean)
     if (!lines.length) return
     submitting.value = true
     const verificationHeaders = await requestHumanVerification('evaluation')
@@ -294,11 +301,11 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
   }
 
-  watch(() => [user.value?.userId, props.competitionId, props.competitionChallengeId, props.practice], () => {
+  watch(() => [user.value?.userId, props.competitionId, props.competitionChallengeId, props.practice, props.completion], () => {
     requestGeneration++
     submitting.value = false
     persistentResult.value = null
-    solved.value = props.initiallySolved || solvedChallengeKeys.has(challengeKey())
+    solved.value = props.completion !== 'Repeatable' && (props.initiallySolved || solvedChallengeKeys.has(challengeKey()))
     input.value = ''
     tracked.value = []
     pendingRefreshes.clear()
@@ -323,6 +330,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   })
 
   onUnmounted(() => {
+    requestGeneration++
     unwatch?.()
     stopPolling()
     pendingRefreshes.clear()

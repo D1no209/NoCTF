@@ -102,7 +102,7 @@ describe('participant challenge progress', () => {
     expect(shell).toContain("...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate(\"common.label.challenge.pageTitle\"), icon: Puzzle }] : [])")
   })
 
-  test('celebrates a correct flag prominently and locks judging after a solve', async () => {
+  test('celebrates a correct flag and displays restored progress with explicit input eligibility', async () => {
     const submit = await sourceFile(
       new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
     ).text()
@@ -146,7 +146,7 @@ describe('participant challenge progress', () => {
     ).text()
 
     expect(submit).toContain("const persistentResult = ref<{ correct: boolean | null; message: UiMessage } | null>(null)")
-    expect(submit).toContain('const solved = ref(props.initiallySolved || solvedChallengeKeys.has(challengeKey()))')
+    expect(submit).toContain("const solved = ref(props.completion !== 'Repeatable' && (props.initiallySolved || solvedChallengeKeys.has(challengeKey())))")
     expect(submit).toContain("showResult(true, translate('terminal.challengeSolved'))")
     expect(submit).toContain('<Alert v-if="persistentResult?.correct === true"')
     expect(submit).not.toContain('<Alert v-if="solved"')

@@ -1,4 +1,5 @@
 {
+  "awd.rules.changedEvent": "{actor} 修改了 {challenge} 的计分规则",
   "competitions.competitionBroadcast.description.liveSolo": "比赛通知会在这里显示",
   "competitions.label.backToAdministration": "返回管理后台",
   "progression.title": "闯关与勋章",
@@ -417,5 +418,6 @@
   "competitions.deletion.soloMatches": "LiveSolo 对局",
   "competitions.deletion.soloQuestionLists": "LiveSolo 题单",
   "competitions.deletion.soloOwnedMaterials": "LiveSolo 本场独立题目",
-  "competitions.deletion.activeSoloMediaResources": "待清理的 LiveSolo 媒体资源"
+  "competitions.deletion.activeSoloMediaResources": "待清理的 LiveSolo 媒体资源",
+  "competitions.label.spectator": "观战大屏"
 }

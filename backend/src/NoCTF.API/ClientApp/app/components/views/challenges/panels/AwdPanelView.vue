@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdPanelViewState } from '~/features/challenges/panels/useAwdPanel'
 
 const viewProps = defineProps<{ state: AwdPanelViewState }>()
-const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
+const { emit, targets, attackTarget, openAttackInfo, closeAttackInfo, AwdAttackInfo, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -15,6 +15,8 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       controls="reset-only"
       :dock-target="runtimeDockTarget"
     />
+
+    <component :is="AwdPublicRules" :competition-id="competition.id!" :competition-challenge-id="challenge.id!" />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
       <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('challenges.label.attackTarget') }}</h3>
@@ -32,6 +34,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
             <TableRow>
               <TableHead>{{ $t('common.label.team') }}</TableHead>
               <TableHead>{{ $t('challenges.label.targetHost') }}</TableHead>
+              <TableHead>{{ $t('challenges.awdAttackInfo.title') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -46,16 +49,22 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
                   />
                 </div>
               </TableCell>
+              <TableCell><Button size="sm" variant="outline" @click="openAttackInfo(target)">{{ $t('challenges.awdAttackInfo.view') }}</Button></TableCell>
             </TableRow>
           </TableBody>
         </Table>
     </section>
+
+    <component :is="AwdAttackInfo" v-if="attackTarget" :key="`${competition.id}:${challenge.id}:${attackTarget.teamId}`"
+      :competition-id="competition.id!" :competition-challenge-id="challenge.id!"
+      :team-id="attackTarget.teamId!" :team-name="attackTarget.teamName ?? ''" @close="closeAttackInfo" />
 
     <component :is="FlagSubmit" :timing="challenge.timing"
       :dock-target="flagDockTarget"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple
+      completion="Repeatable"
       :title="$t('challenges.label.batchSubmitFlag')"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"

@@ -75,6 +75,8 @@ services:
       Authentication__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       Authentication__Issuer: NoCTF.E2E
       Authentication__Audience: NoCTF.E2E.Api
+      # This isolated test API is bound to loopback HTTP, without a TLS terminator.
+      Authentication__RefreshCookieSecure: "false"
       RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       RunnerScoring__Issuer: NoCTF.E2E.Runner
       RunnerScoring__Audience: NoCTF.E2E.Scoring
@@ -103,6 +105,7 @@ services:
 
   backend:
     image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
+    container_name: ${NOCTF_E2E_CALLBACK_CONTAINER}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -112,12 +115,14 @@ services:
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     labels:
+      noctf.io/internal-role: scoring-callback-gateway
       noctf.io/runtime-proxy-gateway: "true"
     environment:
       <<: *api-environment
       Hosting__Roles__0: Api
       ASPNETCORE_HTTP_PORTS: "8080"
       Storage__PublicBaseUrl: http://backend:8080
+    networks: [default, callbacks]
     ports:
       - "127.0.0.1::8080"
     depends_on:
@@ -151,6 +156,7 @@ services:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
+    networks: [default, challenges, callbacks]
     environment:
       Hosting__Roles__0: Runner
       ASPNETCORE_HTTP_PORTS: "8080"
@@ -167,8 +173,11 @@ services:
       RunnerScoring__Audience: NoCTF.E2E.Scoring
       RunnerScoring__CallbackBaseUrl: http://backend:8080
       Runtime__Docker__Endpoint: unix:///var/run/docker.sock
-      Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}
+      Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}-challenges
+      Runtime__Docker__CallbackNetwork: ${NOCTF_E2E_NETWORK}-callbacks
       Runtime__Docker__PublicHost: 127.0.0.1
+      Runtime__Docker__CallbackContainer: ${NOCTF_E2E_CALLBACK_CONTAINER}
+      Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway
     ports:
       - "127.0.0.1::8080"
     volumes:
@@ -193,3 +202,10 @@ services:
 networks:
   default:
     name: ${NOCTF_E2E_NETWORK}
+  challenges:
+    name: ${NOCTF_E2E_NETWORK}-challenges
+    driver: bridge
+  callbacks:
+    name: ${NOCTF_E2E_NETWORK}-callbacks
+    driver: bridge
+    internal: true

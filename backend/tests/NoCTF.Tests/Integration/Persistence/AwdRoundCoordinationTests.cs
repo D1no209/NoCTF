@@ -5,6 +5,9 @@ using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
+using NoCTF.Infrastructure.Authentication;
+using NoCTF.GameModes.Awd.Flags;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Gameplay;
@@ -15,6 +18,9 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Worker;
@@ -24,11 +30,11 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
-public sealed class AwdRoundCoordinationTests
+public sealed partial class AwdRoundCoordinationTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Rebuilt_schedule_resumes_at_current_round_without_historical_ticks(
+    public async Task Rebuilt_schedule_records_missed_rounds_even_without_eligible_teams(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -47,6 +53,7 @@ public sealed class AwdRoundCoordinationTests
             var resumedAt = fixture.Now.AddMinutes(17);
 
             await using var db = new NoCtfDbContext(options);
+            await db.Teams.ExecuteUpdateAsync(setters => setters.SetProperty(team => team.IsBanned, true), cancellationToken);
             var source = new ClusterScheduleSource(
                 db,
                 new AwdRoundConfigurationCatalog(),
@@ -65,7 +72,7 @@ public sealed class AwdRoundCoordinationTests
                 db,
                 new AwdRoundConfigurationCatalog(),
                 outbox,
-                new MutableTimeProvider(resumedAt));
+                new MutableTimeProvider(resumedAt), Secrets());
 
             var outcome = await coordinator.AdvanceAsync(message, cancellationToken);
 
@@ -74,138 +81,35 @@ public sealed class AwdRoundCoordinationTests
             await Assert.That(generate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(4));
             await Assert.That(generate.ValidStart).IsLessThan(resumedAt);
             await Assert.That(generate.ValidUntil).IsGreaterThan(resumedAt);
+            await Assert.That(await db.AwdRounds.CountAsync(cancellationToken)).IsEqualTo(4);
+            await Assert.That(await db.AwdRounds.CountAsync(round => round.Missed, cancellationToken)).IsEqualTo(3);
+            await Assert.That(await db.ChallengeFlags.CountAsync(cancellationToken)).IsEqualTo(0);
             await Assert.That(outbox.Scheduled).IsEmpty();
-        });
-    }
-
-    [Test]
-    [Timeout(300_000)]
-    public async Task Checker_executions_create_independent_facts_and_callback_retries_are_idempotent(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_awd_checker_facts")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var fixture = await SeedAsync(options, cancellationToken, includeChecker: true);
-            var outbox = new RecordingOutbox();
-
-            await using (var dispatchDb = new NoCtfDbContext(options))
-            {
-                var first = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
-                    new DispatchAwdCheckers(fixture.Now),
-                    dispatchDb,
-                    new AwdCheckerConfigurationCatalog(),
-                    outbox,
-                    cancellationToken);
-                var replay = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
-                    new DispatchAwdCheckers(fixture.Now),
-                    dispatchDb,
-                    new AwdCheckerConfigurationCatalog(),
-                    outbox,
-                    cancellationToken);
-
-                await Assert.That(first).IsEqualTo(MessageExecutionOutcome.Applied);
-                await Assert.That(replay).IsEqualTo(MessageExecutionOutcome.Idempotent);
-            }
-
-            Guid healthyFactId;
-            await using (var verification = new NoCtfDbContext(options))
-            {
-                var facts = await verification.GameplayFacts.AsNoTracking()
-                    .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
-                    .ToListAsync(cancellationToken);
-                await Assert.That(facts.Count).IsEqualTo(1);
-                await Assert.That(facts[0].State).IsEqualTo(GameplayFactState.Processing);
-                healthyFactId = facts[0].Id;
-            }
-
-            await using (var healthyDb = new NoCtfDbContext(options))
-            {
-                var store = new InternalResultStore(healthyDb, new RecordingOutbox());
-                var applied = await store.RecordAwdAsync(AwdCheckResult.Create(
-                    fixture.RuntimeId,
-                    healthyFactId,
-                    AwdServiceState.Up,
-                    fixture.Now), cancellationToken);
-                var replay = await store.RecordAwdAsync(AwdCheckResult.Create(
-                    fixture.RuntimeId,
-                    healthyFactId,
-                    AwdServiceState.Down,
-                    fixture.Now), cancellationToken);
-                await Assert.That(applied).IsEqualTo(InternalResultDisposition.Applied);
-                await Assert.That(replay).IsEqualTo(InternalResultDisposition.Duplicate);
-            }
-
-            var nextCheckAt = fixture.Now.AddSeconds(
-                AwdConfiguration.Default.CheckerIntervalSeconds);
-            await using (var dispatchDb = new NoCtfDbContext(options))
-            {
-                var next = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
-                    new DispatchAwdCheckers(nextCheckAt),
-                    dispatchDb,
-                    new AwdCheckerConfigurationCatalog(),
-                    outbox,
-                    cancellationToken);
-                await Assert.That(next).IsEqualTo(MessageExecutionOutcome.Applied);
-            }
-
-            Guid unhealthyFactId;
-            await using (var verification = new NoCtfDbContext(options))
-            {
-                var facts = await verification.GameplayFacts.AsNoTracking()
-                    .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
-                    .OrderBy(fact => fact.OccurredAt)
-                    .ThenBy(fact => fact.Id)
-                    .ToListAsync(cancellationToken);
-                await Assert.That(facts.Count).IsEqualTo(2);
-                await Assert.That(facts[0].Result).IsEqualTo(GameplayFactResult.ServiceUp);
-                unhealthyFactId = facts[1].Id;
-            }
-
-            await using var firstCallbackDb = new NoCtfDbContext(options);
-            await using var retryCallbackDb = new NoCtfDbContext(options);
-            var callbackResults = await Task.WhenAll(
-                new InternalResultStore(firstCallbackDb, new RecordingOutbox())
-                    .RecordAwdAsync(AwdCheckResult.Create(
-                        fixture.RuntimeId,
-                        unhealthyFactId,
-                        AwdServiceState.CheckerTimedOut,
-                        nextCheckAt), cancellationToken),
-                new InternalResultStore(retryCallbackDb, new RecordingOutbox())
-                    .RecordAwdAsync(AwdCheckResult.Create(
-                        fixture.RuntimeId,
-                        unhealthyFactId,
-                        AwdServiceState.CheckerTimedOut,
-                        nextCheckAt), cancellationToken));
-
-            await Assert.That(callbackResults.Count(result =>
-                    result == InternalResultDisposition.Applied))
-                .IsEqualTo(1);
-            await Assert.That(callbackResults.Count(result =>
-                    result == InternalResultDisposition.Duplicate))
-                .IsEqualTo(1);
-            await using var final = new NoCtfDbContext(options);
-            var finalFacts = await final.GameplayFacts.AsNoTracking()
-                .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
-                .OrderBy(fact => fact.OccurredAt)
-                .ThenBy(fact => fact.Id)
-                .ToListAsync(cancellationToken);
-            await Assert.That(finalFacts.Count).IsEqualTo(2);
-            await Assert.That(finalFacts[1].State).IsEqualTo(GameplayFactState.Completed);
-            await Assert.That(finalFacts[1].Result).IsEqualTo(GameplayFactResult.ServiceDown);
-            await Assert.That(finalFacts[1].FailureCode)
-                .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
-            await Assert.That(outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Count())
-                .IsEqualTo(2);
+            // A competition clock also survives disabling its last question.
+            await db.CompetitionChallenges.ExecuteUpdateAsync(setters => setters.SetProperty(challenge => challenge.IsPublished, false), cancellationToken);
+            var emptySchedule = await source.RebuildAsync(fixture.Now.AddMinutes(20), cancellationToken);
+            await Assert.That(emptySchedule.Count(item => item.Kind == ClusterScheduleKind.AwdRound)).IsEqualTo(1);
+            var lifecycleClock = new MutableTimeProvider(fixture.Now.AddMinutes(18));
+            var lifecycle = new CompetitionLifecycleStore(db, null!, outbox,
+                new CompetitionEventStore(db, outbox), clock: lifecycleClock);
+            await Assert.That(await lifecycle.TryTransitionWithAuditAsync(fixture.CompetitionId,
+                CompetitionStatus.Running, CompetitionStatus.Paused, fixture.OwnerId, "pause test", false,
+                CompetitionLifecycleEffects.None, cancellationToken)).IsTrue();
+            // A paused AWD competition must not be automatically finished at its old wall deadline.
+            await Assert.That(await lifecycle.GetDueAsync(fixture.Now.AddHours(2), cancellationToken)).IsEmpty();
+            lifecycleClock.UtcNow = fixture.Now.AddMinutes(28);
+            await Assert.That(await lifecycle.TryTransitionWithAuditAsync(fixture.CompetitionId,
+                CompetitionStatus.Paused, CompetitionStatus.Running, fixture.OwnerId, "resume test", false,
+                CompetitionLifecycleEffects.None, cancellationToken)).IsTrue();
+            var resumedRound = await db.AwdRounds.SingleAsync(round => round.Number == 4, cancellationToken);
+            await Assert.That(resumedRound.StartsAt).IsEqualTo(fixture.Now.AddMinutes(15));
+            await Assert.That(resumedRound.EndsAt).IsEqualTo(fixture.Now.AddMinutes(30));
+            lifecycleClock.UtcNow = fixture.Now.AddMinutes(30);
+            var resumedCoordinator = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, lifecycleClock, Secrets());
+            await resumedCoordinator.AdvanceAsync(new AdvanceAwdRound(fixture.CompetitionId, lifecycleClock.UtcNow), cancellationToken);
+            var nextRound = await db.AwdRounds.SingleAsync(round => round.Number == 5, cancellationToken);
+            await Assert.That(nextRound.StartsAt).IsEqualTo(fixture.Now.AddMinutes(30));
+            await Assert.That(nextRound.EndsAt).IsEqualTo(fixture.Now.AddMinutes(35));
         });
     }
 
@@ -235,11 +139,10 @@ public sealed class AwdRoundCoordinationTests
                 db,
                 new AwdRoundConfigurationCatalog(),
                 outbox,
-                clock);
+                clock, Secrets());
             var advance = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
             await Assert.That(advance).IsEqualTo(MessageExecutionOutcome.Applied);
@@ -268,13 +171,15 @@ public sealed class AwdRoundCoordinationTests
                 cancellationToken);
             var resumeReplacement = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
             await Assert.That(resumeReplacement).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
             await Assert.That(outbox.Scheduled).IsEmpty();
-            var currentRoundGenerate = generate with { ValidUntil = extendedUntil };
+            // A flag lifetime cannot mutate the competition round window.
+            var currentRoundGenerate = generate;
+            var persistedRound = await db.AwdRounds.AsNoTracking().SingleAsync(cancellationToken);
+            await Assert.That(persistedRound.EndsAt).IsEqualTo(generate.ValidUntil);
 
             var greenTeamId = Guid.CreateVersion7();
             var greenRuntimeId = Guid.CreateVersion7();
@@ -342,6 +247,7 @@ public sealed class AwdRoundCoordinationTests
                 cancellationToken);
             await Assert.That(runningGreenRuntime.State).IsEqualTo(RuntimeState.Running);
             await Assert.That(runningGreenRuntime.ProviderReceipt).IsNotNull();
+            await coordinator.GenerateFlagsAsync(currentRoundGenerate, cancellationToken);
             var deferredInjection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().Last();
             var greenFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
                 candidate => candidate.TeamId == greenTeamId
@@ -352,13 +258,12 @@ public sealed class AwdRoundCoordinationTests
             clock.UtcNow = fixture.Now.AddMinutes(17);
             var delayedAdvance = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     currentRoundGenerate.ValidUntil),
                 cancellationToken);
             await Assert.That(delayedAdvance).IsEqualTo(MessageExecutionOutcome.Applied);
             var currentGenerate = outbox.Published.OfType<GenerateAwdFlags>().Last();
-            await Assert.That(currentGenerate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(2));
+            await Assert.That(currentGenerate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(4));
             var roundProjection = outbox.Published.OfType<ProjectLeaderboard>().Single();
             await Assert.That(roundProjection.CompetitionId).IsEqualTo(fixture.CompetitionId);
             await Assert.That(currentGenerate.ValidStart).IsLessThanOrEqualTo(clock.UtcNow);
@@ -376,21 +281,104 @@ public sealed class AwdRoundCoordinationTests
             clock.UtcNow = currentGenerate.ValidUntil;
             await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     currentGenerate.ValidUntil),
                 cancellationToken);
-            await Assert.That(outbox.Published.OfType<GenerateAwdFlags>().Count()).IsEqualTo(2);
+            await Assert.That(await db.AwdRounds.CountAsync(cancellationToken)).IsEqualTo(5);
+            await Assert.That(await db.AwdRounds.CountAsync(round => round.Missed, cancellationToken)).IsEqualTo(2);
             await Assert.That(outbox.Scheduled).IsEmpty();
 
             var stale = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
-            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
         });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Secure_multi_store_issuance_is_durable_and_delivery_is_fenced(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awd_secure_issuance").WithUsername("postgres").WithPassword("postgres").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var template = await db.Challenges.AsSplitQuery().SingleAsync(ct);
+            var definition = (AwdChallengeDefinition)template.Definition!;
+            var main = definition.FlagStores.Single();
+            main.InjectionCommand = "set-flag ${FLAG_ID} ${FLAG}";
+            main.TargetServiceName = "web";
+            var second = new AwdFlagStore { Id = Guid.CreateVersion7(), Position = 1, Name = "notes",
+                DeliveryMode = AwdFlagDeliveryMode.BusinessChecker };
+            definition.FlagStores.Add(second);
+            var competition = await db.Competitions.AsSplitQuery().SingleAsync(ct);
+            var configuration = (AwdCompetitionModeConfiguration)competition.ModeConfiguration!;
+            configuration.AwdOptions = new() { FlagsPerStore = 3 };
+            var challenge = await db.CompetitionChallenges.AsSplitQuery().SingleAsync(ct);
+            ((AwdCompetitionChallengeRules)challenge.Rules!).StoreRules.Add(new() { StoreId = second.Id, Weight = 2m, FlagsPerIssue = 2 });
+            await db.SaveChangesAsync(ct);
+            var clock = new MutableTimeProvider(fixture.Now);
+            var outbox = new RecordingOutbox();
+            var coordinator = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, clock, Secrets());
+            await coordinator.AdvanceAsync(new(fixture.CompetitionId, fixture.Now), ct);
+            var generation = outbox.Published.OfType<GenerateAwdFlags>().Single();
+            await coordinator.GenerateFlagsAsync(generation, ct);
+            var original = await db.ChallengeFlags.AsNoTracking().OrderBy(flag => flag.Id).ToArrayAsync(ct);
+            await Assert.That(original.Length).IsEqualTo(5);
+            await Assert.That(original.Select(flag => flag.Flag).Distinct().Count()).IsEqualTo(5);
+            await Assert.That(original.All(flag => flag.AwdIssue!.ExpiryRound == 6)).IsTrue();
+            await Assert.That(outbox.RunnerNodeMessages.Count).IsEqualTo(3);
+            var keyRow = await db.AwdFlagKeys.AsNoTracking().SingleAsync(ct);
+            var key = Convert.FromBase64String(Secrets().Unprotect(keyRow.ProtectedSecret,
+                PlatformSecretPurpose.AwdFlagKey, fixture.CompetitionId, keyRow.Id));
+            await Assert.That(key.Length).IsEqualTo(32);
+            await Assert.That(key.SequenceEqual(competition.FlagDerivationSecret)).IsFalse();
+            var first = original[0];
+            var issue = first.AwdIssue!;
+            await Assert.That(AwdFlagGenerator.Generate(new("challenge", "[SECURE]", false), key,
+                new(issue.CompetitionId, issue.CompetitionChallengeId, issue.TeamId, issue.RoundId,
+                    issue.StoreId, issue.GenerationSlot, issue.Ordinal, issue.KeyVersion))).IsEqualTo(first.Flag);
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(key);
+            await Assert.That(() => Secrets().Unprotect(keyRow.ProtectedSecret,
+                PlatformSecretPurpose.AwdFlagKey, Guid.NewGuid(), keyRow.Id)).Throws<System.Security.Cryptography.CryptographicException>();
+            configuration.AttackPoints = 999;
+            configuration.AwdOptions = configuration.AwdOptions with { FlagsPerStore = 5 };
+            await db.SaveChangesAsync(ct);
+            await coordinator.GenerateFlagsAsync(generation, ct);
+            await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(5);
+            await Assert.That((await db.AwdRoundRules.SingleAsync(ct)).AttackPoints).IsEqualTo(50L);
+            await Assert.That((await db.AwdRoundRules.SingleAsync(ct)).Stores.Single(store => store.StoreId == main.Id).FlagsPerIssue).IsEqualTo(3);
+            var injection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().First();
+            var reader = new AwdFlagInjectionWorkReader(new TestContextFactory(options), clock);
+            var attempts = await Task.WhenAll(reader.ReadAsync(injection, ct), reader.ReadAsync(injection, ct));
+            await Assert.That(attempts.Count(attempt => attempt is not null)).IsEqualTo(1);
+            var work = attempts.Single(attempt => attempt is not null)!;
+            await reader.CompleteAsync(injection, work, AwdFlagDeliveryState.Succeeded, AwdCheckReason.None, ct);
+            await reader.CompleteAsync(injection, work, AwdFlagDeliveryState.Unconfirmed, AwdCheckReason.CallbackMissing, ct);
+            await Assert.That(await reader.ReadAsync(injection, ct)).IsNull();
+            db.ChangeTracker.Clear();
+            var delivered = await db.AwdFlagIssues.AsNoTracking().SingleAsync(item => item.FlagId == injection.ChallengeFlagId, ct);
+            await Assert.That(delivered.DeliveryState).IsEqualTo(AwdFlagDeliveryState.Succeeded);
+            await Assert.That(delivered.DeliveryAttempts).IsEqualTo(1);
+            await Assert.That(delivered.Obligation).IsEqualTo(AwdFlagObligation.PlayerRequired);
+            await using var restarted = new NoCtfDbContext(options);
+            var restartedCoordinator = new AwdRoundCoordinator(restarted, new AwdRoundConfigurationCatalog(), new RecordingOutbox(), clock, Secrets());
+            await restartedCoordinator.GenerateFlagsAsync(generation, ct);
+            var replay = await restarted.ChallengeFlags.AsNoTracking().OrderBy(flag => flag.Id).ToArrayAsync(ct);
+            await Assert.That(replay.Select(flag => flag.Flag).SequenceEqual(original.Select(flag => flag.Flag))).IsTrue();
+        });
+    }
+
+    private sealed class TestContextFactory(DbContextOptions<NoCtfDbContext> options) : IDbContextFactory<NoCtfDbContext>
+    {
+        public NoCtfDbContext CreateDbContext() => new(options);
     }
 
     private static async Task<Fixture> SeedAsync(
@@ -429,7 +417,7 @@ public sealed class AwdRoundCoordinationTests
                 {
                     HardeningDurationSeconds = 600,
                     RoundDurationSeconds = 300,
-                    FlagTemplate = new("competition", "[TEAMHASH]", false)
+                    FlagTemplate = new("competition", "[SECURE]", false)
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             StartAt = now.AddHours(-1),
@@ -479,7 +467,7 @@ public sealed class AwdRoundCoordinationTests
             IsPublished = true,
             Rules = TestConfigurations.Rules(
                 GameMode.Awd,
-                """{"schemaVersion":4,"flagTemplate":{"header":"challenge","bodyTemplate":"[TEAMHASH]","leetLiteralText":false}}"""),
+                """{"schemaVersion":4,"flagTemplate":{"header":"challenge","bodyTemplate":"[SECURE]","leetLiteralText":false}}"""),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -511,6 +499,12 @@ public sealed class AwdRoundCoordinationTests
         await db.SaveChangesAsync(cancellationToken);
         return new(now, ownerId, competitionId, competitionChallengeId, teamId, runtimeId);
     }
+
+    private static NoCTF.Infrastructure.Authentication.PlatformSecretProtector Secrets() => new(
+        Microsoft.Extensions.Options.Options.Create(new NoCTF.Infrastructure.Authentication.EmailVerificationProtectionOptions
+        {
+            EncryptionKey = Convert.ToBase64String(Enumerable.Range(1, 32).Select(value => (byte)value).ToArray())
+        }));
 
     private sealed record Fixture(
         DateTimeOffset Now,
