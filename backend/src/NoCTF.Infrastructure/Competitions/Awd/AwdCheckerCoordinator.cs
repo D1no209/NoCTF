@@ -159,8 +159,11 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
                 continue;
             }
             // Re-publish pending attempts on every scan; the Runner fences duplicate execution.
+            // Recovery is a new transport delivery, even when a failed claim left the execution attempt unchanged.
+            // Reusing identical payloads would let JetStream suppress recovery after the earlier message was acknowledged.
             await outbox.PublishToRunnerNodeAsync(new RunAwdChecker(runtime.Id, fact.CompetitionChallengeId,
-                fact.Id, runtime.RunnerId!, details.Deadline!.Value, details.AttemptId.Value, details.ReceiptDeadline!.Value));
+                fact.Id, runtime.RunnerId!, details.Deadline!.Value, details.AttemptId.Value, details.ReceiptDeadline!.Value,
+                Guid.NewGuid()));
             await outbox.ScheduleAsync(new AwdCheckerCallbackMissing(fact.CompetitionId, fact.CompetitionChallengeId,
                 runtime.Id, fact.Id, details.ReceiptDeadline.Value, details.AttemptId.Value), details.ReceiptDeadline.Value.AddMilliseconds(1));
         }

@@ -44,7 +44,8 @@ public sealed record RunAwdChecker(
     string RunnerId,
     DateTimeOffset Deadline,
     Guid AttemptId,
-    DateTimeOffset ReceiptDeadline) : IRunnerNodeMessage;
+    DateTimeOffset ReceiptDeadline,
+    Guid DispatchAttemptId = default) : IRunnerNodeMessage;
 
 public sealed record DispatchAwdCheckers(
     DateTimeOffset At,

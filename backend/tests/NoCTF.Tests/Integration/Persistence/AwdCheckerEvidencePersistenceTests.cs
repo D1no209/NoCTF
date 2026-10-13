@@ -109,6 +109,8 @@ public sealed partial class AwdRoundCoordinationTests
             var first = outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Last();
             await Dispatch();
             await Assert.That(outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Last().AttemptId).IsEqualTo(first.AttemptId);
+            await Assert.That(first.DispatchAttemptId).IsNotEqualTo(Guid.Empty);
+            await Assert.That(outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Last().DispatchAttemptId).IsNotEqualTo(first.DispatchAttemptId);
             var firstDetails = await Claim(first, concurrent: true);
             await Assert.That(firstDetails.ManifestComplete).IsTrue();
             await Assert.That(firstDetails.Flags.Count).IsEqualTo(1);
