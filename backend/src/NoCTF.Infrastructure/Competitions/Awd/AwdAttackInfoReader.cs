@@ -35,7 +35,7 @@ public sealed class AwdAttackInfoReader(NoCtfDbContext db) : IAwdAttackInfoReade
         var round = deadline.Rounds.LastOrDefault(item => item.StartsAt <= position);
         // A paused clock reports a provisional wall deadline at its closed interval.
         // Locator validity continues on the frozen active clock until resumption.
-        if (round is null || competition.Status != CompetitionStatus.Paused && now >= deadline.AcceptanceEndsAt)
+        if (round is null || !deadline.EndIsProvisional && now >= deadline.AcceptanceEndsAt)
             return new([], 0);
         var gaps = deadline.Rounds.Where(item => item.Number < round.Number).Sum(item => (long)item.GapSeconds) * TimeSpan.TicksPerSecond;
         var activeTicks = Math.Min(runningTicks - gaps, round.ActiveEndTicks);

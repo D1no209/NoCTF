@@ -8,7 +8,7 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
 internal sealed record AwdCompetitionDeadline(AwdRunningClock Clock, IReadOnlyList<AwdRound> Rounds,
-    TimeSpan? ActiveTimeLimit, DateTimeOffset EndsAt, DateTimeOffset AcceptanceEndsAt)
+    TimeSpan? ActiveTimeLimit, DateTimeOffset EndsAt, DateTimeOffset AcceptanceEndsAt, bool EndIsProvisional)
 {
     public static async Task<AwdCompetitionDeadline> ReadAsync(NoCtfDbContext db, Guid competitionId,
         DateTimeOffset startsAt, DateTimeOffset scheduledEndAt, AwdCompetitionModeConfiguration configuration,
@@ -24,6 +24,10 @@ internal sealed record AwdCompetitionDeadline(AwdRunningClock Clock, IReadOnlyLi
         // EndAt is the scheduled running-time budget, extended only by explicit pauses.
         // Gaps are added by the round timeline, so they cannot consume that budget twice.
         var budget = clock.ElapsedAt(scheduledEndAt);
+        // An open pause freezes elapsed time; it does not consume the unspent running budget.
+        var pausedAt = finishedAt is null ? clock.StoppedAt : null;
+        if (pausedAt is { } stopped && scheduledEndAt > stopped)
+            budget += scheduledEndAt - stopped;
         var limit = configuration.AwdOptions.TotalRounds is null ? budget : (TimeSpan?)null;
         var endPosition = AwdRoundTimeline.EndPosition(rounds,
             TimeSpan.FromSeconds(configuration.HardeningDurationSeconds),
@@ -37,6 +41,7 @@ internal sealed record AwdCompetitionDeadline(AwdRunningClock Clock, IReadOnlyLi
         var tail = last is not null && (finishedAt is not null || observedAt >= end || end <= last.EndsAt)
             ? last.SubmissionTailSeconds
             : finishedAt is not null ? 0 : configuration.AwdOptions.SubmissionTailSeconds;
-        return new(clock, rounds, limit, end, end.AddSeconds(tail));
+        var provisional = pausedAt is not null && clock.ElapsedAt(observedAt) < endPosition;
+        return new(clock, rounds, limit, end, end.AddSeconds(tail), provisional);
     }
 }

@@ -26,8 +26,8 @@ namespace NoCTF.Tests.Integration.Persistence;
 
 public sealed partial class LeaderboardProjectionPersistenceTests
 {
-    [Test, Timeout(300_000)]
-    public Task Awd_scoring_preview_expires_when_time_alone_changes_confirmed_impact(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    [Test, Timeout(300_000), Arguments(false), Arguments(true)]
+    public Task Awd_clock_boundaries_preserve_paused_scores_and_invalidate_changed_previews(bool pause, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
         await postgres.StartAsync(ct);
@@ -50,7 +50,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             AttackRewardMode = AwdAttackRewardMode.FixedPerAttack, AttackPoints = 50, VictimDefensePoolPoints = 100,
             ServiceHealthyPoints = 0, CheckerIntervalSeconds = 30, EligibleTeamCount = 1,
             Stores = [new() { StoreId = Guid.NewGuid(), Weight = 1, FlagsPerIssue = 1 }],
-            Teams = [new() { TeamId = fixture.Team.Id }], Options = new() };
+            Teams = [new() { TeamId = fixture.Team.Id }], Options = new() { ConfidentialityPoints = pause ? 100 : 0 } };
         db.AwdRounds.Add(round); db.AwdRoundRules.Add(rule);
         db.AwdFlagKeys.Add(new() { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id, Version = 1, ProtectedSecret = [1], CreatedAt = start });
         var flagId = Guid.NewGuid(); var digest = System.Security.Cryptography.SHA256.HashData("clock-flag"u8);
@@ -78,6 +78,31 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
         var projections = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
             Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>());
+        if (pause)
+        {
+            fixture.Competition.Status = CompetitionStatus.Paused;
+            db.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id,
+                PreviousCompetitionStatus = CompetitionStatus.Running, CompetitionStatus = CompetitionStatus.Paused, OccurredAt = start.AddSeconds(95) });
+            await db.SaveChangesAsync(ct);
+            foreach (var second in new[] { 95, 105, 500 })
+            {
+                var paused = (await projections.CreateScoreboardAsync(fixture.Competition.Id, start.AddSeconds(second), ct))!;
+                await Assert.That(paused.Snapshot.Teams.Single().TotalScore).IsEqualTo(0L);
+                await Assert.That(paused.Snapshot.Teams.Single().Slots.SelectMany(slot => slot.AwdComponents)
+                    .Single(component => component.Component == AwdScoreComponent.DefenseReward).Settlement).IsEqualTo(AwdSettlementState.Provisional);
+            }
+            fixture.Competition.Status = CompetitionStatus.Running;
+            fixture.Competition.EndAt = fixture.Competition.EndAt.AddSeconds(500);
+            round.EndsAt = round.EndsAt.AddSeconds(500);
+            db.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id,
+                PreviousCompetitionStatus = CompetitionStatus.Paused, CompetitionStatus = CompetitionStatus.Running, OccurredAt = start.AddSeconds(595) });
+            await db.SaveChangesAsync(ct);
+            var resumed = (await projections.CreateScoreboardAsync(fixture.Competition.Id, start.AddSeconds(595), ct))!;
+            await Assert.That(resumed.Snapshot.Teams.Single().TotalScore).IsEqualTo(0L);
+            var expired = (await projections.CreateScoreboardAsync(fixture.Competition.Id, start.AddSeconds(605), ct))!;
+            await Assert.That(expired.Snapshot.Teams.Single().TotalScore).IsEqualTo(100L);
+            return;
+        }
         var publisher = Substitute.For<IPostCommitMessagePublisher>();
         var secrets = new PlatformSecretProtector(Options.Create(new EmailVerificationProtectionOptions
             { EncryptionKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) }));

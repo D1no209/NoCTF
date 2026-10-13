@@ -70,14 +70,14 @@ internal static class AwdScoreProjectionReader
         }).ToArray();
         var deadline = await AwdCompetitionDeadline.ReadAsync(db, competitionId, competition.StartAt,
             competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, projectedAt, ct);
-        var closed = projectedAt >= deadline.AcceptanceEndsAt;
+        var closed = !deadline.EndIsProvisional && projectedAt >= deadline.AcceptanceEndsAt;
         var eligibleCaptures = captures.Where(x => issueById.TryGetValue(x.FlagId, out var issue)
             && (timing[issue.CompetitionChallengeId]?.CanScore(x.ReceivedAt) ?? true)).ToArray();
         var scores = AwdRoundScoreProjector.Project(rounds, rules, issues, eligibleCaptures, checks,
             teams.Where(x => !x.IsBanned && !x.IsDeleted && x.EarnsScore).Select(x => x.Id).ToHashSet(),
             activeTicks, latest.Number, closed,
             rules.ToDictionary(x => x.Id, x => ActiveAt(roundById[x.RoundId], x.EffectiveAt)),
-            projectedAt >= deadline.EndsAt ? ActiveAt(latest, deadline.EndsAt) : null);
+            !deadline.EndIsProvisional && projectedAt >= deadline.EndsAt ? ActiveAt(latest, deadline.EndsAt) : null);
         return scores.Select(score => timing[score.CompetitionChallengeId]?.CanScoreInterval(
                 roundById[score.RoundId].StartsAt, roundById[score.RoundId].EndsAt) != false ? score
             : score with { Components = score.Components.Where(x => x.Component is not
