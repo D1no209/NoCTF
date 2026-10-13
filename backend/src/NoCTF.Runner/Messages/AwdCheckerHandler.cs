@@ -259,14 +259,32 @@ public sealed class AwdCheckerExecutor(
         if (target is null)
             return AwdCheckerExecutionOutcome.Superseded;
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(work.Timeout);
+        var remaining = work.Deadline - (timeProvider ?? TimeProvider.System).GetUtcNow();
+        if (remaining <= TimeSpan.Zero) timeoutSource.Cancel();
+        else timeoutSource.CancelAfter(remaining < work.Timeout ? remaining : work.Timeout);
         try
         {
-            var result = capacity is null
-                ? await providers.Attached(work.Provider).RunAttachedAsync(request, target, timeoutSource.Token)
-                : await capacity.RunAsync(request,
-                    new(RuntimeWorkloadKind.AwdChecker, work.RuntimeInstanceId, request.OperationId), work.GameplayFactId,
-                    (reserved, token) => providers.Attached(work.Provider).RunAttachedAsync(reserved, target, token), timeoutSource.Token);
+            OneShotResult result;
+            while (true)
+            {
+                timeoutSource.Token.ThrowIfCancellationRequested();
+                try
+                {
+                    result = capacity is null
+                        ? await providers.Attached(work.Provider).RunAttachedAsync(request, target, timeoutSource.Token)
+                        : await capacity.RunAsync(request,
+                            new(RuntimeWorkloadKind.AwdChecker, work.RuntimeInstanceId, request.OperationId), work.GameplayFactId,
+                            (reserved, token) => providers.Attached(work.Provider).RunAttachedAsync(reserved, target, token), timeoutSource.Token);
+                    break;
+                }
+                catch (RunnerCapacityUnavailableException exception) when (
+                    exception.Failure == RunnerAdmissionFailure.StartupConcurrencyLimited)
+                {
+                    // Admission failed before provider I/O. Wait within this attempt's original deadline;
+                    // do not consume a checker retry or retain the provider mutation lease while waiting.
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), timeoutSource.Token);
+                }
+            }
             if (result.ExitCode == 0)
                 return AwdCheckerExecutionOutcome.Completed;
             await ReportPlatformStatusAsync(

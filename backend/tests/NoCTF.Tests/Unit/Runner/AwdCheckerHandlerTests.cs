@@ -11,7 +11,7 @@ using Wolverine.Attributes;
 
 namespace NoCTF.Tests.Unit.Runner;
 
-public sealed class AwdCheckerHandlerTests
+public sealed partial class AwdCheckerHandlerTests
 {
     [Test]
     public async Task Checker_provider_io_explicitly_opts_out_of_ambient_ef_transactions()
@@ -31,7 +31,7 @@ public sealed class AwdCheckerHandlerTests
         var executor = new AwdCheckerExecutor(
             new StubProviderCatalog(runner),
             new StubHttpClientFactory());
-        var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(1);
         var work = new AwdCheckerWork(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("77777777-7777-7777-7777-777777777777"), RuntimeProvider.Docker, RuntimeKind.Container, ContainerReceiptJson(
                 Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string> { ["MODE"] = "awd" }, new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", deadline, TimeSpan.FromMinutes(1), "main", Guid.NewGuid(), [], new Uri("https://api.example/api/internal/v1/awd/check-task"), new Dictionary<string, string> { ["main"] = "target.internal" });
 
