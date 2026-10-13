@@ -19,96 +19,14 @@ using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
-public sealed class InternalResultStore(
+public sealed partial class InternalResultStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
-    ProgressionReconciler? progressionReconciler = null) : IInternalResultStore
+    ProgressionReconciler? progressionReconciler = null, NoCTF.Infrastructure.Authentication.PlatformSecretProtector? secrets = null) : IInternalResultStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
-
-    public async Task<InternalResultDisposition> RecordAwdAsync(
-        AwdCheckResult result,
-        CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
-            item => item.Id == result.GameplayFactId,
-            ct);
-        if (fact is null)
-            return InternalResultDisposition.NotFound;
-        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
-            item => item.Id == result.RuntimeInstanceId,
-            ct);
-        if (runtime is null)
-            return InternalResultDisposition.NotFound;
-        if (fact.State is GameplayFactState.Completed or GameplayFactState.PlatformFailed)
-            return InternalResultDisposition.Duplicate;
-        var appliedAt = ToPostgresPrecision(result.OccurredAt);
-
-        var context = await db.CompetitionChallenges
-            .Where(challenge => challenge.Id == runtime.CompetitionChallengeId)
-            .Join(
-                db.Competitions,
-                challenge => challenge.CompetitionId,
-                competition => competition.Id,
-                (challenge, competition) => new
-                {
-                    Competition = competition
-                })
-            .SingleAsync(ct);
-        if (context.Competition.Mode != GameMode.Awd
-            || runtime.TeamId is null
-            || fact.Kind != GameplayFactKind.AwdServiceTransition
-            || fact.CompetitionId != runtime.CompetitionId
-            || fact.CompetitionChallengeId != runtime.CompetitionChallengeId
-            || fact.TeamId != runtime.TeamId)
-            return InternalResultDisposition.NotFound;
-        var scoringResult = AwdCheckerOutcomeMapper.ToGameplayFactResult(result.State);
-        fact.State = GameplayFactState.Completed;
-        fact.Result = scoringResult;
-        fact.FailureCode = result.State is AwdServiceState.CheckerAbnormalExit
-            or AwdServiceState.CheckerTimedOut
-                ? GameplayFactFailureCode.CheckerPlatformError
-                : null;
-        fact.UpdatedAt = appliedAt;
-        await events.RecordAsync(new(
-            runtime.CompetitionId!.Value,
-            CompetitionEventKind.ScoringRecorded,
-            scoringResult == GameplayFactResult.ServiceDown
-                ? CompetitionEventLevel.Warning
-                : CompetitionEventLevel.Information,
-            CompetitionEventVisibility.Team,
-            appliedAt,
-            TeamId: fact.TeamId,
-            CompetitionChallengeId: fact.CompetitionChallengeId!.Value,
-            RuntimeInstanceId: runtime.Id,
-            GameplayFactId: fact.Id,
-            GameplayFactKind: GameplayFactKind.AwdServiceTransition,
-            GameplayFactState: fact.State,
-            GameplayFactResult: fact.Result,
-            RuntimeState: runtime.State), ct);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushCommittedMessagesAsync();
-            return InternalResultDisposition.Applied;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(ct);
-            outbox.DiscardPendingMessages();
-            db.ChangeTracker.Clear();
-            if (await db.GameplayFacts.AsNoTracking().AnyAsync(item =>
-                    item.Id == result.GameplayFactId
-                    && (item.State == GameplayFactState.Completed
-                        || item.State == GameplayFactState.PlatformFailed), ct))
-                return InternalResultDisposition.Duplicate;
-            throw;
-        }
-    }
 
     public async Task<InternalResultDisposition> RecordAwdpAsync(
         AwdpFixResult result,
@@ -154,17 +72,23 @@ public sealed class InternalResultStore(
                 challenge => challenge.Id,
                 (scope, template) => new
                 {
-                    scope.Challenge,
-                    scope.Competition,
-                    Template = template
+                    scope.Competition.Mode,
+                    scope.Competition.FrozenStartAt,
+                    scope.Competition.HiddenStartAt,
+                    scope.Challenge.AutoOpenAt,
+                    scope.Challenge.ScoringEndsAt,
+                    scope.Challenge.SubmissionDeadlineAt,
+                    scope.Challenge.TimingRevision,
+                    IsCtfPatchVerification = template.Definition is CtfChallengeDefinition
+                        && ((CtfChallengeDefinition)template.Definition).InteractionKind
+                            == CtfInteractionKind.PatchVerification
                 })
             .SingleAsync(ct);
-        var validMode = context.Competition.Mode == GameMode.Awdp
+        var validMode = context.Mode == GameMode.Awdp
             && runtime.Purpose == RuntimePurpose.AwdpTarget
-            || context.Competition.Mode == GameMode.Ctf
+            || context.Mode == GameMode.Ctf
             && runtime.Purpose == RuntimePurpose.PatchVerificationTarget
-            && context.Template.Definition is CtfChallengeDefinition
-                { InteractionKind: CtfInteractionKind.PatchVerification };
+            && context.IsCtfPatchVerification;
         if (!validMode
             || fact.Kind != GameplayFactKind.FixAttempt
             || fact.ReferenceKind != GameplayFactReferenceKind.PatchUpload
@@ -190,12 +114,12 @@ public sealed class InternalResultStore(
                 ? InternalResultDisposition.Applied
                 : InternalResultDisposition.Duplicate;
         }
-        var decision = context.Competition.Mode == GameMode.Ctf
+        var decision = context.Mode == GameMode.Ctf
             ? CtfPatchVerificationOutcomeMapper.Map(result.Outcome)
             : MapAwdpOutcome(result.Outcome);
-        var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(context.Challenge);
+        var timing = new ChallengeTiming(context.AutoOpenAt, context.ScoringEndsAt, context.SubmissionDeadlineAt);
         fact.TimeEligibility = timing.Eligibility(fact.OccurredAt);
-        fact.AppliedTimingRevision = context.Challenge.TimingRevision;
+        fact.AppliedTimingRevision = context.TimingRevision;
         decision = decision with { Result = timing.Classify(decision.Result, fact.OccurredAt) };
         fact.Result = decision.Result;
         fact.State = GameplayFactState.Completed;
@@ -203,25 +127,25 @@ public sealed class InternalResultStore(
         fact.UpdatedAt = resolvedAt;
         runtime.State = RuntimeState.Stopping;
         await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        var bloodAward = context.Competition.Mode == GameMode.Ctf
+        var bloodAward = context.Mode == GameMode.Ctf
                 && decision.Result == GameplayFactResult.Correct
             ? await TryCreateCtfPatchBloodAwardAsync(fact, resolvedAt, ct)
             : null;
         var bloodVisibility = bloodAward is null
             ? (CompetitionLeaderboardVisibility?)null
             : CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                context.Competition.FrozenStartAt,
-                context.Competition.HiddenStartAt,
+                context.FrozenStartAt,
+                context.HiddenStartAt,
                 bloodAward.OccurredAt);
         var announceBlood = bloodAward is not null
             && bloodVisibility != CompetitionLeaderboardVisibility.Blackout
             && CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
-                context.Competition.FrozenStartAt,
-                context.Competition.HiddenStartAt,
+                context.FrozenStartAt,
+                context.HiddenStartAt,
                 resolvedAt);
         if (announceBlood && bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
-        if (context.Competition.Mode == GameMode.Ctf
+        if (context.Mode == GameMode.Ctf
             && NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(decision.Result, fact.TimeEligibility))
         {
             var playerRuntimeIds = await db.RuntimeInstances
@@ -260,7 +184,7 @@ public sealed class InternalResultStore(
             result.Outcome == AwdpFixOutcome.PlatformFailed
                 ? CompetitionEventLevel.Error
                 : CompetitionEventLevel.Information,
-            context.Competition.Mode == GameMode.Ctf
+            context.Mode == GameMode.Ctf
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Team,
             resolvedAt,
@@ -294,10 +218,10 @@ public sealed class InternalResultStore(
                 GameplayFactKind: fact.Kind,
                 GameplayFactResult: fact.Result,
                 LeaderboardVisibility: bloodVisibility,
-                FrozenStartAt: context.Competition.FrozenStartAt,
+                FrozenStartAt: context.FrozenStartAt,
                 ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), ct);
         }
-        if (context.Competition.Mode == GameMode.Awdp)
+        if (context.Mode == GameMode.Awdp)
         {
             await events.RecordAsync(new(
                 fact.CompetitionId,
@@ -336,7 +260,7 @@ public sealed class InternalResultStore(
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner."),
             resolvedAt));
         await QueueNextAwdpFixAttemptAsync(fact, ct);
-        if (context.Competition.Mode == GameMode.Ctf)
+        if (context.Mode == GameMode.Ctf)
             await (progressionReconciler ?? new ProgressionReconciler(db))
                 .ReconcileCompletedFactAsync(fact, resolvedAt, ct);
         await db.SaveChangesAsync(ct);

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using NATS.Client.Core;
 using NoCTF.API.SignalR.Hubs;
+using NoCTF.API.SignalR.Publishing;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
@@ -9,7 +10,7 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.API.Endpoints.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 
-namespace NoCTF.API.SignalR.Publishing;
+namespace NoCTF.API.Hosting;
 
 public sealed class NatsCompetitionEventRefreshRelay(
     INatsConnection connection,

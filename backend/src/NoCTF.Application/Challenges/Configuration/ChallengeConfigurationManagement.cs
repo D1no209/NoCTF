@@ -1,3 +1,4 @@
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
@@ -63,14 +64,15 @@ public interface IChallengeConfigurationStore
         Guid competitionChallengeId,
         CompetitionChallengeRules rules,
         DateTimeOffset updatedAt,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, AwdConfigurationChangeAudit? audit = null);
 }
 
 public enum ChallengeConfigurationUpdateFailure
 {
     CompetitionNotFound,
     ConfigurationLocked,
-    ChallengeNotFound
+    ChallengeNotFound,
+    RuleChangeReasonRequired
 }
 
 public enum ChallengeConfigurationFailureCode
@@ -78,7 +80,8 @@ public enum ChallengeConfigurationFailureCode
     InvalidConfiguration,
     CompetitionNotFound,
     ConfigurationLocked,
-    ChallengeNotFound
+    ChallengeNotFound,
+    RuleChangeReasonRequired
 }
 public sealed record ChallengeConfigurationUpdateResult(
     ChallengeConfigurationView? Configuration,
@@ -102,13 +105,18 @@ public sealed class UpdateChallengeConfiguration(
         Guid competitionChallengeId,
         CompetitionChallengeRules rules,
         DateTimeOffset updatedAt,
-        CancellationToken ct = default)
+        CancellationToken ct = default, AwdConfigurationChangeAudit? audit = null)
     {
         var current = await store.FindAsync(competitionId, competitionChallengeId, ct);
         if (current is null)
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
                 ChallengeConfigurationFailureCode.ChallengeNotFound,
                 "Challenge was not found.");
+        if (current.Mode == GameMode.Awd
+            && current.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished
+            && audit?.HasValidReason != true)
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
+                ChallengeConfigurationFailureCode.RuleChangeReasonRequired, "Provide a reason for changing active AWD rules.");
         var errors = catalog.ValidateRulesForDefinition(
             current.Mode,
             rules,
@@ -125,17 +133,19 @@ public sealed class UpdateChallengeConfiguration(
             competitionChallengeId,
             rules,
             updatedAt,
-            ct);
+            ct, audit);
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? ChallengeConfigurationUpdateFailure.ChallengeNotFound;
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(failure switch
             {
+                ChallengeConfigurationUpdateFailure.RuleChangeReasonRequired => ChallengeConfigurationFailureCode.RuleChangeReasonRequired,
                 ChallengeConfigurationUpdateFailure.CompetitionNotFound => ChallengeConfigurationFailureCode.CompetitionNotFound,
                 ChallengeConfigurationUpdateFailure.ConfigurationLocked => ChallengeConfigurationFailureCode.ConfigurationLocked,
                 _ => ChallengeConfigurationFailureCode.ChallengeNotFound
             }, failure switch
             {
+                ChallengeConfigurationUpdateFailure.RuleChangeReasonRequired => "Provide a reason for changing active AWD rules.",
                 ChallengeConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
                 ChallengeConfigurationUpdateFailure.ConfigurationLocked => "Active or finished challenge configuration is read-only.",
                 _ => "Challenge was not found."

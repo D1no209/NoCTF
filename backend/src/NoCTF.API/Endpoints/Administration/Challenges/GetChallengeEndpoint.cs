@@ -9,6 +9,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
@@ -38,8 +39,126 @@ public sealed class CtfCompetitionChallengeRulesContract
     public long? WrongSubmissionPenalty { get; set; }
     public FlagTemplateContract? FlagTemplate { get; set; }
 }
+public sealed record AwdRuleOverridesContract
+{
+    public AwdLifetimeUnitProtocol? FlagLifetimeUnit { get; init; }
+    public int? FlagLifetime { get; init; }
+    public bool? LinkHistoricalWindow { get; init; }
+    public AwdLifetimeUnitProtocol? HistoricalLifetimeUnit { get; init; }
+    public int? HistoricalLifetime { get; init; }
+    public AwdGenerationPolicyProtocol? GenerationPolicy { get; init; }
+    public int? GenerationInterval { get; init; }
+    public int? FlagsPerStore { get; init; }
+    public int? FinalCheckBudgetSeconds { get; init; }
+    public int? RetryCount { get; init; }
+    public int? RetryIntervalSeconds { get; init; }
+    public int? CallbackGraceSeconds { get; init; }
+    public AwdSlaSettlementProtocol? SlaSettlement { get; init; }
+    public AwdScoringPresetProtocol? Preset { get; init; }
+    public AwdDefenseModeProtocol? DefenseMode { get; init; }
+    public AwdSlaBasisProtocol? SlaBasis { get; init; }
+    public decimal? OkRatio { get; init; }
+    public decimal? RecoveringRatio { get; init; }
+    public decimal? MumbleRatio { get; init; }
+    public decimal? OfflineRatio { get; init; }
+    public AwdPenaltyModeProtocol? PenaltyMode { get; init; }
+    public long? MumblePenalty { get; init; }
+    public long? OfflinePenalty { get; init; }
+    public long? RecoveringPenalty { get; init; }
+    public decimal? MumblePenaltyRatio { get; init; }
+    public decimal? OfflinePenaltyRatio { get; init; }
+    public decimal? RecoveringPenaltyRatio { get; init; }
+    public decimal? ConsecutiveFailureMultiplier { get; init; }
+    public long? MaximumRoundPenalty { get; init; }
+    public long? ConfidentialityPoints { get; init; }
+    public decimal? MinimumAttackRatio { get; init; }
+    public decimal? ScarcityAlpha { get; init; }
+    public decimal? MaximumRankMultiplier { get; init; }
+    public AwdAttackSettlementProtocol? AttackSettlement { get; init; }
+
+    public AwdRuleOverrides ToDomain() => new()
+    {
+        FlagLifetimeUnit = (AwdLifetimeUnit?)FlagLifetimeUnit,
+        FlagLifetime = FlagLifetime,
+        LinkHistoricalWindow = LinkHistoricalWindow,
+        HistoricalLifetimeUnit = (AwdLifetimeUnit?)HistoricalLifetimeUnit,
+        HistoricalLifetime = HistoricalLifetime,
+        GenerationPolicy = (AwdGenerationPolicy?)GenerationPolicy,
+        GenerationInterval = GenerationInterval,
+        FlagsPerStore = FlagsPerStore,
+        FinalCheckBudgetSeconds = FinalCheckBudgetSeconds,
+        RetryCount = RetryCount,
+        RetryIntervalSeconds = RetryIntervalSeconds,
+        CallbackGraceSeconds = CallbackGraceSeconds,
+        SlaSettlement = (AwdSlaSettlement?)SlaSettlement,
+        Preset = (AwdScoringPreset?)Preset,
+        DefenseMode = (AwdDefenseMode?)DefenseMode,
+        SlaBasis = (AwdSlaBasis?)SlaBasis,
+        OkRatio = OkRatio,
+        RecoveringRatio = RecoveringRatio,
+        MumbleRatio = MumbleRatio,
+        OfflineRatio = OfflineRatio,
+        PenaltyMode = (AwdPenaltyMode?)PenaltyMode,
+        MumblePenalty = MumblePenalty,
+        OfflinePenalty = OfflinePenalty,
+        RecoveringPenalty = RecoveringPenalty,
+        MumblePenaltyRatio = MumblePenaltyRatio,
+        OfflinePenaltyRatio = OfflinePenaltyRatio,
+        RecoveringPenaltyRatio = RecoveringPenaltyRatio,
+        ConsecutiveFailureMultiplier = ConsecutiveFailureMultiplier,
+        MaximumRoundPenalty = MaximumRoundPenalty,
+        ConfidentialityPoints = ConfidentialityPoints,
+        MinimumAttackRatio = MinimumAttackRatio,
+        ScarcityAlpha = ScarcityAlpha,
+        MaximumRankMultiplier = MaximumRankMultiplier,
+        AttackSettlement = (AwdAttackSettlement?)AttackSettlement,
+    };
+
+    public static AwdRuleOverridesContract FromDomain(AwdRuleOverrides value) => new()
+    {
+        FlagLifetimeUnit = (AwdLifetimeUnitProtocol?)value.FlagLifetimeUnit,
+        FlagLifetime = value.FlagLifetime,
+        LinkHistoricalWindow = value.LinkHistoricalWindow,
+        HistoricalLifetimeUnit = (AwdLifetimeUnitProtocol?)value.HistoricalLifetimeUnit,
+        HistoricalLifetime = value.HistoricalLifetime,
+        GenerationPolicy = (AwdGenerationPolicyProtocol?)value.GenerationPolicy,
+        GenerationInterval = value.GenerationInterval,
+        FlagsPerStore = value.FlagsPerStore,
+        FinalCheckBudgetSeconds = value.FinalCheckBudgetSeconds,
+        RetryCount = value.RetryCount,
+        RetryIntervalSeconds = value.RetryIntervalSeconds,
+        CallbackGraceSeconds = value.CallbackGraceSeconds,
+        SlaSettlement = (AwdSlaSettlementProtocol?)value.SlaSettlement,
+        Preset = (AwdScoringPresetProtocol?)value.Preset,
+        DefenseMode = (AwdDefenseModeProtocol?)value.DefenseMode,
+        SlaBasis = (AwdSlaBasisProtocol?)value.SlaBasis,
+        OkRatio = value.OkRatio,
+        RecoveringRatio = value.RecoveringRatio,
+        MumbleRatio = value.MumbleRatio,
+        OfflineRatio = value.OfflineRatio,
+        PenaltyMode = (AwdPenaltyModeProtocol?)value.PenaltyMode,
+        MumblePenalty = value.MumblePenalty,
+        OfflinePenalty = value.OfflinePenalty,
+        RecoveringPenalty = value.RecoveringPenalty,
+        MumblePenaltyRatio = value.MumblePenaltyRatio,
+        OfflinePenaltyRatio = value.OfflinePenaltyRatio,
+        RecoveringPenaltyRatio = value.RecoveringPenaltyRatio,
+        ConsecutiveFailureMultiplier = value.ConsecutiveFailureMultiplier,
+        MaximumRoundPenalty = value.MaximumRoundPenalty,
+        ConfidentialityPoints = value.ConfidentialityPoints,
+        MinimumAttackRatio = value.MinimumAttackRatio,
+        ScarcityAlpha = value.ScarcityAlpha,
+        MaximumRankMultiplier = value.MaximumRankMultiplier,
+        AttackSettlement = (AwdAttackSettlementProtocol?)value.AttackSettlement,
+    };
+}
+
+public sealed record AwdStoreRuleContract(Guid StoreId, decimal Weight = 1m, int? FlagsPerIssue = null);
+
 public sealed class AwdCompetitionChallengeRulesContract
 {
+    public AwdRuleOverridesContract? Overrides { get; set; }
+    public IReadOnlyList<AwdStoreRuleContract> StoreRules { get; set; } = [];
     public AwdAttackRewardModeProtocol? AttackRewardMode { get; set; }
     public long? AttackPoints { get; set; }
     public long? VictimDefensePoolPoints { get; set; }
@@ -88,7 +207,9 @@ public static class CompetitionChallengeRulesContractMapper
                     || contract.Ctf.BloodRewards.All(item => item is not null))
                 && ValidFlagTemplate(contract.Ctf.FlagTemplate),
             GameModeProtocol.Awd => contract.Awd is not null
-                && ValidFlagTemplate(contract.Awd.FlagTemplate),
+                && ValidFlagTemplate(contract.Awd.FlagTemplate)
+                && contract.Awd.StoreRules is not null
+                && contract.Awd.StoreRules.All(item => item is not null),
             GameModeProtocol.Awdp => contract.Awdp is not null
                 && ValidFlagTemplate(contract.Awdp.FlagTemplate),
             GameModeProtocol.Koh => contract.Koh is not null,
@@ -141,9 +262,12 @@ public static class CompetitionChallengeRulesContractMapper
                     FlagTemplate = flagTemplate
                 };
                 break;
-            case AwdCompetitionChallengeRules:
+            case AwdCompetitionChallengeRules awd:
                 result.Awd = new AwdCompetitionChallengeRulesContract
                 {
+                    Overrides = AwdRuleOverridesContract.FromDomain(awd.AwdOverrides),
+                    StoreRules = awd.StoreRules.OrderBy(item => item.StoreId)
+                        .Select(item => new AwdStoreRuleContract(item.StoreId, item.Weight, item.FlagsPerIssue)).ToArray(),
                     AttackRewardMode = value.AttackRewardMode is null
                         ? null : (AwdAttackRewardModeProtocol)value.AttackRewardMode.Value,
                     AttackPoints = value.AttackPoints,
@@ -211,6 +335,12 @@ public static class CompetitionChallengeRulesContractMapper
             },
             GameModeProtocol.Awd => new AwdCompetitionChallengeRules
             {
+                AwdOverrides = value.Awd!.Overrides?.ToDomain() ?? new(),
+                StoreRules = value.Awd.StoreRules.Select(item => new AwdStoreRule
+                {
+                    CompetitionChallengeId = competitionChallengeId, StoreId = item.StoreId,
+                    Weight = item.Weight, FlagsPerIssue = item.FlagsPerIssue
+                }).ToList(),
                 AttackRewardMode = value.Awd!.AttackRewardMode is { } rewardMode
                     ? (AwdAttackRewardMode)rewardMode : null,
                 AttackPoints = value.Awd.AttackPoints,

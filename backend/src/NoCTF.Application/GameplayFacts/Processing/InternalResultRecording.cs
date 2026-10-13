@@ -1,5 +1,6 @@
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.Application.GameplayFacts.Processing;
 
@@ -15,27 +16,22 @@ public enum InternalResultDisposition
 public sealed record AwdCheckResult(
     Guid RuntimeInstanceId,
     Guid GameplayFactId,
-    AwdServiceState State,
-    DateTimeOffset OccurredAt)
-{
-    public static AwdCheckResult Create(
-        Guid runtimeInstanceId,
-        Guid gameplayFactId,
-        AwdServiceState state,
-        DateTimeOffset occurredAt) =>
-        new(
-            runtimeInstanceId,
-            gameplayFactId,
-            state,
-            occurredAt);
-}
+    Guid AttemptId,
+    AwdProbe Connection,
+    AwdProbe Functionality,
+    IReadOnlyList<AwdReportedFlag> Flags,
+    DateTimeOffset ObservedAt,
+    DateTimeOffset ReceivedAt);
 
 public static class AwdCheckerOutcomeMapper
 {
-    public static GameplayFactResult ToGameplayFactResult(AwdServiceState state) =>
-        state == AwdServiceState.Up
-            ? GameplayFactResult.ServiceUp
-            : GameplayFactResult.ServiceDown;
+    public static GameplayFactResult? ToGameplayFactResult(AwdHealth health) => health switch
+    {
+        AwdHealth.Ok => GameplayFactResult.ServiceUp,
+        AwdHealth.Mumble or AwdHealth.Offline or AwdHealth.Recovering => GameplayFactResult.ServiceDown,
+        AwdHealth.InternalError => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(health))
+    };
 }
 
 public sealed record AwdpFixResult(

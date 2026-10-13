@@ -13,6 +13,8 @@ using NoCTF.Domain.Commands;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Observability;
 using NoCTF.GameModes.Registration;
+using NoCTF.Domain.Competitions.Awd;
+using NoCTF.Infrastructure.Competitions.Awd;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -154,13 +156,29 @@ public sealed class GameplayFactIntakeStore(
             || currentRules is null
             || currentRules.AllowsFlag != expectedRules.AllowsFlag
             || currentRules.MaxFlagAttempts != expectedRules.MaxFlagAttempts
-            || current!.CompetitionStatus != CompetitionStatus.Running && !practice)
+            || current!.CompetitionStatus != CompetitionStatus.Running && !practice
+                && !GameplayFactAdmissionPolicy.IsAwdAcceptanceWindow(current, received[0].Kind, received[0].OccurredAt))
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
         if (!practice && maxAttempts is > 0
             && checked(current.AcceptedFlagAttempts + received.Count) > maxAttempts)
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();
+
+        AwdFactDetails? awdReceipt = null;
+        if (current.Mode == GameMode.Awd)
+        {
+            var admission = GameplayFactAdmissionPolicy.Check(current, received[0].Kind, currentRules,
+                received[0].OccurredAt);
+            if (!admission.Succeeded)
+                return received.Select(_ => new GameplayFactAcceptanceResult(
+                    GameplayFactAcceptanceState.AdmissionRejected, FailureCode: admission.FailureCode)).ToArray();
+            var receipt = await AwdAttackReceiptReader.ReadAsync(db, current, received[0].OccurredAt, cancellationToken);
+            if (receipt.Failure is { } failure)
+                return received.Select(_ => new GameplayFactAcceptanceResult(
+                    GameplayFactAcceptanceState.AdmissionRejected, FailureCode: failure)).ToArray();
+            awdReceipt = receipt.Receipt!;
+        }
 
         var acquisitionEvidence = received[0].Kind == GameplayFactKind.FlagAttempt
             ? await FlagAcquisitionEvidenceReader.CaptureAsync(db, current, templates,
@@ -180,6 +198,20 @@ public sealed class GameplayFactIntakeStore(
             entity.OccurredAt = item.OccurredAt;
             entity.State = GameplayFactState.Queued;
             entity.AcquisitionEvidence = acquisitionEvidence?.Copy();
+            if (awdReceipt is not null)
+            {
+                entity.Awd = new AwdFactDetails
+                {
+                    GameplayFactId = entity.Id,
+                    ReceivedRoundId = awdReceipt.ReceivedRoundId,
+                    ReceivedRoundNumber = awdReceipt.ReceivedRoundNumber,
+                    ReceivedActiveTicks = awdReceipt.ReceivedActiveTicks,
+                    ReceiptScorable = current.Timing?.CanScore(item.OccurredAt) ?? true,
+                    Settlement = awdReceipt.Settlement
+                };
+                entity.TimeEligibility = current.Timing?.Eligibility(item.OccurredAt)
+                    ?? NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid;
+            }
             entity.UpdatedAt = item.OccurredAt;
             return entity;
         }).ToArray();
@@ -287,9 +319,12 @@ public sealed class GameplayFactIntakeStore(
         var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == received.CompetitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(cancellationToken);
         if (mode is not null && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).ManualScoreAdjustment)
             return new(GameplayFactAcceptanceState.UnsupportedMode);
+        if (mode is not null && !CreateManualAdjustment.IsReasonValid(mode.Value, received.Reason))
+            return new(GameplayFactAcceptanceState.AdmissionRejected,
+                FailureCode: GameplayFactAdmissionFailureCode.ManualAdjustmentReasonInvalid);
         var previous = replay is null ? null : await replay.FindAsync<GameplayFactAcceptanceResult>(
             new(received.UserId, ReplayOperation.ManualAdjustment, received.CompetitionId, received.CompetitionChallengeId),
-            new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta), cancellationToken);
+            new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta, received.Reason), cancellationToken);
         if (previous is not null) return previous;
         var valid = await db.CompetitionChallenges.AnyAsync(item =>
             item.Id == received.CompetitionChallengeId
@@ -326,7 +361,7 @@ public sealed class GameplayFactIntakeStore(
             GameplayFactId: entity.Id,
             GameplayFactKind: entity.Kind,
             GameplayFactState: entity.State,
-            GameplayFactResult: entity.Result), cancellationToken);
+            GameplayFactResult: entity.Result, Reason: received.Reason), cancellationToken);
         replay?.Store(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

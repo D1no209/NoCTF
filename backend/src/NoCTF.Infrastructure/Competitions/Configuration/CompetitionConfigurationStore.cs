@@ -1,7 +1,9 @@
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
@@ -52,7 +54,7 @@ public sealed class CompetitionConfigurationStore(
         CompetitionModeConfiguration configuration,
         bool allowWhileRunning,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct, AwdConfigurationChangeAudit? audit = null)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
@@ -64,7 +66,22 @@ public sealed class CompetitionConfigurationStore(
         if (tracked.Mode != configuration.Mode
             || tracked.ModeConfiguration.GetType() != configuration.GetType())
             throw new InvalidOperationException("Competition configuration type does not match its mode.");
+        var nextAwdRound = tracked.Mode == GameMode.Awd
+            ? (await db.AwdRounds.Where(round => round.CompetitionId == competitionId).MaxAsync(round => (int?)round.Number, ct) ?? 0) + 1
+            : (int?)null;
+        if (nextAwdRound > 1 && audit?.HasValidReason != true)
+            return new(null, CompetitionConfigurationUpdateFailure.RuleChangeReasonRequired);
         configuration.CompetitionId = competitionId;
+        if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration existingAwd
+            && configuration is AwdCompetitionModeConfiguration requestedAwd
+            && status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        {
+            var latestRound = await db.AwdRounds.Where(round => round.CompetitionId == competitionId)
+                .MaxAsync(round => (int?)round.Number, ct) ?? 0;
+            if (requestedAwd.HardeningDurationSeconds != existingAwd.HardeningDurationSeconds
+                || requestedAwd.AwdOptions.TotalRounds is { } total && total < latestRound)
+                return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
+        }
         if (tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration existingLive
             && configuration is LiveSoloCompetitionModeConfiguration nextLive && existingLive.BracketFormat != nextLive.BracketFormat
             && await db.LiveSoloMatches.AnyAsync(x => x.CompetitionId == competitionId, ct))
@@ -77,9 +94,16 @@ public sealed class CompetitionConfigurationStore(
             && configuration is CtfCompetitionModeConfiguration afterCtf
             && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
                 .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
+        var tieBreaksChanged = tracked.ModeConfiguration is AwdCompetitionModeConfiguration beforeAwd
+            && configuration is AwdCompetitionModeConfiguration afterAwd
+            && !beforeAwd.TieBreakers.OrderBy(item => item.Position).Select(item => (item.Field, item.Direction))
+                .SequenceEqual(afterAwd.TieBreakers.OrderBy(item => item.Position).Select(item => (item.Field, item.Direction)));
         db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
+        if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration currentAwd
+            && configuration is AwdCompetitionModeConfiguration nextAwd)
+            currentAwd.AwdOptions = nextAwd.AwdOptions with { };
         db.ChangeTracker.DetectChanges();
-        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged)
+        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged && !tieBreaksChanged)
         {
             var unchanged = await FindAsync(competitionId, ct);
             await transaction.CommitAsync(ct);
@@ -107,22 +131,22 @@ public sealed class CompetitionConfigurationStore(
             currentLive.StageRules = requestedLive.StageRules.Select(x => new LiveSoloStageRule {
                 CompetitionId = competitionId, Lane = x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList();
         }
+        if (tieBreaksChanged && tracked.ModeConfiguration is AwdCompetitionModeConfiguration ranking
+            && configuration is AwdCompetitionModeConfiguration requestedRanking)
+        {
+            db.Set<AwdCompetitionTieBreak>().RemoveRange(ranking.TieBreakers);
+            ranking.TieBreakers.Clear();
+            // Release both position and field uniqueness before replacing the ordered list.
+            // This remains inside the aggregate transaction with its audit and publication.
+            await db.SaveChangesAsync(ct);
+            ranking.TieBreakers = requestedRanking.TieBreakers.OrderBy(item => item.Position).Select((item, position) =>
+                new AwdCompetitionTieBreak { CompetitionId = competitionId, Position = position,
+                    Field = item.Field, Direction = item.Direction }).ToList();
+        }
         tracked.UpdatedAt = now;
         if (tracked.Mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
-            var challenges = await db.CompetitionChallenges.AsNoTracking()
-                .Where(challenge => challenge.CompetitionId == competitionId
-                    && challenge.IsPublished
-                    && challenge.DeletedAt == null)
-                .Select(challenge => challenge.Id)
-                .ToListAsync(ct);
-            foreach (var challengeId in challenges)
-            {
-                await outbox.PublishAsync(new AdvanceAwdRound(
-                    competitionId,
-                    challengeId,
-                    now));
-            }
+            await outbox.PublishAsync(new AdvanceAwdRound(competitionId, now));
         }
         await events.RecordAsync(new(
             competitionId,
@@ -130,7 +154,9 @@ public sealed class CompetitionConfigurationStore(
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Staff,
             now,
-            CompetitionStatus: status), ct);
+            CompetitionStatus: status, ActorUserId: audit?.ActorUserId, Reason: audit?.Reason?.Trim(),
+            AwdRuleTiming: nextAwdRound is null ? null : NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming.NextRound,
+            AwdEffectiveFromRound: nextAwdRound), ct);
         await db.SaveChangesAsync(ct);
         var result = await FindAsync(competitionId, ct);
         await transaction.CommitAsync(ct);

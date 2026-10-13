@@ -153,6 +153,9 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
         GameplayFactAcceptanceState.AttemptsExhausted =>
             OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.AttemptsExhausted, "The maximum number of accepted attempts has been reached."),
+        _ when result.FailureCode is { } failure =>
+            OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
+                failure, "AWD is not accepting attacks in the current interval."),
         _ => OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
             GameplayFactAdmissionFailureCode.GameplayFactConcurrency, "The submission could not be accepted because its scope changed.")
     };

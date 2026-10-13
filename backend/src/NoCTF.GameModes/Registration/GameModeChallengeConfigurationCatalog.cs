@@ -64,8 +64,9 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     TypedGameModeConfiguration.Ctf(ctfCompetition),
                     eligibleTeamCount),
             (AwdCompetitionChallengeRules awdRules,
-                AwdCompetitionModeConfiguration) =>
-                AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(awdRules)),
+                AwdCompetitionModeConfiguration awdCompetition) =>
+                AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(awdRules))
+                    .Concat(AwdEffectiveRules.ValidateConfiguration(awdCompetition, awdRules)).ToArray(),
             (AwdpCompetitionChallengeRules awdpRules,
                 AwdpCompetitionModeConfiguration awdpCompetition) =>
                 ValidateAwdpRules(awdpRules, awdpCompetition, eligibleTeamCount),

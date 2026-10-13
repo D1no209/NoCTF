@@ -1,3 +1,5 @@
+import AwdScoringRuleChangesComponent from '~/features/admin/awd/AwdScoringRuleChanges.vue'
+import { getAwdRules } from '~/api'
 import ChallengeTimingSettingsComponent from '~/features/challenges/timing/ChallengeTimingSettings.vue'
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
@@ -56,6 +58,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const sectionOptions = computed(() => [
     { value: 'general', label: translate('administration.label.basicSettings') },
     { value: 'config', label: translate('administration.label.questionConfiguration') },
+    ...(competition.value?.mode === 'Awd' && canWrite.value ? [{ value: 'awdScoring', label: translate('administration.awd.scoring.title') }] : []),
     { value: 'hints', label: translate('administration.label.hint') },
     { value: 'scoring', label: translate('administration.label.teamScoring') },
   ])
@@ -148,6 +151,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const savingConfig = ref(false)
 
+  const awdStores = ref<import('~/api').NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse[]>([])
+
   const inheritedConfiguration = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
 
   async function loadConfig() {
@@ -168,16 +173,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!competitionResult.error && competitionResult.data) {
       inheritedConfiguration.value = competitionResult.data.modeConfiguration?.configuration ?? null
     }
+    if (challengeResult.data?.mode === 'Awd') {
+      const result = await getAwdRules({ path: { competitionId, competitionChallengeId: ccId } })
+      if (result.data) awdStores.value = result.data.nextRound?.stores ?? []
+      else if (result.error) toast.error(parseApiError(result.error).displayMessage)
+    }
     configLoading.value = false
   }
 
-  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
+  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, reason?: string) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: { rules: { configuration: rules } },
+        body: { rules: { configuration: rules, reason } },
       })
       if (error) throw error
       config.value = data
@@ -482,16 +492,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const adjustmentTarget = ref<ChallengeTeamScoringRow | null>(null)
 
   const adjustmentDelta = ref(0)
+  const adjustmentReason = ref('')
+  const adjustmentReasonRequired = computed(() => competition.value?.mode === 'Awd')
 
   const adjustmentPending = ref(false)
 
   const adjustmentError = ref<UiMessage | null>(null)
 
-  const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0)
+  const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0
+    && (!adjustmentReasonRequired.value || adjustmentReason.value.trim().length > 0)
+    && adjustmentReason.value.length <= 512)
 
   function openAdjustment(row: ChallengeTeamScoringRow): void {
     adjustmentTarget.value = row
     adjustmentDelta.value = 0
+    adjustmentReason.value = ''
     adjustmentError.value = null
   }
 
@@ -507,7 +522,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     try {
       const { error } = await adminCreateManualAdjustment({
         path: { competitionId },
-        body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value },
+        body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value, reason: adjustmentReason.value.trim() || undefined },
       })
       if (error) throw error
       toast.success(describeMessage("administration.label.challengeScoringCorrected"))
@@ -562,6 +577,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       configLoading,
       savingConfig,
       inheritedConfiguration,
+      awdStores,
       saveConfig,
       hints,
       hintsLoading,
@@ -592,6 +608,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       scoringRows,
       adjustmentTarget,
       adjustmentDelta,
+      adjustmentReason,
+      adjustmentReasonRequired,
       adjustmentPending,
       adjustmentError,
       adjustmentValid,
@@ -599,6 +617,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       closeAdjustment,
       submitAdjustment,
       ChallengeRulesEditor,
+      AwdScoringRuleChanges: markRaw(AwdScoringRuleChangesComponent),
       hiddenRuleKeys
     }
   const viewState = proxyRefs(viewBindings)

@@ -20,7 +20,7 @@ internal static class ChallengeTimingProjection
     {
         GameplayFacts = input.GameplayFacts.Where(fact => CanScore(input, fact)).Select(fact =>
             fact.Result == GameplayFactResult.RightButDue ? fact with { Result = GameplayFactResult.Correct } : fact).ToArray(),
-        AwdRounds = input.AwdRounds?.Where(round => CanScoreInterval(input, round.CompetitionChallengeId, round.StartsAt, round.EndsAt)).ToArray()
+        AwdRounds = input.AwdRounds
     };
 
     public static LeaderboardProjectionInput WithCurrentResults(LeaderboardProjectionInput input)

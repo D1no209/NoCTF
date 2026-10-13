@@ -30,7 +30,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool PracticeModeEnabled = false,
     PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired,
     ChallengeDefinition? ChallengeDefinition = null,
-    ChallengeTiming? Timing = null);
+    ChallengeTiming? Timing = null,
+    DateTimeOffset? AwdAcceptanceEndsAt = null);
 
 public enum PracticeRuntimeAdmissionState
 {
@@ -67,7 +68,8 @@ public enum GameplayFactAcceptanceState
 public sealed record GameplayFactAcceptanceResult(
     GameplayFactAcceptanceState State,
     Guid? GameplayFactId = null,
-    DateTimeOffset? OccurredAt = null);
+    DateTimeOffset? OccurredAt = null,
+    GameplayFactAdmissionFailureCode? FailureCode = null);
 
 public sealed record GameplayFactAccepted(Guid GameplayFactId, DateTimeOffset OccurredAt);
 

@@ -28,6 +28,7 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
     domains.add('writeups')
   }
   if (path.includes('/live-solo')) domains.add('live-solo')
+  if (/\/(awd-live|koh-live)\/?$/.test(path)) domains.add('spectator')
   if (path.includes('/challenges')) {
     domains.add('challenges')
     domains.add('runtime')

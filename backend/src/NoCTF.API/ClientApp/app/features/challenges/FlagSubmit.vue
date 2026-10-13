@@ -18,6 +18,7 @@ const props = withDefaults(
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
+    completion?: 'Solved' | 'Repeatable' | 'Break'
     title?: string
     description?: string
     practice?: boolean
@@ -28,7 +29,7 @@ const props = withDefaults(
     timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
     initiallySolved?: boolean
   }>(),
-  { multiple: false, title: '', description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },
+  { multiple: false, completion: 'Solved', title: '', description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },
 )
 const emit = defineEmits<{
   evaluated: [result: TrackedSubmission['result']]

@@ -1,5 +1,10 @@
+import { defaultAwdTieBreaks } from './awd-tie-breaks'
+import { createAwdFlagStore } from './awd-flag-stores'
+import { toRaw } from 'vue'
+import { awdOptionFields } from './awd-config-fields'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
   NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
@@ -159,6 +164,7 @@ export interface DefinitionModel {
   checker: { job: RunnerJobModel; targetServiceName: string } | null
   /** AWDP:checker 直接是 RunnerJobConfiguration。 */
   checkerJob: RunnerJobModel | null
+  awdFlagStores: NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract[]
   flagInjection: FlagInjectionModel | null
   flagTemplate: FlagTemplateModel | null
   patchEntrypoint: string
@@ -234,6 +240,7 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     runtime: null,
     checker: null,
     checkerJob: null,
+    awdFlagStores: mode === 'Awd' ? [createAwdFlagStore()] : [],
     flagInjection: null,
     flagTemplate: null,
     patchEntrypoint: '',
@@ -399,6 +406,7 @@ export function definitionContractToModel(
       model.checkerJob = job
     }
   }
+  if (mode === 'Awd') model.awdFlagStores = structuredClone(toRaw(contract.awd?.flagStores ?? []))
   const injection = asObject(contract.awd?.flagInjection)
   if (mode === 'Awd' && injection) {
     model.flagInjection = {
@@ -467,11 +475,14 @@ export interface ConfigFieldOption {
 export interface ConfigFieldDef {
   /** JSON 属性名(camelCase)。 */
   key: string
+  scope?: 'awdOptions'
+  group?: import('./awd-config-fields').AwdFieldGroup
   label: string
   type: ConfigFieldType
   description?: string
   placeholder?: string
   min?: number
+  exclusiveMinimum?: boolean
   max?: number
   options?: readonly ConfigFieldOption[]
   /** 缺省值(竞赛配置缺失字段时回填)。 */
@@ -549,15 +560,15 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Awd':
       return [
-        { key: 'hardeningDurationSeconds', label: translate("common.label.reinforcementPhaseDurationSeconds"), type: 'int', min: 0, defaultValue: 0, description: translate("common.description.reinforcementTimeStartGame") },
-        { key: 'roundDurationSeconds', label: translate("common.label.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'attackRewardMode', label: translate("common.label.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
-        { key: 'attackPoints', label: translate("common.label.scoreAttack"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'victimDefensePoolPoints', label: translate("common.label.victimDefensePool"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'checkerIntervalSeconds', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1, defaultValue: 30 },
-        { key: 'serviceHealthyPoints', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceUnhealthyPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'flagTemplate', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', description: translate("common.description.optionalGenerateFlagsTeam") },
+        { key: 'hardeningDurationSeconds', group: 'timeline', label: translate("common.label.reinforcementPhaseDurationSeconds"), type: 'int', min: 0, defaultValue: 0, description: translate("common.description.reinforcementTimeStartGame") },
+        { key: 'roundDurationSeconds', group: 'timeline', label: translate("common.label.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 180 },
+        { key: 'attackRewardMode', group: 'scoring', label: translate("common.label.attackScoringMethod"), type: 'select', options: ['FixedPerAttack', 'SplitVictimDefensePool', 'Scarcity', 'TargetRank'].map(value => ({ value, label: `administration.awd.option.${value}` })), defaultValue: 'FixedPerAttack' },
+        { key: 'attackPoints', max: 1000000, group: 'scoring', label: translate("common.label.scoreAttack"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'victimDefensePoolPoints', max: 1000000, group: 'scoring', label: translate("common.label.victimDefensePool"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'checkerIntervalSeconds', max: 86400, group: 'checker', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1, defaultValue: 30 },
+        { key: 'serviceHealthyPoints', max: 1000000, group: 'sla', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'flagTemplate', group: 'flags', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', defaultValue: { header: 'flag', bodyTemplate: '[SECURE]', leetLiteralText: false }, description: translate("common.description.optionalGenerateFlagsTeam") },
+        ...awdOptionFields(false),
       ]
     case 'Awdp':
       return [
@@ -597,13 +608,13 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Awd':
       return [
-        { key: 'attackRewardMode', label: translate("common.label.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES },
-        { key: 'attackPoints', label: translate("common.label.scoreAttack"), type: 'int', min: 0 },
-        { key: 'victimDefensePoolPoints', label: translate("common.label.victimDefensePool"), type: 'int', min: 0 },
-        { key: 'checkerIntervalSeconds', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1 },
-        { key: 'serviceHealthyPoints', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0 },
-        { key: 'serviceUnhealthyPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0 },
-        { key: 'flagTemplate', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', description: translate("common.description.futureTeamRoundFlags") },
+        { key: 'attackRewardMode', group: 'scoring', label: translate("common.label.attackScoringMethod"), type: 'select', options: ['FixedPerAttack', 'SplitVictimDefensePool', 'Scarcity', 'TargetRank'].map(value => ({ value, label: `administration.awd.option.${value}` })) },
+        { key: 'attackPoints', max: 1000000, group: 'scoring', label: translate("common.label.scoreAttack"), type: 'int', min: 0 },
+        { key: 'victimDefensePoolPoints', max: 1000000, group: 'scoring', label: translate("common.label.victimDefensePool"), type: 'int', min: 0 },
+        { key: 'checkerIntervalSeconds', max: 86400, group: 'checker', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1 },
+        { key: 'serviceHealthyPoints', max: 1000000, group: 'sla', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0 },
+        { key: 'flagTemplate', group: 'flags', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', defaultValue: { header: 'flag', bodyTemplate: '[SECURE]', leetLiteralText: false }, description: translate("common.description.futureTeamRoundFlags") },
+        ...awdOptionFields(true),
       ]
     case 'Awdp':
       return [
@@ -811,7 +822,7 @@ export function definitionModelToContract(
       return {
         mode,
         ...common,
-        awd: { flagInjection: model.flagInjection
+        awd: { flagStores: structuredClone(toRaw(model.awdFlagStores)), flagInjection: model.flagInjection
           ? {
               command: model.flagInjection.command,
               timeoutSeconds: model.flagInjection.timeoutSeconds ?? 30,
@@ -848,7 +859,9 @@ export function readConfigValues(
   const values: ConfigValues = {}
   const overridden: Record<string, boolean> = {}
   for (const field of fields) {
-    const source = !options.rules && field.key === 'flagTemplate' ? configuration : branch
+    const source = field.scope === 'awdOptions'
+      ? (asObject(branch[options.rules ? 'overrides' : 'options']) ?? {})
+      : !options.rules && field.key === 'flagTemplate' ? configuration : branch
     const key = !options.rules && field.key === 'scoreCurve' ? 'defaultScoreCurve' : field.key
     if (key in source) {
       values[field.key] = readFieldValue(field, source[key])
@@ -859,6 +872,8 @@ export function readConfigValues(
       overridden[field.key] = false
     }
   }
+  if (mode === 'Awd' && !options.rules) values.awdTieBreakers = structuredClone(toRaw(branch.tieBreakers ?? defaultAwdTieBreaks()))
+  if (mode === 'Awd' && options.rules) values.awdStoreRules = structuredClone(toRaw(branch.storeRules ?? []))
   return { values, overridden }
 }
 
@@ -930,10 +945,20 @@ export function buildConfigValues(
   const out: JsonObject = { mode, [mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()]: branch }
   for (const field of fields) {
     if (options.rules && !options.overridden?.[field.key]) continue
-    writeFieldValue(!options.rules && field.key === 'flagTemplate' ? out : branch, field, values[field.key])
+    let target = !options.rules && field.key === 'flagTemplate' ? out : branch
+    if (field.scope === 'awdOptions') {
+      const key = options.rules ? 'overrides' : 'options'
+      target = (branch[key] ??= {}) as JsonObject
+    }
+    const value = field.type === 'flagTemplate' && mode === 'Awd' && values[field.key]
+      ? { ...(values[field.key] as FlagTemplateModel), bodyTemplate: (values[field.key] as FlagTemplateModel).bodyTemplate.trim() || '[SECURE]' }
+      : values[field.key]
+    writeFieldValue(target, field, value)
   }
+  if (mode === 'Awd' && !options.rules) { branch.serviceUnhealthyPenalty = 0; branch.tieBreakers = structuredClone(toRaw(values.awdTieBreakers ?? defaultAwdTieBreaks())) }
+  if (mode === 'Awd' && options.rules) branch.storeRules = structuredClone(toRaw(values.awdStoreRules ?? []))
   if (!options.rules && !out.flagTemplate)
-    writeFieldValue(out, { key: 'flagTemplate', label: '', type: 'flagTemplate' }, emptyFlagTemplate())
+    writeFieldValue(out, { key: 'flagTemplate', label: '', type: 'flagTemplate' }, mode === 'Awd' ? { ...emptyFlagTemplate(), bodyTemplate: '[SECURE]' } : emptyFlagTemplate())
   return out
 }
 
@@ -962,6 +987,7 @@ export function runtimeServiceIsReferenced(model: DefinitionModel, name: string)
   return !!model.runtime?.urlBindings.some(binding => binding.serviceName === name)
     || model.runtime?.controlCheckUrlBinding?.serviceName === name
     || model.checker?.targetServiceName === name || model.flagInjection?.serviceName === name
+    || model.awdFlagStores.some(store => store.targetServiceName === name)
 }
 
 /** Rename the service and all references in one editor operation. */
@@ -974,4 +1000,5 @@ export function renameRuntimeService(model: DefinitionModel, oldName: string, na
   if (model.runtime.controlCheckUrlBinding?.serviceName === oldName) model.runtime.controlCheckUrlBinding.serviceName = name
   if (model.checker?.targetServiceName === oldName) model.checker.targetServiceName = name
   if (model.flagInjection?.serviceName === oldName) model.flagInjection.serviceName = name
+  for (const store of model.awdFlagStores) if (store.targetServiceName === oldName) store.targetServiceName = name
 }

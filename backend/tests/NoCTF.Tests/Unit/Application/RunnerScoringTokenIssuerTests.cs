@@ -17,7 +17,7 @@ public sealed class RunnerScoringTokenIssuerTests
         var deadline = issuedAt.AddMinutes(1);
 
         var encoded = issuer.IssueAwdChecker(new AwdCheckerTokenRequest(
-            "runner-a", runtimeId, gameplayFactId, deadline, issuedAt));
+            "runner-a", runtimeId, gameplayFactId, deadline, issuedAt, Guid.NewGuid(), deadline.AddSeconds(30)));
 
         var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
         await Assert.That(token.Audiences).Contains("audience");
@@ -30,7 +30,7 @@ public sealed class RunnerScoringTokenIssuerTests
         await Assert.That(token.Claims.Any(claim => claim.Type == "processing_version"))
             .IsFalse();
         await Assert.That(token.ValidTo)
-            .IsEqualTo(deadline.AddHours(24).UtcDateTime);
+            .IsEqualTo(deadline.AddSeconds(30).AddHours(24).UtcDateTime);
     }
 
     [Test]

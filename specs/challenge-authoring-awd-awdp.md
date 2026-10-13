@@ -19,7 +19,7 @@ NoCTF 将“可复用题目模板”和“某场比赛中的题目”严格分�
 - Runtime、Checker 和“如何把 Flag 写进容器”是题库模板的可复用执行规格。
 - 具体比赛使用什么 Flag 头、Flag 正文模板和计分覆盖，必须在“比赛管理 → 题目 → 题目规则”中配置。不同比赛可以引用同一模板而使用不同 Flag 模板。
 - 出题人不需要手写 `schemaVersion`、队伍 ID、规格 ID、生效时间或失效时间；前端会维护这些内部字段。
-- Challenge 定义只选择 Container/Compose 等可移植规格。实际使用 Docker 还是 Kubernetes、使用哪个 Runner Pool，由平台配置统一决定。
+- Challenge 定义只选择 Container 命名服务等可移植规格。实际使用 Docker 还是 Kubernetes、使用哪个 Runner Pool，由平台配置统一决定。
 
 ## 2. 通用镜像和 Runtime 要求
 
@@ -63,134 +63,102 @@ Docker 单服务复用共享题目网络，多服务才建立实例专属网络�
 
 ## 3. AWD 出题规范
 
-### 3.1 AWD 的运行模型
+### 3.1 运行模型与制作流程
 
-每支获批队伍拥有独立 Runtime。平台按有效运行时间推进轮次，为“比赛 + 题目 + 队伍 + 轮次”生成精确匹配的动态 Flag，并调用注入命令写入该队 Runtime。Checker 周期性检测服务状态，攻击者提交其他队伍当前轮次 Flag 获得攻击收益。
+每队拥有独立 Container Runtime，分配为 `PerTeam`、Flag 来源为 `AwdRotation`。比赛独立推进轮次，按题目、队伍、Store、轮次、发行序号持久化正式 Flag。攻击可提交接收窗口内的历史 Flag，去重身份为攻击队与 FlagId。
 
-AWD 只允许：
+1. 新建 AWD 题库模板，配置 1–64 个命名服务，按核/MiB 填写资源。
+2. 添加 Runtime 级 Participants 访问入口，选择服务名和容器端口；宿主端口由平台分配。
+3. 配置有序 Store，选择 `BusinessChecker` 或 `RunnerCommand`，声明历史保存能力。
+4. 配置 Checker 镜像、目标命名服务和超时，按下述任务清单协议实现证据。
+5. 用至少两队完成轮换、跨轮捕获、历史丢失、故障恢复、暂停与收官验证。
+6. 在比赛中配置默认规则和题目覆盖，交付已填写的 [AWD 模板](challenge-authoring-templates/awd-challenge-template.md)。
 
-- `PerTeam` 分配；
-- Container Runtime（一个或多个命名服务）；
-- `AwdRotation` Flag 来源；
-- 平台生成、精确匹配的动态 Flag。
+Runtime、Checker 和 Store 属于题库；比赛规则、Flag 外观和计分属于比赛或比赛题目。Provider、Runner Pool、PID 限制与安全策略属于部署。不要提交 Compose 或自定义容器权限。
 
-出题人不得手工创建队伍 Flag，也不得把 AWD Fix、服务状态或轮次建模为静态 Flag。
+### 3.2 默认规则与窗口
 
-### 3.2 推荐出题流程
+默认轮长 180 秒、加固和间隔 0 秒、Flag 接收 5 轮（含发行轮）、历史窗口跟随接收窗口、每 Store 每轮 1 Flag。ATK/DEF/SLA 预算为 50/100/100，额外处罚关闭；OK 的 SLA 系数 1，RECOVERING 为 0.5，MUMBLE/OFFLINE 为 0，INTERNAL_ERROR 待裁定。Checker 间隔和超时默认 30 秒。
 
-1. 在题库中新建 `AWD` 模板，完成题面和附件。
-2. 配置 Container Runtime（一个或多个命名服务），设定资源、内部/公网端口、URL 和安全选项。
-3. 配置 Flag 注入命令。
-4. 配置 Checker 镜像、超时和目标服务。
-5. 在题库“运行环境”页启动题目测试容器，验证镜像拉取、入口展开和测试 Flag 注入；停止后 Runner 保留镜像缓存，可用于赛前预热。
-6. 在比赛中添加该模板。
-7. 在比赛配置中设置硬化期、轮次、攻击收益、服务分和 Checker 默认周期。
-8. 在比赛题目规则中按需覆盖单题计分、Checker 周期和比赛专属 Flag 模板。
-9. 使用至少两支测试队伍完成轮换、攻击、宕机恢复、暂停恢复和比赛结束验收。
+规则面板区分本轮已发行规则、下一轮配置与明确的历史计分修订。nullable 覆盖中 0/false 是显式值。具体五种预设、预算与边界见 [完整规则](awd-rules-2026.zh-CN.md)。
 
-### 3.3 比赛配置
+### 3.3 Flag Store 与历史保存
 
-当前默认值如下：
+默认 Flag 为专用 HMAC 派生的 `flag{32字符Base64URL主体}`，可用 `[SECURE]` 安全模板改变外观。不可用队伍 UUID、时间戳或低熵随机串代替安全主体。Flag 按精确 UTF-8 字节比较，不 Trim、不改大小写。
 
-| 字段 | 默认值 | 含义 |
-| --- | ---: | --- |
-| 硬化期 | 0 秒 | 开赛后只允许加固、隐藏对手入口且拒绝攻击 |
-| 轮次长度 | 300 秒 | 动态 Flag、攻击去重和服务分的逻辑轮次 |
-| 攻击奖励模式 | 固定奖励 | 每个合法攻击按固定分奖励 |
-| 单次攻击分 | 50 | 固定奖励模式下攻击者所得 |
-| 受害方防守池 | 100 | 某题某轮首次被攻破后受害队扣除的总额 |
-| Checker 周期 | 30 秒 | 同一题服务检测间隔 |
-| 服务正常分 | 100 | 完整轮次最终服务状态为 Up 时所得 |
-| 服务异常罚分 | 50 | 完整轮次最终服务状态为 Down 时扣除 |
+`BusinessChecker` 通过业务接口写入本次 `requiresWrite=true` 的 Flag。已有历史项只读，不补造历史；即使当前写入失败，也继续尝试读取任务要求的历史项。真实题目可保存私有登录凭据于 `privateReadContext`，可公开记录 ID 于 `publicLocator`，不得将密码或 Flag 放入公开定位字段。
 
-攻击奖励模式：
-
-- `FixedPerAttack`：每个不同攻击者的首次合法攻击获得“单次攻击分”；受害队在该题该轮只扣一次防守池。
-- `SplitVictimDefensePool`：受害队仍只扣一次防守池；该题该轮所有合法攻击者均分防守池，单队获得 `Floor(防守池 / 攻击者数量)`。
-
-硬化期、轮次长度是比赛级字段。单题可覆盖攻击模式、攻击分、防守池、Checker 周期、服务正常分和服务异常罚分，但未开启“覆盖”的字段继续继承比赛默认值。
-
-### 3.4 Flag 模板与注入
-
-Flag 模板在“比赛管理 → 题目 → 题目规则”中配置，而不是写死在题库模板中。留空时平台按当前默认规则生成：
-
-- 未填写前缀：使用 `flag`；
-- 未填写正文模板：使用随机 `[GUID]`；
-- 典型结果：`flag{550e8400-e29b-41d4-a716-446655440000}`。
-
-题库模板只配置注入方式。注入命令中必须出现 `${FLAG}`。例如服务从 `/dev/shm/flag` 读取 Flag：
+`RunnerCommand` 将 Flag、FlagId、StoreId 作为独立 shell 参数传入，脚本使用已导出的变量并正确引用：
 
 ```sh
-printf '%s' '${FLAG}' > /dev/shm/flag
+mkdir -p "/dev/shm/flags/${STORE_ID}"
+printf '%s' "${FLAG}" > "/dev/shm/flags/${STORE_ID}/${FLAG_ID}"
 ```
 
-注意：Runner 直接把 `${FLAG}` 替换到命令后执行 `/bin/sh -c`，不会额外进行 shell 转义。出题人和 Checker 被视为可信代码，但仍应避免把 Flag 拼接进复杂的二次 `eval`、SQL 或不受控路径。推荐只做单一文件写入或调用参数明确的内部脚本。
+命令应幂等，不使用 eval，不覆盖唯一文件破坏历史。投放重试使用同一 Flag；Runtime 重置不能自动回填应由选手保存的旧 Flag。服务启动不清空历史目录。
 
-Container 注入在当前容器中执行；Compose 必须填写接收 Flag 的 `ServiceName`。注入超时默认 30 秒，建议设置为 3～10 秒并保持幂等：同一个 Flag 重复注入不应破坏服务。
+### 3.4 Checker 任务与回执
 
-服务端应在请求到达时读取最新 Flag，或让注入命令以原子替换方式更新文件。不要只在进程启动时读取一次，否则轮换后仍会泄露旧 Flag。
-
-### 3.5 Checker 合约
-
-Checker 是可信的一次性容器。平台注入以下环境变量：
-
-| 变量 | 含义 |
+| 环境变量 | 用途 |
 | --- | --- |
-| `NOCTF_TARGET_HOST` | 目标服务在隔离网络中的主机名 |
-| `NOCTF_CALLBACK_URL` | 本次检测结果回调地址 |
-| `NOCTF_CALLBACK_TOKEN` | 仅绑定本次检测的短期 JWT |
+| `NOCTF_TARGET_HOST` | 默认目标服务内部地址 |
+| `NOCTF_AWD_TARGETS` | JSON 命名服务地址映射 |
+| `NOCTF_AWD_TASK_URL` | 当前尝试的受保护任务材料地址 |
+| `NOCTF_AWD_DEADLINE` | 本次执行绝对期限 |
+| `NOCTF_CALLBACK_URL` | 当前尝试结果回调地址 |
+| `NOCTF_CALLBACK_TOKEN` | 绑定 Runtime、GameplayFact、Attempt 的 JWT |
 
-Container 目标的默认 DNS 名为 `target`；Compose 题目必须正确选择目标服务名。Checker 应直接访问题目声明的容器内端口，而不是公网随机端口。
+先以 Bearer JWT GET 任务。响应含 `gameplayFactId`、`attemptId`、`deadline`、`flags`；每项含 `flagId`、`storeId`、`storeName`、`targetServiceName`、`flag`、`historical`、`requiresWrite`、`privateReadContext`、`publicLocator`。只处理这个清单，不猜测其他轮次材料。
 
-最小 Checker：
+回调 JSON 结构：
 
-```sh
-#!/bin/sh
-set -eu
-
-if wget -qO /dev/null -T 3 \
-  "http://${NOCTF_TARGET_HOST}:8080/health"; then
-  state='Up'
-else
-  state='Down'
-fi
-
-wget -qO /dev/null -T 3 \
-  --header "Authorization: Bearer ${NOCTF_CALLBACK_TOKEN}" \
-  --header 'Content-Type: application/json' \
-  --post-data "{\"state\":\"${state}\"}" \
-  "${NOCTF_CALLBACK_URL}"
+```json
+{
+  "connection": { "outcome": "Passed", "reason": "None" },
+  "functionality": { "outcome": "Passed", "reason": "None" },
+  "flags": [
+    {
+      "flagId": "aaaaaaaa-0000-0000-0000-000000000001",
+      "write": { "outcome": "NotRequired", "reason": "None" },
+      "read": { "outcome": "Passed", "reason": "None" },
+      "privateReadContext": null,
+      "publicLocator": "/records/opaque-record-id"
+    }
+  ],
+  "observedAt": "2026-10-13T00:00:00Z"
+}
 ```
 
-合约要求：
+实际回执必须恰好覆盖清单全部 FlagId，无重复；无需写入才可报 `NotRequired`。结果枚举为 `Unknown`、`Passed`、`TargetFailure`、`PlatformFailure`、`NotRequired`；原因使用 OpenAPI 枚举，例如 `ConnectionRefused`、`FunctionalCheckFailed`、`FlagStoreFailed`、`CurrentFlagMissing`、`HistoricalFlagMissing`、`InfrastructureFailure`。
 
-- 回调正文只允许 `{"state":"Up"}` 或 `{"state":"Down"}`。
-- 同一次 Checker 执行可以多次回调，最后一次有效状态为准。
-- 回调成功后 Checker 应以 0 退出；非零退出会记录 Checker 异常，超时会记录 Checker 超时。
-- 未得到有效 Up/Down 的平台异常不应错误扣选手服务分。
-- Checker 不得把 Token、Flag 或响应正文打印到日志。
+Checker 不上报最终健康、历史责任或计分资格。服务端根据固定清单分类。TCP 建连失败与已连接后的业务失败分开；网络基础设施异常不能一律扣为选手离线。剩余预算不足时保留清单项并报未知，不能省略或默认通过。一次有效回执固定当前尝试证据，重复回调不能用“最后一次获胜”改写结论。
 
-### 3.6 轮次、暂停和判定
+示例 Checker 用 Python 标准库实现，见 [checker.py](challenge-authoring-templates/starter-kits/awd/checker/checker.py)。它只用于样例 HTTP 服务；正式题须实现真实业务探测与可靠故障归因。不要记录 Token、Flag、私有上下文、任务正文或目标响应正文。
 
-- 逻辑轮次只按比赛有效运行时间推进。暂停期间时间冻结，不补发“错过的轮次”。
-- 当前 Flag 有效区间是半开区间 `[ValidStart, ValidUntil)`；轮换后旧 Flag 立即按过期处理。
-- 硬化期随暂停冻结；硬化期内 Checker 仍可运行，但不开放攻击和轮次计分。
-- 本队 Flag、错误格式、错误 Flag、过期 Flag均不得分。
-- 其他队伍当前唯一 Flag首次提交成功；同一攻击者对同一受害队、题目和轮次的重复提交不重复计分。
-- AWD 批量提交没有条数和总字节限制，但每个 Flag 必须为 1～4096 个 UTF-8 字节且不能包含 NUL；一个批次存在非法项时整批拒绝。
-- 比赛结束后停止新轮次、Checker、注入和计分，并回收 Runtime、端口和 Runner 容量。
+### 3.5 健康、执行与结算
 
-### 3.7 AWD 验收清单
+- `Ok`：当前连接、功能、当前操作、全部应保存历史读取通过，可同时存在有效捕获。
+- `Mumble`：连接成功，但当前业务或当前 Flag 操作失败。
+- `Offline`：可靠证据证明无法建立目标连接。
+- `Recovering`：当前检查通过，但仍有选手应保存的历史 Flag 缺失。
+- `InternalError`：平台、Checker、调度或证据不足导致不可信；保留已知目标故障证据，默认同轮重检，耗尽后待裁定。
 
-- [ ] 两支以上队伍各自得到独立 Runtime，端口不冲突。
-- [ ] 硬化期内只显示本队入口，攻击被拒绝；硬化期后对手入口按配置开放。
-- [ ] 每支队伍同一轮 Flag 不同，下一轮全部轮换。
-- [ ] 注入重复执行幂等，重置 Runtime 后新 Runtime UUID 获得当前有效 Flag。
-- [ ] 自己的 Flag、旧 Flag、错误 Flag、重复 Flag均返回明确结果。
-- [ ] 服务正常、主动宕机、Checker 超时、连接失败和恢复均符合预期。
-- [ ] 暂停期间不错误轮换或计分，恢复后从正确有效时间继续。
-- [ ] 排行榜、GameplayFact、比赛事件和管理端运行状态一致。
-- [ ] 结束后容器、网络、端口和容量全部释放。
+待检测、执行中、无法判定、未启用、暂定/最终/豁免是独立维度。新一轮不继承旧健康作为当前结果。默认轮末计划样本及其合法同轮重试用于 SLA；新轮检查不能倒填旧轮。
+
+任务材料读取止于执行期限，原窗口内观察有 30 秒自动回执宽限，更迟证据进入复核。24 小时回执令牌寿命不延长执行或 Flag 接收窗口。
+
+### 3.6 暂停、收官与验收
+
+暂停和轮间间隔冻结有效时钟，暂停发行与新攻击接收，已可靠接收的提交继续处理。默认收官关闭新接收，保留未决检测与结算；高级尾期只接受截止前仍有效的旧发行。最后不完整轮不伪造完整 SLA。
+
+- [ ] 两队 Runtime、地址和 Flag 独立，多 Store/多 Flag 预算不放大。
+- [ ] 跨轮首次捕获成功，同队重复不计分，过期、自己、未发行值明确拒绝。
+- [ ] 当前写入失败仍读取历史；历史丢失不会被重写成“正常”。
+- [ ] OK、MUMBLE、OFFLINE、RECOVERING、INTERNAL_ERROR 与任务、捕获、结算分开展示。
+- [ ] 平台漏发与未启用不产生历史责任；服务故障导致的历史缺失保留责任。
+- [ ] 暂停、尾期、延迟消息、重复回调与重启接管不重复计分。
+- [ ] 主办方预览历史规则变更后提交理由，排行榜解释与公开规则一致。
+- [ ] 完成镜像冒烟和真实 API/Worker/Runner 两队 E2E，收官释放资源。
 
 ## 4. AWDP 出题规范
 
@@ -428,15 +396,15 @@ dotnet test backend/NoCTF.slnx -c Release
 
 ### Runtime 无法启动
 
-检查镜像是否可拉取、镜像 `USER` 是否满足非 root 选项、端口是否声明、资源是否为正数、Compose 是否包含禁用字段，以及 Runtime Provider 是否健康。不要通过写死宿主端口绕过配置错误。
+检查镜像是否可拉取、默认 `USER` 和目录权限是否正确、命名服务与入口是否一致、资源是否为正数，以及平台 Runtime Provider 是否健康。不要通过写死宿主端口绕过配置错误。
 
 ### AWD Flag 注入失败
 
-检查注入命令是否包含精确的 `${FLAG}`、目标路径权限、只读根文件系统、Compose `ServiceName`、超时时间和脚本幂等性。注入命令失败时先修模板，不要手改系统生成的动态 Flag。
+检查 Store 投放方式、命令中引用的 `${FLAG}`、目标路径权限、命名服务、超时时间和脚本幂等性。注入命令失败时先修模板，不要手改系统生成的动态 Flag。
 
-### AWD Checker 一直 Unknown
+### AWD Checker 一直无法判定
 
-检查 Checker 是否能解析目标主机名、是否访问内部端口、回调是否携带 Bearer Token、JSON 是否严格为 Up/Down，以及 Checker 是否在回调成功后正常退出。不要把 Token 打入 stdout/stderr。
+检查任务材料能否在期限内领取、命名服务是否可达、Bearer Token 是否绑定当前尝试、全部 FlagId 是否有合法证据，以及观察时间是否在原执行窗口内。查看稳定原因、执行状态和待裁定证据后再处理。不要把 Token 打入 stdout/stderr。
 
 ### AWDP Fix 一直 Processing
 

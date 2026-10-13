@@ -20,6 +20,7 @@ internal static class ScoringInfrastructure
         services.AddScoped<IScoreboardDetailReader, ScoreboardDetailReader>();
         services.AddScoped<IScoreboardTrendFactReader, ScoreboardTrendFactReader>();
         services.AddScoped<BuildScoreboardTrends>();
+        services.AddScoped<GetSpectatorScreen>();
         if (!development)
             services.AddSingleton<ILeaderboardPublicationFence, NatsLeaderboardPublicationFence>();
         return services;

@@ -1,6 +1,6 @@
 import { date, id, model, now, type Data } from '../schema'
 import { mockRuntimeEndpoint } from '../runtime'
-import { defaultDefinition } from '../../app/utils/game-config'
+import { defaultDefinition, competitionConfigFields, buildConfigValues, fieldDefaultValue } from '../../app/utils/game-config'
 
 export function mockDefinition(mode: string) {
   if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh')
@@ -20,10 +20,9 @@ export function mockModeConfiguration(mode: string) {
       wrongSubmissionPenalty: 0,
     },
   }
-  if (mode === 'Awd') return {
-    mode, flagTemplate, hardeningDurationSeconds: 0, roundDurationSeconds: 300,
-    attackRewardMode: 'FixedPerAttack', attackPoints: 50, victimDefensePoolPoints: 100,
-    checkerIntervalSeconds: 30, serviceHealthyPoints: 100, serviceUnhealthyPenalty: 50,
+  if (mode === 'Awd') {
+    const fields = competitionConfigFields('Awd')
+    return buildConfigValues('Awd', fields, Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)])), { rules: false })
   }
   if (mode === 'Awdp') return {
     mode, flagTemplate, roundDurationSeconds: 300,
@@ -37,6 +36,7 @@ export function mockModeConfiguration(mode: string) {
 }
 
 export function mockRules(mode: string) {
+  if (mode === 'Awd') return { mode, awd: { overrides: {}, storeRules: [] } }
   if (mode === 'Ctf') return { mode, ctf: { scoreSettlementMode: null } }
   return { mode }
 }

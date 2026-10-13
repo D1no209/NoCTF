@@ -63,6 +63,7 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             or CompetitionEventKind.TeamBanned
             or CompetitionEventKind.TeamUnbanned
             or CompetitionEventKind.GameplayFactReceived
+            or CompetitionEventKind.AwdScoringRulesChanged
             or CompetitionEventKind.GameplayFactAdjudicated
             or CompetitionEventKind.ScoringRecorded
             or CompetitionEventKind.FirstBloodAwarded

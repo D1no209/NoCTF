@@ -45,7 +45,21 @@ public sealed class CompetitionConfigurationUpdateTests
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
-    private sealed class Store(CompetitionStatus status) : ICompetitionConfigurationStore
+    [Test]
+    public async Task Active_awd_defaults_require_an_operator_reason()
+    {
+        var store = new Store(CompetitionStatus.Running, GameMode.Awd);
+        var useCase = new UpdateCompetitionConfiguration(store, new Validator());
+        var config = CompetitionModeConfigurationDefaults.Create(GameMode.Awd, store.CompetitionId);
+        await Assert.That((await useCase.ExecuteAsync(store.CompetitionId, config, DateTimeOffset.UtcNow)).FailureCode)
+            .IsEqualTo(CompetitionConfigurationFailureCode.RuleChangeReasonRequired);
+        await Assert.That(store.UpdateCalls).IsEqualTo(0);
+        var audit = new NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit(Guid.NewGuid(), "Adjust next-round budget");
+        await Assert.That((await useCase.ExecuteAsync(store.CompetitionId, config, DateTimeOffset.UtcNow, audit: audit)).Succeeded).IsTrue();
+        await Assert.That(store.UpdateCalls).IsEqualTo(1);
+    }
+
+    private sealed class Store(CompetitionStatus status, GameMode mode = GameMode.Ctf) : ICompetitionConfigurationStore
     {
         public Guid CompetitionId { get; } = Guid.NewGuid();
         public int UpdateCalls { get; private set; }
@@ -53,19 +67,19 @@ public sealed class CompetitionConfigurationUpdateTests
 
         public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionConfigurationView?>(new(
-                CompetitionId, GameMode.Ctf, Configuration(1), status, 2, [], DateTimeOffset.UtcNow));
+                CompetitionId, mode, CompetitionModeConfigurationDefaults.Create(mode, CompetitionId), status, 2, [], DateTimeOffset.UtcNow));
 
         public Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
             CompetitionModeConfiguration configuration,
             bool allowWhileRunning,
             DateTimeOffset now,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit? audit = null)
         {
             UpdateCalls++;
             AllowWhileRunning = allowWhileRunning;
             return Task.FromResult(new CompetitionConfigurationUpdateResult(
-                new(competitionId, GameMode.Ctf, configuration, status, 2, [], now)));
+                new(competitionId, mode, configuration, status, 2, [], now)));
         }
     }
 

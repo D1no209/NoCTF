@@ -3,7 +3,7 @@ import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
-import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, Monitor, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression, getCompetitionTheory } from '../../../api'
 import { watchNotifications } from '~/composables/useNotificationHub'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
@@ -24,9 +24,13 @@ export function useCompetitionsByIdPage() {
 
   const isOverview = computed(() => isCompetitionOverviewPath(route.path))
 
+  const isPublicSpectator = computed(() => /\/(awd-live|koh-live)$/.test(route.path))
+
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
     `/competitions/${competitionId.value}/awdp-live`,
+    `/competitions/${competitionId.value}/awd-live`,
+    `/competitions/${competitionId.value}/koh-live`,
   ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/question-pool') || route.path.includes('/live-solo/postgame/') || route.path.endsWith('/theory'))
 
   const isWriteUpReview = computed(() =>
@@ -112,6 +116,7 @@ export function useCompetitionsByIdPage() {
   let progressionRequestId = 0
 
   async function refreshProgressionEnabled() {
+    if (isPublicSpectator.value) return
     const requestId = ++progressionRequestId
     if (competition.value?.mode !== 'Ctf'
       || (!hasCompetitionStaffAccess.value && !hasParticipantChallengeAccess.value)) {
@@ -130,6 +135,7 @@ export function useCompetitionsByIdPage() {
   }, { immediate: true })
 
   async function refreshMyTeam() {
+    if (isPublicSpectator.value) return
     const requestId = ++teamRequestId
     teamLoading.value = myTeam.value === null
     if (!user.value) {
@@ -161,6 +167,7 @@ export function useCompetitionsByIdPage() {
   }
 
   async function refreshMyStanding(): Promise<void> {
+    if (isPublicSpectator.value) return
     if (competition.value?.mode === 'LiveSolo') {
       myStanding.value = null; standingError.value = null; standingLoading.value = false
       return
@@ -193,6 +200,7 @@ export function useCompetitionsByIdPage() {
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
   async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
+    if (isPublicSpectator.value) return 'failed'
     const requestId = ++competitionRequestId
     const actorId = user.value?.userId ?? null
     const { data, error: err, response } = await getCompetitionEndpoint({
@@ -225,7 +233,7 @@ export function useCompetitionsByIdPage() {
   watch(
     () => user.value?.userId,
     () => {
-      if (isOverview.value) return
+      if (isOverview.value || isPublicSpectator.value) return
       competitionActorId.value = null
       competition.value = null
       myTeam.value = null
@@ -238,14 +246,17 @@ export function useCompetitionsByIdPage() {
 
   let unwatch: (() => void) | undefined
 
-  onMounted(() => {
-    if (isOverview.value) return
+  function subscribeWorkspace() {
+    unwatch?.()
+    unwatch = undefined
+    if (isOverview.value || isPublicSpectator.value) return
     unwatch = watchCompetition(competitionId.value, {
       competitionLifecycleChanged: () => {
         void refresh()
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       competitionEventChanged: event => {
+        if (isPublicSpectator.value) return
         if (event.kind === 'TeamBanned' || event.kind === 'TeamUnbanned' || event.kind === 'TeamBanCorrectionPublished'
           || event.kind === 'TeamRegistered' || event.kind === 'TeamRegistrationChanged' || event.kind === 'TeamDeleted'
           || event.kind === 'TeamMemberJoined' || event.kind === 'TeamMemberRemoved')
@@ -263,13 +274,25 @@ export function useCompetitionsByIdPage() {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       onReconnected: () => {
+        if (isPublicSpectator.value) return
         if (!isWriteUpReview.value) void refreshMyTeam()
         if (!isWriteUpReview.value) void refreshStandingLatest()
         void refreshProgressionEnabled()
         void refreshMissedAnnouncements()
       },
     })
-  })
+  }
+  onMounted(subscribeWorkspace)
+  watch(isPublicSpectator, enabled => {
+    if (enabled) {
+      unwatch?.(); unwatch = undefined
+      competitionRequestId++; teamRequestId++; progressionRequestId++
+      competition.value = null; competitionActorId.value = null; myTeam.value = null; myStanding.value = null
+    } else {
+      subscribeWorkspace()
+      void initialize()
+    }
+  }, { flush: 'sync' })
 
   onUnmounted(() => {
     competitionRequestId++
@@ -307,6 +330,8 @@ export function useCompetitionsByIdPage() {
             ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
             : []),
           ...(competition.value?.mode === 'LiveSolo' ? [] : [{ to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy }]),
+          ...(competition.value?.mode === 'Awd' || competition.value?.mode === 'Koh'
+            ? [{ to: `${base}/${competition.value.mode === 'Awd' ? 'awd' : 'koh'}-live`, label: translate('competitions.label.spectator'), icon: Monitor }] : []),
           { to: `${base}/questions`, label: translate("common.label.questions"), icon: MessageCircleQuestion },
         ],
       },
@@ -344,7 +369,7 @@ export function useCompetitionsByIdPage() {
 
 
   async function initialize() {
-    if (isOverview.value) return
+    if (isOverview.value || isPublicSpectator.value) return
     await refresh()
     if (!isWriteUpReview.value) await refreshMyTeam()
     await refreshMissedAnnouncements()

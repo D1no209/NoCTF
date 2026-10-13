@@ -9984,6 +9984,37 @@
         }
       }
     },
+    "/api/internal/v1/awd/check-task": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "summary": "Reads only the flag material assigned to the current AWD checker attempt.",
+        "description": "Executes GET /api/internal/v1/awd/check-task.",
+        "operationId": "ReadAwdCheckTaskEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckTaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/internal/v1/awd/check-results": {
       "post": {
         "tags": [
@@ -11344,6 +11375,91 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/awd-spectator": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Read a public-only, consistent AWD broadcast snapshot and bounded history.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/awd-spectator.",
+        "operationId": "GetAwdSpectatorEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorScreenResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorConflictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/badges/{badgeId}/image": {
       "get": {
         "tags": [
@@ -11436,6 +11552,91 @@
         "responses": {
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/koh-spectator": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Read a public-only KoH control field and bounded confirmation history.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/koh-spectator.",
+        "operationId": "GetKohSpectatorEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorScreenResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorConflictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -12476,6 +12677,49 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads safe issued, effective scoring and next-round AWD policies. Paused deadlines are provisional until resumption.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules.",
+        "operationId": "GetAwdRules",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicRulesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}": {
       "get": {
         "tags": [
@@ -12519,6 +12763,107 @@
             "description": "Not Found"
           }
         }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists currently valid public AWD locators for a participant target.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info.",
+        "operationId": "ListAwdAttackInfo",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfAwdAttackInfoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments": {
@@ -21397,6 +21742,83 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}/adjudication": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Confirms saved AWD evidence or explicitly exempts a pending check with an audited reason.",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}/adjudication.",
+        "operationId": "AdminAdjudicateAwdCheck",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gameplayFactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "AdjudicateAwdCheckRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicateAwdCheckRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-fact-rejudgements": {
       "post": {
         "tags": [
@@ -21668,6 +22090,60 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads AWD check evidence without flag values or private read credentials.",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}.",
+        "operationId": "AdminGetAwdCheckEvidence",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gameplayFactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse"
                 }
               }
             }
@@ -21980,6 +22456,132 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/awd/checks": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists AWD checks, defaulting to pending adjudication; evidence is loaded separately.",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/awd/checks.",
+        "operationId": "AdminListAwdChecks",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "settlement",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState2"
+                }
+              ]
+            }
+          },
+          {
+            "name": "allSettlements",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "roundNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfAwdCheckListItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences": {
       "get": {
         "tags": [
@@ -22111,6 +22713,83 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Applies a reviewed AWD scoring policy to an explicit round range with immutable audit evidence.",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring.",
+        "operationId": "AdminApplyAwdScoringRules",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ApplyAwdScoringRulesRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -23551,6 +24230,79 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads issued and effective AWD scoring rules for a round and the latest 50 audited changes.",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules.",
+        "operationId": "AdminGetAwdScoringRules",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roundNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringRulesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/directions": {
       "get": {
         "tags": [
@@ -24013,6 +24765,83 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews explicit AWD scoring changes for existing rounds, preserving issued flag and check policies.",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview.",
+        "operationId": "AdminPreviewAwdScoringRules",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PreviewAwdScoringRulesRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationCompetitionsAwdAwdScoringRulePreview"
                 }
               }
             }
@@ -31125,7 +31954,14 @@
           "PatchVerificationPlatformFailed",
           "StaticFlagWithoutContainer",
           "StaticFlagWithoutAttachment",
-          "StaticFlagWithoutContainerAndAttachment"
+          "StaticFlagWithoutContainerAndAttachment",
+          "FlagInvalid",
+          "FlagUnknown",
+          "FlagRevoked",
+          "FlagNotIssued",
+          "FlagNotYetActive",
+          "FlagNotScorable",
+          "AwdReceiptUnavailable"
         ],
         "enum": [
           0,
@@ -31166,7 +32002,14 @@
           35,
           36,
           37,
-          38
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45
         ]
       },
       "NoCTFApplicationNotificationsRuntimeStateChangedNotificationContent": {
@@ -33459,6 +34302,12 @@
           "flagInjection"
         ],
         "properties": {
+          "flagStores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagStoreContract"
+            }
+          },
           "flagInjection": {
             "nullable": true,
             "oneOf": [
@@ -33468,6 +34317,49 @@
             ]
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagStoreContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "deliveryMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol"
+          },
+          "targetServiceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "injectionCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "injectionTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "preservesHistoricalFlags": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "RunnerCommand",
+          "BusinessChecker"
+        ],
+        "enum": [
+          "RunnerCommand",
+          "BusinessChecker"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract": {
         "type": "object",
@@ -36496,6 +37388,68 @@
           "RandomOnePerTeam"
         ]
       },
+      "NoCTFAPIEndpointsInternalAwdCheckTaskResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckTaskFlagResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsInternalAwdCheckTaskFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "storeName": {
+            "type": "string"
+          },
+          "targetServiceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string"
+          },
+          "historical": {
+            "type": "boolean"
+          },
+          "requiresWrite": {
+            "type": "boolean"
+          },
+          "privateReadContext": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicLocator": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsInternalInternalResultResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -36528,29 +37482,131 @@
       "NoCTFAPIEndpointsInternalRecordAwdCheckResultRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "connection",
+          "functionality",
+          "flags",
+          "observedAt"
+        ],
         "properties": {
-          "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdServiceStateProtocol"
+          "connection": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckProbeRequest"
+          },
+          "functionality": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckProbeRequest"
+          },
+          "flags": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckFlagRequest"
+            }
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 1,
+            "nullable": false
           }
         }
       },
-      "NoCTFAPIEndpointsInternalAwdServiceStateProtocol": {
+      "NoCTFAPIEndpointsInternalAwdCheckProbeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdProbeOutcome"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckReason"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdProbeOutcome": {
         "type": "string",
         "description": "",
         "x-enumNames": [
           "Unknown",
-          "Up",
-          "Down",
-          "CheckerAbnormalExit",
-          "CheckerTimedOut"
+          "Passed",
+          "TargetFailure",
+          "PlatformFailure",
+          "NotRequired"
         ],
         "enum": [
           "Unknown",
-          "Up",
-          "Down",
-          "CheckerAbnormalExit",
-          "CheckerTimedOut"
+          "Passed",
+          "TargetFailure",
+          "PlatformFailure",
+          "NotRequired"
         ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdCheckReason": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "ConnectionRefused",
+          "ConnectTimeout",
+          "RequestTimeout",
+          "FunctionalCheckFailed",
+          "FlagStoreFailed",
+          "CurrentFlagMissing",
+          "HistoricalFlagMissing",
+          "CheckerCrashed",
+          "CheckerTimedOut",
+          "TaskNotExecuted",
+          "CallbackMissing",
+          "InfrastructureFailure",
+          "IncompleteEvidence",
+          "InvalidEvidence",
+          "RuntimeSuperseded",
+          "LateReceipt"
+        ],
+        "enum": [
+          "None",
+          "ConnectionRefused",
+          "ConnectTimeout",
+          "RequestTimeout",
+          "FunctionalCheckFailed",
+          "FlagStoreFailed",
+          "CurrentFlagMissing",
+          "HistoricalFlagMissing",
+          "CheckerCrashed",
+          "CheckerTimedOut",
+          "TaskNotExecuted",
+          "CallbackMissing",
+          "InfrastructureFailure",
+          "IncompleteEvidence",
+          "InvalidEvidence",
+          "RuntimeSuperseded",
+          "LateReceipt"
+        ]
+      },
+      "NoCTFAPIEndpointsInternalAwdCheckFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "write": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckProbeRequest"
+          },
+          "read": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdCheckProbeRequest"
+          },
+          "privateReadContext": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicLocator": {
+            "type": "string",
+            "nullable": true
+          }
+        }
       },
       "NoCTFAPIEndpointsInternalRecordAwdpCheckResultRequest": {
         "type": "object",
@@ -36711,6 +37767,14 @@
           },
           "timeEligibility": {
             "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
+          },
+          "awdAttack": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdAttackStatusResponse"
+              }
+            ]
           }
         }
       },
@@ -36832,7 +37896,14 @@
           "PatchVerificationPlatformFailed",
           "StaticFlagWithoutContainer",
           "StaticFlagWithoutAttachment",
-          "StaticFlagWithoutContainerAndAttachment"
+          "StaticFlagWithoutContainerAndAttachment",
+          "FlagInvalid",
+          "FlagUnknown",
+          "FlagRevoked",
+          "FlagNotIssued",
+          "FlagNotYetActive",
+          "FlagNotScorable",
+          "AwdReceiptUnavailable"
         ],
         "enum": [
           "FlagNotSupported",
@@ -36873,7 +37944,14 @@
           "PatchVerificationPlatformFailed",
           "StaticFlagWithoutContainer",
           "StaticFlagWithoutAttachment",
-          "StaticFlagWithoutContainerAndAttachment"
+          "StaticFlagWithoutContainerAndAttachment",
+          "FlagInvalid",
+          "FlagUnknown",
+          "FlagRevoked",
+          "FlagNotIssued",
+          "FlagNotYetActive",
+          "FlagNotScorable",
+          "AwdReceiptUnavailable"
         ]
       },
       "NoCTFDomainChallengesGameplayFactTimeEligibility": {
@@ -36888,6 +37966,93 @@
           "Valid",
           "NotOpened",
           "SubmissionClosed"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdAttackStatusResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "generationRoundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "generationRoundNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "receivedRoundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "receivedRoundNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "storeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "outcome": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdAttackOutcome"
+              }
+            ]
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdAttackOutcome": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Accepted",
+          "Invalid",
+          "Expired",
+          "Duplicate",
+          "OwnFlag",
+          "UnknownFlag",
+          "NotScorable",
+          "SystemError"
+        ],
+        "enum": [
+          "Accepted",
+          "Invalid",
+          "Expired",
+          "Duplicate",
+          "OwnFlag",
+          "UnknownFlag",
+          "NotScorable",
+          "SystemError"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSettlementState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Provisional",
+          "Final",
+          "PendingAdjudication",
+          "Exempted"
+        ],
+        "enum": [
+          "Provisional",
+          "Final",
+          "PendingAdjudication",
+          "Exempted"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse": {
@@ -37501,7 +38666,11 @@
           "GameplayFactConcurrency",
           "PatchUploadNotFound",
           "ChallengeNotOpened",
-          "ChallengeSubmissionClosed"
+          "ChallengeSubmissionClosed",
+          "AwdHardeningActive",
+          "AwdRoundGap",
+          "AwdRoundUnavailable",
+          "ManualAdjustmentReasonInvalid"
         ],
         "enum": [
           "ResourceDeleted",
@@ -37524,7 +38693,11 @@
           "GameplayFactConcurrency",
           "PatchUploadNotFound",
           "ChallengeNotOpened",
-          "ChallengeSubmissionClosed"
+          "ChallengeSubmissionClosed",
+          "AwdHardeningActive",
+          "AwdRoundGap",
+          "AwdRoundUnavailable",
+          "ManualAdjustmentReasonInvalid"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsSubmitFlagRequest": {
@@ -37674,6 +38847,462 @@
           }
         }
       },
+      "NoCTFAPIEndpointsCompetitionsSpectatorScreenResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "competitionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
+              }
+            ]
+          },
+          "hardeningEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardSpectatorScreenTeam"
+            }
+          },
+          "challenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardScoreboardChallengeCatalogItem"
+            }
+          },
+          "round": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorRoundResponse"
+              }
+            ]
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorServiceResponse"
+            }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorPointResponse"
+            }
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorChangeResponse"
+            }
+          },
+          "settlements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardSpectatorSettlement"
+            }
+          },
+          "historyStartsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "historyTruncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Live",
+          "Frozen",
+          "Hidden"
+        ],
+        "enum": [
+          "Live",
+          "Frozen",
+          "Hidden"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Draft",
+          "Visible",
+          "Published",
+          "Running",
+          "Paused",
+          "Finished"
+        ],
+        "enum": [
+          "Draft",
+          "Visible",
+          "Published",
+          "Running",
+          "Paused",
+          "Finished"
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardSpectatorScreenTeam": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardScoreboardChallengeCatalogItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "directionIcon": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorRoundResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorServiceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "health": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isCompromised": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "lastTrustedHealth": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "lastTrustedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdHealth": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ok",
+          "Mumble",
+          "Offline",
+          "Recovering",
+          "InternalError"
+        ],
+        "enum": [
+          "Ok",
+          "Mumble",
+          "Offline",
+          "Recovering",
+          "InternalError"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdCheckExecution": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Running",
+          "Completed",
+          "FailedToDetermine"
+        ],
+        "enum": [
+          "Pending",
+          "Running",
+          "Completed",
+          "FailedToDetermine"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorPointResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "controllerId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "observedTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "health": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorHealthProtocol"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pointsPerInterval": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorHealthProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Unknown",
+          "Healthy",
+          "Down"
+        ],
+        "enum": [
+          "Unknown",
+          "Healthy",
+          "Down"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorChangeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "revision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorChangeProtocol"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "targetTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "controllerId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorChangeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attack",
+          "Control",
+          "Uncontrolled",
+          "DetectionFailed"
+        ],
+        "enum": [
+          "Attack",
+          "Control",
+          "Uncontrolled",
+          "DetectionFailed"
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardSpectatorSettlement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "attack": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lost": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "service": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "other": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorConflictCode"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CursorExpired"
+        ],
+        "enum": [
+          "CursorExpired"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsGetAwdSpectatorRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionBadgeImageRequest": {
         "type": "object",
         "additionalProperties": false
@@ -37806,26 +39435,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Draft",
-          "Visible",
-          "Published",
-          "Running",
-          "Paused",
-          "Finished"
-        ],
-        "enum": [
-          "Draft",
-          "Visible",
-          "Published",
-          "Running",
-          "Paused",
-          "Finished"
-        ]
-      },
       "NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol": {
         "type": "string",
         "description": "",
@@ -37883,6 +39492,10 @@
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsGetKohSpectatorRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -38148,12 +39761,14 @@
         "x-enumNames": [
           "ManualAdjustment",
           "CompetitionPenalty",
-          "BanRecalculation"
+          "BanRecalculation",
+          "ScoreFloor"
         ],
         "enum": [
           "ManualAdjustment",
           "CompetitionPenalty",
-          "BanRecalculation"
+          "BanRecalculation",
+          "ScoreFloor"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse": {
@@ -38203,6 +39818,12 @@
           },
           "defenseState": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
+          },
+          "awdComponents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse"
+            }
           }
         }
       },
@@ -38411,6 +40032,51 @@
           "Succeeded"
         ]
       },
+      "NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardAwdScoreComponent"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "unroundedPoints": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "roundingDifference": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardAwdScoreComponent": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attack",
+          "DefenseReward",
+          "DefenseLoss",
+          "Availability",
+          "ExtraPenalty"
+        ],
+        "enum": [
+          "Attack",
+          "DefenseReward",
+          "DefenseLoss",
+          "Availability",
+          "ExtraPenalty"
+        ]
+      },
       "NoCTFAPIEndpointsCompetitionsScoreboardChallengeAchievementResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -38514,20 +40180,6 @@
             "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Live",
-          "Frozen",
-          "Hidden"
-        ],
-        "enum": [
-          "Live",
-          "Frozen",
-          "Hidden"
-        ]
       },
       "NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse": {
         "type": "object",
@@ -39050,6 +40702,12 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "awdComponents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse"
+            }
           }
         }
       },
@@ -39291,7 +40949,8 @@
           "ChallengeWriteUpPublished",
           "ChallengeWriteUpWithdrawn",
           "ChallengeWriteUpRejected",
-          "ChallengeWriteUpUnlocked"
+          "ChallengeWriteUpUnlocked",
+          "AwdScoringRulesChanged"
         ],
         "enum": [
           "CompetitionCreated",
@@ -39361,7 +41020,8 @@
           "ChallengeWriteUpPublished",
           "ChallengeWriteUpWithdrawn",
           "ChallengeWriteUpRejected",
-          "ChallengeWriteUpUnlocked"
+          "ChallengeWriteUpUnlocked",
+          "AwdScoringRulesChanged"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -39624,6 +41284,24 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "awdRuleTiming": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdRuleChangeTiming"
+              }
+            ]
+          },
+          "awdEffectiveFromRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdEffectiveThroughRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -39689,6 +41367,20 @@
           "Closed"
         ]
       },
+      "NoCTFDomainCompetitionsAwdAwdRuleChangeTiming": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NextRound",
+          "Immediately",
+          "RecalculateHistory"
+        ],
+        "enum": [
+          "NextRound",
+          "Immediately",
+          "RecalculateHistory"
+        ]
+      },
       "NoCTFAPIEndpointsCompetitionsEventsListCompetitionEventsRequest": {
         "allOf": [
           {
@@ -39698,6 +41390,999 @@
             "type": "object",
             "additionalProperties": false
           }
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesAwdPublicRulesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptanceEndsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "acceptingSubmissions": {
+            "type": "boolean"
+          },
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "roundStartsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "roundEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hardeningDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionDefaults": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract"
+          },
+          "questionOverrides": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdRuleOverridesContract"
+          },
+          "attackPointsOverridden": {
+            "type": "boolean"
+          },
+          "defensePointsOverridden": {
+            "type": "boolean"
+          },
+          "slaPointsOverridden": {
+            "type": "boolean"
+          },
+          "checkerIntervalOverridden": {
+            "type": "boolean"
+          },
+          "attackModeOverridden": {
+            "type": "boolean"
+          },
+          "issuedPolicies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicRulePolicyResponse"
+            }
+          },
+          "nextRound": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicRulePolicyResponse"
+          },
+          "ownService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicTeamHealthResponse"
+              }
+            ]
+          },
+          "currentTieBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
+          },
+          "nextTieBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagLifetimeUnit": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+          },
+          "flagLifetime": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "linkHistoricalWindow": {
+            "type": "boolean"
+          },
+          "historicalLifetimeUnit": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+          },
+          "historicalLifetime": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generationPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol"
+          },
+          "generationInterval": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flagsPerStore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundGapSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "submissionTailSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "finalCheckBudgetSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "callbackGraceSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "slaSettlement": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol"
+          },
+          "defenseMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol"
+          },
+          "slaBasis": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol"
+          },
+          "okRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "mumbleRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlineRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "penaltyMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol"
+          },
+          "mumblePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offlinePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recoveringPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mumblePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlinePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringPenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "consecutiveFailureMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRoundPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "minimumTotalScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "confidentialityPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumAttackRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "scarcityAlpha": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRankMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "composition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol"
+          },
+          "attackWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "defenseWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "slaWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "attackSettlement": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Rounds",
+          "ActiveSeconds"
+        ],
+        "enum": [
+          "Rounds",
+          "ActiveSeconds"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "EveryRound",
+          "EveryNRounds",
+          "ActiveInterval"
+        ],
+        "enum": [
+          "EveryRound",
+          "EveryNRounds",
+          "ActiveInterval"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ],
+        "enum": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Fixed",
+          "SharedPool",
+          "Scarcity",
+          "TargetRank",
+          "SlaMultiplier",
+          "Custom"
+        ],
+        "enum": [
+          "Fixed",
+          "SharedPool",
+          "Scarcity",
+          "TargetRank",
+          "SlaMultiplier",
+          "Custom"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ],
+        "enum": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "StatusRatio",
+          "ReadableFlags"
+        ],
+        "enum": [
+          "StatusRatio",
+          "ReadableFlags"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ],
+        "enum": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ],
+        "enum": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
+        ],
+        "enum": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdRuleOverridesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagLifetimeUnit": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+              }
+            ]
+          },
+          "flagLifetime": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "linkHistoricalWindow": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "historicalLifetimeUnit": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+              }
+            ]
+          },
+          "historicalLifetime": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "generationPolicy": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol"
+              }
+            ]
+          },
+          "generationInterval": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagsPerStore": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "finalCheckBudgetSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "retryIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "callbackGraceSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "slaSettlement": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol"
+              }
+            ]
+          },
+          "preset": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol"
+              }
+            ]
+          },
+          "defenseMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol"
+              }
+            ]
+          },
+          "slaBasis": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol"
+              }
+            ]
+          },
+          "okRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "recoveringRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "mumbleRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "offlineRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "penaltyMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol"
+              }
+            ]
+          },
+          "mumblePenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "offlinePenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "recoveringPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "mumblePenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "offlinePenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "recoveringPenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "consecutiveFailureMultiplier": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "maximumRoundPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "confidentialityPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "minimumAttackRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "scarcityAlpha": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "maximumRankMultiplier": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "attackSettlement": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesAwdPublicRulePolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rulesId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attackMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol"
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "defensePoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slaPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "checkerIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "options": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract"
+          },
+          "stores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicStoreRuleResponse"
+            }
+          },
+          "scoring": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          },
+          "scoringChangeEventId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
+        ],
+        "enum": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesAwdPublicStoreRuleResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "flagsPerIssue": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attackRewardMode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAttackRewardMode"
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "victimDefensePoolPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serviceHealthyPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slaSettlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSlaSettlement"
+          },
+          "defenseMode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdDefenseMode"
+          },
+          "slaBasis": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSlaBasis"
+          },
+          "okRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "mumbleRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlineRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "penaltyMode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdPenaltyMode"
+          },
+          "mumblePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offlinePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recoveringPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mumblePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlinePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringPenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "consecutiveFailureMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRoundPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "confidentialityPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumAttackRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "scarcityAlpha": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRankMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "composition": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdScoreComposition"
+          },
+          "attackWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "defenseWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "slaWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "attackSettlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdAttackSettlement"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAttackRewardMode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
+        ],
+        "enum": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSlaSettlement": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ],
+        "enum": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdDefenseMode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ],
+        "enum": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSlaBasis": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "StatusRatio",
+          "ReadableFlags"
+        ],
+        "enum": [
+          "StatusRatio",
+          "ReadableFlags"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdPenaltyMode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ],
+        "enum": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdScoreComposition": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ],
+        "enum": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdAttackSettlement": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
+        ],
+        "enum": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesAwdPublicTeamHealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "health": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastTrustedHealth": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "lastTrustedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdTieBreakField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSortDirection"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdTieBreakField": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AttackPoints",
+          "HealthyRounds",
+          "AttackCount",
+          "LastAttackAt",
+          "RegistrationTime"
+        ],
+        "enum": [
+          "AttackPoints",
+          "HealthyRounds",
+          "AttackCount",
+          "LastAttackAt",
+          "RegistrationTime"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSortDirection": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Descending",
+          "Ascending"
+        ],
+        "enum": [
+          "Descending",
+          "Ascending"
         ]
       },
       "NoCTFAPIEndpointsChallengesChallengeResponse": {
@@ -39984,6 +42669,75 @@
       "NoCTFAPIEndpointsChallengesGetChallengeRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIPaginationArrayResultOfAwdAttackInfoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdAttackInfoResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesAwdAttackInfoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "generationRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "storeName": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publicLocator": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exclusiveExpiryRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "remainingActiveSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesListAwdAttackInfoRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentListResponse": {
         "type": "object",
@@ -45437,6 +48191,228 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "health": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "knownTargetFailure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckReason"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse"
+          },
+          "functionality": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "receiptDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "adjudicatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "attemptStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attemptDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "finalScheduledCheck": {
+            "type": "boolean"
+          },
+          "manifestComplete": {
+            "type": "boolean"
+          },
+          "evidenceComplete": {
+            "type": "boolean"
+          },
+          "requiredFlags": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "readableFlags": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdProbeOutcome"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckReason"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "historical": {
+            "type": "boolean"
+          },
+          "requiresWrite": {
+            "type": "boolean"
+          },
+          "obligation": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdFlagObligation"
+          },
+          "write": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse"
+          },
+          "read": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdFlagObligation": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "PlatformPending",
+          "PlayerRequired",
+          "Exempted"
+        ],
+        "enum": [
+          "PlatformPending",
+          "PlayerRequired",
+          "Exempted"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicateAwdCheckRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "reason"
+        ],
+        "properties": {
+          "expectedAttemptId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "expectedReceivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "action": {
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckAdjudicationAction"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdCheckAdjudicationAction": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AcceptEvidence",
+          "Exempt"
+        ],
+        "enum": [
+          "AcceptEvidence",
+          "Exempt"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationGameplayFactsGameplayFactRejudgementResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -45513,6 +48489,12 @@
           "delta": {
             "type": "integer",
             "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
           }
         }
       },
@@ -45597,6 +48579,14 @@
           },
           "timeEligibility": {
             "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
+          },
+          "awdAttack": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdAttackStatusResponse"
+              }
+            ]
           }
         }
       },
@@ -45727,6 +48717,104 @@
             "type": "object",
             "additionalProperties": false
           }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfAwdCheckListItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckListItemResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckListItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "health": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckReason"
+          },
+          "finalScheduledCheck": {
+            "type": "boolean"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsListAwdChecksRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSettlementState2": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Provisional",
+          "Final",
+          "PendingAdjudication",
+          "Exempted"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
         ]
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse": {
@@ -46026,6 +49114,56 @@
             "type": "string",
             "format": "guid",
             "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy",
+          "reason",
+          "previewToken"
+        ],
+        "properties": {
+          "firstRound": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "lastRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdRuleChangeTiming"
+          },
+          "policy": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": false
+          },
+          "previewToken": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
             "nullable": false
           }
         }
@@ -46931,20 +50069,23 @@
           "serviceUnhealthyPenalty": {
             "type": "integer",
             "format": "int64"
+          },
+          "options": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract"
+              }
+            ]
+          },
+          "tieBreakers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "FixedPerAttack",
-          "SplitVictimDefensePool"
-        ],
-        "enum": [
-          "FixedPerAttack",
-          "SplitVictimDefensePool"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract": {
         "type": "object",
@@ -47112,6 +50253,102 @@
             "type": "boolean"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringRulesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse"
+            }
+          },
+          "recentChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rulesId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issuedPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          },
+          "effectivePolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          },
+          "appliedChangeEventId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdRuleChangeTiming"
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsGetAwdScoringRulesRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionsResponse": {
         "type": "object",
@@ -47825,6 +51062,12 @@
           "configuration"
         ],
         "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
+          },
           "configuration": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract"
           }
@@ -47994,6 +51237,91 @@
             "maxLength": 500,
             "minLength": 0,
             "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsAwdAwdScoringRulePreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "projectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affectedFlags": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectedRuleSnapshots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsAwdAwdScoringTeamImpact"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsAwdAwdScoringTeamImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "scoreBefore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "scoreAfter": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy",
+          "reason"
+        ],
+        "properties": {
+          "firstRound": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "lastRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdRuleChangeTiming"
+          },
+          "policy": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": false
           }
         }
       },
@@ -48970,6 +52298,20 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "overrides": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdRuleOverridesContract"
+              }
+            ]
+          },
+          "storeRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdStoreRuleContract"
+            }
+          },
           "attackRewardMode": {
             "nullable": true,
             "oneOf": [
@@ -49010,6 +52352,25 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
               }
             ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdStoreRuleContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "weight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "flagsPerIssue": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -49229,6 +52590,12 @@
           "configuration"
         ],
         "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
+          },
           "configuration": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
           }

@@ -1,6 +1,7 @@
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.LiveSolo;
 using NoCTF.GameModes.LiveSolo.Configuration;
 
@@ -17,8 +18,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             GameMode.Ctf when configuration is CtfCompetitionModeConfiguration ctf =>
                 ValidateCtf(ctf, eligibleTeamCount, challengeRules),
             GameMode.Awd when configuration is AwdCompetitionModeConfiguration awd =>
-                Awd.Configuration.AwdConfigurationValidator.Validate(
-                    TypedGameModeConfiguration.Awd(awd)),
+                ValidateAwd(awd, challengeRules),
             GameMode.Awdp when configuration is AwdpCompetitionModeConfiguration awdp =>
                 ValidateAwdp(awdp, eligibleTeamCount, challengeRules),
             GameMode.Koh when configuration is KohCompetitionModeConfiguration koh =>
@@ -135,6 +135,24 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             }
             errors.AddRange(Ctf.Configuration.CtfConfigurationValidator.Validate(
                 TypedGameModeConfiguration.Ctf(ctf), competition, eligibleTeamCount));
+        }
+        return errors;
+    }
+
+    private static IReadOnlyList<string> ValidateAwd(
+        AwdCompetitionModeConfiguration configuration, IReadOnlyList<CompetitionChallengeRules> challengeRules)
+    {
+        var errors = Awd.Configuration.AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(configuration)).ToList();
+        if (!AwdTieBreakPolicy.IsValid(AwdTieBreakPolicy.Resolve(
+                configuration.TieBreakers.OrderBy(item => item.Position).Select(item =>
+                    new AwdTieBreakCriterion(item.Field, item.Direction)))))
+            errors.Add("AWD tie-break rules require 1..5 distinct supported fields and valid directions.");
+        errors.AddRange(Awd.Configuration.AwdEffectiveRules.ValidateConfiguration(configuration, new AwdCompetitionChallengeRules()));
+        foreach (var rules in challengeRules)
+        {
+            if (rules is AwdCompetitionChallengeRules awd)
+                errors.AddRange(Awd.Configuration.AwdEffectiveRules.ValidateConfiguration(configuration, awd));
+            else errors.Add("AWD challenge rules type does not match the competition mode.");
         }
         return errors;
     }

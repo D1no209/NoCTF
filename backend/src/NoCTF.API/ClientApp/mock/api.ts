@@ -1,3 +1,6 @@
+import { createMockAwdPublicRules } from './awd-public-rules'
+import { createMockAwdScoring } from './awd-scoring'
+import { createMockAwdChecks } from './awd-checks'
 import { createMockMfa } from './mfa'
 import { createMockChallengeWriteUps } from './challenge-writeups'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
@@ -53,6 +56,9 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
+  const awdChecks = createMockAwdChecks(state)
+  const awdScoring = createMockAwdScoring(state)
+  const awdPublicRules = createMockAwdPublicRules()
   const liveSolo = createMockLiveSolo(state)
   const broadcastHistory = createMockBroadcastHistory(state)
   const platformLogHistory = createMockPlatformLogHistory()
@@ -293,6 +299,10 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
+    const awdScoringResponse = awdScoring.handle(request, route, p, body, user?.userId)
+    if (awdScoringResponse) return awdScoringResponse
+    const awdCheckResponse = awdChecks.handle(request, route, p, body)
+    if (awdCheckResponse) return awdCheckResponse
     const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
     if (liveSoloRead !== undefined) return json(shape(responseSchema(operation), liveSoloRead))
     if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
@@ -498,6 +508,23 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
         capabilities: { canObserve: true, canModerate: true, canManagePermissions: true },
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/targets') {
+        if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
+        return json({ items: state.teams.filter(team => team.competitionId === p.competitionId).map(team => ({ teamId: team.id, teamName: team.name, accesses: [] })) })
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info') {
+        if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
+        return json(list(Array.from({ length: 13 }, (_, index) => ({ flagId: id(99500 + index), generationRound: 4 - Math.floor(index / 5),
+          storeId: id(99600), storeName: 'accounts', ordinal: index % 5 + 1,
+          publicLocator: index === 0 ? '<script>alert("locator")</script> / public-user-17' : `public-user-${17 + index}`,
+          issuedAt: date(-2), exclusiveExpiryRound: 6, remainingActiveSeconds: null })), url))
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules') {
+        if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
+        const template = state.templates.find(template => template.id === challenge.challengeId)
+        return json(awdPublicRules(competition, challenge, template, state.settings, myTeam,
+          awdScoring.publicAmendment(challenge.id, 4)))
       }
       else if (route === '/admin/competitions/{competitionId}/staff-webhooks') value = {
         canManage: user?.role === 'Administrator' || user?.role === 'Organizer', total: 1,

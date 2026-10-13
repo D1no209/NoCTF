@@ -40,7 +40,7 @@ describe('admin competition challenge navigation', () => {
     expect(source).toContain('v-for="row in scoringRows"')
     expect(source).toContain('v-if="canJudge"')
     expect(source).toContain('adminCreateManualAdjustment')
-    expect(source).toContain('body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value }')
+    expect(source).toContain('body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value, reason: adjustmentReason.value.trim() || undefined }')
     expect(source).toContain('if (!teamId || !adjustmentValid.value || adjustmentPending.value) return')
 
     const catchStart = source.indexOf('catch (requestError)', source.indexOf('async function submitAdjustment'))

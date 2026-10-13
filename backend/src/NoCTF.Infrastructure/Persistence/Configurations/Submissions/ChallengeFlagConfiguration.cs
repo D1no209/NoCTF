@@ -34,5 +34,6 @@ internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<Chal
             .HasForeignKey(flag => flag.TeamId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(x => x.DeletedAt == null);
+        builder.Navigation(flag => flag.AwdIssue).AutoInclude();
     }
 }

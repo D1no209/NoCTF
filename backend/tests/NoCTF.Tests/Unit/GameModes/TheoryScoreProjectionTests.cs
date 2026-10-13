@@ -32,13 +32,16 @@ public sealed class TheoryScoreProjectionTests
     }
 
     [Test]
-    public async Task Theory_ties_use_achievement_time_and_no_theory_configuration_keeps_mode_projection_unchanged()
+    [Arguments(GameMode.Ctf)]
+    [Arguments(GameMode.Awd)]
+    [Arguments(GameMode.Awdp)]
+    public async Task Theory_ties_use_achievement_time_and_no_theory_configuration_keeps_mode_projection_unchanged(GameMode mode)
     {
         var now = DateTimeOffset.UtcNow;
         var first = Guid.NewGuid(); var second = Guid.NewGuid();
-        var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Ctf,
+        var input = new LeaderboardProjectionInput(Guid.NewGuid(), mode,
             [new(first, "first", false, false), new(second, "second", false, false)], [],
-            CompetitionConfiguration: TestConfigurations.Competition(GameMode.Ctf), ProjectedAt: now,
+            CompetitionConfiguration: TestConfigurations.Competition(mode), CompetitionStartTime: now.AddHours(-1), ProjectedAt: now,
             TheoryScores: [new(first, 10, now.AddMinutes(-1), true), new(second, 10, now.AddMinutes(-2), true)]);
         var engine = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog());
         await Assert.That(engine.Project(input).Snapshot.Teams.Single(team => team.TeamId == second).Rank).IsEqualTo(1);

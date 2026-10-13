@@ -9,6 +9,8 @@ public static class ChallengeDefinitionGraph
             definition.Checker.ChallengeId = challengeId;
         foreach (var item in definition.StringItems)
             item.ChallengeId = challengeId;
+        if (definition is AwdChallengeDefinition awd)
+            foreach (var store in awd.FlagStores) store.ChallengeId = challengeId;
         if (definition.Runtime is null) return;
         definition.Runtime.ChallengeId = challengeId;
         foreach (var item in definition.Runtime.UrlBindings) item.ChallengeId = challengeId;
@@ -52,7 +54,10 @@ public static class ChallengeDefinitionStructuralComparer
             (AwdChallengeDefinition a, AwdChallengeDefinition b) =>
                 a.FlagInjectionCommand == b.FlagInjectionCommand
                 && a.FlagInjectionTimeoutSeconds == b.FlagInjectionTimeoutSeconds
-                && a.FlagInjectionServiceName == b.FlagInjectionServiceName,
+                && a.FlagInjectionServiceName == b.FlagInjectionServiceName
+                && SequenceEqual(a.FlagStores, b.FlagStores,
+                    store => (store.Id, store.Position, store.Name, store.DeliveryMode,
+                        store.TargetServiceName, store.InjectionCommand, store.InjectionTimeoutSeconds, store.PreservesHistoricalFlags)),
             (AwdpChallengeDefinition, AwdpChallengeDefinition) => true,
             (KohChallengeDefinition, KohChallengeDefinition) => true,
             (NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition, NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition) => true,

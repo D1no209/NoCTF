@@ -39,7 +39,7 @@ test('management review remains discoverable for finished competitions and uses 
   expect(state.usesPageScroll.value).toBeTrue()
 })
 
-function harness(canJudge: boolean) {
+function harness(canJudge: boolean, mode = 'Ctf') {
   const route = reactive({ path: '/admin/competitions/competition/writeups', params: { id: 'competition' }, query: { team: 'team-b', filter: 'retained' } })
   const review = { scoreboardAvailable: true, canJudge, items: ['team-a', 'team-b'].map(teamId => ({
     writeUp: { teamId, teamName: teamId, fileId: `file-${teamId}`, fileName: 'writeup.pdf' },
@@ -54,6 +54,8 @@ function harness(canJudge: boolean) {
   const polling = ref(false)
   const deps = { ...soloNavigation,
     ref, computed, watch, createTrailingRefresh, markRaw, ChallengeWriteUpReviewComponent: {},
+    CompetitionAdminKey: Symbol(), competitionContextKey: Symbol(),
+    inject: () => ({ competition: ref({ mode }) }),
     ...Object.fromEntries('ArrowLeft Download FileSearch MessageCircleQuestion MinusCircle RefreshCw Scale'.split(' ').map(name => [name, {}])),
     useRoute: () => route,
     useRouter: () => ({ replace: async (next: { query: typeof route.query }) => { route.query = next.query }, push: async () => {} }),
@@ -71,6 +73,27 @@ function harness(canJudge: boolean) {
 }
 
 describe('management WriteUp review', () => {
+  test('AWD requires a review reason and sends the entered reason with the adjustment', async () => {
+    const app = harness(true, 'Awd')
+    try {
+      await app.state.load()
+      await drain()
+      app.state.adjustmentDelta.value = -25
+      app.state.adjustmentReason.value = '   '
+      app.state.submitAdjustment()
+      await drain()
+      expect(app.writes).toEqual([])
+      expect(app.state.adjustmentError.value.key).toBe('api.awd.manualAdjustmentReasonInvalid')
+      app.state.adjustmentReason.value = '  Evidence reviewed  '
+      app.state.submitAdjustment()
+      await drain()
+      expect(app.writes).toEqual([{ path: { competitionId: 'competition' }, body: {
+        teamId: 'team-b', competitionChallengeId: 'challenge', delta: -25, reason: 'Evidence reviewed',
+      } }])
+    }
+    finally { app.stop() }
+  })
+
   test('opens the deep-linked team, retains its admin route and observes authoritative score changes', async () => {
     const app = harness(true)
     try {

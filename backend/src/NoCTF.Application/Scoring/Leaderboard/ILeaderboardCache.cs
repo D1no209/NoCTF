@@ -27,6 +27,8 @@ public sealed record WebhookScoreboardProjection(
 
 public interface ILeaderboardCache
 {
+    Task<ScoreboardProjection?> GetFrozenSpectatorScoreboardAsync(Guid competitionId, CancellationToken ct) =>
+        GetFrozenScoreboardAsync(competitionId, ct);
     async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
         Guid competitionId, bool frozen, CancellationToken cancellationToken)
     {
@@ -55,6 +57,9 @@ public interface ILeaderboardCache
 
 public interface ILeaderboardSnapshotFactory
 {
+    Task<ScoreboardProjection?> CreateAwdScoringPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride candidate, CancellationToken ct) =>
+        Task.FromResult<ScoreboardProjection?>(null);
     Task<ScoreboardProjection?> CreateTimingPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
         NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride candidate, CancellationToken ct) =>
         Task.FromResult<ScoreboardProjection?>(null);

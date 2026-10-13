@@ -1,4 +1,6 @@
-import { markRaw } from 'vue'
+import { inject, markRaw } from 'vue'
+import { CompetitionAdminKey } from '../../../../lib/admin-competition'
+import { competitionContextKey } from '../../../../utils/labels'
 import ChallengeWriteUpReviewComponent from '~/features/writeups/ChallengeWriteUpReview.vue'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
@@ -19,6 +21,8 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const router = useRouter()
   const competitionId = route.params.id as string
   const management = options.management === true
+  const adminContext = inject(CompetitionAdminKey, null)
+  const participantContext = inject(competitionContextKey, null)
   const activeTab = ref(route.query.writeupMode === 'whole' ? 'whole' : 'single')
   const ChallengeWriteUpReview = markRaw(ChallengeWriteUpReviewComponent)
   watch(activeTab, value => { void router.replace({ query: { ...route.query, writeupMode: value } }) })
@@ -121,6 +125,9 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const refreshLatest = createTrailingRefresh(load)
   const selectedChallengeId = ref('')
   const adjustmentDelta = ref(0)
+  const adjustmentReason = ref('')
+  const adjustmentReasonRequired = computed(() =>
+    (adminContext?.competition.value?.mode ?? participantContext?.competition.value?.mode) === 'Awd')
   const adjustmentRequestPending = ref(false)
   const adjustmentError = ref<UiMessage | null>(null)
   const pendingAdjustment = ref<{
@@ -170,6 +177,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     if (!available)
       selectedChallengeId.value = item?.challengeScores?.[0]?.competitionChallengeId ?? ''
     adjustmentDelta.value = 0
+    adjustmentReason.value = ''
     adjustmentError.value = null
   }, { immediate: true })
 
@@ -180,6 +188,10 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       return false
     if (!Number.isInteger(delta) || delta < -2147483648 || delta > 2147483647) {
       adjustmentError.value = describeMessage('writeUp.invalidAdjustment')
+      return false
+    }
+    if (adjustmentReason.value.length > 512 || adjustmentReasonRequired.value && !adjustmentReason.value.trim()) {
+      adjustmentError.value = describeMessage('api.awd.manualAdjustmentReasonInvalid')
       return false
     }
     const score = selected.value?.challengeScores?.find(candidate =>
@@ -197,6 +209,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
           teamId: writeUp.teamId,
           competitionChallengeId: selectedChallengeId.value,
           delta,
+          reason: adjustmentReason.value.trim() || undefined,
         },
       })
       if (error || !data?.gameplayFactId) throw error
@@ -229,6 +242,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   }
 
   function selectChallenge(score: ChallengeScore) {
+    adjustmentReason.value = ''
     selectedChallengeId.value = score.competitionChallengeId ?? ''
   }
 
@@ -239,6 +253,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       return
     adjustmentError.value = null
     selectedChallengeId.value = score.competitionChallengeId
+    adjustmentReason.value = ''
     deduction.value = score
   }
 
@@ -365,6 +380,8 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     download,
     selectedChallengeId,
     adjustmentDelta,
+    adjustmentReason,
+    adjustmentReasonRequired,
     adjustmentPending,
     adjustmentRefreshing,
     adjustmentBusy,

@@ -51,8 +51,7 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
                 && fact.OccurredAt >= ctfWindow.StartAt
                 && fact.OccurredAt < ctfWindow.EndAt),
             GameMode.Awd => facts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
-                && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
-                && fact.ReferenceId == query.RoundId),
+                && fact.Awd != null && fact.Awd.ReceivedRoundId == query.RoundId),
             GameMode.Awdp => facts.Where(fact => (fact.Kind == GameplayFactKind.BreakAttempt
                     || fact.Kind == GameplayFactKind.FixAttempt)
                 && fact.OccurredAt >= query.RoundStartAt

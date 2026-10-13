@@ -10,6 +10,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   <NumberInput
     v-if="field.type === 'int' || field.type === 'decimal'"
 
+    :aria-label="field.label"
     :model-value="numberText"
     :min="field.min"
     :max="field.max"
@@ -20,6 +21,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   />
   <Input
     v-else-if="field.type === 'string'"
+    :aria-label="field.label"
     :model-value="textValue"
     :placeholder="field.placeholder"
     :disabled="disabled"
@@ -27,6 +29,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   />
   <Textarea
     v-else-if="field.type === 'text'"
+    :aria-label="field.label"
     :model-value="textValue"
     :rows="3"
     :placeholder="field.placeholder"
@@ -35,6 +38,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   />
   <Switch
     v-else-if="field.type === 'bool'"
+    :aria-label="field.label"
     :model-value="boolValue"
     :disabled="disabled"
     @update:model-value="emitValue($event)"
@@ -45,7 +49,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
     :disabled="disabled"
     @update:model-value="emitValue($event)"
   >
-    <SelectTrigger class="w-full">
+    <SelectTrigger class="w-full" :aria-label="field.label">
       <SelectValue />
     </SelectTrigger>
     <SelectContent>

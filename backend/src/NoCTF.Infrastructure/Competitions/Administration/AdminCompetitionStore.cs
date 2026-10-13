@@ -787,6 +787,9 @@ public sealed class AdminCompetitionStore(
                 flag.CompetitionChallengeId != null
                 && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value))
             .ExecuteDeleteAsync(ct);
+        await db.AwdFlagKeys.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.AwdRoundRules.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.AwdRounds.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
         await db.CompetitionWebhookDeliveries.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
         await db.CompetitionWebhookOutboxEvents.Where(item => item.CompetitionId == competitionId)

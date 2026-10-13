@@ -87,7 +87,10 @@ public sealed class PersistedRunnerCapacityGate(
             && item.RunnerId == runnerId);
         return allocation is not null
             && await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
-                && fact.State == GameplayFactState.Processing, ct)
+                && fact.State == GameplayFactState.Processing
+                && (identity.Kind != RuntimeWorkloadKind.AwdChecker || fact.Awd != null
+                    && fact.Awd.AttemptId == identity.OperationId && fact.Awd.RuntimeId == identity.RuntimeInstanceId
+                    && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running), ct)
             && await IsReadyOwnerAsync(allocation, ct);
     }
 
@@ -201,6 +204,9 @@ public sealed class PersistedRunnerCapacityGate(
                     && fact.TeamId == runtime.TeamId
                     && (identity.Kind == RuntimeWorkloadKind.AwdChecker
                         && fact.Kind == GameplayFactKind.AwdServiceTransition
+                        && fact.Awd != null && fact.Awd.AttemptId == identity.OperationId
+                        && fact.Awd.RuntimeId == runtime.Id
+                        && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
                         || identity.Kind == RuntimeWorkloadKind.PatchChecker
                             && runtime.GameplayFactId == fact.Id), ct)))
                 return new(RunnerCapacityAvailability.Unavailable,

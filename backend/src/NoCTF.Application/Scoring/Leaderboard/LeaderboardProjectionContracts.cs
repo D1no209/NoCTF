@@ -21,6 +21,9 @@ public sealed record LeaderboardProjectionInput(
     int? ScoreboardLatestRound = null,
     IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null,
     IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null,
+    IReadOnlyList<AwdRoundScoreProjection>? AwdRoundScores = null,
+    long? AwdMinimumTotalScore = null,
+    IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdTieBreakCriterion>? AwdTieBreakers = null,
     IReadOnlyList<LeaderboardTheoryScore>? TheoryScores = null,
     IReadOnlyList<TheoryProjectionReceipt>? TheoryReceipts = null);
 
@@ -79,7 +82,8 @@ public sealed record LeaderboardAwdRoundFact(
     Guid TeamId,
     Guid RoundId,
     DateTimeOffset StartsAt,
-    DateTimeOffset EndsAt);
+    DateTimeOffset EndsAt,
+    int Number = 0);
 
 public sealed record LeaderboardAwdAggregateFact(
     Guid TeamId,

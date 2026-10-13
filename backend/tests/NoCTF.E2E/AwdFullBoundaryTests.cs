@@ -44,11 +44,12 @@ public sealed class AwdFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionId = competition.GetProperty("id").GetGuid();
+        await using var evidence = new AwdEvidenceRecorder(admin, competitionId, cancellationToken);
 
         var competitionConfiguration = new
         {
             mode = "Awd",
-            flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
+            flagTemplate = new { header = "flag", bodyTemplate = "[SECURE]", leetLiteralText = false },
             awd = new
             {
                 hardeningDurationSeconds = 20,
@@ -56,9 +57,18 @@ public sealed class AwdFullBoundaryTests
                 attackRewardMode = "FixedPerAttack",
                 attackPoints = 13L,
                 victimDefensePoolPoints = 17L,
-                checkerIntervalSeconds = 2,
+                checkerIntervalSeconds = 10,
                 serviceHealthyPoints = 11L,
-                serviceUnhealthyPenalty = 7L
+                serviceUnhealthyPenalty = 0L,
+                options = new
+                {
+                    flagLifetime = 1,
+                    finalCheckBudgetSeconds = 10,
+                    preset = "Custom",
+                    penaltyMode = "Fixed",
+                    mumblePenalty = 7L,
+                    offlinePenalty = 7L
+                }
             }
         };
         await SendJsonAsync(
@@ -163,21 +173,14 @@ public sealed class AwdFullBoundaryTests
         await AssertSingleTargetAsync(redHardeningTargets, red.TeamId);
         await AssertSingleTargetAsync(blueHardeningTargets, blue.TeamId);
 
-        var hardeningGameplayFactId = await SubmitSingleFlagAsync(
+        var hardeningRejection = await SendJsonAsync(
             red.Client,
-            competitionId,
-            competitionChallengeId,
-            "flag{hardening-probe}",
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
+            new { flag = "flag{hardening-probe}" },
+            HttpStatusCode.BadRequest,
             cancellationToken);
-        var hardeningSubmission = await PollSubmissionAsync(
-            red.Client,
-            competitionId,
-            hardeningGameplayFactId,
-            cancellationToken);
-        await AssertSubmissionAsync(
-            hardeningSubmission,
-            result: "Rejected",
-            failureCode: "HardeningActive");
+        await Assert.That(hardeningRejection.GetProperty("code").GetString()).IsEqualTo("AwdHardeningActive");
 
         await PollJsonAsync(
             red.Client,
@@ -231,7 +234,7 @@ public sealed class AwdFullBoundaryTests
             batchIds[1],
             cancellationToken);
         await AssertSubmissionAsync(correctBatchSubmission, result: "Correct", failureCode: null);
-        await AssertSubmissionAsync(wrongBatchSubmission, result: "Wrong", failureCode: null);
+        await AssertSubmissionAsync(wrongBatchSubmission, result: "Wrong", failureCode: "FlagUnknown");
 
         var duplicateId = await SubmitSingleFlagAsync(
             red.Client,
@@ -375,6 +378,12 @@ public sealed class AwdFullBoundaryTests
             .Sum(item => item.GetProperty("successfulCount").GetInt32());
         await Assert.That(successfulAttacks).IsEqualTo(1);
 
+        // A later successful round must not hide a checker that failed during an earlier round.
+        // Inspect before finishing, which intentionally holds unstarted future samples.
+        var pendingChecks = await GetJsonAsync(admin,
+            $"/api/v1/admin/competitions/{competitionId}/awd/checks?Limit=200", cancellationToken);
+        await Assert.That(pendingChecks.GetProperty("total").GetInt32()).IsEqualTo(0);
+
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Finished", cancellationToken);
         await PollJsonAsync(
@@ -393,11 +402,19 @@ public sealed class AwdFullBoundaryTests
             mode = "Awd",
             awd = new
             {
-                flagInjection = new
+                flagInjection = (object?)null,
+                flagStores = new[]
                 {
-                    command = "printf '%s' '${FLAG}' > /dev/shm/flag",
-                    timeoutSeconds = 5,
-                    serviceName = "main"
+                    new
+                    {
+                        id = Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
+                        name = "main",
+                        deliveryMode = "RunnerCommand",
+                        targetServiceName = "main",
+                        injectionCommand = "mkdir -p \"/dev/shm/flags/${STORE_ID}\"; printf '%s' \"${FLAG}\" > \"/dev/shm/flags/${STORE_ID}/${FLAG_ID}\"",
+                        injectionTimeoutSeconds = 5,
+                        preservesHistoricalFlags = true
+                    }
                 }
             },
             runtime = new
@@ -532,7 +549,7 @@ public sealed class AwdFullBoundaryTests
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(
                 $"Fixture endpoint {response.RequestMessage?.RequestUri} returned {(int)response.StatusCode}.");
-        return (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
     private static async Task<string> PollFixtureTextAsync(
@@ -560,7 +577,7 @@ public sealed class AwdFullBoundaryTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
         throw new TimeoutException(
-            $"Fixture endpoint {relativePath} did not reach the expected value. Last value: {last}");
+            $"Fixture endpoint {relativePath} did not reach the expected value.");
     }
 
     private static async Task<JsonElement> PollLeaderboardAsync(
@@ -669,13 +686,27 @@ public sealed class AwdFullBoundaryTests
         HttpStatusCode expected,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, path)
+        var requestId = Guid.NewGuid().ToString("D");
+        for (var attempt = 0; ; attempt++)
         {
-            Content = JsonContent.Create(body, options: JsonOptions)
-        };
-        E2ELifecycle.AddIdempotencyKey(request);
-        using var response = await client.SendAsync(request, cancellationToken);
-        return await ReadExpectedJsonAsync(response, expected, cancellationToken);
+            using var request = new HttpRequestMessage(method, path)
+            {
+                Content = JsonContent.Create(body, options: JsonOptions)
+            };
+            request.Headers.Add("Idempotency-Key", requestId);
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.ServiceUnavailable && attempt < 3)
+            {
+                var problem = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+                if (problem.TryGetProperty("code", out var code)
+                    && code.GetString() == "TransactionBusy")
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                    continue;
+                }
+            }
+            return await ReadExpectedJsonAsync(response, expected, cancellationToken);
+        }
     }
 
     private static async Task SendWithoutBodyAsync(

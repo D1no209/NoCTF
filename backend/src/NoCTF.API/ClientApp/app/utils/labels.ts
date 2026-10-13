@@ -106,6 +106,13 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     ProducerUnavailable: translate("common.error.flagGeneratorUnavailable"),
     AmbiguousFlagMatch: translate("common.label.flagMatchAmbiguous"),
     FlagExpired: translate("common.label.flagExpired"),
+    FlagInvalid: translate("api.awd.flagInvalid"),
+    FlagUnknown: translate("api.awd.flagUnknown"),
+    FlagRevoked: translate("api.awd.flagRevoked"),
+    FlagNotIssued: translate("api.awd.flagNotIssued"),
+    FlagNotYetActive: translate("api.awd.flagNotYetActive"),
+    FlagNotScorable: translate("api.awd.flagNotScorable"),
+    AwdReceiptUnavailable: translate("api.awd.receiptUnavailable"),
     RoundOutOfRange: translate("common.label.roundOutRange"),
     HardeningActive: translate("common.description.submissionsDisabledBlackoutPeriod"),
     AwdpExploitSucceeded: translate("common.label.expStillSucceeds"),
@@ -188,6 +195,7 @@ export function competitionEventText(
       : translate('common.error.teamPatchVerificationFailed', { team, challenge })
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+    AwdScoringRulesChanged: translate("awd.rules.changedEvent", { actor, challenge }),
     GameplayFactPatchDownloaded: translate("common.description.downloadedPatchArchiveTeam", { actor, team }),
     CompetitionAudienceChanged: translate("competitionAccess.changed"),
     TeamWriteUpSubmitted: translate("writeUp.submittedEvent"),

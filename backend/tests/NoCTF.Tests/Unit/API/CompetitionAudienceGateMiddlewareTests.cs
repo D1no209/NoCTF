@@ -95,6 +95,16 @@ public sealed class CompetitionAudienceGateMiddlewareTests
             Called();
             return TypedResults.Ok();
         });
+        app.MapGet("/api/v1/competitions/{competitionId:guid}/challenges/{challengeId:guid}/targets", () =>
+        {
+            Called();
+            return TypedResults.Ok();
+        });
+        app.MapGet("/api/v1/competitions/{competitionId:guid}/challenges/{challengeId:guid}/targets/{teamId:guid}/attack-info", () =>
+        {
+            Called();
+            return TypedResults.Ok();
+        });
         app.MapPost(
             "/api/v1/competitions/{competitionId:guid}/challenges/{challengeId:guid}/flag-submissions",
             () =>
@@ -117,7 +127,9 @@ public sealed class CompetitionAudienceGateMiddlewareTests
             (HttpMethod.Get, $"/api/v1/competitions/{competitionId}/poster"),
             (HttpMethod.Get, $"/api/v1/competitions/{competitionId}/leaderboard"),
             (HttpMethod.Post,
-                $"/api/v1/competitions/{competitionId}/challenges/{challengeId}/flag-submissions")
+                $"/api/v1/competitions/{competitionId}/challenges/{challengeId}/flag-submissions"),
+            (HttpMethod.Get, $"/api/v1/competitions/{competitionId}/challenges/{challengeId}/targets"),
+            (HttpMethod.Get, $"/api/v1/competitions/{competitionId}/challenges/{challengeId}/targets/{Guid.NewGuid()}/attack-info")
         ];
         foreach (var blockedRequest in blockedRequests)
         {

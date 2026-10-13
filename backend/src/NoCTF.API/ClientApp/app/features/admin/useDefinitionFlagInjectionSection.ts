@@ -1,32 +1,52 @@
-import { toRefs } from 'vue'
-
+import { computed, toRefs } from 'vue'
 import type { DefinitionModel } from '../../utils/game-config'
+import { createAwdFlagStore, AWD_HISTORY_PRESERVING_COMMAND } from '../../utils/awd-flag-stores'
 
-/** Owns state, effects and commands for DefinitionFlagInjectionSection. */
-export function useDefinitionFlagInjectionSection(props: Readonly<Omit<{
-  model: DefinitionModel
-  disabled?: boolean
-}, "disabled"> & Required<Pick<{
-  model: DefinitionModel
-  disabled?: boolean
-}, "disabled">>>) {
-  const hasServices = computed(() => props.model.runtime?.definition.kind === 'container')
-
-  function toggleFlagInjection(enabled: boolean): void {
-    props.model.flagInjection = enabled ? { command: '', timeoutSeconds: null, serviceName: '' } : null
-  }
-
-  const viewBindings = {
-      ...toRefs(props),
-      hasServices,
-      serviceNames: computed(() => props.model.runtime?.definition.kind === 'container' ? props.model.runtime.definition.services.map(service => service.name) : []),
-      toggleFlagInjection
+/** Owns the AWD template's stable Flag stores and their delivery contract. */
+export function useDefinitionFlagInjectionSection(props: Readonly<{ model: DefinitionModel; disabled: boolean }>) {
+  const serviceNames = computed(() => props.model.runtime?.definition.kind === 'container'
+    ? props.model.runtime.definition.services.map(service => service.name) : [])
+  const canAddStore = computed(() => !props.disabled && props.model.awdFlagStores.length < 64)
+  function addStore() {
+    if (!canAddStore.value) return
+    const names = new Set(props.model.awdFlagStores.map(store => store.name))
+    let name = 'main'
+    for (let n = 2; names.has(name); n++) name = `store-${n}`
+    const store = createAwdFlagStore(name, serviceNames.value[0] ?? null)
+    if (props.model.awdFlagStores.length === 0 && props.model.flagInjection) {
+      Object.assign(store, { injectionCommand: props.model.flagInjection.command,
+        injectionTimeoutSeconds: props.model.flagInjection.timeoutSeconds ?? 30,
+        targetServiceName: props.model.flagInjection.serviceName || store.targetServiceName })
     }
-  function onUpdateModelValueTimeoutSeconds(value: number | null) {
-    if (props.model.flagInjection) props.model.flagInjection.timeoutSeconds = value
+    props.model.awdFlagStores.push(store)
+    props.model.flagInjection = null
   }
-
-  return { ...viewBindings, onUpdateModelValueTimeoutSeconds }
+  function removeStore(index: number) {
+    if (props.disabled || props.model.awdFlagStores.length <= 1) return
+    props.model.awdFlagStores.splice(index, 1)
+  }
+  function setDeliveryMode(index: number, mode: unknown) {
+    const store = props.model.awdFlagStores[index]
+    if (props.disabled || !store || (mode !== 'RunnerCommand' && mode !== 'BusinessChecker')) return
+    store.deliveryMode = mode
+    store.injectionCommand = mode === 'BusinessChecker' ? null : AWD_HISTORY_PRESERVING_COMMAND
+  }
+  function setTimeoutSeconds(index: number, value: number | null) {
+    const store = props.model.awdFlagStores[index]
+    if (!props.disabled && store) store.injectionTimeoutSeconds = value ?? 30
+  }
+  function setCommand(index: number, value: string | number) {
+    const store = props.model.awdFlagStores[index]
+    if (!props.disabled && store) store.injectionCommand = String(value)
+  }
+  function useFileTemplate(index: number) {
+    const store = props.model.awdFlagStores[index]
+    if (!props.disabled && store) {
+      store.injectionCommand = AWD_HISTORY_PRESERVING_COMMAND
+      store.preservesHistoricalFlags = true
+    }
+  }
+  return { ...toRefs(props), serviceNames, canAddStore, addStore, removeStore, setDeliveryMode, setTimeoutSeconds, setCommand, useFileTemplate }
 }
 
-export type DefinitionFlagInjectionSectionViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useDefinitionFlagInjectionSection>>>
+export type DefinitionFlagInjectionSectionViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useDefinitionFlagInjectionSection>>

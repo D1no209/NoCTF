@@ -1,14 +1,14 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Runtime;
-using NoCTF.GameModes.Awd.Configuration;
-using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
 
@@ -22,11 +22,16 @@ public sealed record AwdFlagInjectionWork(
     string Flag,
     string CommandTemplate,
     string? ServiceName,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    Guid FlagId = default,
+    Guid StoreId = default,
+    Guid AttemptId = default);
 
 public interface IAwdFlagInjectionWorkReader
 {
     Task<AwdFlagInjectionWork?> ReadAsync(InjectAwdFlag message, CancellationToken cancellationToken);
+    Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
+        AwdCheckReason reason, CancellationToken cancellationToken);
 }
 
 public interface IAwdFlagInjectionExecutor
@@ -36,90 +41,95 @@ public interface IAwdFlagInjectionExecutor
 
 public sealed class AwdFlagInjectionWorkReader(
     IDbContextFactory<NoCtfDbContext> contexts,
-    IAwdFlagInjectionConfigurationCatalog configurations) : IAwdFlagInjectionWorkReader
+    TimeProvider timeProvider) : IAwdFlagInjectionWorkReader
 {
-    public async Task<AwdFlagInjectionWork?> ReadAsync(
-        InjectAwdFlag message,
-        CancellationToken cancellationToken)
+    public async Task<AwdFlagInjectionWork?> ReadAsync(InjectAwdFlag message, CancellationToken cancellationToken)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var now = timeProvider.GetUtcNow();
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
-                && runtime.State == RuntimeState.Running
-                && runtime.RunnerId == message.RunnerId
+                && runtime.State == RuntimeState.Running && runtime.RunnerId == message.RunnerId
                 && runtime.ProviderReceipt != null)
-            .Join(
-                db.CompetitionChallenges.AsNoTracking(),
-                runtime => runtime.CompetitionChallengeId,
-                challenge => challenge.Id,
-                (runtime, challenge) => new { Runtime = runtime, Challenge = challenge })
-            .Join(
-                db.ChallengeFlags.AsNoTracking(),
-                pair => pair.Runtime.TeamId,
-                flag => flag.TeamId,
-                (pair, flag) => new { pair.Runtime, pair.Challenge, Flag = flag })
-            .Join(
-                db.Challenges.AsNoTracking(),
-                item => item.Challenge.ChallengeId,
-                template => template.Id,
-                (item, template) => new { item.Runtime, item.Challenge, item.Flag, Template = template })
-            .Where(target => target.Flag.Id == message.ChallengeFlagId
-                && target.Flag.CompetitionChallengeId == message.CompetitionChallengeId
-                && target.Flag.SpecificationKind == SpecificationKind.AwdRound
-                && target.Flag.ValidUntil == message.ValidUntil
-                && target.Flag.DeletedAt == null)
-            .Select(target => new
-            {
-                target.Runtime.CompetitionId,
-                target.Runtime.RuntimeKind,
-                target.Runtime.RuntimeProvider,
-                ProviderReceipt = target.Runtime.ProviderReceipt!,
-                target.Flag.Flag,
-                target.Template.Definition
-            })
-            .AsSplitQuery()
-            .SingleOrDefaultAsync(cancellationToken);
-        if (target is null)
+            .Join(db.ChallengeFlags.AsNoTracking(), runtime => runtime.TeamId, flag => flag.TeamId,
+                (runtime, flag) => new { Runtime = runtime, Flag = flag })
+            .Where(item => item.Flag.Id == message.ChallengeFlagId
+                && item.Flag.CompetitionChallengeId == message.CompetitionChallengeId && item.Flag.DeletedAt == null)
+            .Join(db.AwdFlagIssues, item => item.Flag.Id, issue => issue.FlagId,
+                (item, issue) => new { item.Runtime, item.Flag, Issue = issue })
+            .Join(db.AwdRoundRules, item => item.Issue.RulesId, rules => rules.Id,
+                (item, rules) => new { item.Runtime, item.Flag, item.Issue, Rules = rules })
+            .Join(db.AwdRounds, item => item.Issue.RoundId, round => round.Id,
+                (item, round) => new { item.Runtime, item.Flag, item.Issue, item.Rules, Round = round })
+            .Join(db.Competitions, item => item.Issue.CompetitionId, competition => competition.Id,
+                (item, competition) => new { item.Runtime, item.Flag, item.Issue, item.Rules, item.Round, Competition = competition })
+            .Where(item => item.Competition.Status == CompetitionStatus.Running
+                && item.Round.StartsAt <= now && item.Round.EndsAt > now
+                && item.Round.EndsAt == message.ValidUntil && item.Issue.State == AwdFlagIssueState.Issued
+                && item.Issue.DeliveryState == AwdFlagDeliveryState.Pending
+                && item.Issue.DeliveryRuntimeId == message.RuntimeInstanceId)
+            .AsSplitQuery().SingleOrDefaultAsync(cancellationToken);
+        if (target is null) return null;
+        var competitionEndsAt = await AwdFlagDeliveryWindow.EndsAtAsync(db, target.Competition, now, cancellationToken);
+        if (now >= competitionEndsAt) return null;
+        var deliveryEndsAt = competitionEndsAt < message.ValidUntil ? competitionEndsAt : message.ValidUntil;
+        var store = target.Rules.Stores.Single(store => store.StoreId == target.Issue.StoreId);
+        if (store.DeliveryMode != AwdFlagDeliveryMode.RunnerCommand || string.IsNullOrWhiteSpace(store.InjectionCommand))
             return null;
-        if (target.Definition is not AwdChallengeDefinition definition)
-            return null;
-        var injection = configurations.Get(definition);
-        if (injection is null)
-            return null;
-        return new(
-            target.CompetitionId!.Value,
-            target.RuntimeKind,
-            target.RuntimeProvider,
-            target.ProviderReceipt.ToData(),
-            target.Flag,
-            injection.Command,
-            injection.ServiceName,
-            TimeSpan.FromSeconds(injection.TimeoutSeconds));
+        var attemptId = Guid.CreateVersion7();
+        var claimed = await db.AwdFlagIssues.Where(issue => issue.FlagId == message.ChallengeFlagId
+                && issue.ConcurrencyStamp == target.Issue.ConcurrencyStamp && issue.DeliveryState == AwdFlagDeliveryState.Pending
+                && issue.DeliveryRuntimeId == message.RuntimeInstanceId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(issue => issue.DeliveryState, AwdFlagDeliveryState.Running)
+                .SetProperty(issue => issue.DeliveryAttemptId, attemptId)
+                .SetProperty(issue => issue.DeliveryAttempts, issue => issue.DeliveryAttempts + 1)
+                .SetProperty(issue => issue.UpdatedAt, now)
+                .SetProperty(issue => issue.ConcurrencyStamp, Guid.NewGuid()), cancellationToken);
+        if (claimed == 0) return null;
+        return new(target.Issue.CompetitionId, target.Runtime.RuntimeKind, target.Runtime.RuntimeProvider,
+            target.Runtime.ProviderReceipt!.ToData(), target.Flag.Flag, store.InjectionCommand,
+            store.TargetServiceName, TimeSpan.FromSeconds(Math.Min(store.InjectionTimeoutSeconds,
+                (deliveryEndsAt - now).TotalSeconds)), target.Flag.Id, store.StoreId, attemptId);
+    }
+
+    public async Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
+        AwdCheckReason reason, CancellationToken cancellationToken)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        // A stale completion cannot overwrite a different runtime/attempt or a checker's confirmed read.
+        await db.AwdFlagIssues.Where(issue => issue.FlagId == message.ChallengeFlagId
+                && issue.DeliveryRuntimeId == message.RuntimeInstanceId && issue.DeliveryAttemptId == work.AttemptId
+                && issue.DeliveryState == AwdFlagDeliveryState.Running)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(issue => issue.DeliveryState, state)
+                .SetProperty(issue => issue.DeliveryReason, reason)
+                .SetProperty(issue => issue.Obligation, state == AwdFlagDeliveryState.Succeeded
+                    ? AwdFlagObligation.PlayerRequired : AwdFlagObligation.PlatformPending)
+                .SetProperty(issue => issue.UpdatedAt, now)
+                .SetProperty(issue => issue.ConcurrencyStamp, Guid.NewGuid()), cancellationToken);
     }
 }
 
-public sealed class AwdFlagInjectionExecutor(IRuntimeProviderCatalog providers)
-    : IAwdFlagInjectionExecutor
+public sealed class AwdFlagInjectionExecutor(IRuntimeProviderCatalog providers) : IAwdFlagInjectionExecutor
 {
-    public Task<ContainerExecResult> ExecuteAsync(
-        AwdFlagInjectionWork work,
-        CancellationToken cancellationToken)
+    public Task<ContainerExecResult> ExecuteAsync(AwdFlagInjectionWork work, CancellationToken cancellationToken)
     {
-        var expanded = work.CommandTemplate.Replace(
-            "${FLAG}",
-            work.Flag,
-            StringComparison.Ordinal);
-        IReadOnlyList<string> command = ["/bin/sh", "-c", expanded];
+        // Secret values are shell arguments, never shell source. Disable globbing for unquoted legacy expansions.
+        IReadOnlyList<string> command = ["/bin/sh", "-c",
+            "set -f; FLAG=$1; FLAG_ID=$2; STORE_ID=$3; export FLAG FLAG_ID STORE_ID; " + work.CommandTemplate,
+            "noctf-flag", work.Flag, work.FlagId.ToString("N"), work.StoreId.ToString("N")];
         return work.RuntimeKind switch
         {
             RuntimeKind.Container => providers.Runtime(work.RuntimeProvider).ExecAsync(
-                (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt() ?? throw new InvalidDataException("Container receipt is invalid."),
-                work.ServiceName ?? throw new InvalidDataException("Flag injection requires a service name."), command, work.Timeout, cancellationToken),
+                (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
+                    ?? throw new InvalidDataException("Container receipt is invalid."),
+                work.ServiceName ?? throw new InvalidDataException("Flag injection requires a service name."),
+                command, work.Timeout, cancellationToken),
             _ => throw new NotSupportedException("AWD flag injection only supports Container runtimes.")
         };
     }
-
 }
 
 [NonTransactional]
@@ -131,79 +141,42 @@ public sealed class AwdFlagInjectionHandler(
     TimeProvider timeProvider,
     ILogger<AwdFlagInjectionHandler>? logger = null)
 {
-    public async Task<MessageExecutionOutcome> Handle(
-        InjectAwdFlag message,
-        CancellationToken cancellationToken)
+    public async Task<MessageExecutionOutcome> Handle(InjectAwdFlag message, CancellationToken cancellationToken)
     {
-        RunnerNodeAssignmentGuard.Validate(
-            message,
-            runnerOptions.Value.Pool,
-            runnerOptions.Value.Id);
+        RunnerNodeAssignmentGuard.Validate(message, runnerOptions.Value.Pool, runnerOptions.Value.Id);
         var work = await reader.ReadAsync(message, cancellationToken);
-        if (work is null)
+        if (work is null) return MessageExecutionOutcome.Superseded;
+        var state = AwdFlagDeliveryState.Unconfirmed;
+        var reason = AwdCheckReason.TaskNotExecuted;
+        if (timeProvider.GetUtcNow() < message.ValidUntil)
         {
-            logger?.LogDebug("AWD Flag injection superseded for Runtime {RuntimeInstanceId}.", message.RuntimeInstanceId);
-            return MessageExecutionOutcome.Superseded;
+            try
+            {
+                var result = await executor.ExecuteAsync(work, cancellationToken);
+                if (!result.TimedOut && result.ExitCode == 0)
+                {
+                    state = AwdFlagDeliveryState.Succeeded;
+                    reason = AwdCheckReason.None;
+                }
+                else reason = result.TimedOut ? AwdCheckReason.CheckerTimedOut : AwdCheckReason.FlagStoreFailed;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception)
+            {
+                reason = AwdCheckReason.InfrastructureFailure;
+                logger?.LogWarning("AWD Flag injection provider failed with {FailureType} for Runtime {RuntimeInstanceId}.",
+                    exception.GetType().Name, message.RuntimeInstanceId);
+            }
         }
-
-        var now = timeProvider.GetUtcNow();
-        if (now >= message.ValidUntil)
-            return await RecordFinalFailureAsync(message, work.CompetitionId, now);
-        ContainerExecResult result;
-        try
+        await reader.CompleteAsync(message, work, state, reason, cancellationToken);
+        if (state != AwdFlagDeliveryState.Succeeded)
         {
-            result = await executor.ExecuteAsync(work, cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger?.LogWarning("AWD Flag injection provider failed with {FailureType} for Runtime {RuntimeInstanceId}.",
-                exception.GetType().Name, message.RuntimeInstanceId);
-            return await RetryOrRecordFailureAsync(message, work.CompetitionId);
-        }
-        if (!result.TimedOut && result.ExitCode == 0)
-            return MessageExecutionOutcome.Applied;
-        logger?.LogWarning("AWD Flag injection failed with exit code {ExitCode}, timed out {TimedOut}, for Runtime {RuntimeInstanceId}.",
-            result.ExitCode, result.TimedOut, message.RuntimeInstanceId);
-        return await RetryOrRecordFailureAsync(message, work.CompetitionId);
-    }
-
-    private async Task<MessageExecutionOutcome> RetryOrRecordFailureAsync(
-        InjectAwdFlag message,
-        Guid competitionId)
-    {
-        var now = timeProvider.GetUtcNow();
-        var nextAt = AwdRoundScheduler.NextInjectionAttempt(
-            now,
-            message.ValidUntil,
-            message.FailedAttempts);
-        if (nextAt is DateTimeOffset retryAt)
-        {
-            await outbox.ScheduleToRunnerNodeAsync(
-                message with { FailedAttempts = checked(message.FailedAttempts + 1) },
-                retryAt);
+            // A command can have written successfully before losing its acknowledgement.
+            // Keep the same issuance for checker verification; never blindly repeat a destructive write.
+            await outbox.PublishAsync(new AwdFlagInjectionFailed(work.CompetitionId, message.CompetitionChallengeId,
+                message.RuntimeInstanceId, message.ChallengeFlagId, timeProvider.GetUtcNow()));
             await outbox.FlushOutgoingMessagesAsync();
-            return MessageExecutionOutcome.DeferredSchedule;
         }
-
-        return await RecordFinalFailureAsync(message, competitionId, now);
-    }
-
-    private async Task<MessageExecutionOutcome> RecordFinalFailureAsync(
-        InjectAwdFlag message,
-        Guid competitionId,
-        DateTimeOffset now)
-    {
-        await outbox.PublishAsync(new AwdFlagInjectionFailed(
-            competitionId,
-            message.CompetitionChallengeId,
-            message.RuntimeInstanceId,
-            message.ChallengeFlagId,
-            now));
-        await outbox.FlushOutgoingMessagesAsync();
         return MessageExecutionOutcome.Applied;
     }
 }

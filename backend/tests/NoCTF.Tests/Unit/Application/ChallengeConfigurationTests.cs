@@ -113,7 +113,7 @@ public class ChallengeConfigurationTests
             Guid challengeId,
             CompetitionChallengeRules rules,
             DateTimeOffset updatedAt,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit? audit = null)
         {
             UpdateCalls++;
             Current = Current is null

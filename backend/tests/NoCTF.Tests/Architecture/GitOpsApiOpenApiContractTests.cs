@@ -127,7 +127,7 @@ public sealed class GitOpsApiOpenApiContractTests
             "patch");
         var rulesPatch = ResolveSchema(root,
             patchChallenge.GetProperty("properties").GetProperty("rules"));
-        await Assert.That(PropertyNames(rulesPatch)).IsEquivalentTo(["configuration"]);
+        await Assert.That(PropertyNames(rulesPatch)).IsEquivalentTo(["configuration", "reason"]);
         await Assert.That(PropertyNames(rulesPatch)).DoesNotContain("json");
         var rules = ResolveSchema(root,
             rulesPatch.GetProperty("properties").GetProperty("configuration"));

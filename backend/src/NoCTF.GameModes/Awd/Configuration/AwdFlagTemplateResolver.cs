@@ -13,6 +13,6 @@ public static class AwdFlagTemplateResolver
     {
         return (challenge.HasFlagTemplate ? TypedGameModeConfiguration.Awd(challenge).FlagTemplate : null)
             ?? TypedGameModeConfiguration.Awd(competition).FlagTemplate
-            ?? PerTeamFlagTemplate.Default;
+            ?? Flags.AwdFlagGenerator.Default;
     }
 }

@@ -4,6 +4,7 @@ using NoCTF.Application.Challenges.WriteUps;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Awd.Scoring;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -89,12 +90,27 @@ internal static class WriteUpBenefitProjection
                 ScoreOutsideWindow = checked(team.ScoreOutsideWindow - totalDeduction + visibleDeduction),
                 Slots = team.Slots.Select(x => slots[x.ColumnIndex]).ToArray(), ChallengeBenefits = benefits });
         }
+        var floorApplied = false;
+        if (input.Mode == GameMode.Awd && input.AwdMinimumTotalScore is { } floor)
+        {
+            adjusted = adjusted.Select(team =>
+            {
+                if (team.TotalScore >= floor || !raw.Entries.Any(entry => entry.TeamId == team.TeamId)) return team;
+                var delta = checked(floor - team.TotalScore);
+                var identity = SHA256.HashData(Encoding.UTF8.GetBytes($"NoCTF/AWD/score-floor:{input.CompetitionId:N}:{team.TeamId:N}"));
+                var adjustment = new ScoreboardAdjustment(new Guid(identity.AsSpan(0, 16)), ScoreboardAdjustmentKind.ScoreFloor,
+                    input.ProjectedAt!.Value, null, delta, 0, delta);
+                floorApplied = true;
+                return team with { TotalScore = floor, GlobalAdjustmentCount = checked(team.GlobalAdjustmentCount + 1),
+                    GlobalAdjustments = team.GlobalAdjustments.Append(adjustment).ToArray() };
+            }).ToList();
+        }
         var ranked = adjusted.Where(x => x.RankingState == ScoreboardRankingState.Eligible && x.Rank is not null)
             .GroupBy(x => x.TrackKey, StringComparer.OrdinalIgnoreCase).SelectMany(track => Rank(input, raw, track)
                 .Select((team, index) => team with { Rank = index + 1 })).ToDictionary(x => x.TeamId);
         var teams = adjusted.Select(x => ranked.GetValueOrDefault(x.TeamId, x)).ToArray();
         var version = scoreboard.Snapshot.Version;
-        if (unlocks.Count != 0)
+        if (unlocks.Count != 0 || floorApplied)
         {
             var digest = SHA256.HashData(Encoding.UTF8.GetBytes(version + ":" + string.Join(';', teams.OrderBy(x => x.TeamId)
                 .Select(x => $"{x.TeamId:N}:{x.TotalScore}:{x.Rank}:" + string.Join(',', x.ChallengeBenefits.Select(b =>
@@ -151,9 +167,9 @@ internal static class WriteUpBenefitProjection
                         (input.WriteUpUnlocks ?? []).SingleOrDefault(x => x.TeamId == row.TeamId
                             && x.CompetitionChallengeId == row.CompetitionChallengeId)?.DeductionPercent ?? 0)));
             }
-            return ordered.ThenByDescending(AttackPoints).ThenByDescending(x => entries[x.TeamId].UpRoundCount)
-                .ThenByDescending(x => entries[x.TeamId].AttackCount).ThenBy(x => entries[x.TeamId].LastScoreAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+            return AwdTeamRanking.Order(teams, input, team => new(team.TeamId, team.TotalScore, AttackPoints(team),
+                entries[team.TeamId].UpRoundCount, entries[team.TeamId].AttackCount,
+                entries[team.TeamId].LastScoreAt, facts[team.TeamId].RegisteredAt, team.TheoryAchievedAt));
         }
         if (input.Mode == GameMode.Awdp)
             return ordered.ThenByDescending(x => entries[x.TeamId].FixCount).ThenByDescending(x => entries[x.TeamId].AttackCount)

@@ -49,7 +49,7 @@ public sealed class FlagAttemptStateReaderPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                foreach (var mode in Enum.GetValues<GameMode>())
+                foreach (var mode in new[] { GameMode.Ctf, GameMode.Awd, GameMode.Awdp, GameMode.Koh })
                 {
                     var competitionId = Guid.CreateVersion7();
                     var templateId = Guid.CreateVersion7();

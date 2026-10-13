@@ -1,3 +1,4 @@
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
@@ -56,20 +57,22 @@ public interface ICompetitionConfigurationStore
         CompetitionModeConfiguration configuration,
         bool allowWhileRunning,
         DateTimeOffset now,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, AwdConfigurationChangeAudit? audit = null);
 }
 
 public enum CompetitionConfigurationUpdateFailure
 {
     CompetitionNotFound,
-    ConfigurationLocked
+    ConfigurationLocked,
+    RuleChangeReasonRequired
 }
 
 public enum CompetitionConfigurationFailureCode
 {
     CompetitionNotFound,
     InvalidConfiguration,
-    ConfigurationLocked
+    ConfigurationLocked,
+    RuleChangeReasonRequired
 }
 public sealed record CompetitionConfigurationUpdateResult(
     CompetitionConfigurationView? Configuration,
@@ -88,13 +91,18 @@ public sealed class UpdateCompetitionConfiguration(
         Guid competitionId,
         CompetitionModeConfiguration configuration,
         DateTimeOffset now,
-        CancellationToken ct = default)
+        CancellationToken ct = default, AwdConfigurationChangeAudit? audit = null)
     {
         var current = await store.FindAsync(competitionId, ct);
         if (current is null)
             return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
                 CompetitionConfigurationFailureCode.CompetitionNotFound,
                 "Competition was not found.");
+        if (current.Mode == GameMode.Awd
+            && current.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished
+            && audit?.HasValidReason != true)
+            return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
+                CompetitionConfigurationFailureCode.RuleChangeReasonRequired, "Provide a reason for changing active AWD rules.");
         var errors = validator.Validate(
             current.Mode,
             configuration,
@@ -110,16 +118,18 @@ public sealed class UpdateCompetitionConfiguration(
             configuration,
             allowWhileRunning,
             now,
-            ct);
+            ct, audit);
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? CompetitionConfigurationUpdateFailure.CompetitionNotFound;
             return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(failure switch
             {
+                CompetitionConfigurationUpdateFailure.RuleChangeReasonRequired => CompetitionConfigurationFailureCode.RuleChangeReasonRequired,
                 CompetitionConfigurationUpdateFailure.CompetitionNotFound => CompetitionConfigurationFailureCode.CompetitionNotFound,
                 _ => CompetitionConfigurationFailureCode.ConfigurationLocked
             }, failure switch
             {
+                CompetitionConfigurationUpdateFailure.RuleChangeReasonRequired => "Provide a reason for changing active AWD rules.",
                 CompetitionConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
                 _ => "The configuration change is not allowed in the current competition state."
             });

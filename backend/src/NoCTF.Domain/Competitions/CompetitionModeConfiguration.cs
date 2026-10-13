@@ -67,13 +67,17 @@ public sealed class CtfCompetitionModeConfiguration()
 public enum AwdAttackRewardMode : short
 {
     FixedPerAttack,
-    SplitVictimDefensePool
+    SplitVictimDefensePool,
+    Scarcity,
+    TargetRank
 }
 
 [PersistentDiscriminator("awd")]
 public sealed class AwdCompetitionModeConfiguration()
     : CompetitionModeConfiguration(GameMode.Awd)
 {
+    public Awd.AwdRuleOptions AwdOptions { get; set; } = new();
+    public List<Awd.AwdCompetitionTieBreak> TieBreakers { get; set; } = [];
     public int HardeningDurationSeconds { get; set; }
     public int RoundDurationSeconds { get; set; }
     public AwdAttackRewardMode AttackRewardMode { get; set; }
