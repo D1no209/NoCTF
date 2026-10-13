@@ -23,10 +23,11 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue _leaderboardProjectionMergeQueue;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock _leaderboardProjectionKeyedLock;
+        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public CompetitionEventLeaderboardMessageHandlerHandler914949183(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue leaderboardProjectionMergeQueue, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public CompetitionEventLeaderboardMessageHandlerHandler914949183(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue leaderboardProjectionMergeQueue, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
@@ -36,6 +37,7 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardProjectionMergeQueue = leaderboardProjectionMergeQueue;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardProjectionKeyedLock = leaderboardProjectionKeyedLock;
+            _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
             _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
@@ -46,7 +48,7 @@ namespace Internal.Generated.WolverineHandlers
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var competitionEventApplicabilityReader = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventApplicabilityReader(noCtfDbContext);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider, _leaderboardSnapshotDeserializer);
             // The actual message body
             var competitionEventCommitted = (NoCTF.Application.Competitions.Events.CompetitionEventCommitted)context.Envelope.Message;
 

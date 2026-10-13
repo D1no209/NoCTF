@@ -28,7 +28,8 @@ public sealed class FusionLeaderboardCache(
     IFusionCacheProvider caches,
     ILeaderboardPublicationFence? publicationFence = null,
     LeaderboardProjectionKeyedLock? projectionKeyedLock = null,
-    TimeProvider? clock = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    TimeProvider? clock = null,
+    LeaderboardSnapshotDeserializer? snapshotDeserializer = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
@@ -478,6 +479,12 @@ public sealed class FusionLeaderboardCache(
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
+        using var projectionLock = await keyedLock.EnterAsync(competitionId, ct);
+        await RefreshCoreAsync(competitionId, ct);
+    }
+
+    private async Task RefreshCoreAsync(Guid competitionId, CancellationToken ct)
+    {
         var publicationPhase = false;
         CachedScoreboardProjection? response = null;
         long? publicationToken = null;
@@ -625,7 +632,7 @@ public sealed class FusionLeaderboardCache(
 
         try
         {
-            await RefreshAsync(competitionId, ct);
+            await RefreshCoreAsync(competitionId, ct);
             published = await GetPublishedBundleAsync(competitionId, ct);
             NoCtfTelemetry.RecordLeaderboardCacheMissRebuild(
                 published is null ? "not_found" : "success");
@@ -656,10 +663,9 @@ public sealed class FusionLeaderboardCache(
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return null;
-        var bundle = JsonSerializer.Deserialize(published.Payload,
-            CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
-        if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
-            throw new InvalidOperationException("The fenced leaderboard payload is invalid.");
+        var bundle = snapshotDeserializer is null
+            ? LeaderboardSnapshotDeserializer.Deserialize(competitionId, published)
+            : await snapshotDeserializer.ReadAsync(competitionId, published, ct);
         if (IsExpired(bundle) || !await HasCurrentTimingAsync(competitionId, bundle, ct))
             return null;
 
