@@ -509,6 +509,17 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
         capabilities: { canObserve: true, canModerate: true, canManagePermissions: true },
       }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/targets') {
+        if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
+        return json({ items: state.teams.filter(team => team.competitionId === p.competitionId).map(team => ({ teamId: team.id, teamName: team.name, accesses: [] })) })
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info') {
+        if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
+        return json(list(Array.from({ length: 13 }, (_, index) => ({ flagId: id(99500 + index), generationRound: 4 - Math.floor(index / 5),
+          storeId: id(99600), storeName: 'accounts', ordinal: index % 5 + 1,
+          publicLocator: index === 0 ? '<script>alert("locator")</script> / public-user-17' : `public-user-${17 + index}`,
+          issuedAt: date(-2), exclusiveExpiryRound: 6, remainingActiveSeconds: null })), url))
+      }
       else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules') {
         if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
         const template = state.templates.find(template => template.id === challenge.challengeId)

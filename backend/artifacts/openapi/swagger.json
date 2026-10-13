@@ -10683,6 +10683,107 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists currently valid public AWD locators for a participant target.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info.",
+        "operationId": "ListAwdAttackInfo",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfAwdAttackInfoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments": {
       "get": {
         "tags": [
@@ -38727,6 +38828,75 @@
       "NoCTFAPIEndpointsChallengesGetChallengeRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIPaginationArrayResultOfAwdAttackInfoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdAttackInfoResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesAwdAttackInfoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "generationRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "storeName": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publicLocator": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exclusiveExpiryRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "remainingActiveSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesListAwdAttackInfoRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentListResponse": {
         "type": "object",

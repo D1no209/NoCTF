@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdPanelViewState } from '~/features/challenges/panels/useAwdPanel'
 
 const viewProps = defineProps<{ state: AwdPanelViewState }>()
-const { emit, targets, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
+const { emit, targets, attackTarget, openAttackInfo, closeAttackInfo, AwdAttackInfo, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -34,6 +34,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, 
             <TableRow>
               <TableHead>{{ $t('common.label.team') }}</TableHead>
               <TableHead>{{ $t('challenges.label.targetHost') }}</TableHead>
+              <TableHead>{{ $t('challenges.awdAttackInfo.title') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -48,10 +49,15 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, 
                   />
                 </div>
               </TableCell>
+              <TableCell><Button size="sm" variant="outline" @click="openAttackInfo(target)">{{ $t('challenges.awdAttackInfo.view') }}</Button></TableCell>
             </TableRow>
           </TableBody>
         </Table>
     </section>
+
+    <component :is="AwdAttackInfo" v-if="attackTarget" :key="`${competition.id}:${challenge.id}:${attackTarget.teamId}`"
+      :competition-id="competition.id!" :competition-challenge-id="challenge.id!"
+      :team-id="attackTarget.teamId!" :team-name="attackTarget.teamName ?? ''" @close="closeAttackInfo" />
 
     <component :is="FlagSubmit" :timing="challenge.timing"
       :dock-target="flagDockTarget"

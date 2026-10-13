@@ -3217,6 +3217,25 @@ export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiPaginationArrayResultOfAwdAttackInfoResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsChallengesAwdAttackInfoResponse>;
+};
+
+export type NoCtfapiEndpointsChallengesAwdAttackInfoResponse = {
+    flagId?: string;
+    generationRound?: number;
+    storeId?: string;
+    storeName?: string;
+    ordinal?: number;
+    publicLocator?: string;
+    issuedAt?: string;
+    exclusiveExpiryRound?: number | null;
+    remainingActiveSeconds?: number | null;
+};
+
+export type NoCtfapiEndpointsChallengesListAwdAttackInfoRequest = NoCtfapiPaginationPaginationRequest & {};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentListResponse = {
     deliveryPolicy?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
     items?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
@@ -11331,6 +11350,51 @@ export type GetChallengeEndpointResponses = {
 };
 
 export type GetChallengeEndpointResponse = GetChallengeEndpointResponses[keyof GetChallengeEndpointResponses];
+
+export type ListAwdAttackInfoData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+        teamId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info';
+};
+
+export type ListAwdAttackInfoErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListAwdAttackInfoError = ListAwdAttackInfoErrors[keyof ListAwdAttackInfoErrors];
+
+export type ListAwdAttackInfoResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfAwdAttackInfoResponse;
+};
+
+export type ListAwdAttackInfoResponse = ListAwdAttackInfoResponses[keyof ListAwdAttackInfoResponses];
 
 export type ListChallengeAttachmentsEndpointData = {
     body?: never;
