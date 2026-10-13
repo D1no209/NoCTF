@@ -35,6 +35,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Challenges.Management;
@@ -153,17 +154,26 @@ public sealed class ChallengeTimingPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    [Arguments(false, GameplayFactTimeEligibility.Valid)] [Arguments(true, GameplayFactTimeEligibility.Valid)]
-    [Arguments(false, GameplayFactTimeEligibility.NotOpened)] [Arguments(false, GameplayFactTimeEligibility.SubmissionClosed)]
-    public Task A_late_checker_callback_uses_received_time_and_latest_configuration(bool receivedBeforeCutoff, GameplayFactTimeEligibility eligibility, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.Valid)] [Arguments(GameMode.Awdp, true, GameplayFactTimeEligibility.Valid)]
+    [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.NotOpened)] [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.SubmissionClosed)]
+    [Arguments(GameMode.Ctf, false, GameplayFactTimeEligibility.Valid)] [Arguments(GameMode.Ctf, true, GameplayFactTimeEligibility.Valid)]
+    public Task A_late_checker_callback_uses_received_time_and_latest_configuration(GameMode mode, bool receivedBeforeCutoff, GameplayFactTimeEligibility eligibility, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
-        await using var f = await Fixture.CreateAsync(ct, GameMode.Awdp); var at = f.Now.AddMinutes(-10);
+        await using var f = await Fixture.CreateAsync(ct, mode); var at = f.Now.AddMinutes(-10);
+        if (mode == GameMode.Ctf)
+        {
+            var template = await f.Db.Challenges.SingleAsync(item => item.Id == f.Challenge.ChallengeId, ct);
+            ((CtfChallengeDefinition)template.Definition!).InteractionKind = CtfInteractionKind.PatchVerification;
+        }
         var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Callback team", CaptainId = f.Competition.OwnerId,
             MemberIds = [f.Competition.OwnerId], InvitationToken = new string('g', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
         f.Db.Add(team); var factId = Guid.NewGuid(); var runtimeId = Guid.NewGuid();
-        f.Db.Add(new AwdpTargetRuntimeInstance { Id = runtimeId, CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
-            TeamId = team.Id, RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, RunnerId = "synthetic-runner", State = RuntimeState.Running,
-            GameplayFactId = factId, CreatedAt = at, RunningAt = at, ExpiresAt = f.Now.AddHours(1) });
+        RuntimeInstance runtime = mode == GameMode.Awdp ? new AwdpTargetRuntimeInstance() : new PatchVerificationTargetRuntimeInstance();
+        runtime.Id = runtimeId; runtime.CompetitionId = f.Competition.Id; runtime.CompetitionChallengeId = f.Challenge.Id;
+        runtime.TeamId = team.Id; runtime.RuntimeKind = RuntimeKind.Container; runtime.RuntimeProvider = RuntimeProvider.Docker;
+        runtime.RunnerId = "synthetic-runner"; runtime.State = RuntimeState.Running;
+        runtime.GameplayFactId = factId; runtime.CreatedAt = at; runtime.RunningAt = at; runtime.ExpiresAt = f.Now.AddHours(1);
+        f.Db.Add(runtime);
         f.Db.Add(new FixAttemptGameplayFact { Id = factId, CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
             TeamId = team.Id, ActorUserId = f.Competition.OwnerId, ReferenceKind = GameplayFactReferenceKind.PatchUpload, ReferenceId = Guid.NewGuid(),
             Value = "synthetic", State = GameplayFactState.Processing, OccurredAt = at, UpdatedAt = at }); await f.Db.SaveChangesAsync(ct);
@@ -173,14 +183,16 @@ public sealed class ChallengeTimingPersistenceTests
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, latestTiming, f.Now), ct);
         var checker = new InternalResultStore(f.Db, Substitute.For<IPostCommitMessagePublisher>());
         var callback = new AwdpFixResult(factId, runtimeId, AwdpFixOutcome.DefenseSucceeded, f.Now);
-        await Assert.That(await checker.RecordAwdpAsync(callback, ct)).IsEqualTo(InternalResultDisposition.Applied);
+        Task<InternalResultDisposition> Record() => mode == GameMode.Awdp
+            ? checker.RecordAwdpAsync(callback, ct) : checker.RecordPatchVerificationAsync(callback, ct);
+        await Assert.That(await Record()).IsEqualTo(InternalResultDisposition.Applied);
         var fact = await f.Db.GameplayFacts.SingleAsync(x => x.Id == factId, ct);
         await Assert.That(fact.Result).IsEqualTo(receivedBeforeCutoff ? GameplayFactResult.Correct : GameplayFactResult.RightButDue);
         await Assert.That(fact.TimeEligibility).IsEqualTo(eligibility);
         await Assert.That(GameplayFactCompletion.IsSuccessful(fact.Result, fact.TimeEligibility)).IsEqualTo(eligibility == GameplayFactTimeEligibility.Valid);
         await Assert.That(fact.OccurredAt).IsEqualTo(at);
         await Assert.That(fact.AppliedTimingRevision).IsEqualTo(f.Challenge.TimingRevision);
-        await Assert.That(await checker.RecordAwdpAsync(callback, ct)).IsEqualTo(InternalResultDisposition.Duplicate);
+        await Assert.That(await Record()).IsEqualTo(InternalResultDisposition.Duplicate);
         await Assert.That(await f.Db.GameplayFacts.CountAsync(ct)).IsEqualTo(1);
     });
 
@@ -290,7 +302,34 @@ public sealed class ChallengeTimingPersistenceTests
             f.Db.Add(new User { Id = victimUser, UserName = "victim", NormalizedUserName = "VICTIM", Email = "victim@test.invalid", NormalizedEmail = "VICTIM@TEST.INVALID", PasswordHash = "synthetic", CreatedAt = f.Now, UpdatedAt = f.Now });
             f.Db.Add(new Team { Id = victimId.Value, CompetitionId = f.Competition.Id, Name = "Victim", NormalizedName = "VICTIM", CaptainId = victimUser,
                 MemberIds = [victimUser], InvitationToken = new string('d', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now });
-            correct.VictimTeamId = victimId; correct.ReferenceKind = GameplayFactReferenceKind.AwdRound; correct.ReferenceId = Guid.NewGuid();
+            var round = new AwdRound { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Number = 1,
+                StartsAt = at.AddSeconds(-1), EndsAt = at.AddMinutes(1), ActiveEndTicks = TimeSpan.FromSeconds(61).Ticks };
+            var storeId = Guid.NewGuid();
+            var rules = new AwdRoundRules { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+                CompetitionChallengeId = f.Challenge.Id, RoundId = round.Id, Revision = 1, EffectiveAt = round.StartsAt,
+                AttackRewardMode = AwdAttackRewardMode.FixedPerAttack, AttackPoints = 50, VictimDefensePoolPoints = 100,
+                CheckerIntervalSeconds = 30, EligibleTeamCount = 2,
+                Stores = [new() { StoreId = storeId, Weight = 1, FlagsPerIssue = 1 }],
+                Teams = [new() { TeamId = team.Id }, new() { TeamId = victimId.Value }] };
+            var flagId = Guid.NewGuid();
+            var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("flag{timing}"));
+            f.Db.AddRange(round, rules);
+            f.Db.AwdFlagKeys.Add(new() { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+                Version = 1, ProtectedSecret = new byte[32], CreatedAt = round.StartsAt });
+            f.Db.Add(new AwdRoundChallengeFlag { Id = flagId, CompetitionChallengeId = f.Challenge.Id,
+                TeamId = victimId, Flag = "flag{timing}", FlagSha256 = digest, CreatedAt = round.StartsAt,
+                SpecificationKind = SpecificationKind.AwdRound, SpecificationId = AwdRoundSpecificationId.FromRound(1).Value,
+                ValidStart = round.StartsAt, ValidUntil = round.EndsAt,
+                AwdIssue = new() { FlagId = flagId, CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
+                    TeamId = victimId.Value, RoundId = round.Id, RoundNumber = 1, RulesId = rules.Id, StoreId = storeId,
+                    State = AwdFlagIssueState.Issued, IssuedAt = round.StartsAt, ExpiryRound = 2, HistoricalExpiryRound = 2,
+                    Digest = Convert.ToHexString(digest) } });
+            correct.VictimTeamId = victimId; correct.ReferenceKind = GameplayFactReferenceKind.AwdRound; correct.ReferenceId = round.Id;
+            ((FlagAttemptGameplayFact)correct).Awd = new() { GameplayFactId = correct.Id, FlagId = flagId,
+                RulesId = rules.Id, GenerationRoundId = round.Id, ReceivedRoundId = round.Id, ReceivedRoundNumber = 1,
+                ReceiptScorable = true, AttackOutcome = AwdAttackOutcome.Accepted };
+            f.Db.AwdCaptureIdentities.Add(new() { CompetitionId = f.Competition.Id, FlagId = flagId,
+                AttackingTeamId = team.Id, GameplayFactId = correct.Id });
         }
         f.Db.Add(correct); f.Db.Add(new ManualAdjustmentGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, TeamId = team.Id, OccurredAt = at, UpdatedAt = at,
