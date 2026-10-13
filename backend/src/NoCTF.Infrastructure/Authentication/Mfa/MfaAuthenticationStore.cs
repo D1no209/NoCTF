@@ -35,20 +35,28 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
 
     public async Task<MfaFailure?> ValidateContextAsync(Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct)
     {
-        var account = await ReadAccountAsync(userId, ct);
-        if (account is null || account.User.TokenVersion != tokenVersion) return MfaFailure.AccountUnavailable;
-        if (account.User.Kind == UserKind.Bot) return null;
+        var user = await ContextUsers([userId]).SingleOrDefaultAsync(ct);
+        if (user is null || user.AccountStatus != UserAccountStatus.Active || user.TokenVersion != tokenVersion) return MfaFailure.AccountUnavailable;
+        if (user.Kind == UserKind.Bot) return null;
         var now = clock.GetUtcNow();
         if (context is null || !context.IsWellFormed || context.Method == AuthenticationMethod.Bot || context.AuthenticatedAt > now.AddSeconds(30)) return MfaFailure.PrimaryAuthenticationRequired;
         if (context.Method == AuthenticationMethod.Passkey && !await db.UserPasskeys.AsNoTracking().AnyAsync(value => value.Id == context.PrimaryCredentialId && value.UserId == userId, ct)) return MfaFailure.PrimaryAuthenticationRequired;
         if (context.HasMfa)
         {
             if (context.MfaAuthenticatedAt > now.AddSeconds(30) || context.MfaDeadline <= now) return MfaFailure.PrimaryAuthenticationRequired;
-            if (context.IsLocalMfa && context.CredentialId != account.CredentialId) return MfaFailure.PrimaryAuthenticationRequired;
+            if (context.IsLocalMfa && context.CredentialId != user.CredentialId) return MfaFailure.PrimaryAuthenticationRequired;
             if (context.MfaSource == MfaSource.Oidc && !await OidcPolicyCurrentAsync(context.ProviderId!.Value, context.TrustPolicyId!.Value, ct)) return MfaFailure.PrimaryAuthenticationRequired;
+            return null;
         }
-        if (account.Required && !context.HasMfa)
-            return account.CredentialId is null ? MfaFailure.NotEnrolled : MfaFailure.LocalMfaRequired;
+        if (user.CredentialId is not null) return MfaFailure.LocalMfaRequired;
+        if (user.MfaRequired) return MfaFailure.NotEnrolled;
+        var policy = await db.PlatformSettings.AsNoTracking().IgnoreAutoIncludes()
+            .Where(value => value.Id == 1).Select(value => value.MfaPolicy).SingleAsync(ct);
+        var privileged = policy == MfaPolicy.RequirePrivileged
+            && user.Role is not (UserRole.Administrator or UserRole.Organizer)
+            && await CompetitionPrivilegedAsync(userId, ct);
+        if (MfaRequirements.IsRequired(user.Kind, user.Role, user.MfaRequired, policy, privileged, hasTotp: false))
+            return MfaFailure.NotEnrolled;
         return null;
     }
 
