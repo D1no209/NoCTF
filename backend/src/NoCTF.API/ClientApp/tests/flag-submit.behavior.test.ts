@@ -59,6 +59,15 @@ test('CTF restored solved state remains editable without replaying a success not
   } finally { mounted.stop() }
 })
 
+test('AWD preserves flag bytes while treating CRLF only as the batch line boundary', async () => {
+  const app = harness(), mounted = app.mount({ completion: 'Repeatable', multiple: true })
+  try {
+    mounted.state.input.value = ' flag{first} \r\nflag{second}\t\r\n'
+    await mounted.state.submit()
+    expect(app.submissions[0]).toMatchObject({ body: { flags: [' flag{first} ', 'flag{second}\t'] } })
+  } finally { mounted.stop() }
+})
+
 test('AWDP locks an achieved Break until the panel switches to read-only judgement', async () => {
   const app = harness(), mounted = app.mount({ completion: 'Break' })
   try {

@@ -213,9 +213,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     const generation = requestGeneration
     persistentResult.value = null
     try {
-    const lines = props.multiple
-      ? input.value.split('\n').map((line) => line.trim()).filter(Boolean)
-      : [input.value.trim()].filter(Boolean)
+    const rawLines = props.multiple ? input.value.split(/\r?\n/) : [input.value]
+    const lines = (props.completion === 'Repeatable' ? rawLines : rawLines.map(line => line.trim())).filter(Boolean)
     if (!lines.length) return
     submitting.value = true
     const verificationHeaders = await requestHumanVerification('evaluation')
