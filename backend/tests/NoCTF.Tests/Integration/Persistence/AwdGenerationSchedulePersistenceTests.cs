@@ -11,6 +11,48 @@ namespace NoCTF.Tests.Integration.Persistence;
 
 public sealed partial class AwdRoundCoordinationTests
 {
+    [Test, Timeout(300_000), Arguments(5), Arguments(7)]
+    public Task Active_interval_cadence_uses_actual_issuance_time_without_backfill(int interval, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+        await postgres.StartAsync(ct);
+        var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+        var fixture = await SeedAsync(options, ct);
+        await using var db = new NoCtfDbContext(options);
+        var competition = await db.Competitions.SingleAsync(ct);
+        var configuration = (AwdCompetitionModeConfiguration)competition.ModeConfiguration!;
+        configuration.RoundDurationSeconds = 180;
+        configuration.AwdOptions = configuration.AwdOptions with { GenerationPolicy = AwdGenerationPolicy.ActiveInterval,
+            GenerationInterval = interval, FlagLifetimeUnit = AwdLifetimeUnit.ActiveSeconds, FlagLifetime = 100 };
+        await db.SaveChangesAsync(ct);
+        var clock = new MutableTimeProvider(fixture.Now); var outbox = new RecordingOutbox();
+        var coordinator = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, clock, Secrets());
+        async Task Generate(int seconds)
+        {
+            clock.UtcNow = fixture.Now.AddSeconds(seconds); outbox.Published.Clear();
+            await coordinator.AdvanceAsync(new(fixture.CompetitionId, clock.UtcNow), ct);
+            var message = outbox.Published.OfType<GenerateAwdFlags>().Single();
+            await coordinator.GenerateFlagsAsync(message, ct); await coordinator.GenerateFlagsAsync(message, ct);
+        }
+        for (var seconds = 0; seconds <= 40; seconds += AwdGenerationPlan.CoordinationIntervalSeconds)
+        {
+            await Generate(seconds);
+            await Assert.That(await db.AwdFlagIssues.CountAsync(ct)).IsEqualTo(seconds / interval + 1);
+        }
+        var before = await db.AwdFlagIssues.CountAsync(ct);
+        await Generate(90);
+        await Assert.That(await db.AwdFlagIssues.CountAsync(ct)).IsEqualTo(before + 1);
+        var issues = await db.AwdFlagIssues.AsNoTracking().OrderBy(issue => issue.GenerationSlot).ToArrayAsync(ct);
+        var anchor = issues[0].ActiveStartTicks;
+        foreach (var issue in issues)
+        {
+            var actualSeconds = (issue.IssuedAt - fixture.Now).TotalSeconds;
+            await Assert.That(issue.ActiveStartTicks - anchor).IsEqualTo(TimeSpan.FromSeconds(actualSeconds).Ticks);
+            await Assert.That(issue.ActiveExpiryTicks - issue.ActiveStartTicks).IsEqualTo(TimeSpan.FromSeconds(100).Ticks);
+            await Assert.That(issue.GenerationSlot).IsEqualTo((long)actualSeconds / interval);
+        }
+    });
+
     [Test, Timeout(300_000)]
     [Arguments(AwdGenerationPolicy.ActiveInterval)]
     [Arguments(AwdGenerationPolicy.EveryNRounds)]

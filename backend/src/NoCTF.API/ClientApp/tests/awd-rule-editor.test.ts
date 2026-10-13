@@ -12,6 +12,11 @@ const fields = competitionConfigFields('Awd')
 const defaults = () => Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)]))
 
 describe('AWD rule editor', () => {
+  test.each([1, 4, 5, 7])('active-time interval %s respects the five-second cadence without restricting round intervals', interval => {
+    const values = { ...defaults(), generationPolicy: 'ActiveInterval', generationInterval: interval }
+    expect(awdInvalidFields(fields, values).includes('generationInterval')).toBe(interval < 5)
+    expect(awdInvalidFields(fields, { ...values, generationPolicy: 'EveryNRounds' })).toEqual([])
+  })
   test('unavailable time weighting cannot be selected or saved and is not silently converted', () => {
     expect(fields.find(field => field.key === 'slaSettlement')?.options?.map(option => option.value))
       .toEqual(['FinalScheduledCheck', 'SampleAverage'])

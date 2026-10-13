@@ -30,6 +30,8 @@ export function useAwdRuleEditor(
         collapsible: ['flags', 'checker', 'sla', 'penalty', 'composition'].includes(key),
         defaultOpen: members.some(field => JSON.stringify(effectiveValues.value[field.key]) !== JSON.stringify(fieldDefaultValue(field))),
         fields: members.filter(field => awdFieldVisible(field, effectiveValues.value) || invalidFields.value.includes(field.key))
+          .map(field => field.key === 'generationInterval' && effectiveValues.value.generationPolicy === 'ActiveInterval'
+            ? { ...field, min: 5, description: translate('administration.awd.activeIntervalPrecision') } : field)
           .sort((a, b) => Number(b.key === 'preset') - Number(a.key === 'preset')),
       }
     }).filter(group => group.fields.length > 0)

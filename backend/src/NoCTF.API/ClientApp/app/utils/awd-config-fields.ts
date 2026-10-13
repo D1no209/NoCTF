@@ -125,5 +125,6 @@ export function awdInvalidFields(fields: ConfigFieldDef[], values: ConfigValues)
   }
   if (['SplitVictimDefensePool', 'Scarcity'].includes(String(values.attackRewardMode)) && values.attackSettlement !== 'FlagExpiry') invalid.push('attackSettlement')
   if ((values.attackRewardMode === 'SplitVictimDefensePool') !== (values.defenseMode === 'SharedPool')) invalid.push('attackRewardMode', 'defenseMode')
+  if (values.generationPolicy === 'ActiveInterval' && Number(values.generationInterval) < 5) invalid.push('generationInterval')
   return [...new Set(invalid)]
 }

@@ -2,6 +2,7 @@ namespace NoCTF.Domain.Competitions.Awd;
 
 public static class AwdGenerationPlan
 {
+    public const int CoordinationIntervalSeconds = 5;
     public static bool SameSchedule(AwdGenerationPolicy leftPolicy, int leftInterval,
         AwdGenerationPolicy rightPolicy, int rightInterval) => leftPolicy == rightPolicy
         && (leftPolicy == AwdGenerationPolicy.EveryRound || leftInterval == rightInterval);

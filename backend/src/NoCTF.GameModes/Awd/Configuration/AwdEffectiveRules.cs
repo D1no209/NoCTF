@@ -82,6 +82,9 @@ public sealed record AwdEffectiveRules(
             errors.Add("AWD lifetime must be 1..1000 rounds or 1..864000 active seconds.");
         if (value.FlagsPerStore is < 1 or > 64 || value.GenerationInterval is < 1 or > 864000)
             errors.Add("AWD flags per store must be 1..64 and generation interval 1..864000.");
+        if (value.GenerationPolicy == AwdGenerationPolicy.ActiveInterval
+            && value.GenerationInterval < AwdGenerationPlan.CoordinationIntervalSeconds)
+            errors.Add("AWD active-time generation intervals must be at least 5 seconds.");
         if (value.RoundGapSeconds is < 0 or > 86400 || value.SubmissionTailSeconds is < 0 or > 86400
             || value.TotalRounds is <= 0 or > 1000000)
             errors.Add("AWD round gaps and submission tails must be 0..86400 seconds; total rounds must be 1..1000000.");

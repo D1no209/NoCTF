@@ -130,15 +130,16 @@ public sealed class ClusterScheduleSource(
         // inventing historical flag deliveries. The durable round remains the schedule source.
         var delay = plan.NewRounds.Count > 0 ? TimeSpan.Zero
             : plan.NextRunningPosition!.Value - effectiveElapsed;
-        if (plan.Current is not null && delay > TimeSpan.FromSeconds(5))
-            delay = TimeSpan.FromSeconds(5);
+        var cadence = TimeSpan.FromSeconds(NoCTF.Domain.Competitions.Awd.AwdGenerationPlan.CoordinationIntervalSeconds);
+        if (plan.Current is not null && delay > cadence)
+            delay = cadence;
         var dueAt = now + delay;
         if (dueAt >= deadline.EndsAt)
             return;
         logger.LogDebug("AWD competition {CompetitionId} next round coordination is due at {DueAt}.",
             competition.Id, dueAt);
         entries.Add(new($"awd-round:{competition.Id:N}", ClusterScheduleKind.AwdRound,
-            dueAt, TimeSpan.FromSeconds(5),
+            dueAt, cadence,
             new AdvanceAwdRound(competition.Id, dueAt)));
     }
 

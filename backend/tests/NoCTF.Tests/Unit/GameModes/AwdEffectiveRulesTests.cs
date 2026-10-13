@@ -7,6 +7,15 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class AwdEffectiveRulesTests
 {
+    [Test, Arguments(1, false), Arguments(4, false), Arguments(5, true), Arguments(7, true)]
+    public async Task Active_generation_interval_matches_scheduler_capacity(int interval, bool supported)
+    {
+        var defaults = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, Guid.NewGuid());
+        defaults.AwdOptions = defaults.AwdOptions with { GenerationPolicy = AwdGenerationPolicy.ActiveInterval, GenerationInterval = interval };
+        await Assert.That(AwdEffectiveRules.ValidateConfiguration(defaults, new()).Count == 0).IsEqualTo(supported);
+        defaults.AwdOptions = defaults.AwdOptions with { GenerationPolicy = AwdGenerationPolicy.EveryNRounds };
+        await Assert.That(AwdEffectiveRules.ValidateConfiguration(defaults, new()).Count).IsEqualTo(0);
+    }
     [Test]
     [Arguments(AwdSlaSettlement.FinalScheduledCheck, true)]
     [Arguments(AwdSlaSettlement.SampleAverage, true)]
