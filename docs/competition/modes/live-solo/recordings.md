@@ -1,6 +1,6 @@
 # 录像预览、保留与恢复
 
-入口：`/competitions/比赛ID/live-solo/recordings/对局ID`，选择录像后带 `/录像ID`。列表按页码读取；工作人员与公开回放使用不同读取范围。
+管理入口：`/admin/competitions/比赛ID/live-solo/recordings/对局ID`，选择录像后带 `/录像ID`。公开回放位于 `/competitions/比赛ID/live-solo/recordings/对局ID`。列表按页码读取，工作人员与公开回放使用不同读取范围。
 
 ## 录像与临时节目
 

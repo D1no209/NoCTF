@@ -52,7 +52,7 @@ Fix 上传上限和 archive 展开上限不同：压缩文件可能小但展开�
 
 AWD 每个 Store 选择业务 Checker 写入或 Runner 命令注入，必须保留接收/历史窗口需要的数据。Runner 命令使用双引号引用 `${FLAG}`、`${FLAG_ID}`、`${STORE_ID}`；按 StoreId/FlagId 分开保存，不能每轮覆盖唯一文件。
 
-AWD Checker 使用 `NOCTF_AWD_TASK_URL` 领取本次尝试的 Flag 清单，以 `NOCTF_AWD_TARGETS` 选择命名服务；材料不放入环境变量。逐项回调连接、功能、Flag 写入/读取、稳定原因和观察时间。写入失败仍读取历史；遗漏、平台异常和超时不能报告健康。最终 `Ok/Mumble/Offline/Recovering/InternalError` 由服务端分类，攻击成果独立显示。可运行实现见 [AWD Starter Kit](../../specs/challenge-authoring-templates/starter-kits/awd/README.md)，完整合约见 [制作规范](../../specs/challenge-authoring-awd-awdp.md)。内部 JWT、Flag 和私有读取凭据不得公开或写日志。
+AWD Checker 使用 `NOCTF_AWD_TASK_URL` 领取本次尝试的 Flag 清单，以 `NOCTF_AWD_TARGETS` 选择命名服务；材料不放入环境变量。逐项回调连接、功能、Flag 写入/读取、稳定原因和观察时间。写入失败仍读取历史；遗漏、平台异常和超时不能报告健康。最终 `Ok/Mumble/Offline/Recovering/InternalError` 由服务端分类，攻击成果独立显示。可运行实现见 [AWD Starter Kit](https://github.com/D1no209/NoCTF/blob/HEAD/specs/challenge-authoring-templates/starter-kits/awd/README.md)，完整合约见 [制作规范](https://github.com/D1no209/NoCTF/blob/HEAD/specs/challenge-authoring-awd-awdp.md)。内部 JWT、Flag 和私有读取凭据不得公开或写日志。
 
 ## 网络与隔离边界
 

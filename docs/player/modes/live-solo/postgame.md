@@ -2,6 +2,8 @@
 
 入口：`/competitions/比赛ID/live-solo/postgame/对局ID`，具体题目为 `/postgame/对局ID/轮次ID/题目ID`。目录区分 Round、重赛次数和 RoundQuestion，不用普通 CompetitionChallenge 地址绕过作用域。
 
+工作人员使用对应 `/admin/competitions/比赛ID/live-solo/postgame/...` 管理入口；题解汇总位于选手或管理工作区各自的 `/live-solo/writeups`。比赛尚未结束时查看已开放原题，应使用 [场内历史回看](./review.md)，与赛后题解分开。
+
 ## 目录与权限
 
 从历史目录选题，核对原 Round 和重赛版本。赛前、赛中和没有明确作用域的普通正文请求不能读取赛后题解；赛事结束后合格读取者按当前资格访问。

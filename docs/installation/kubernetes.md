@@ -145,3 +145,13 @@ curl -f https://noctf.example.com/health/ready
 确认 PVC Bound、Pod Ready、Gateway HTTPS 与文件域名可用，再检查 Runtime namespace 的 Pod 调度、DNS、跨实例隔离与公网 NodePort。Runtime DNS 必须到达可提供对应 NodePort 的节点，NodePort 数量按每个直接访问入口预算。
 
 需要脚本验收时可在具备 PowerShell 7 的运维环境运行 `Verify.ps1 -Context YOUR_CONTEXT -Environment production`。使用仓库 production overlay 的高级路径要先准备 Secret、TLS、Registry 与替换所有占位配置，再运行 `Deploy.ps1 -Environment production -Image ... -Initialize`；普通更新不加 `-Initialize`。不要将向导生成 overlay 与手工 overlay 混用。
+
+## 多副本连接与 Worker 队列
+
+Api/Worker 使用 Deployment，Runner 使用单副本 StatefulSet。增加 Runner 副本不会增加资源域容量；应扩充已验证的 Runtime 节点，并按实测调整有界启动和 Checker 并发。
+
+`/hubs` 经 Envoy Gateway 1.9 使用 `noctf-hub-affinity` Cookie 保持会话，将 SignalR negotiate、SSE 和长轮询落到同一 Api Pod。浏览器须接受此路由 Cookie；非浏览器客户端也须在协商与后续传输间保存 Cookie。Cookie 只负责路由，不提供登录身份。
+
+通过真实 Gateway 验证多 Api 广播、协商重连、SSE/长轮询，再结合配置包的 `Test-Scaling.ps1` 做逐 Pod 检查。仅端口转发绕过了会话保持，不能证明公网路径正常。公开观众 Hub 使用独立连接，不带工作人员 bearer 或私有分组。
+
+Worker 消费队列包含 `livesolo-media`，对应并发配置为 `Worker__Concurrency__LiveSoloMedia`，当前模板为 4。自定义队列列表升级时核对该项，否则媒体任务可能已受理却无人消费。它不替代 [LiveSolo 媒体服务部署](./live-solo-media.md)；未启用平台直播的轮次不要求媒体服务。

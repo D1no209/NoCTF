@@ -61,3 +61,9 @@ pwsh -File deploy/k8s/scripts/Measure-Capacity.ps1 -Context YOUR_TEST_CONTEXT -I
 容量报告的资源是输入假设，生命周期 fixture 成功也不等于真实题目/玩法吞吐量。区分 target、started、reachable、failed 和 not-run，保留 headroom，不从“50 Pod 本地成功”推断“生产 1000 Pod 能承载”。
 
 Windows kind 多节点共享同一 Docker Desktop VM，不会增加物理 CPU/memory；默认回环端口预算也与生产 NodePort 不同。
+
+## 从受理追踪到最终完成
+
+性能观察分别记录请求授权与受理、持久消息处理、业务最终结果、榜单/通知更新。HTTP 202、队列入列或客户端发出请求都不等于最终成功；负载报告应包含实际终态、失败原因和等待时间。
+
+理论答卷/纠错检查最终成绩及目标修订；LiveSolo 检查 Round 准备、题目开放、判胜及媒体任务终态。多 Worker 榜单重建还需关注 NATS 协调租约和数据库查询压力。开发环境负载验证见 [AWD Checker 负载验证](../development/awd-check-load.md)，其结果不能直接当成生产容量承诺。

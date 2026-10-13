@@ -1,6 +1,6 @@
 # 手册导读
 
-NoCTF 是以队伍为参赛单位的竞赛平台，支持 CTF、AWD、AWDP、KoH 和 LiveSolo。本手册围绕“如何完成一次操作”组织内容，适合部署人员、选手、出题人、赛事组织者和平台管理员。
+NoCTF 的比赛以队伍为参赛单位，支持 CTF、AWD、AWDP、KoH 和 LiveSolo，并提供独立个人理论练习与测验。本手册围绕“如何完成一次操作”组织内容，适合部署人员、选手、出题人、赛事组织者和平台管理员。
 
 LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于前四种模式。使用 [LiveSolo 操作手册](../competition/modes/live-solo/index.md)和 [启用验收](../operations/live-solo-readiness.md)，不要直接套用普通积分榜或容器题的开赛流程。
 
@@ -14,7 +14,7 @@ LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于�
 | 出题人 | 平台概念 → 题库 → Runtime/Checker | 创建可复用题库模板并完成测试 |
 | 平台管理员 | 角色 → 账号 → 平台设置 → 实例与日志 | 配置身份、邮件与执行资源并维护平台 |
 | 运维人员 | 配置 → 监控 → 升级 → 备份 → 排障 | 可观测、可升级、可恢复 |
-| LiveSolo 工作人员/选手 | 独立设置 → 题组/赛程 → 名单/共享 → Round → 节目/录像/纠正 | 按独立规则完成配置和验收，不套用普通积分榜 |
+| 理论活动组织者/参与者 | 理论题库 → 活动组卷 → 发布 → 答题 → 交卷 → 审核纠错 | 完成个人测验或比赛团队答题 |
 
 比赛管理从 [完整菜单手册](../competition/index.md)阅读，题库维护从 [题库手册](../challenge-bank/index.md)阅读，平台设置从 [平台管理手册](../platform/index.md)阅读。[覆盖索引](../reference/management-map.md)将实际管理路由逐项对应到操作说明。
 
@@ -36,3 +36,5 @@ LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于�
 本手册描述当前仓库能力，不承诺旧数据库或旧 API 兼容。生产部署应固定审核过的 Host 镜像 digest，并保留对应 Git revision 的手册和配置模板。历史上线记录不是新安装命令，不应直接复制历史密钥、生产地址或临时镜像标签。
 
 继续阅读 [平台概念](./concepts.md)，或直接进入 [选择安装方式](../installation/index.md)。
+
+理论内容按任务分布在 [题库](../challenge-bank/theory.md)、[个人练习与测验](../competition/activities/theory.md)、[比赛组卷](../competition/content/theory.md)、[选手作答](../player/theory.md)及 [答卷纠错](../competition/judging/theory.md)，不另设赛制。

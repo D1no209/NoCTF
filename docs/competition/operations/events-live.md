@@ -1,6 +1,6 @@
 # 赛事动态与大屏
 
-入口：比赛管理菜单中的动态、大屏/控制屏，也可从比赛工作区进入。路由分别为 `/competitions/比赛ID/events`、`/competitions/比赛ID/live` 和 AWDP 的 `/competitions/比赛ID/awdp-live`。
+入口：比赛管理菜单中的动态、大屏/控制屏，也可从比赛工作区进入。动态位于 `/competitions/比赛ID/events`。控制屏按模式分别为 CTF 的 `/live`、AWD 的 `/awd-live`、AWDP 的 `/awdp-live`、KoH 的 `/koh-live`，均接在 `/competitions/比赛ID` 后。
 
 ## 动态、播报与消息
 
@@ -27,7 +27,7 @@
 4. 验证实际成绩变动和断线恢复，不只看动画运行。
 5. 现场展示保持普通公开读取范围，不投屏管理敏感页。
 
-CTF 3D 视图可呈现题目和解题进展；AWDP 控制屏按 Break/Fix、轮次和队伍动态组织。当前菜单仅向对应 CTF/AWDP 提供其大屏，AWD/KoH 不冒充 CTF 3D 内容。
+CTF 3D 视图呈现题目和解题进展；AWD、AWDP、KoH 各有对应控制屏，使用本赛制的轮次、攻防或占领信息。入口按当前赛制选择，不用切换 URL 冒充其他模式。
 
 LiveSolo 使用独立 [大厅/赛程](../modes/live-solo/bracket.md)和 [延迟节目](../../player/modes/live-solo/program.md)，不进入普通积分排行榜或 CTF/AWDP 大屏。观众不接收裁判当前私有状态。
 
@@ -36,3 +36,5 @@ LiveSolo 使用独立 [大厅/赛程](../modes/live-solo/bracket.md)和 [延迟�
 大屏、公开播报和 Webhook 应遵守公开投影。Frozen 不代表未判，Blackout 不对外暴露血榜。管理者需要调查时另用授权事实页，不能通过展示账号绕过可见性。
 
 事件导出见 [导出说明](../integrations/exports.md)，技术性能与连接排障见 [运维排障](../../operations/troubleshooting.md)。
+
+LiveSolo 选手动态、实时通知和公开 Webhook 不混入普通积分、血奖及不适用的题目事件；工作人员审计仍保留调查记录。等待中的不适用投递可显示 Suppressed（已抑制），不会为了屏蔽公开内容而删除历史。
