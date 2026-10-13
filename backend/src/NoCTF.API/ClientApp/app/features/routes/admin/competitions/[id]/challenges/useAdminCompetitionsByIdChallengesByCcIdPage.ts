@@ -1,3 +1,4 @@
+import AwdScoringRuleChangesComponent from '~/features/admin/awd/AwdScoringRuleChanges.vue'
 import { getAwdRules } from '~/api'
 import ChallengeTimingSettingsComponent from '~/features/challenges/timing/ChallengeTimingSettings.vue'
 import { message as describeMessage } from '../../../../../../utils/i18n'
@@ -57,6 +58,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const sectionOptions = computed(() => [
     { value: 'general', label: translate('administration.label.basicSettings') },
     { value: 'config', label: translate('administration.label.questionConfiguration') },
+    ...(competition.value?.mode === 'Awd' && canWrite.value ? [{ value: 'awdScoring', label: translate('administration.awd.scoring.title') }] : []),
     { value: 'hints', label: translate('administration.label.hint') },
     { value: 'scoring', label: translate('administration.label.teamScoring') },
   ])
@@ -615,6 +617,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       closeAdjustment,
       submitAdjustment,
       ChallengeRulesEditor,
+      AwdScoringRuleChanges: markRaw(AwdScoringRuleChangesComponent),
       hiddenRuleKeys
     }
   const viewState = proxyRefs(viewBindings)

@@ -1,3 +1,4 @@
+import { createMockAwdScoring } from './awd-scoring'
 import { createMockAwdChecks } from './awd-checks'
 import { createMockMfa } from './mfa'
 import { createMockChallengeWriteUps } from './challenge-writeups'
@@ -55,6 +56,7 @@ function mockWriteUpPdf(teamName: string): Blob {
 export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
   const awdChecks = createMockAwdChecks(state)
+  const awdScoring = createMockAwdScoring(state)
   const liveSolo = createMockLiveSolo(state)
   const broadcastHistory = createMockBroadcastHistory(state)
   const platformLogHistory = createMockPlatformLogHistory()
@@ -295,6 +297,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
+    const awdScoringResponse = awdScoring.handle(request, route, p, body, user?.userId)
+    if (awdScoringResponse) return awdScoringResponse
     const awdCheckResponse = awdChecks.handle(request, route, p, body)
     if (awdCheckResponse) return awdCheckResponse
     const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
