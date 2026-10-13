@@ -49,16 +49,11 @@ public sealed class AwdScoringRuleStore(NoCtfDbContext db, ILeaderboardSnapshotF
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, IsolationLevel.RepeatableRead, ct);
         var failure = await ValidateAsync(candidate, ct);
         if (failure is not null) return new(failure);
-        var before = await projections.CreateScoreboardAsync(candidate.CompetitionId, candidate.Now, ct);
-        var after = await projections.CreateAwdScoringPreviewAsync(candidate.CompetitionId, candidate.Now,
-            new(candidate.CompetitionChallengeId, candidate.FirstRound, candidate.LastRound, candidate.Policy), ct);
-        if (before is null || after is null) return new(AwdScoringRuleFailure.NotFound);
-        var old = before.Snapshot.Teams.ToDictionary(team => team.TeamId);
-        var impact = after.Snapshot.Teams.Select(team => new AwdScoringTeamImpact(team.TeamId, team.TeamName,
-            old[team.TeamId].TotalScore, team.TotalScore)).OrderBy(team => team.TeamId).ToArray();
+        var impact = await ReadImpactAsync(candidate, ct);
+        if (impact is null) return new(AwdScoringRuleFailure.NotFound);
         var rules = await Rules(candidate).Select(rule => rule.Id).ToArrayAsync(ct);
         var flagCount = await db.AwdFlagIssues.CountAsync(issue => rules.Contains(issue.RulesId), ct);
-        var stamp = await StampAsync(candidate, ct);
+        var stamp = await StampAsync(candidate, impact, ct);
         var at = candidate.Now.UtcTicks.ToString(CultureInfo.InvariantCulture);
         var token = Convert.ToBase64String(secrets.Protect(at + ":" + stamp,
             PlatformSecretPurpose.AwdScoringPreview, candidate.ActorUserId));
@@ -68,7 +63,8 @@ public sealed class AwdScoringRuleStore(NoCtfDbContext db, ILeaderboardSnapshotF
 
     public async Task<AwdScoringRuleResult> ApplyAsync(AwdScoringRuleCandidate candidate, string token, CancellationToken ct)
     {
-        // The digest binds all mutable score inputs. Serializable isolation closes the validation/commit window.
+        // Bind mutable inputs and the confirmed before/after scores, including clock-driven settlement.
+        // Serializable isolation closes the validation/commit window.
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, IsolationLevel.Serializable, ct);
         var failure = await ValidateAsync(candidate, ct);
         if (failure is not null) return new(failure);
@@ -145,18 +141,33 @@ public sealed class AwdScoringRuleStore(NoCtfDbContext db, ILeaderboardSnapshotF
                 || ticks < DateTimeOffset.MinValue.UtcTicks || ticks > DateTimeOffset.MaxValue.UtcTicks) return false;
             var at = new DateTimeOffset(ticks, TimeSpan.Zero);
             if (at > candidate.Now || candidate.Now - at >= TimeSpan.FromMinutes(2)) return false;
-            var expected = await StampAsync(candidate, ct);
+            var impact = await ReadImpactAsync(candidate, ct);
+            if (impact is null) return false;
+            var expected = await StampAsync(candidate, impact, ct);
             return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(parts[1]), Encoding.UTF8.GetBytes(expected));
         }
         catch (Exception exception) when (exception is FormatException or CryptographicException) { return false; }
     }
 
-    private async Task<string> StampAsync(AwdScoringRuleCandidate candidate, CancellationToken ct)
+    private async Task<AwdScoringTeamImpact[]?> ReadImpactAsync(AwdScoringRuleCandidate candidate, CancellationToken ct)
+    {
+        var before = await projections.CreateScoreboardAsync(candidate.CompetitionId, candidate.Now, ct);
+        var after = await projections.CreateAwdScoringPreviewAsync(candidate.CompetitionId, candidate.Now,
+            new(candidate.CompetitionChallengeId, candidate.FirstRound, candidate.LastRound, candidate.Policy), ct);
+        if (before is null || after is null) return null;
+        var old = before.Snapshot.Teams.ToDictionary(team => team.TeamId);
+        return after.Snapshot.Teams.Select(team => new AwdScoringTeamImpact(team.TeamId, team.TeamName,
+            old[team.TeamId].TotalScore, team.TotalScore)).OrderBy(team => team.TeamId).ToArray();
+    }
+
+    private async Task<string> StampAsync(AwdScoringRuleCandidate candidate,
+        IReadOnlyList<AwdScoringTeamImpact> impact, CancellationToken ct)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         void Append<T>(T value) => hash.AppendData(JsonSerializer.SerializeToUtf8Bytes(value));
         Append(new { candidate.CompetitionId, candidate.CompetitionChallengeId, candidate.ActorUserId,
             candidate.FirstRound, candidate.LastRound, candidate.Timing, candidate.Policy, candidate.Reason });
+        Append(impact);
         Append(await db.Competitions.AsNoTracking().Where(item => item.Id == candidate.CompetitionId)
             .Select(item => item.ConcurrencyStamp).SingleAsync(ct));
         Append(await db.CompetitionEvents.CountAsync(item => item.CompetitionId == candidate.CompetitionId, ct));
