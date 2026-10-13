@@ -244,12 +244,21 @@ public sealed class AwdRoundCoordinator(
         var predecessor = await db.AwdRoundRules.AsNoTracking()
             .Where(rule => rule.CompetitionChallengeId == challenge.Id)
             .Join(db.AwdRounds.Where(item => item.Number <= round.Number), rule => rule.RoundId, item => item.Id,
-                (rule, item) => new { rule.GenerationEpochId, rule.GenerationEpochRound, rule.GenerationEpochActiveTicks,
+                (rule, item) => new { rule.Id, rule.GenerationEpochId, rule.GenerationEpochRound, rule.GenerationEpochActiveTicks,
                     rule.Options.GenerationPolicy, rule.Options.GenerationInterval, item.Number, rule.Revision })
             .OrderByDescending(item => item.Number).ThenByDescending(item => item.Revision).FirstOrDefaultAsync(ct);
         var continueEpoch = predecessor is not null && AwdGenerationPlan.SameSchedule(
             predecessor.GenerationPolicy, predecessor.GenerationInterval,
             effective.Options.GenerationPolicy, effective.Options.GenerationInterval);
+        if (continueEpoch)
+        {
+            var issuedStores = await db.Set<AwdRoundStoreBudget>().AsNoTracking()
+                .Where(store => store.RulesId == predecessor!.Id).OrderBy(store => store.StoreId)
+                .Select(store => new { store.StoreId, store.Weight, store.FlagsPerIssue }).ToArrayAsync(ct);
+            // A generation budget is one complete manifest. Never fill holes using a different denominator.
+            continueEpoch = issuedStores.SequenceEqual(stores.OrderBy(store => store.StoreId)
+                .Select(store => new { store.StoreId, store.Weight, store.FlagsPerIssue }));
+        }
         var snapshot = new AwdRoundRules
         {
             Id = Guid.CreateVersion7(), CompetitionId = competition.Id, CompetitionChallengeId = challenge.Id,
