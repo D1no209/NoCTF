@@ -6,10 +6,34 @@ using NoCTF.Application.Competitions.Webhooks;
 
 namespace NoCTF.Infrastructure.Competitions.Webhooks;
 
-public sealed class CompetitionWebhookSender(
-    CompetitionWebhookOptions options,
-    TimeProvider timeProvider) : ICompetitionWebhookSender
+public sealed class CompetitionWebhookSender : ICompetitionWebhookSender, IDisposable
 {
+    private readonly CompetitionWebhookOptions options;
+    private readonly TimeProvider timeProvider;
+    private readonly HttpClient client;
+
+    public CompetitionWebhookSender(CompetitionWebhookOptions options, TimeProvider timeProvider)
+    {
+        this.options = options;
+        this.timeProvider = timeProvider;
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.None,
+            UseCookies = false,
+            ConnectTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            MaxResponseHeadersLength = 32,
+            ConnectCallback = ConnectAsync
+        };
+        client = new HttpClient(handler, disposeHandler: true)
+        {
+            Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
+        };
+    }
+
+    public void Dispose() => client.Dispose();
+
     public async Task<CompetitionWebhookSendOutcome> SendAsync(
         CompetitionWebhookDelivery delivery,
         CancellationToken cancellationToken)
@@ -35,19 +59,6 @@ public sealed class CompetitionWebhookSender(
                 delivery.PreviousSigningSecret));
         }
 
-        using var handler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.None,
-            ConnectTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-            MaxResponseHeadersLength = 32,
-            ConnectCallback = ConnectAsync
-        };
-        using var client = new HttpClient(handler, disposeHandler: true)
-        {
-            Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
-        };
         using var request = new HttpRequestMessage(HttpMethod.Post, delivery.Endpoint);
         request.Content = new ByteArrayContent(delivery.Body);
         request.Content.Headers.ContentType = new("application/cloudevents+json")
