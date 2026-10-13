@@ -164,15 +164,44 @@ public sealed class SpectatorFramePersistenceTests
 
             // The public freeze uses the immutable persisted generation, including health
             // and ownership, even if a past fact is corrected after capture.
+            if (mode == GameMode.Awd)
+            {
+                // All three samples were scheduled before freeze, but their current
+                // observations, receipts or adjudications were not available at the cutoff.
+                var observedLater = Fact(teamId, now.AddSeconds(-1), GameplayFactResult.ServiceUp);
+                observedLater.Awd!.ObservedAt = now.AddSeconds(5);
+                observedLater.Awd.ReceivedAt = now.AddSeconds(6);
+                var receivedLater = Fact(defenderId, now.AddSeconds(-1), GameplayFactResult.ServiceUp);
+                receivedLater.Awd!.ObservedAt = now.AddSeconds(-1);
+                receivedLater.Awd.ReceivedAt = now.AddSeconds(6);
+                var adjudicatedLater = Fact(exhibitionId, now.AddSeconds(-1), GameplayFactResult.ServiceUp);
+                adjudicatedLater.Awd!.ReceivedAt = now.AddSeconds(-1);
+                adjudicatedLater.Awd.AdjudicatedAt = now.AddSeconds(6);
+                db.GameplayFacts.AddRange(observedLater, receivedLater, adjudicatedLater);
+            }
             competition.FrozenStartAt = now;
             await db.SaveChangesAsync(ct);
             using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
             var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
-                Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>(), clock: new FakeTimeProvider(now));
+                Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>(), clock: new FakeTimeProvider(now.AddSeconds(10)));
             await Assert.That(await cache.GetFrozenSpectatorScoreboardAsync(competitionId, ct)).IsNull();
-            await cache.GetFrozenWebhookScoreboardAsync(competitionId, now, ct);
+            await using (var freezeTransaction = await db.Database.BeginTransactionAsync(ct))
+            {
+                await cache.GetFrozenWebhookScoreboardAsync(competitionId, now, ct);
+                await freezeTransaction.CommitAsync(ct);
+            }
             var captured = await cache.GetFrozenSpectatorScoreboardAsync(competitionId, ct);
             await Assert.That(captured!.Spectator).IsNotNull();
+            if (mode == GameMode.Awd)
+            {
+                await Assert.That(captured.Spectator!.Services.All(service => service.Health == null
+                    && service.CheckedAt == null && service.Settlement == AwdSettlementState.Provisional)).IsTrue();
+                var frozenTeam = captured.Spectator.Services.Single(service => service.TeamId == teamId);
+                await Assert.That(frozenTeam.LastTrustedHealth).IsEqualTo(AwdHealth.Recovering);
+                await Assert.That(frozenTeam.LastTrustedAt).IsEqualTo(now.AddSeconds(-10));
+                await Assert.That(captured.Spectator.Services.Where(service => service.TeamId != teamId)
+                    .All(service => service.LastTrustedHealth == null && service.LastTrustedAt == null)).IsTrue();
+            }
             var before = System.Text.Json.JsonSerializer.Serialize(captured.Spectator);
             var failed = await db.GameplayFacts.SingleAsync(x => x.State == GameplayFactState.PlatformFailed, ct);
             failed.State = GameplayFactState.Completed;

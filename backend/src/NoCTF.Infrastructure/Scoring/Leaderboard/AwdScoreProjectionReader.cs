@@ -64,13 +64,7 @@ internal static class AwdScoreProjectionReader
         var roundById = rounds.ToDictionary(x => x.Id);
         var checks = checkFacts.Select(fact =>
         {
-            var evidence = fact.Awd!;
-            // A historical freeze must not expose evidence observed or received after its cutoff.
-            if (evidence.ReceivedAt > projectedAt || evidence.ObservedAt > projectedAt
-                || evidence.AdjudicatedAt > projectedAt)
-                evidence = new AwdFactDetails { RulesId = evidence.RulesId, SampleActiveTicks = evidence.SampleActiveTicks,
-                    SampleDeadlineActiveTicks = evidence.SampleDeadlineActiveTicks,
-                    FinalScheduledCheck = evidence.FinalScheduledCheck, Settlement = AwdSettlementState.Provisional };
+            var evidence = AwdEvidenceCutoff.Read(fact.Awd!, fact.UpdatedAt, projectedAt);
             return new AwdScoringCheck(fact.TeamId!.Value, fact.CompetitionChallengeId, fact.ReferenceId!.Value,
                 evidence, evidence.ObservedAt is { } at ? ActiveAt(roundById[fact.ReferenceId.Value], at) : null);
         }).ToArray();

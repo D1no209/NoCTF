@@ -49,14 +49,13 @@ internal static class SpectatorFrameReader
         var points = new List<SpectatorPoint>();
         if (input.Mode == GameMode.Awd)
         {
-            var checks = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition && x.TeamId != null && x.Awd != null)
-                .Select(x => new { x.Id, x.TeamId, ChallengeId = x.CompetitionChallengeId,
-                    RoundId = x.Awd!.ReceivedRoundId, x.Awd.Health, x.Awd.Execution, x.Awd.Settlement,
-                    x.Awd.ScheduledAt, x.Awd.ObservedAt });
+            var checkFacts = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition && x.TeamId != null && x.Awd != null);
+            var checks = CheckRows(checkFacts);
             var latest = await checks.Where(x => currentRoundId != null && x.RoundId == currentRoundId)
                 .GroupBy(x => new { x.ChallengeId, x.TeamId })
                 .Select(g => g.OrderByDescending(x => x.ScheduledAt).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
-            var trusted = await checks.Where(x => x.Health != null && x.Health != AwdHealth.InternalError
+            var trusted = await CheckRows(AwdEvidenceCutoff.VisibleFacts(checkFacts, cutoff))
+                .Where(x => x.Health != null && x.Health != AwdHealth.InternalError
                     && x.Execution == AwdCheckExecution.Completed && x.Settlement == AwdSettlementState.Final)
                 .GroupBy(x => new { x.ChallengeId, x.TeamId })
                 .Select(g => g.OrderByDescending(x => x.ObservedAt).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
@@ -71,11 +70,13 @@ internal static class SpectatorFrameReader
             {
                 lookup.TryGetValue((team.Id, challenge.Id), out var observation);
                 prior.TryGetValue((team.Id, challenge.Id), out var previous);
-                services.Add(new(team.Id, challenge.Id, observation?.Health, observation?.ObservedAt)
+                var visible = observation is not null && AwdEvidenceCutoff.IsVisible(observation.UpdatedAt,
+                    observation.ObservedAt, observation.ReceivedAt, observation.AdjudicatedAt, observation.AttemptStartedAt, cutoff);
+                services.Add(new(team.Id, challenge.Id, visible ? observation!.Health : null, visible ? observation!.ObservedAt : null)
                 {
                     Enabled = enabled.Contains((team.Id, challenge.Id)),
-                    Execution = observation?.Execution ?? AwdCheckExecution.Pending,
-                    Settlement = observation?.Settlement ?? AwdSettlementState.Provisional,
+                    Execution = visible ? observation!.Execution : AwdEvidenceCutoff.UnresolvedExecution(observation?.AttemptStartedAt, cutoff),
+                    Settlement = visible ? observation!.Settlement : AwdSettlementState.Provisional,
                     LastTrustedHealth = previous?.Health, LastTrustedAt = previous?.ObservedAt
                 });
             }
@@ -155,6 +156,31 @@ internal static class SpectatorFrameReader
         }
         return new(title, input.CompetitionStatus ?? CompetitionStatus.Published, hardeningEnd,
             services, points, changes.Take(HistoryLimit).ToArray(), start, changes.Length > HistoryLimit);
+    }
+
+    private static IQueryable<CheckObservation> CheckRows(IQueryable<GameplayFact> facts) => facts.Select(x => new CheckObservation
+    {
+        Id = x.Id, TeamId = x.TeamId, ChallengeId = x.CompetitionChallengeId, UpdatedAt = x.UpdatedAt,
+        RoundId = x.Awd!.ReceivedRoundId, Health = x.Awd.Health, Execution = x.Awd.Execution, Settlement = x.Awd.Settlement,
+        ScheduledAt = x.Awd.ScheduledAt, ObservedAt = x.Awd.ObservedAt, ReceivedAt = x.Awd.ReceivedAt,
+        AdjudicatedAt = x.Awd.AdjudicatedAt, AttemptStartedAt = x.Awd.AttemptStartedAt
+    });
+
+    private sealed class CheckObservation
+    {
+        public Guid Id { get; init; }
+        public Guid? TeamId { get; init; }
+        public Guid ChallengeId { get; init; }
+        public Guid? RoundId { get; init; }
+        public DateTimeOffset UpdatedAt { get; init; }
+        public AwdHealth? Health { get; init; }
+        public AwdCheckExecution Execution { get; init; }
+        public AwdSettlementState Settlement { get; init; }
+        public DateTimeOffset? ScheduledAt { get; init; }
+        public DateTimeOffset? ObservedAt { get; init; }
+        public DateTimeOffset? ReceivedAt { get; init; }
+        public DateTimeOffset? AdjudicatedAt { get; init; }
+        public DateTimeOffset? AttemptStartedAt { get; init; }
     }
 
     private static SpectatorHealth Health(Observation? item) => item?.State != GameplayFactState.Completed
