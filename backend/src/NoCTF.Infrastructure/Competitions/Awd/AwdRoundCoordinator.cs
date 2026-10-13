@@ -96,21 +96,14 @@ public sealed class AwdRoundCoordinator(
         var competitiveTeams = teams.Where(team => (target.Competition.TracksEnabled
                 ? tracks.Find(team.TrackKey) : tracks.DefaultTrack) is { EarnsScore: true, AffectsCompetitiveResults: true })
             .Select(team => team.Id).ToHashSet();
-        var rules = await ResolveRoundRulesAsync(target.Competition, target.Challenge, target.Template,
-            round, teamIds, competitiveTeams, handledAt, cancellationToken);
         // Pauses within this round do not count towards an active-time issuance slot.
         var clock = await AwdRunningClock.ReadAsync(db, target.Competition.Id, target.Competition.StartAt,
             handledAt, cancellationToken);
         var activeTicks = round.ActiveStartTicks + (clock.ElapsedAt(handledAt) - clock.ElapsedAt(round.StartsAt)).Ticks;
-        var slot = rules.Options.GenerationPolicy switch
-        {
-            AwdGenerationPolicy.EveryRound => round.Number - 1L,
-            AwdGenerationPolicy.EveryNRounds => (round.Number - 1L) / rules.Options.GenerationInterval,
-            AwdGenerationPolicy.ActiveInterval => activeTicks / TimeSpan.FromSeconds(rules.Options.GenerationInterval).Ticks,
-            _ => throw new InvalidOperationException("Unknown AWD generation policy.")
-        };
-        if (rules.Options.GenerationPolicy == AwdGenerationPolicy.EveryNRounds
-            && (round.Number - 1) % rules.Options.GenerationInterval != 0)
+        var rules = await ResolveRoundRulesAsync(target.Competition, target.Challenge, target.Template,
+            round, teamIds, competitiveTeams, handledAt, activeTicks, cancellationToken);
+        var slot = AwdGenerationPlan.Slot(rules, round.Number, activeTicks);
+        if (!AwdGenerationPlan.IsDue(rules, round.Number))
         {
             await db.SaveChangesAsync(cancellationToken);
             await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
@@ -119,7 +112,7 @@ public sealed class AwdRoundCoordinator(
         var existing = await db.AwdFlagIssues.Where(issue => issue.CompetitionChallengeId == message.CompetitionChallengeId
             && issue.GenerationSlot == slot
             && db.AwdRoundRules.Any(snapshot => snapshot.Id == issue.RulesId
-                && snapshot.Options.GenerationPolicy == rules.Options.GenerationPolicy)).ToListAsync(cancellationToken);
+                && snapshot.GenerationEpochId == rules.GenerationEpochId)).ToListAsync(cancellationToken);
         var identities = existing.Select(issue => (issue.TeamId, issue.StoreId, issue.Ordinal)).ToHashSet();
         var runtimes = await db.RuntimeInstances.AsNoTracking()
             .Where(instance => instance.CompetitionChallengeId == message.CompetitionChallengeId
@@ -200,7 +193,7 @@ public sealed class AwdRoundCoordinator(
 
     private async Task<AwdRoundRules> ResolveRoundRulesAsync(Competition competition, CompetitionChallenge challenge,
         Challenge template, AwdRound round, IReadOnlyList<Guid> teams, IReadOnlySet<Guid> competitiveTeams,
-        DateTimeOffset now, CancellationToken ct)
+        DateTimeOffset now, long activeTicks, CancellationToken ct)
     {
         var previous = await db.AwdRoundRules.AsSplitQuery()
             .Where(rules => rules.RoundId == round.Id && rules.CompetitionChallengeId == challenge.Id)
@@ -248,10 +241,22 @@ public sealed class AwdRoundCoordinator(
             : new Dictionary<Guid, int>();
         foreach (var team in eligibility)
             team.SettledRank = ranks.TryGetValue(team.TeamId, out var rank) ? rank : null;
+        var predecessor = await db.AwdRoundRules.AsNoTracking()
+            .Where(rule => rule.CompetitionChallengeId == challenge.Id)
+            .Join(db.AwdRounds.Where(item => item.Number <= round.Number), rule => rule.RoundId, item => item.Id,
+                (rule, item) => new { rule.GenerationEpochId, rule.GenerationEpochRound, rule.GenerationEpochActiveTicks,
+                    rule.Options.GenerationPolicy, rule.Options.GenerationInterval, item.Number, rule.Revision })
+            .OrderByDescending(item => item.Number).ThenByDescending(item => item.Revision).FirstOrDefaultAsync(ct);
+        var continueEpoch = predecessor is not null && AwdGenerationPlan.SameSchedule(
+            predecessor.GenerationPolicy, predecessor.GenerationInterval,
+            effective.Options.GenerationPolicy, effective.Options.GenerationInterval);
         var snapshot = new AwdRoundRules
         {
             Id = Guid.CreateVersion7(), CompetitionId = competition.Id, CompetitionChallengeId = challenge.Id,
             RoundId = round.Id, Revision = (previous?.Revision ?? 0) + 1, EffectiveAt = now,
+            GenerationEpochId = continueEpoch ? predecessor!.GenerationEpochId : Guid.CreateVersion7(),
+            GenerationEpochRound = continueEpoch ? predecessor!.GenerationEpochRound : round.Number,
+            GenerationEpochActiveTicks = continueEpoch ? predecessor!.GenerationEpochActiveTicks : activeTicks,
             AttackRewardMode = effective.AttackMode, AttackPoints = effective.AttackPoints,
             VictimDefensePoolPoints = effective.DefensePoints, ServiceHealthyPoints = effective.SlaPoints,
             CheckerIntervalSeconds = effective.CheckerIntervalSeconds, Options = effective.Options with { },

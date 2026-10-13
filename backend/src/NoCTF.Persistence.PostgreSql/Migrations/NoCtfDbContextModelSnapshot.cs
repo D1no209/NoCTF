@@ -1791,6 +1791,18 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("flag_header");
 
+                    b.Property<long>("GenerationEpochActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation_epoch_active_ticks");
+
+                    b.Property<Guid>("GenerationEpochId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_epoch_id");
+
+                    b.Property<int>("GenerationEpochRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation_epoch_round");
+
                     b.Property<int>("Revision")
                         .HasColumnType("integer")
                         .HasColumnName("revision");

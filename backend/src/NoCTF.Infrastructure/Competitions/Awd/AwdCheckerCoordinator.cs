@@ -183,13 +183,14 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
         var competition = await db.Competitions.SingleAsync(item => item.Id == fact.CompetitionId, ct);
         var timeline = await AwdRunningClock.ReadAsync(db, competition.Id, competition.StartAt, now, ct);
         var activeTicks = round.ActiveStartTicks + timeline.ElapsedAt(now).Ticks - timeline.ElapsedAt(round.StartsAt).Ticks;
-        var generationDue = rules.Options.GenerationPolicy != AwdGenerationPolicy.EveryNRounds
-            || (round.Number - 1) % rules.Options.GenerationInterval == 0;
-        var activeSlot = rules.Options.GenerationPolicy == AwdGenerationPolicy.ActiveInterval
-            ? activeTicks / TimeSpan.FromSeconds(rules.Options.GenerationInterval).Ticks : (long?)null;
+        var generationDue = AwdGenerationPlan.IsDue(rules, round.Number);
+        var slot = AwdGenerationPlan.Slot(rules, round.Number, activeTicks);
+        var epochRuleIds = await db.AwdRoundRules.Where(snapshot => snapshot.CompetitionChallengeId == fact.CompetitionChallengeId
+                && snapshot.GenerationEpochId == rules.GenerationEpochId)
+            .Select(snapshot => snapshot.Id).ToArrayAsync(ct);
         details.ManifestComplete = !generationDue || rules.Stores.All(store =>
-            issues.Count(issue => issue.StoreId == store.StoreId && (activeSlot is { } slot
-                ? issue.GenerationSlot == slot : issue.RoundId == round.Id)) >= store.FlagsPerIssue);
+            issues.Count(issue => issue.StoreId == store.StoreId && epochRuleIds.Contains(issue.RulesId)
+                && issue.GenerationSlot == slot) >= store.FlagsPerIssue);
         foreach (var issue in issues.Where(issue => AwdFlagLifetime.RequiresRead(issue, round.Number, activeTicks)))
         {
             var issueRules = issue.RulesId == rules.Id ? rules

@@ -32,6 +32,9 @@ public sealed class AwdRoundRules
     public Guid CompetitionChallengeId { get; set; }
     public int Revision { get; set; }
     public DateTimeOffset EffectiveAt { get; set; }
+    public Guid GenerationEpochId { get; set; } = Guid.CreateVersion7();
+    public int GenerationEpochRound { get; set; } = 1;
+    public long GenerationEpochActiveTicks { get; set; }
     public AwdAttackRewardMode AttackRewardMode { get; set; }
     public long AttackPoints { get; set; }
     public long VictimDefensePoolPoints { get; set; }

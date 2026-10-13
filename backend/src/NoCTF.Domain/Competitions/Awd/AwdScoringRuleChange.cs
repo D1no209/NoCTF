@@ -72,6 +72,8 @@ public sealed record AwdScoringPolicy
     {
         Id = rules.Id, CompetitionId = rules.CompetitionId, RoundId = rules.RoundId,
         CompetitionChallengeId = rules.CompetitionChallengeId, Revision = rules.Revision, EffectiveAt = rules.EffectiveAt,
+        GenerationEpochId = rules.GenerationEpochId, GenerationEpochRound = rules.GenerationEpochRound,
+        GenerationEpochActiveTicks = rules.GenerationEpochActiveTicks,
         AttackRewardMode = AttackRewardMode, AttackPoints = AttackPoints,
         VictimDefensePoolPoints = VictimDefensePoolPoints, ServiceHealthyPoints = ServiceHealthyPoints,
         CheckerIntervalSeconds = rules.CheckerIntervalSeconds, EligibleTeamCount = rules.EligibleTeamCount,
