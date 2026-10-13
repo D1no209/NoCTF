@@ -5,6 +5,7 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -15,10 +16,10 @@ public sealed class SpectatorScreenTests
     {
         var team = Guid.NewGuid(); var attacker = Guid.NewGuid(); var hidden = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var frame = new SpectatorFrame("Test", CompetitionStatus.Running, null,
-            [new(team, challenge, SpectatorHealth.Down, null) { CompromisedBy = [hidden, attacker] }], [], [], DateTimeOffset.UtcNow, true);
+            [new(team, challenge, AwdHealth.Offline, null) { CompromisedBy = [hidden, attacker] }], [], [], DateTimeOffset.UtcNow, true);
         var filtered = SpectatorAudience.Filter(frame, new HashSet<Guid> { team, attacker }, new HashSet<Guid> { challenge });
         await Assert.That(filtered.Services.Single().CompromisedBy).IsEquivalentTo([attacker]);
-        await Assert.That(filtered.Services.Single().Health).IsEqualTo(SpectatorHealth.Down);
+        await Assert.That(filtered.Services.Single().Health).IsEqualTo(AwdHealth.Offline);
         var redacted = SpectatorAudience.Filter(frame, new HashSet<Guid> { team }, new HashSet<Guid> { challenge });
         await Assert.That(redacted.Services.Single().CompromisedBy).IsEmpty();
         await Assert.That(frame.Services.Single().CompromisedBy.Count).IsEqualTo(2);
@@ -147,7 +148,7 @@ public sealed class SpectatorScreenTests
             var secret = Guid.NewGuid(); var challenge = Guid.NewGuid();
             var cutoff = Now.AddMinutes(-1);
             var frame = new SpectatorFrame("Public", CompetitionStatus.Running, null,
-                [new(PublicTeam, challenge, SpectatorHealth.Healthy, cutoff), new(secret, challenge, SpectatorHealth.Down, cutoff)],
+                [new(PublicTeam, challenge, AwdHealth.Ok, cutoff), new(secret, challenge, AwdHealth.Offline, cutoff)],
                 [new(challenge, PublicTeam, secret, SpectatorHealth.Unknown, cutoff, 5, 10)],
                 Enumerable.Range(0, 300).Select(i => new SpectatorChange(Guid.NewGuid(), Guid.NewGuid(), cutoff.AddSeconds(-i),
                     SpectatorChangeKind.Control, challenge, PublicTeam, null, PublicTeam)).ToArray(), cutoff.AddMinutes(-30), false);

@@ -35,13 +35,13 @@ function harness() {
     setClearColor() {} setSize(w: number, h: number) { this.width = Math.floor(w * this.pixelRatio); this.height = Math.floor(h * this.pixelRatio) }
     render(scene: Three.Scene) { this.lastScene = scene; this.info.render.calls++ } dispose() { this.disposed = true }
   }
-  const palette: Record<string, string> = { '--spectator-healthy': '#50dfbd', '--spectator-attack': '#ff3858', '--spectator-down': '#f5a34b', '--spectator-unknown': '#7a8896' }
+  const palette: Record<string, string> = { '--spectator-healthy': '#50dfbd', '--spectator-attack': '#ff3858', '--spectator-down': '#f5a34b', '--spectator-unknown': '#7a8896', '--spectator-mumble': '#f2cf63', '--spectator-recovering': '#63c7f2', '--spectator-internal-error': '#c99aef' }
   const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: (key: string) => palette[key] ?? '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer, awdTeamLayout, awdOverviewRadius,
     document, window, ResizeObserver: class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} },
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++id, callback); return id }, cancelAnimationFrame: (key: number) => frames.delete(key) }
   const Scene = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return SpectatorScene;`)(deps)
   const scene = new Scene(element, () => { lost = true }) as SpectatorScene
-  scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Healthy'] }, { id: 'b', name: 'B', services: ['Down'] }],
+  scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Ok'] }, { id: 'b', name: 'B', services: ['Offline'] }],
     focus: '', reduced: false, fps: 60, locked: true })
   return { scene, document, window, queries, frames, element, renderer: renderer!, lost: () => lost,
     resize(w: number, h: number) { element.clientWidth = w; element.clientHeight = h; resized() },
@@ -81,22 +81,29 @@ test('native density survives 4K resize and monitor changes without exceeding pi
   expect(h.queries.every(query => query.events.size === 0)).toBe(true)
 })
 
-test('four service states color only existing lamps while cabinet materials remain unchanged', () => {
+test('health lamps and independent attack diamonds preserve cabinets and clear on the next snapshot', () => {
   const h = harness()
-  h.scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Healthy', 'Compromised', 'Down', 'Unknown'] }],
+  h.scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Ok', 'Mumble', 'Offline', 'Recovering', 'InternalError', 'Pending', 'Running', 'Unknown'], compromised: [true, false, true, false, true, false, false, false] }],
     focus: '', reduced: false, fps: 60, locked: true })
   h.pump(17)
   const meshes: Three.InstancedMesh[] = []
   h.renderer.lastScene!.traverse(object => { if (object instanceof Three.InstancedMesh) meshes.push(object) })
   const colored = meshes.filter(mesh => mesh.instanceColor !== null)
   expect(colored).toHaveLength(1)
-  expect(colored[0]!.count).toBe(4)
+  expect(colored[0]!.count).toBe(8)
   const color = new Three.Color()
-  expect(Array.from({ length: 4 }, (_, i) => { colored[0]!.getColorAt(i, color); return color.getHexString() }))
-    .toEqual(['50dfbd', 'ff3858', 'f5a34b', '7a8896'])
-  const bodies = meshes.filter(mesh => mesh.instanceColor === null)
+  expect(Array.from({ length: 8 }, (_, i) => { colored[0]!.getColorAt(i, color); return color.getHexString() }))
+    .toEqual(['50dfbd', 'f2cf63', 'f5a34b', '63c7f2', 'c99aef', '7a8896', '7a8896', '7a8896'])
+  const bodies = meshes.filter(mesh => mesh.instanceColor === null && !mesh.userData.attackMarkers)
   expect(bodies.length).toBeGreaterThan(0)
   expect(bodies.every(mesh => (mesh.material as Three.MeshStandardMaterial).color.getHexString() === 'aabbcc')).toBe(true)
+  const markers = meshes.find(mesh => mesh.userData.attackMarkers)!
+  expect((markers.material as Three.MeshStandardMaterial).color.getHexString()).toBe('ff3858')
+  const matrix = new Three.Matrix4(), scale = new Three.Vector3()
+  const shown = () => Array.from({ length: markers.count }, (_, i) => { markers.getMatrixAt(i, matrix); scale.setFromMatrixScale(matrix); return scale.x > 0 })
+  expect(shown()).toEqual([true, false, true, false, true, false, false, false])
+  h.scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: Array(8).fill('Pending'), compromised: [] }], focus: '', reduced: true, fps: 60, locked: true })
+  expect(shown()).toEqual(Array(8).fill(false))
   h.scene.dispose()
 })
 

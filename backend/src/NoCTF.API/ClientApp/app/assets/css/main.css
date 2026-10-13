@@ -1279,7 +1279,7 @@ body:has([data-modal-scroll-lock]) {
 /* AWD / KoH broadcast palette is independent of operator theme and brand. */
 .spectator-screen {
   --spectator-ground: #070f18; --spectator-metal: #465362; --spectator-edge: #4a9bb5;
-  --spectator-attack: #ff3858; --spectator-down: #f5a34b; --spectator-healthy: #50dfbd; --spectator-unknown: #7a8896;
+  --spectator-attack: #ff3858; --spectator-down: #f5a34b; --spectator-healthy: #50dfbd; --spectator-unknown: #7a8896; --spectator-mumble: #f2cf63; --spectator-recovering: #63c7f2; --spectator-internal-error: #c99aef;
   --spectator-rock: #79786e; --spectator-rock-lit: #e6e3dc; --spectator-snow: #d9e8ed;
   --spectator-flag-a: #4db6ff; --spectator-flag-b: #ff657d; --spectator-flag-c: #c2a6ff; --spectator-flag-d: #f2c974;
   --background: var(--spectator-ground); --foreground: #e3f2f5; --muted-foreground: #8cabb8;
@@ -1311,10 +1311,10 @@ body:has([data-modal-scroll-lock]) {
 .spectator-field-legend { position: absolute; bottom: 20px; left: 22px; display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted-foreground); }
 .spectator-dot { display: inline-block; width: 6px; height: 6px; background: currentColor; flex-shrink: 0; }
 .spectator-dot:not(:first-child) { margin-left: 16px; }
-.spectator-screen [data-health='Healthy'] { color: var(--spectator-healthy); }
-.spectator-screen [data-health='Compromised'] { color: var(--spectator-attack); }
-.spectator-screen [data-health='Down'] { color: var(--spectator-down); }
-.spectator-screen [data-health='Unknown'] { color: var(--spectator-unknown); }
+.spectator-screen [data-health='Ok'], .spectator-screen [data-health='Healthy'] { color: var(--spectator-healthy); }
+.spectator-capture { color: var(--spectator-attack); }
+.spectator-screen [data-health='Offline'], .spectator-screen [data-health='Down'] { color: var(--spectator-down); }
+.spectator-screen [data-health='Pending'], .spectator-screen [data-health='Running'], .spectator-screen [data-health='Disabled'], .spectator-screen [data-health='Unknown'] { color: var(--spectator-unknown); }
 .spectator-field-pages { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 8px; }
 .spectator-burst { position: absolute; top: 54px; left: 22px; color: var(--spectator-flag-d); font-size: 12px; }
 .spectator-sidebar { display: grid; grid-template-rows: 1fr 1.05fr; gap: 16px; min-height: 0; }
@@ -1338,7 +1338,7 @@ body:has([data-modal-scroll-lock]) {
 .spectator-service-row { display: flex; align-items: center; gap: 9px; margin: 0 18px; padding: 9px 0; box-shadow: inset 0 -1px #397f9122; font-size: 11px; }
 .spectator-service-row > div { flex: 1; min-width: 0; }
 .spectator-service-row strong { display: block; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-.spectator-service-row small { display: block; color: var(--muted-foreground); font-size: 9px; margin-top: 3px; }
+.spectator-service-row small { display: block; color: var(--muted-foreground); font-size: clamp(10px, .65vw, 16px); margin-top: 3px; }
 .spectator-carousel-controls { display: flex; justify-content: space-between; padding: 10px; gap: 4px; }
 .spectator-point h3 { font-size: clamp(18px, 1.3vw, 30px); padding: 16px 18px 4px; }
 .spectator-owner { color: var(--primary); padding: 0 18px 10px; font-size: 18px; }
@@ -1433,3 +1433,12 @@ body:has([data-modal-scroll-lock]) {
  .spectator-screen[data-mode='Awd'] .spectator-service-row { margin-inline: 12px; }
  .spectator-screen[data-mode='Awd'] .spectator-service-team { padding-inline: 12px; }
 }
+
+.spectator-screen [data-health='Mumble'] { color: var(--spectator-mumble); }
+.spectator-screen [data-health='Recovering'] { color: var(--spectator-recovering); }
+.spectator-screen [data-health='InternalError'] { color: var(--spectator-internal-error); }
+.spectator-field-legend { flex-wrap: wrap; max-width: calc(100% - 180px); gap: 6px 12px; bottom: 8px; padding: 4px 6px; background: var(--spectator-ground); font-size: clamp(10px, .65vw, 16px); }
+.spectator-field-legend > span { display: inline-flex; gap: 5px; align-items: center; }
+.spectator-service-row > .spectator-capture { display: flex; flex-direction: column; align-items: center; max-width: 72px; text-align: center; }
+.spectator-service-row > .spectator-capture small { color: inherit; font-size: clamp(10px, .65vw, 14px); }
+.spectator-fallback .spectator-capture { margin-left: 8px; }

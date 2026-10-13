@@ -12,6 +12,7 @@ using ZiggyCreatures.Caching.Fusion;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
@@ -41,7 +42,7 @@ public sealed class SpectatorFramePersistenceTests
             var now = DateTimeOffset.Parse("2026-10-12T00:00:00Z");
             var userId = Guid.NewGuid(); var competitionId = Guid.NewGuid(); var challengeId = Guid.NewGuid();
             var instanceId = Guid.NewGuid(); var teamId = Guid.NewGuid(); var exhibitionId = Guid.NewGuid(); var defenderId = Guid.NewGuid();
-            var round = Guid.NewGuid();
+            var round = Guid.NewGuid(); var previousRound = Guid.NewGuid(); var rulesId = Guid.NewGuid();
             db.Users.Add(new User { Id = userId, UserName = "spectator", NormalizedUserName = "SPECTATOR", Email = "test@example.test", PasswordHash = "test", Kind = UserKind.Human, Role = UserRole.Administrator, CreatedAt = now, UpdatedAt = now });
             Competition competition = mode == GameMode.Awd ? new AwdCompetition() : new KohCompetition();
             competition.Id = competitionId; competition.OwnerId = userId; competition.Title = "Broadcast";
@@ -65,6 +66,11 @@ public sealed class SpectatorFramePersistenceTests
                 GameplayFact fact = mode == GameMode.Awd ? new AwdServiceTransitionGameplayFact() : new KohControlObservationGameplayFact();
                 fact.Id = Guid.CreateVersion7(); fact.CompetitionId = competitionId; fact.CompetitionChallengeId = instanceId;
                 fact.TeamId = team; fact.OccurredAt = at; fact.UpdatedAt = at; fact.Result = result; fact.State = state;
+                if (mode == GameMode.Awd) fact.Awd = new() { ReceivedRoundId = at < now.AddMinutes(-36) ? previousRound : round,
+                    RulesId = rulesId, ScheduledAt = at, ObservedAt = state == GameplayFactState.Completed ? at : null,
+                    Health = state == GameplayFactState.PlatformFailed ? AwdHealth.InternalError : result == GameplayFactResult.ServiceUp ? AwdHealth.Ok : AwdHealth.Offline,
+                    Execution = state == GameplayFactState.PlatformFailed ? AwdCheckExecution.FailedToDetermine : AwdCheckExecution.Completed,
+                    Settlement = state == GameplayFactState.PlatformFailed ? AwdSettlementState.PendingAdjudication : AwdSettlementState.Final };
                 return fact;
             }
             db.GameplayFacts.AddRange(
@@ -74,11 +80,17 @@ public sealed class SpectatorFramePersistenceTests
                 Fact(teamId, now.AddMinutes(1), mode == GameMode.Awd ? GameplayFactResult.ServiceUp : GameplayFactResult.Uncontrolled));
             if (mode == GameMode.Awd)
             {
+                db.AwdRounds.AddRange(new AwdRound { Id = previousRound, CompetitionId = competitionId, Number = 1, StartsAt = now.AddHours(-1), EndsAt = now.AddMinutes(-36) },
+                    new AwdRound { Id = round, CompetitionId = competitionId, Number = 2, StartsAt = now.AddMinutes(-36), EndsAt = now.AddMinutes(2) });
+                db.AwdRoundRules.Add(new AwdRoundRules { Id = rulesId, CompetitionId = competitionId, RoundId = round,
+                    CompetitionChallengeId = instanceId, Revision = 1, EffectiveAt = now.AddMinutes(-36),
+                    Teams = [new() { TeamId = teamId }, new() { TeamId = defenderId }] });
                 FlagAttemptGameplayFact Attack(Guid source, Guid victim, int minute) => new()
                 {
                     Id = Guid.CreateVersion7(), CompetitionId = competitionId, CompetitionChallengeId = instanceId,
                     TeamId = source, VictimTeamId = victim, ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = round,
-                    OccurredAt = now.AddMinutes(minute), UpdatedAt = now, State = GameplayFactState.Completed, Result = GameplayFactResult.Correct
+                    OccurredAt = now.AddMinutes(minute), UpdatedAt = now, State = GameplayFactState.Completed, Result = GameplayFactResult.Correct,
+                    Awd = new() { GenerationRoundId = previousRound, ReceivedRoundId = round, ReceiptScorable = true, AttackOutcome = AwdAttackOutcome.Accepted }
                 };
                 db.GameplayFacts.AddRange(Attack(teamId, defenderId, -3), Attack(teamId, defenderId, -2),
                     Attack(exhibitionId, defenderId, -2), Attack(teamId, teamId, -2),
@@ -97,7 +109,11 @@ public sealed class SpectatorFramePersistenceTests
             var frame = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: round))!;
             if (mode == GameMode.Awd)
             {
-                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).Health).IsEqualTo(SpectatorHealth.Unknown);
+                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).Health).IsEqualTo(AwdHealth.InternalError);
+                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).Settlement).IsEqualTo(AwdSettlementState.PendingAdjudication);
+                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).LastTrustedHealth).IsEqualTo(AwdHealth.Offline);
+                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).Enabled).IsTrue();
+                await Assert.That(frame.Services.Single(x => x.TeamId == exhibitionId).Enabled).IsFalse();
                 await Assert.That(frame.Services.Single(x => x.TeamId == exhibitionId).CheckedAt).IsNull();
                 await Assert.That(frame.Services.Single(x => x.TeamId == defenderId).CompromisedBy).IsEquivalentTo([teamId]);
                 // An attack outside the entire history window still marks the current round.
@@ -111,7 +127,14 @@ public sealed class SpectatorFramePersistenceTests
                 await Assert.That(preview!.Changes).IsEmpty();
                 await Assert.That(preview.Services.All(x => x.CompromisedBy.Count == 0)).IsTrue();
                 var nextRound = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: Guid.NewGuid()))!;
-                await Assert.That(nextRound.Services.All(x => x.CompromisedBy.Count == 0)).IsTrue();
+                await Assert.That(nextRound.Services.All(x => x.CompromisedBy.Count == 0 && x.Health == null && x.Execution == AwdCheckExecution.Pending)).IsTrue();
+                await Assert.That(nextRound.Services.Single(x => x.TeamId == teamId).LastTrustedHealth).IsEqualTo(AwdHealth.Offline);
+                var recover = Fact(teamId, now.AddSeconds(-10), GameplayFactResult.ServiceDown);
+                recover.Awd!.Health = AwdHealth.Recovering;
+                db.GameplayFacts.Add(recover); await db.SaveChangesAsync(ct);
+                var recovered = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: round))!;
+                await Assert.That(recovered.Services.Single(x => x.TeamId == teamId).Health).IsEqualTo(AwdHealth.Recovering);
+                await Assert.That(recovered.Services.Single(x => x.TeamId == teamId).CompromisedBy).IsEquivalentTo([defenderId]);
             }
             else
             {

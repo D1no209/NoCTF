@@ -1,4 +1,5 @@
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
@@ -6,8 +7,13 @@ public enum SpectatorHealth { Unknown, Healthy, Down }
 public enum SpectatorChangeKind { Attack, Control, Uncontrolled, DetectionFailed }
 
 // Cached alongside the canonical scoreboard, never reconstructed from live facts when frozen.
-public sealed record SpectatorService(Guid TeamId, Guid ChallengeId, SpectatorHealth Health, DateTimeOffset? CheckedAt)
+public sealed record SpectatorService(Guid TeamId, Guid ChallengeId, AwdHealth? Health, DateTimeOffset? CheckedAt)
 {
+    public bool Enabled { get; init; }
+    public AwdCheckExecution Execution { get; init; }
+    public AwdSettlementState Settlement { get; init; }
+    public AwdHealth? LastTrustedHealth { get; init; }
+    public DateTimeOffset? LastTrustedAt { get; init; }
     // Keep provenance in the cached frame so public track filtering cannot leak hidden attacks.
     public IReadOnlyList<Guid> CompromisedBy { get; init; } = [];
 }

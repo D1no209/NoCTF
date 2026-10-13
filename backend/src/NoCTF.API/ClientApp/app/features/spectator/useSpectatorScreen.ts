@@ -32,6 +32,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   const nodes = computed<SpectatorNode[]>(() => mode === 'Awd' ? stableTeams.value.map(team => ({
     id: team.id!, name: team.name ?? '', services: challenges.value.map(c => spectatorServiceState(
       snapshot.value?.services?.find(s => s.teamId === team.id && s.challengeId === c.competitionChallengeId))),
+    compromised: challenges.value.map(c => snapshot.value?.services?.find(s => s.teamId === team.id && s.challengeId === c.competitionChallengeId)?.isCompromised ?? false),
   })) : challenges.value.map(c => {
     const point = snapshot.value?.points?.find(p => p.challengeId === c.competitionChallengeId)
     const owner = stableTeams.value.findIndex(team => team.id === point?.controllerId)
@@ -91,7 +92,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   const timelineTicks = computed(() => !historyScreen.value?.dataAsOf ? [] : Array.from({ length: 6 }, (_, i) => formatTime(new Date(Date.parse(historyScreen.value?.dataAsOf ?? '') - Number(minutes.value) * 60000 * (1 - i / 5)).toISOString())))
   function toggleHistory() { historyPaused.value = !historyPaused.value; pinnedHistory.value = historyPaused.value ? snapshot.value : null }
   const fallbackRows = computed(() => visibleNodes.value.map(node => ({ ...node,
-    services: mode === 'Awd' ? challenges.value.map((c, i) => ({ name: c.title, health: node.services?.[i] ?? 'Unknown' })) : [],
+    services: mode === 'Awd' ? challenges.value.map((c, i) => ({ name: c.title, health: node.services?.[i] ?? 'Unknown', compromised: node.compromised?.[i] ?? false })) : [],
     controller: mode === 'Koh' ? node.ownerName ?? t('spectator.unknown') : '',
   })))
   const settlements = computed(() => snapshot.value?.settlements?.filter(x => x.teamId === team.value?.id).slice(0, 3) ?? [])
@@ -101,7 +102,13 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   }
   function challengeName(challengeId: string | undefined) { return challenges.value.find(x => x.competitionChallengeId === challengeId)?.title ?? '—' }
   function formatTime(value: string | null | undefined) { return value ? new Date(value).toLocaleTimeString() : t('spectator.noCheck') }
-  function healthText(value: string | undefined) { return t(value === 'Healthy' ? 'spectator.healthy' : value === 'Compromised' ? 'spectator.compromised' : value === 'Down' ? 'spectator.down' : 'spectator.unknown') }
+  function healthText(value: string | null | undefined) {
+    const keys = { Healthy: 'spectator.healthy', Down: 'spectator.down', Ok: 'spectator.ok', Mumble: 'spectator.mumble', Offline: 'spectator.offline', Recovering: 'spectator.recovering', InternalError: 'spectator.internalError', Pending: 'spectator.pending', Running: 'spectator.checking', Disabled: 'spectator.disabled' } as const
+    return t(keys[value as keyof typeof keys] ?? 'spectator.unknown')
+  }
+  function settlementText(value: string | undefined) {
+    return t(value === 'Final' ? 'spectator.final' : value === 'PendingAdjudication' ? 'spectator.pendingAdjudication' : value === 'Exempted' ? 'spectator.exempted' : 'spectator.provisional')
+  }
   function eventText(value: Change) {
     return value.kind === 'Attack' ? `${teamName(value.teamId)} → ${teamName(value.targetTeamId)}`
       : value.kind === 'DetectionFailed' ? t('spectator.detectionFailed')
@@ -214,7 +221,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   return { t, mode, transferText, fullscreenActive, fullscreenFailed, diagnostics, metricsText, snapshot, loading, failed, fallback, focus, teamFocus, challengeFocus, minutes, reduced, fps, locked,
     carouselLocked, group, groups, visibleNodes, fallbackRows, timeline, timelineTicks, historyPaused, toggleHistory, rankTeams, teams, challenges, team, services, point, pointTitle,
     stale, frozen, clockText, statusText, history, settlements, summaryCount,
-    teamName, controlName, challengeName, formatTime, healthText, eventText, controlledCount, mountScene, previousTeam, nextTeam,
+    teamName, controlName, challengeName, formatTime, healthText, settlementText, eventText, controlledCount, mountScene, previousTeam, nextTeam,
     previousGroup, nextGroup, toggleReduced, toggleFps, toggleLock, toggleCarousel, enterHover, leaveHover,
     enterFocus, leaveFocus, fullscreen, back, refresh }
 }

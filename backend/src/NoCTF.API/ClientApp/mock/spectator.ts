@@ -46,7 +46,16 @@ export function spectatorMock(request: Request): Response | null {
   const data: Screen = { version: String(now), serverTime: new Date().toISOString(), dataAsOf: new Date(now).toISOString(), scope, mode,
     competitionName: mode === 'Awd' ? 'NoCTF · 攻防对阵场 / MOCK' : 'NoCTF · 山巅争夺 / MOCK', status: 'Running', teams, challenges,
     round: mode === 'Awd' ? { id: id(95, 24), number: 24, startAt: new Date(now - 40000).toISOString(), endAt: new Date(now + 260000).toISOString() } : null,
-    services: mode === 'Awd' ? teams.flatMap((team, i) => challenges.map((c, j) => ({ teamId: team.id, challengeId: c.competitionChallengeId, health: (i + j) % 13 === 0 ? 'Down' as const : (i + j) % 19 === 0 ? 'Unknown' as const : 'Healthy' as const, isCompromised: compromised.has(`${team.id}:${c.competitionChallengeId}`), checkedAt: new Date(now - 15000).toISOString() }))) : [],
+    services: mode === 'Awd' ? teams.flatMap((team, i) => challenges.map((c, j) => {
+      const variant = (i + j) % 8
+      const health = (['Ok', 'Mumble', 'Offline', 'Recovering', 'InternalError', null, null, null] as const)[variant]
+      return { teamId: team.id, challengeId: c.competitionChallengeId, health,
+        enabled: variant !== 7, execution: variant < 4 ? 'Completed' as const : variant === 4 ? 'FailedToDetermine' as const : variant === 6 ? 'Running' as const : 'Pending' as const,
+        settlement: variant < 4 ? 'Final' as const : variant === 4 ? 'PendingAdjudication' as const : 'Provisional' as const,
+        isCompromised: compromised.has(`${team.id}:${c.competitionChallengeId}`),
+        checkedAt: health ? new Date(now - 15000).toISOString() : null,
+        lastTrustedHealth: 'Ok' as const, lastTrustedAt: new Date(now - 195000).toISOString() }
+    })) : [],
     points: mode === 'Koh' ? challenges.map((c, i) => {
       const n = total - ((total - i + challengeCount) % challengeCount), unknown = n <= 0 || n % 11 === 0
       return { challengeId: c.competitionChallengeId, controllerId: controlAt(unknown ? n - challengeCount : n),

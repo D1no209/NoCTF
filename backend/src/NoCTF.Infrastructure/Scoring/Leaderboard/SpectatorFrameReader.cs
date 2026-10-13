@@ -3,6 +3,7 @@ using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Challenges.Timing;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Infrastructure.Persistence;
 
@@ -28,7 +29,8 @@ internal static class SpectatorFrameReader
         var competitive = input.Teams.Where(x => !x.IsBanned && !x.IsDeleted && x.AffectsCompetitiveResults).Select(x => x.Id).ToArray();
         var facts = db.GameplayFacts.AsNoTracking().Where(x => x.CompetitionId == input.CompetitionId
             && challengeIds.Contains(x.CompetitionChallengeId) && x.OccurredAt <= cutoff
-            && (x.State == GameplayFactState.Completed || x.State == GameplayFactState.PlatformFailed));
+            && (x.Kind == GameplayFactKind.AwdServiceTransition
+                || x.State == GameplayFactState.Completed || x.State == GameplayFactState.PlatformFailed));
         var eligible = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition
             || (x.CompetitionChallengeId == overrideId
                 && (overrideOpening == null || x.OccurredAt >= overrideOpening)
@@ -47,15 +49,35 @@ internal static class SpectatorFrameReader
         var points = new List<SpectatorPoint>();
         if (input.Mode == GameMode.Awd)
         {
-            var latest = await observations.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition && x.TeamId != null)
+            var checks = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition && x.TeamId != null && x.Awd != null)
+                .Select(x => new { x.Id, x.TeamId, ChallengeId = x.CompetitionChallengeId,
+                    RoundId = x.Awd!.ReceivedRoundId, x.Awd.Health, x.Awd.Execution, x.Awd.Settlement,
+                    x.Awd.ScheduledAt, x.Awd.ObservedAt });
+            var latest = await checks.Where(x => currentRoundId != null && x.RoundId == currentRoundId)
                 .GroupBy(x => new { x.ChallengeId, x.TeamId })
-                .Select(g => g.OrderByDescending(x => x.At).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
+                .Select(g => g.OrderByDescending(x => x.ScheduledAt).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
+            var trusted = await checks.Where(x => x.Health != null && x.Health != AwdHealth.InternalError
+                    && x.Execution == AwdCheckExecution.Completed && x.Settlement == AwdSettlementState.Final)
+                .GroupBy(x => new { x.ChallengeId, x.TeamId })
+                .Select(g => g.OrderByDescending(x => x.ObservedAt).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
+            var active = await db.AwdRoundRules.AsNoTracking().Where(x => x.RoundId == currentRoundId
+                    && x.EffectiveAt <= cutoff && challengeIds.Contains(x.CompetitionChallengeId))
+                .SelectMany(x => x.Teams.Select(team => new { team.TeamId, x.CompetitionChallengeId })).ToArrayAsync(ct);
+            var enabled = active.Select(x => (x.TeamId, x.CompetitionChallengeId)).ToHashSet();
             var lookup = latest.ToDictionary(x => (x.TeamId!.Value, x.ChallengeId));
+            var prior = trusted.ToDictionary(x => (x.TeamId!.Value, x.ChallengeId));
             foreach (var team in input.Teams.Where(x => !x.IsDeleted))
             foreach (var challenge in challenges)
             {
                 lookup.TryGetValue((team.Id, challenge.Id), out var observation);
-                services.Add(new(team.Id, challenge.Id, Health(observation), observation?.At));
+                prior.TryGetValue((team.Id, challenge.Id), out var previous);
+                services.Add(new(team.Id, challenge.Id, observation?.Health, observation?.ObservedAt)
+                {
+                    Enabled = enabled.Contains((team.Id, challenge.Id)),
+                    Execution = observation?.Execution ?? AwdCheckExecution.Pending,
+                    Settlement = observation?.Settlement ?? AwdSettlementState.Provisional,
+                    LastTrustedHealth = previous?.Health, LastTrustedAt = previous?.ObservedAt
+                });
             }
         }
         else
@@ -84,12 +106,13 @@ internal static class SpectatorFrameReader
             // attribution of points, not whether a competitive attack took place.
             var attacks = eligible.Where(x => x.Kind == GameplayFactKind.FlagAttempt
                 && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue)
-                && x.State == GameplayFactState.Completed && x.ReferenceKind == GameplayFactReferenceKind.AwdRound
-                && x.ReferenceId != null && x.TeamId != null && competitive.Contains(x.TeamId.Value)
+                && x.State == GameplayFactState.Completed && x.Awd != null && x.Awd.ReceiptScorable == true
+                && x.Awd.AttackOutcome == AwdAttackOutcome.Accepted && x.Awd.ReceivedRoundId != null
+                && x.TeamId != null && competitive.Contains(x.TeamId.Value)
                 && x.VictimTeamId != null && competitive.Contains(x.VictimTeamId.Value) && x.TeamId != x.VictimTeamId);
             // Current service compromise is independent of the bounded event feed.
             // The round id comes from the same canonical scoreboard generation.
-            var currentAttacks = await attacks.Where(x => currentRoundId != null && x.ReferenceId == currentRoundId)
+            var currentAttacks = await attacks.Where(x => currentRoundId != null && x.Awd!.ReceivedRoundId == currentRoundId)
                 .Select(x => new { Attacker = x.TeamId!.Value, Victim = x.VictimTeamId!.Value, Challenge = x.CompetitionChallengeId })
                 .Distinct().ToArrayAsync(ct);
             var compromised = currentAttacks.ToLookup(x => (x.Victim, x.Challenge), x => x.Attacker);
@@ -98,7 +121,7 @@ internal static class SpectatorFrameReader
                 CompromisedBy = compromised[(service.TeamId, service.ChallengeId)].ToArray()
             }).ToList();
             changes = await attacks.Where(x => x.OccurredAt >= start && !attacks.Any(prior =>
-                    prior.ReferenceId == x.ReferenceId && prior.TeamId == x.TeamId && prior.VictimTeamId == x.VictimTeamId
+                    prior.Awd!.ReceivedRoundId == x.Awd!.ReceivedRoundId && prior.TeamId == x.TeamId && prior.VictimTeamId == x.VictimTeamId
                     && prior.CompetitionChallengeId == x.CompetitionChallengeId
                     && (prior.OccurredAt < x.OccurredAt || prior.OccurredAt == x.OccurredAt && prior.Id.CompareTo(x.Id) < 0)))
                 .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id).Take(HistoryLimit + 1)

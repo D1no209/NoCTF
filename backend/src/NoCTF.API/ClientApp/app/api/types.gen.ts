@@ -2363,12 +2363,19 @@ export type NoCtfapiEndpointsCompetitionsSpectatorRoundResponse = {
 export type NoCtfapiEndpointsCompetitionsSpectatorServiceResponse = {
     teamId?: string;
     challengeId?: string;
-    health?: NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
     checkedAt?: string | null;
     isCompromised?: boolean;
+    enabled?: boolean;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    lastTrustedHealth?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    lastTrustedAt?: string | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol = 'Unknown' | 'Healthy' | 'Down';
+export type NoCtfDomainCompetitionsAwdAwdHealth = 'Ok' | 'Mumble' | 'Offline' | 'Recovering' | 'InternalError';
+
+export type NoCtfDomainCompetitionsAwdAwdCheckExecution = 'Pending' | 'Running' | 'Completed' | 'FailedToDetermine';
 
 export type NoCtfapiEndpointsCompetitionsSpectatorPointResponse = {
     challengeId?: string;
@@ -2379,6 +2386,8 @@ export type NoCtfapiEndpointsCompetitionsSpectatorPointResponse = {
     intervalSeconds?: number;
     pointsPerInterval?: number;
 };
+
+export type NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol = 'Unknown' | 'Healthy' | 'Down';
 
 export type NoCtfapiEndpointsCompetitionsSpectatorChangeResponse = {
     id?: string;
@@ -4736,10 +4745,6 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse
     readableFlags?: number;
     flags?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse>;
 };
-
-export type NoCtfDomainCompetitionsAwdAwdHealth = 'Ok' | 'Mumble' | 'Offline' | 'Recovering' | 'InternalError';
-
-export type NoCtfDomainCompetitionsAwdAwdCheckExecution = 'Pending' | 'Running' | 'Completed' | 'FailedToDetermine';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse = {
     outcome?: NoCtfDomainCompetitionsAwdAwdProbeOutcome;

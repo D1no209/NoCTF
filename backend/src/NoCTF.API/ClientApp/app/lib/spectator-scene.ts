@@ -8,7 +8,7 @@ import { awdTeamLayout, awdOverviewRadius } from './spectator-awd-layout'
 import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
 import type { SpectatorServiceState } from '../features/spectator/spectator-service-state'
 
-export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: SpectatorServiceState[] }
+export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: SpectatorServiceState[]; compromised?: boolean[] }
 export interface SpectatorBeam { id: string; source: string; target: string; service: number }
 export interface SpectatorSceneState { mode: 'Awd' | 'Koh'; nodes: SpectatorNode[]; focus: string; highlighted?: string[]; serviceFocus?: number; reduced: boolean; fps: 30 | 60; locked: boolean }
 export interface SpectatorSceneMetrics { frames: number; p95: number; active: number; queued: number; geometries: number; textures: number; calls: number; triangles: number; cpuP95: number; renderDuty: number }
@@ -44,6 +44,7 @@ export class SpectatorScene {
   private createdAt = performance.now()
   private signature = ''
   private lamps: { mesh: THREE.InstancedMesh; node: string; service: number; index: number }[] = []
+  private attackMarkers: { mesh: THREE.InstancedMesh; node: string; service: number; index: number; matrix: THREE.Matrix4 }[] = []
   private flags = new Map<string, { group: THREE.Group; material: THREE.MeshStandardMaterial; owner?: number; name?: string; start: number; leaving: boolean; texture: THREE.CanvasTexture }>()
   private batch = new Map<THREE.Material, THREE.Matrix4[]>()
   private grid!: THREE.GridHelper
@@ -62,7 +63,7 @@ export class SpectatorScene {
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.shadowMap.autoUpdate = false
     this.renderer.setClearColor(themeColor('--spectator-ground', element))
-    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'down', 'healthy', 'unknown', 'rock', 'rock-lit', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
+    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'down', 'healthy', 'mumble', 'recovering', 'internal-error', 'unknown', 'rock', 'rock-lit', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
     element.append(this.renderer.domElement)
     this.renderer.domElement.addEventListener('webglcontextlost', this.contextLost)
     this.scene.add(this.world)
@@ -115,6 +116,7 @@ export class SpectatorScene {
       this.fillLight.color.copy(state.mode === 'Koh' ? this.colors['rock-lit']! : this.colors.edge!)
       const metal = this.material(this.colors.metal!, .5), edge = this.material(this.colors.edge!, .3)
       const lampMaterial = this.material(new THREE.Color(1, 1, 1))
+      const attackMaterial = this.material(this.colors.attack!)
       const count = state.nodes.length, columns = Math.ceil(Math.sqrt(count * (state.mode === 'Koh' ? 1 : 1.5))), rows = Math.ceil(count / columns)
       const teamLayout = awdTeamLayout(Math.max(0, ...state.nodes.map(node => node.services?.length ?? 0)))
       const teamSpacingX = teamLayout.width + 2.2, teamSpacingZ = teamLayout.depth + 2.8
@@ -143,6 +145,11 @@ export class SpectatorScene {
             const index = this.batch.get(lampMaterial)?.length ?? 0
             const matrices = this.batch.get(lampMaterial) ?? []; matrices.push(matrix); this.batch.set(lampMaterial, matrices)
             this.lamps.push({ mesh: null!, node: node.id, service: i, index })
+            const marker = new THREE.Matrix4().compose(new THREE.Vector3(x + .23, 1.65, z + .39).add(group.position),
+              new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 4), new THREE.Vector3(.16, .16, .045))
+            const markers = this.batch.get(attackMaterial) ?? []
+            this.attackMarkers.push({ mesh: null!, node: node.id, service: i, index: markers.length, matrix: marker })
+            markers.push(marker); this.batch.set(attackMaterial, markers)
           })
         } else peaks.push(group.position.clone())
         this.world.add(group); this.nodes.set(node.id, group)
@@ -207,6 +214,7 @@ export class SpectatorScene {
         matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix))
         mesh.instanceMatrix.needsUpdate = true
         if (material === lampMaterial) this.lamps.forEach(lamp => { lamp.mesh = mesh })
+        if (material === attackMaterial) { mesh.userData.attackMarkers = true; this.attackMarkers.forEach(marker => { marker.mesh = mesh }) }
         this.world.add(mesh)
       }
       this.batch.clear()
@@ -214,10 +222,16 @@ export class SpectatorScene {
     const byId = new Map(state.nodes.map(n => [n.id, n]))
     for (const lamp of this.lamps) {
       const status = byId.get(lamp.node)?.services?.[lamp.service]
-      const color = (status === 'Healthy' ? this.colors.healthy : status === 'Compromised' ? this.colors.attack : status === 'Down' ? this.colors.down : this.colors.unknown)!.clone()
+      const color = (status === 'Ok' ? this.colors.healthy : status === 'Offline' ? this.colors.down : status === 'Mumble' ? this.colors.mumble : status === 'Recovering' ? this.colors.recovering : status === 'InternalError' ? this.colors['internal-error'] : this.colors.unknown)!.clone()
       if (state.serviceFocus !== undefined && state.serviceFocus >= 0 && lamp.service !== state.serviceFocus) color.multiplyScalar(.2)
       lamp.mesh.setColorAt(lamp.index, color); lamp.mesh.instanceColor!.needsUpdate = true
     }
+    for (const marker of this.attackMarkers) {
+      const visible = byId.get(marker.node)?.compromised?.[marker.service] === true
+      marker.mesh.setMatrixAt(marker.index, visible ? marker.matrix : new THREE.Matrix4().makeScale(0, 0, 0))
+      marker.mesh.instanceMatrix.needsUpdate = true
+    }
+    for (const mesh of new Set(this.attackMarkers.map(marker => marker.mesh))) mesh.computeBoundingSphere()
     for (const [id, flag] of this.flags) {
       const node = byId.get(id)!
       if (node.owner !== flag.owner) {
@@ -267,7 +281,7 @@ export class SpectatorScene {
       this.camera.position.set(target.x + Math.sin(this.angle) * 36, target.y + 30, target.z + Math.cos(this.angle) * 36)
     } else {
       this.camera = this.perspective
-      const size = focused ? 12 : awdOverviewRadius(this.awdSpan.x, this.awdSpan.y + 1, this.aspect, this.angle)
+      const size = focused ? 12 : awdOverviewRadius(this.awdSpan.x, this.awdSpan.y + 1, this.aspect, this.angle) * 1.08
       this.camera.position.set(target.x + Math.sin(this.angle) * size, size * .95, target.z + Math.cos(this.angle) * size)
     }
     this.camera.lookAt(target); this.camera.updateMatrixWorld(); this.placeLabels()
@@ -345,7 +359,7 @@ export class SpectatorScene {
   private up = () => { this.dragging = false }
   private clearBeams() { for (const beam of this.beams) { this.scene.remove(beam.mesh); beam.mesh.geometry.dispose(); beam.mesh.material.dispose() }; this.beams = []; this.queue = [] }
   private clearWorld() {
-    this.clearBeams(); this.world.traverse(o => { if (o instanceof THREE.InstancedMesh) o.dispose() }); this.world.clear(); this.controlLines.clear(); this.textures.forEach(t => t.dispose()); this.textures = []; this.flags.clear(); this.lamps = []; this.batch.clear(); this.nodes.clear(); this.labels.forEach(x => x.remove()); this.labels = []
+    this.clearBeams(); this.world.traverse(o => { if (o instanceof THREE.InstancedMesh) o.dispose() }); this.world.clear(); this.controlLines.clear(); this.textures.forEach(t => t.dispose()); this.textures = []; this.flags.clear(); this.lamps = []; this.attackMarkers = []; this.batch.clear(); this.nodes.clear(); this.labels.forEach(x => x.remove()); this.labels = []
     // Dispose only per-layout resources. Grid and shared box survive layout changes.
     while (this.geometries.length > 1) this.geometries.pop()!.dispose()
     while (this.materials.length > 1) this.materials.pop()!.dispose()

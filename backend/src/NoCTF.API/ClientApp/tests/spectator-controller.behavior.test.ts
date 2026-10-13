@@ -52,19 +52,42 @@ describe('spectator snapshot controller', () => {
   test('one server per question uses authoritative compromise even with empty history, and resets with the next snapshot', async () => {
     const h = harness(), first = h.state.refresh()
     const screen = { ...data(1), challenges: ['c', 'd', 'e'].map(competitionChallengeId => ({ competitionChallengeId })),
-      services: [{ teamId: 'a', challengeId: 'c', health: 'Healthy' as const, isCompromised: true },
-        { teamId: 'a', challengeId: 'd', health: 'Down' as const, isCompromised: true }] }
+      services: [{ teamId: 'a', challengeId: 'c', health: 'Ok' as const, isCompromised: true },
+        { teamId: 'a', challengeId: 'd', health: 'Offline' as const, isCompromised: true }] }
     h.respond(0, screen); await first; await drain()
     expect(h.scene.states.at(-1)!.nodes.map(node => node.services?.length)).toEqual([3, 3])
-    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Compromised', 'Down', 'Unknown'])
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Ok', 'Offline', 'Unknown'])
     expect(h.scene.states.at(-1)!.nodes[1]!.services).toEqual(['Unknown', 'Unknown', 'Unknown'])
-    expect(h.state.services.value.map(service => service.state)).toEqual(['Compromised', 'Down', 'Unknown'])
-    expect(h.state.healthText(h.state.services.value[0]!.state)).toBe('spectator.compromised')
-    expect(h.state.fallbackRows.value[0]!.services.map(service => service.health)).toEqual(['Compromised', 'Down', 'Unknown'])
+    expect(h.scene.states.at(-1)!.nodes[0]!.compromised).toEqual([true, true, false])
+    expect(h.state.services.value.map(service => service.state)).toEqual(['Ok', 'Offline', 'Unknown'])
+    expect(h.state.healthText(h.state.services.value[0]!.state)).toBe('spectator.ok')
+    expect(h.state.fallbackRows.value[0]!.services.map(service => service.health)).toEqual(['Ok', 'Offline', 'Unknown'])
     const second = h.state.refresh()
-    h.respond(1, { ...screen, version: '2', services: [{ teamId: 'a', challengeId: 'c', health: 'Healthy', isCompromised: false }] })
+    h.respond(1, { ...screen, version: '2', services: [{ teamId: 'a', challengeId: 'c', health: 'Ok', isCompromised: false }] })
     await second; await drain()
-    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Healthy', 'Unknown', 'Unknown'])
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Ok', 'Unknown', 'Unknown'])
+    h.stop()
+  })
+  test('all health conclusions remain independent of capture and settlement across a frozen read', async () => {
+    const h = harness(), first = h.state.refresh()
+    const healths = ['Ok', 'Mumble', 'Offline', 'Recovering', 'InternalError'] as const
+    const screen: Screen = { ...data(2), challenges: healths.map(competitionChallengeId => ({ competitionChallengeId })),
+      services: healths.map(health => ({ teamId: 'a', challengeId: health, health, enabled: true,
+        execution: health === 'InternalError' ? 'FailedToDetermine' : 'Completed',
+        settlement: health === 'InternalError' ? 'PendingAdjudication' : 'Final', isCompromised: true })) }
+    h.respond(0, screen); await first; await drain()
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual([...healths].sort())
+    expect(h.scene.states.at(-1)!.nodes[0]!.compromised).toEqual(healths.map(() => true))
+    expect(h.state.services.value.find(service => service.health === 'InternalError')?.settlement).toBe('PendingAdjudication')
+    const freeze = h.state.refresh()
+    h.respond(1, { ...screen, version: '1', scope: 'Frozen' }); await freeze; await drain()
+    expect(h.state.snapshot.value?.scope).toBe('Frozen')
+    expect(h.scene.states.at(-1)!.reduced).toBe(true)
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual([...healths].sort())
+    expect(h.scene.states.at(-1)!.nodes[0]!.compromised).toEqual(healths.map(() => true))
+    expect(spectatorServiceState({ enabled: true, health: null, execution: 'Pending', lastTrustedHealth: 'Ok' })).toBe('Pending')
+    expect(spectatorServiceState({ enabled: true, health: null, execution: 'Running' })).toBe('Running')
+    expect(spectatorServiceState({ enabled: false, health: null })).toBe('Disabled')
     h.stop()
   })
   test('coalesces bursts into a single trailing request and never overlaps reads', async () => {

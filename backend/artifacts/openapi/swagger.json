@@ -35118,7 +35118,12 @@
             "format": "guid"
           },
           "health": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSpectatorHealthProtocol"
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
           },
           "checkedAt": {
             "type": "string",
@@ -35127,21 +35132,63 @@
           },
           "isCompromised": {
             "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "lastTrustedHealth": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "lastTrustedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsSpectatorHealthProtocol": {
+      "NoCTFDomainCompetitionsAwdAwdHealth": {
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "Unknown",
-          "Healthy",
-          "Down"
+          "Ok",
+          "Mumble",
+          "Offline",
+          "Recovering",
+          "InternalError"
         ],
         "enum": [
-          "Unknown",
-          "Healthy",
-          "Down"
+          "Ok",
+          "Mumble",
+          "Offline",
+          "Recovering",
+          "InternalError"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdCheckExecution": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Running",
+          "Completed",
+          "FailedToDetermine"
+        ],
+        "enum": [
+          "Pending",
+          "Running",
+          "Completed",
+          "FailedToDetermine"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsSpectatorPointResponse": {
@@ -35179,6 +35226,20 @@
             "format": "int64"
           }
         }
+      },
+      "NoCTFAPIEndpointsCompetitionsSpectatorHealthProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Unknown",
+          "Healthy",
+          "Down"
+        ],
+        "enum": [
+          "Unknown",
+          "Healthy",
+          "Down"
+        ]
       },
       "NoCTFAPIEndpointsCompetitionsSpectatorChangeResponse": {
         "type": "object",
@@ -44115,40 +44176,6 @@
             }
           }
         }
-      },
-      "NoCTFDomainCompetitionsAwdAwdHealth": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Ok",
-          "Mumble",
-          "Offline",
-          "Recovering",
-          "InternalError"
-        ],
-        "enum": [
-          "Ok",
-          "Mumble",
-          "Offline",
-          "Recovering",
-          "InternalError"
-        ]
-      },
-      "NoCTFDomainCompetitionsAwdAwdCheckExecution": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Pending",
-          "Running",
-          "Completed",
-          "FailedToDetermine"
-        ],
-        "enum": [
-          "Pending",
-          "Running",
-          "Completed",
-          "FailedToDetermine"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsAwdCheckProbeResponse": {
         "type": "object",
