@@ -16,6 +16,27 @@ public sealed record LiveSoloOrderedResult(long Sequence, Guid GameplayFactId, G
 public sealed record LiveSoloResolutionDecision(LiveSoloResolution State, long ResolvedThrough,
     Guid? WinnerTeamId = null, Guid? WinningGameplayFactId = null);
 
+/// <summary>Resolves an admission-ordered stream without sorting each growing prefix again.</summary>
+public sealed class LiveSoloOrderedResolution(long admittedThrough)
+{
+    private long next = 1;
+    private LiveSoloResolutionDecision? terminal;
+
+    public LiveSoloResolutionDecision Decision => terminal
+        ?? new(next <= admittedThrough ? LiveSoloResolution.Waiting : LiveSoloResolution.NoWinner, next - 1);
+
+    public void Observe(LiveSoloOrderedResult result)
+    {
+        if (terminal is not null) return;
+        if (result.Sequence != next || result.State != GameplayFactState.Completed || result.Result is null)
+            terminal = new(LiveSoloResolution.Waiting, next - 1);
+        else if (result.Result == GameplayFactResult.Correct)
+            terminal = new(LiveSoloResolution.Winner, result.Sequence, result.TeamId, result.GameplayFactId);
+        else
+            next = checked(next + 1);
+    }
+}
+
 public static class LiveSoloRoundRules
 {
     public static LiveSoloFailure? CanAdmit(LiveSoloRound round, LiveSoloRoundQuestion question,
@@ -34,16 +55,10 @@ public static class LiveSoloRoundRules
 
     public static LiveSoloResolutionDecision Resolve(long admittedThrough, IEnumerable<LiveSoloOrderedResult> results)
     {
-        var next = 1L;
+        var resolution = new LiveSoloOrderedResolution(admittedThrough);
         foreach (var result in results.OrderBy(x => x.Sequence))
-        {
-            if (result.Sequence != next || result.State != GameplayFactState.Completed || result.Result is null)
-                return new(LiveSoloResolution.Waiting, next - 1);
-            if (result.Result == GameplayFactResult.Correct)
-                return new(LiveSoloResolution.Winner, result.Sequence, result.TeamId, result.GameplayFactId);
-            next = checked(next + 1);
-        }
-        return next <= admittedThrough ? new(LiveSoloResolution.Waiting, next - 1) : new(LiveSoloResolution.NoWinner, next - 1);
+            resolution.Observe(result);
+        return resolution.Decision;
     }
 
     public static bool CanRelease(LiveSoloRound round, LiveSoloRoundQuestion question, DateTimeOffset now) =>

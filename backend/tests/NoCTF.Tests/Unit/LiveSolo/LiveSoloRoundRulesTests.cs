@@ -8,6 +8,40 @@ public sealed class LiveSoloRoundRulesTests
 {
     private static readonly DateTimeOffset Start = DateTimeOffset.Parse("2026-10-08T12:00:00Z");
     [Test]
+    public async Task Ordered_resolution_keeps_gaps_and_unresolved_predecessors_blocking_later_winners()
+    {
+        var winner = new LiveSoloOrderedResult(3, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Correct);
+        foreach (var state in new[] { GameplayFactState.Queued, GameplayFactState.PlatformFailed })
+        {
+            var resolution = new LiveSoloOrderedResolution(3);
+            resolution.Observe(new(1, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Wrong));
+            resolution.Observe(new(2, Guid.NewGuid(), Guid.NewGuid(), state, null));
+            resolution.Observe(winner);
+            await Assert.That(resolution.Decision).IsEqualTo(new LiveSoloResolutionDecision(LiveSoloResolution.Waiting, 1));
+        }
+        var gap = new LiveSoloOrderedResolution(3);
+        gap.Observe(new(1, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Wrong));
+        gap.Observe(winner);
+        await Assert.That(gap.Decision).IsEqualTo(new LiveSoloResolutionDecision(LiveSoloResolution.Waiting, 1));
+    }
+
+    [Test]
+    public async Task Ordered_resolution_drains_long_wrong_prefix_and_keeps_the_first_winner()
+    {
+        var resolution = new LiveSoloOrderedResolution(1002);
+        for (var sequence = 1; sequence <= 1000; sequence++)
+            resolution.Observe(new(sequence, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Wrong));
+        await Assert.That(resolution.Decision).IsEqualTo(new LiveSoloResolutionDecision(LiveSoloResolution.Waiting, 1000));
+        var first = new LiveSoloOrderedResult(1001, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Correct);
+        resolution.Observe(first);
+        resolution.Observe(new(1002, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Correct));
+        await Assert.That(resolution.Decision).IsEqualTo(new LiveSoloResolutionDecision(
+            LiveSoloResolution.Winner, 1001, first.TeamId, first.GameplayFactId));
+        var empty = new LiveSoloOrderedResolution(0);
+        await Assert.That(empty.Decision).IsEqualTo(new LiveSoloResolutionDecision(LiveSoloResolution.NoWinner, 0));
+    }
+
+    [Test]
     public async Task An_earlier_pending_or_failed_dependency_prevents_a_later_correct_flag_stealing_the_round()
     {
         var later = new LiveSoloOrderedResult(2, Guid.NewGuid(), Guid.NewGuid(), GameplayFactState.Completed, GameplayFactResult.Correct);
