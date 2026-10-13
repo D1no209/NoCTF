@@ -40,7 +40,7 @@ Docker 直接发布题目服务，随机 host port；Kubernetes 为公开入口�
 | --- | --- | --- |
 | CTF Flag 题 | 通常 PerTeam，静态或 PerTeam Flag | 按题目需要，不把无 Checker 当作错误 |
 | CTF Patch 验证 | 单服务，不注入 Flag | 内部端口、Patch 和 Checker |
-| AWD | 每队目标、轮换 Flag | Checker targetServiceName 和注入 serviceName 必须存在 |
+| AWD | 每队目标、轮换 Flag | Checker 与各 Flag Store 的目标命名服务必须存在 |
 | AWDP | 单服务目标、每队 Flag | Break、独立 Fix、Patch 和 Checker |
 | KoH | 共享 Hill | 独立 Control URL，返回精确队伍 Flag |
 
@@ -50,7 +50,9 @@ Checker 镜像、命令、目标服务、超时、就绪等待和修复包入口
 
 Fix 上传上限和 archive 展开上限不同：压缩文件可能小但展开很大。平台拒绝路径穿越、链接、特殊文件、冲突条目和超过展开预算的包。资源耗尽或存储故障应与修复失败区分。
 
-AWD 注入命令需要正确引用生成 Flag，占位和转义以当前编辑器/Starter Kit 为准。Checker 使用受保护内部回调，不在题面公开内部 JWT 或回调 secret。
+AWD 每个 Store 选择业务 Checker 写入或 Runner 命令注入，必须保留接收/历史窗口需要的数据。Runner 命令使用双引号引用 `${FLAG}`、`${FLAG_ID}`、`${STORE_ID}`；按 StoreId/FlagId 分开保存，不能每轮覆盖唯一文件。
+
+AWD Checker 使用 `NOCTF_AWD_TASK_URL` 领取本次尝试的 Flag 清单，以 `NOCTF_AWD_TARGETS` 选择命名服务；材料不放入环境变量。逐项回调连接、功能、Flag 写入/读取、稳定原因和观察时间。写入失败仍读取历史；遗漏、平台异常和超时不能报告健康。最终 `Ok/Mumble/Offline/Recovering/InternalError` 由服务端分类，攻击成果独立显示。可运行实现见 [AWD Starter Kit](../../specs/challenge-authoring-templates/starter-kits/awd/README.md)，完整合约见 [制作规范](../../specs/challenge-authoring-awd-awdp.md)。内部 JWT、Flag 和私有读取凭据不得公开或写日志。
 
 ## 网络与隔离边界
 

@@ -1,31 +1,59 @@
+"""Deliberately vulnerable storage example; replace its business logic for a real challenge."""
+import os
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-
-FLAG_PATH = Path("/dev/shm/flag")
-FLAG_PATH.write_text("awaiting-first-round", encoding="utf-8")
+ROOT = Path(os.environ.get("FLAG_ROOT", "/dev/shm/flags"))
+ROOT.mkdir(parents=True, exist_ok=True)
 
 
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
+    def flag_path(self):
+        parts = self.path.split("/")
+        if len(parts) != 4 or parts[1] != "flags":
+            return None
+        try:
+            return ROOT / uuid.UUID(parts[2]).hex / uuid.UUID(parts[3]).hex
+        except ValueError:
+            return None
+
+    def do_PUT(self):
+        path = self.flag_path()
+        if path is None:
+            self.respond(404, b"not found")
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if not 0 < length <= 8192:
+            self.respond(400, b"invalid length")
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(self.rfile.read(length))
+        self.respond(204, b"")
+
+    def do_GET(self):
         if self.path == "/health":
-            self.respond(200, "ok")
+            self.respond(200, b"ok")
             return
-        if self.path == "/flag":
-            self.respond(200, FLAG_PATH.read_text(encoding="utf-8"))
+        path = self.flag_path()
+        if path is not None and path.is_file():
+            self.respond(200, path.read_bytes())
             return
-        self.respond(404, "not found")
+        self.respond(404, b"not found")
 
-    def respond(self, status: int, body: str) -> None:
-        encoded = body.encode("utf-8")
+    def respond(self, status, body):
         self.send_response(status)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(encoded)
+        self.wfile.write(body)
 
-    def log_message(self, format: str, *args: object) -> None:
-        return
+    def log_message(self, format, *args):
+        pass
 
 
-ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+if __name__ == "__main__":
+    ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
