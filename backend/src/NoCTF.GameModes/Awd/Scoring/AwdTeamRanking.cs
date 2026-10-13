@@ -15,6 +15,12 @@ public static class AwdTeamRanking
         var rules = input.AwdTieBreakers ?? AwdTieBreakPolicy.Resolve(
             (input.CompetitionConfiguration as AwdCompetitionModeConfiguration)?.TieBreakers
                 .OrderBy(item => item.Position).Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)) ?? []);
+        return Order(teams, rules, values);
+    }
+
+    public static IOrderedEnumerable<T> Order<T>(IEnumerable<T> teams,
+        IReadOnlyList<AwdTieBreakCriterion> rules, Func<T, AwdRankingValues> values)
+    {
         var ordered = teams.OrderByDescending(team => values(team).TotalScore);
         foreach (var rule in rules)
         {

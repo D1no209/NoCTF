@@ -5,6 +5,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Awd.Scoring;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -33,8 +34,11 @@ internal static class AwdSettledRankingReader
         var settled = scores.Where(x => x.RoundNumber < firstUnsettled).ToArray();
         if (settled.Length == 0) return new Dictionary<Guid, int>();
         var lastRound = settled.Max(x => x.RoundNumber);
-        var cutoff = await db.AwdRounds.Where(x => x.CompetitionId == competition.Id && x.Number == lastRound)
-            .Select(x => x.EndsAt).SingleAsync(ct);
+        var settledRound = await db.AwdRounds.AsNoTracking()
+            .SingleAsync(x => x.CompetitionId == competition.Id && x.Number == lastRound, ct);
+        var cutoff = settledRound.EndsAt;
+        var tieBreaks = AwdTieBreakPolicy.Resolve(settledRound.TieBreakers.OrderBy(item => item.Position)
+            .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)));
         var manuals = await db.GameplayFacts.AsNoTracking().Where(x => x.CompetitionId == competition.Id
             && x.Kind == GameplayFactKind.ManualAdjustment && x.Result == GameplayFactResult.Applied
             && x.OccurredAt < cutoff && x.TeamId != null).Select(x => new { TeamId = x.TeamId!.Value, x.Value }).ToArrayAsync(ct);
@@ -43,7 +47,7 @@ internal static class AwdSettledRankingReader
         var floor = await db.AwdRoundRules.Where(x => x.CompetitionId == competition.Id && x.EffectiveAt < cutoff)
             .OrderByDescending(x => x.EffectiveAt).Select(x => x.Options.MinimumTotalScore).FirstOrDefaultAsync(ct);
         var byTeam = teams.ToDictionary(x => x.Id);
-        var ranked = AwdScoreProjectionReader.Aggregate(settled).GroupBy(x => x.TeamId).Select(group =>
+        var totals = AwdScoreProjectionReader.Aggregate(settled).GroupBy(x => x.TeamId).Select(group =>
         {
             var score = checked(group.Sum(x => x.Score) + manuals.Where(x => x.TeamId == group.Key).Sum(x =>
                 (long)int.Parse(x.Value!, System.Globalization.CultureInfo.InvariantCulture)));
@@ -58,9 +62,9 @@ internal static class AwdSettledRankingReader
             return new { Team = group.Key, Score = floor is { } minimum ? Math.Max(minimum, score) : score,
                 Attack = attack, Healthy = group.Sum(x => x.UpRoundCount), Captures = group.Sum(x => x.AttackCount),
                 Last = group.Max(x => x.LastAttackAt), byTeam[group.Key].RegisteredAt };
-        }).OrderByDescending(x => x.Score).ThenByDescending(x => x.Attack).ThenByDescending(x => x.Healthy)
-            .ThenByDescending(x => x.Captures).ThenBy(x => x.Last ?? DateTimeOffset.MaxValue)
-            .ThenBy(x => x.RegisteredAt).ThenBy(x => x.Team).ToArray();
+        });
+        var ranked = AwdTeamRanking.Order(totals, tieBreaks, value => new(value.Team, value.Score,
+            value.Attack, value.Healthy, value.Captures, value.Last, value.RegisteredAt)).ToArray();
         return ranked.Select((value, index) => (value.Team, Rank: index + 1)).ToDictionary(x => x.Team, x => x.Rank);
     }
 }
