@@ -15,6 +15,9 @@ namespace NoCTF.API.Endpoints.Competitions;
 public enum SpectatorHealthProtocol { Unknown, Healthy, Down }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<SpectatorChangeProtocol>))]
 public enum SpectatorChangeProtocol { Attack, Control, Uncontrolled, DetectionFailed }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SpectatorConflictCode>))]
+public enum SpectatorConflictCode { CursorExpired }
+public sealed record SpectatorConflictResponse(SpectatorConflictCode Code, string Message);
 
 public sealed record SpectatorServiceResponse(Guid TeamId, Guid ChallengeId,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdHealth>))] AwdHealth? Health,
@@ -54,7 +57,7 @@ public sealed class GetAwdSpectatorValidator : Validator<GetAwdSpectatorRequest>
 }
 
 public sealed class GetAwdSpectatorEndpoint(GetSpectatorScreen query)
-    : Endpoint<GetAwdSpectatorRequest, Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>>
+    : Endpoint<GetAwdSpectatorRequest, Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict<SpectatorConflictResponse>>>
 {
     public override void Configure()
     {
@@ -63,17 +66,19 @@ public sealed class GetAwdSpectatorEndpoint(GetSpectatorScreen query)
         Summary(s => s.Summary = "Read a public-only, consistent AWD broadcast snapshot and bounded history.");
     }
 
-    public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict<SpectatorConflictResponse>>> ExecuteAsync(
         GetAwdSpectatorRequest request, CancellationToken ct) => SpectatorProtocol.Map(await query.ExecuteAsync(
             Route<Guid>("competitionId"), GameMode.Awd, request.Minutes, request.Cursor, ct, request.Limit));
 }
 
 internal static class SpectatorProtocol
 {
-    public static Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict> Map(SpectatorReadResult result)
+    public static Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict<SpectatorConflictResponse>> Map(SpectatorReadResult result)
     {
         if (result.State == SpectatorReadState.NotFound) return TypedResults.NotFound();
-        if (result.State == SpectatorReadState.CursorExpired) return TypedResults.Conflict();
+        if (result.State == SpectatorReadState.CursorExpired)
+            return TypedResults.Conflict(new SpectatorConflictResponse(SpectatorConflictCode.CursorExpired,
+                ApiMessages.Text(ApiMessageId.InvalidCursor)));
         if (result.Screen is not { } x) return TypedResults.Accepted((string?)null);
         var f = x.Frame;
         return TypedResults.Ok(new SpectatorScreenResponse(x.Version.ToString(CultureInfo.InvariantCulture), x.DataAsOf, x.ServerTime,

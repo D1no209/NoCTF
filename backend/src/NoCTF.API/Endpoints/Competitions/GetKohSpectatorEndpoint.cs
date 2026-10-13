@@ -23,7 +23,7 @@ public sealed class GetKohSpectatorValidator : Validator<GetKohSpectatorRequest>
     }
 }
 public sealed class GetKohSpectatorEndpoint(GetSpectatorScreen query)
-    : Endpoint<GetKohSpectatorRequest, Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>>
+    : Endpoint<GetKohSpectatorRequest, Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict<SpectatorConflictResponse>>>
 {
     public override void Configure()
     {
@@ -31,7 +31,7 @@ public sealed class GetKohSpectatorEndpoint(GetSpectatorScreen query)
         AllowAnonymous();
         Summary(s => s.Summary = "Read a public-only KoH control field and bounded confirmation history.");
     }
-    public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict<SpectatorConflictResponse>>> ExecuteAsync(
         GetKohSpectatorRequest request, CancellationToken ct) => SpectatorProtocol.Map(await query.ExecuteAsync(
             Route<Guid>("competitionId"), GameMode.Koh, request.Minutes, request.Cursor, ct, request.Limit));
 }

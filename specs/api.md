@@ -791,7 +791,6 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions
 GET /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/question-groups
-POST /api/v1/competitions/{competitionId}/live-solo/templates/copies
 GET /api/v1/competitions/{competitionId}/live-solo/bracket
 POST /api/v1/competitions/{competitionId}/live-solo/bracket
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments
@@ -832,3 +831,38 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 - 正确而不计分返回 `RightButDue`。`timeEligibility=Valid` 时算完成及闯关，正式解题人数和血榜不受益；`NotOpened` 或 `SubmissionClosed` 表示历史记录按最新时间无效，不计分、不算完成、不占有效次数。错误记录仍保留 `Wrong`。
 - 首次受理、迟到评测与历史回算都比较原 `OccurredAt` 和最新配置。回算不运行 Checker，不新增尝试，也不冻结旧时间规则。队伍提示费用和人工调分不受计分结束时间影响。
 - 开放任务在暂停时挂起，恢复补执行；重启后从关系数据重建。LiveSolo 不使用这些字段控制 Round。
+
+## AWD 判定、规则与公开观战
+
+```text
+GET /api/internal/v1/awd/check-task
+GET /api/v1/admin/competitions/{competitionId}/awd/checks
+GET /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}
+GET /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules
+GET /api/v1/competitions/{competitionId}/awd-spectator
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules
+GET /api/v1/competitions/{competitionId}/koh-spectator
+POST /api/v1/admin/competitions/{competitionId}/awd/checks/{gameplayFactId}/adjudication
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview
+```
+
+## LiveSolo 当前工作区与题库扩展
+
+```text
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/workspace
+GET /api/v1/competitions/{competitionId}/live-solo/question-pool
+PATCH /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}
+POST /api/v1/admin/challenges/live-solo/copies
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}/browser-download
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/deploy
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments
+POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank
+```

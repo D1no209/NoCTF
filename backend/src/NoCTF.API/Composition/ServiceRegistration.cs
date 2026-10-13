@@ -249,7 +249,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsGameplayFactStateRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsLeaderboardRefreshRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
+            services.AddHostedService<NoCTF.API.Hosting.NatsCompetitionEventRefreshRelay>();
             services.AddHostedService<NatsNotificationChangeRelay>();
             services.AddHostedService<NatsMfaAuthenticationRelay>();
         }

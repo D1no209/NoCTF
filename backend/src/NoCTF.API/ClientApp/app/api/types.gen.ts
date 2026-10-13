@@ -2412,6 +2412,13 @@ export type NoCtfApplicationScoringLeaderboardSpectatorSettlement = {
     other?: number;
 };
 
+export type NoCtfapiEndpointsCompetitionsSpectatorConflictResponse = {
+    code?: NoCtfapiEndpointsCompetitionsSpectatorConflictCode;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorConflictCode = 'CursorExpired';
+
 export type NoCtfapiEndpointsCompetitionsGetAwdSpectatorRequest = {
     [key: string]: never;
 };
@@ -10652,7 +10659,7 @@ export type GetAwdSpectatorEndpointErrors = {
      * Not Found
      */
     404: unknown;
-    409: unknown;
+    409: NoCtfapiEndpointsCompetitionsSpectatorConflictResponse;
 };
 
 export type GetAwdSpectatorEndpointError = GetAwdSpectatorEndpointErrors[keyof GetAwdSpectatorEndpointErrors];
@@ -10750,7 +10757,7 @@ export type GetKohSpectatorEndpointErrors = {
      * Not Found
      */
     404: unknown;
-    409: unknown;
+    409: NoCtfapiEndpointsCompetitionsSpectatorConflictResponse;
 };
 
 export type GetKohSpectatorEndpointError = GetKohSpectatorEndpointErrors[keyof GetKohSpectatorEndpointErrors];
