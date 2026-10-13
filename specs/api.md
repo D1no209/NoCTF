@@ -256,6 +256,7 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/ru
 PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 DELETE /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets
+GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets/{teamId}/attack-info
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state
 ```
 
@@ -271,6 +272,8 @@ CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期
 `awdp-state` 仅用于 AWDP schema v4 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最近一次防御 Target 的 TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
 
 `targets` 只用于 AWD：加固期只返回本队 TeamId/Name/Running urls；加固期结束后返回所有 Approved、未 Ban、未删除队伍的 TeamId/Name 与其 Running `Exposure=Participants` urls，未 Running 的目标保留 Team 条目但 urls 为空。本队仍可从 Runtime GET 取得 OwnerOnly urls。排序 Team.RegisteredAt/TeamId。targets 永不返回 Flag、服务状态、Provider receipt 或内部地址；其他模式返回 404。
+
+`targets/{teamId}/attack-info` 要求已登录且具备本比赛选手题目读取权限和合格队伍，按 `offset/limit/total` 分页返回指定合格目标队伍的公开定位信息。加固期仅能读本队，未发布/已删除题目不可读。仅返回已发行、未撤销、未过期且有 PublicLocator 的条目，包含 FlagId、生成轮次、Store、序号、发行时刻和有效窗口；不包含 Flag、私有读取上下文或 Checker 诊断。暂停与轮间间隔不消耗剩余活跃时间，接收尾窗结束后返回空集合。响应使用 `private,no-store`。
 
 ## Admin Competition
 
