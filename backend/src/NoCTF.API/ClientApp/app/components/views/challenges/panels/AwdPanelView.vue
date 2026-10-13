@@ -64,6 +64,7 @@ const { emit, targets, attackTarget, openAttackInfo, closeAttackInfo, AwdAttackI
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple
+      completion="Repeatable"
       :title="$t('challenges.label.batchSubmitFlag')"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
