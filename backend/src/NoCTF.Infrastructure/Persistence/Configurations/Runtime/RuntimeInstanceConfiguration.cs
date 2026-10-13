@@ -39,6 +39,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             allocations.ToTable("runtime_capacity_allocations");
             allocations.WithOwner().HasForeignKey("runtime_instance_id");
             allocations.HasKey(entry => entry.Id);
+            allocations.HasIndex(entry => entry.ResourceDomain);
             allocations.HasIndex(entry => new
             {
                 entry.WorkloadKind,

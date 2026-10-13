@@ -19,6 +19,10 @@ internal sealed class ProjectionReadMetrics : DbCommandInterceptor
 
     private DbDataReader Observe(DbCommand command, DbDataReader reader)
     {
+        // Npgsql's modification batch consumes provider-specific reader metadata for
+        // INSERT/UPDATE/DELETE ... RETURNING. Preserve its native reader on write paths.
+        if (!command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            return reader;
         var measurement = new ProjectionReadCommand(command.CommandText, reader.FieldCount);
         Commands.Add(measurement);
         return new CountingReader(reader, measurement);

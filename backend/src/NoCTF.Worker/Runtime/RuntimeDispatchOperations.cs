@@ -37,6 +37,7 @@ using NoCTF.Domain.Shared;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Application.Observability;
 using System.Diagnostics;
+using NoCTF.Infrastructure.Runtime.Capacity;
 
 namespace NoCTF.Worker;
 
@@ -54,8 +55,10 @@ internal static partial class BackendMessageOperations
         ICompetitionEventRecorder? events = null,
         RuntimeResourceBudgetPolicy? budgets = null)
     {
-        for (var attempt = 0; attempt < 3; attempt++)
+        var ownsTransaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null;
+        for (var attempt = 0; attempt < RunnerCapacityTransactionRetry.MaximumAttempts; attempt++)
         {
+            var committed = false;
             try
             {
                 await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
@@ -68,6 +71,7 @@ internal static partial class BackendMessageOperations
                 {
                     var commitStarted = Stopwatch.GetTimestamp();
                     await transaction.CommitAsync(cancellationToken);
+                    committed = true;
                     NoCtfTelemetry.RecordRuntimeDispatchStage(
                         RuntimeDispatchPerformanceStage.TransactionCommit,
                         Stopwatch.GetElapsedTime(commitStarted).TotalSeconds);
@@ -85,13 +89,21 @@ internal static partial class BackendMessageOperations
                 }
                 return;
             }
-            catch (Exception exception) when (attempt < 2
+            catch (Exception exception) when (ownsTransaction && !committed
+                && RunnerCapacityTransactionRetry.CanRetry(attempt)
                 && TransactionFailureClassifier.IsRetryable(exception))
             {
                 outbox.DiscardPendingMessages();
                 db.ChangeTracker.Clear();
-                await Task.Delay(TimeSpan.FromMilliseconds(
-                    Random.Shared.Next(25, 76) * (attempt + 1)), cancellationToken);
+                NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(RunnerCapacityTransactionOperation.Claim);
+                await RunnerCapacityTransactionRetry.DelayAsync(attempt, cancellationToken);
+            }
+            catch (Exception exception) when (ownsTransaction && !committed
+                && TransactionFailureClassifier.IsRetryable(exception))
+            {
+                outbox.DiscardPendingMessages();
+                NoCtfTelemetry.RecordRunnerCapacityTransactionExhaustion(RunnerCapacityTransactionOperation.Claim);
+                throw;
             }
         }
         throw new InvalidOperationException("Runtime dispatch retry loop did not complete.");
