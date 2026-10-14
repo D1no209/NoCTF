@@ -91,6 +91,26 @@ spec:
   hostnames:
   - noctf.invalid
   rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /hubs
+    timeouts:
+      request: 0s
+    sessionPersistence:
+      sessionName: noctf-hub-affinity
+      type: Cookie
+      cookieConfig:
+        lifetimeType: Session
+    backendRefs:
+    - name: backend-service
+      port: 8080
+    filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        set:
+        - name: X-Forwarded-Host
+          value: '%REQ(:AUTHORITY)%'
   - timeouts:
       request: 0s
     backendRefs:

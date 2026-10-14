@@ -1,11 +1,15 @@
+using System.Data.Common;
 using NSubstitute;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.Mfa;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Authentication.Mfa;
 using NoCTF.Infrastructure.Persistence;
@@ -19,6 +23,144 @@ namespace NoCTF.Tests.Integration.Authentication;
 [NotInParallel]
 public sealed class MfaPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public Task Context_validation_reads_only_authoritative_authentication_fields_with_bounded_queries(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = Container(); await postgres.StartAsync(ct); var options = Options(postgres);
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-07T00:00:00Z"));
+        var userId = Guid.NewGuid(); var primaryId = Guid.NewGuid(); var credentialId = Guid.NewGuid();
+        await using (var seed = new NoCtfDbContext(options))
+        {
+            await seed.Database.MigrateAsync(ct);
+            var primary = User(primaryId, UserKind.Human); primary.Role = UserRole.User;
+            seed.Users.AddRange(User(userId, UserKind.Human), primary);
+            seed.UserTotpCredentials.Add(new() { Id = credentialId, UserId = userId, SecretCiphertext = [1, 2, 3], EnabledAt = clock.GetUtcNow(), RecoveryBatchId = Guid.NewGuid() });
+            var settings = await seed.PlatformSettings.SingleAsync(ct); settings.MfaPolicy = MfaPolicy.Optional;
+            await seed.SaveChangesAsync(ct);
+        }
+        var commands = new AuthenticationQueryRecorder();
+        await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(options).AddInterceptors(commands).Options);
+        var store = new MfaAuthenticationStore(db, new MfaCryptography(), Protector(), clock);
+        var local = new AuthenticationContext(AuthenticationMethod.Password, clock.GetUtcNow(), MfaSource.Totp, clock.GetUtcNow(), credentialId);
+        await Assert.That(await store.ValidateContextAsync(userId, 0, local, ct)).IsNull();
+        await Assert.That(commands.Commands.Count).IsEqualTo(1);
+        commands.Commands.Clear();
+        await Assert.That(await store.ValidateContextAsync(primaryId, 0, new(AuthenticationMethod.Password, clock.GetUtcNow()), ct)).IsNull();
+        await Assert.That(commands.Commands.Count).IsEqualTo(2);
+        commands.Commands.Clear();
+        var batch = await store.ValidateContextsAsync([new("totp", userId, 0, local), new("recovery", userId, 0, local with { MfaSource = MfaSource.RecoveryCode })], ct);
+        await Assert.That(batch.Values.All(value => value is null)).IsTrue();
+        await Assert.That(commands.Commands.Count).IsEqualTo(2);
+        await Assert.That(commands.Commands.Any(command => command.Contains("recovery_codes", StringComparison.OrdinalIgnoreCase)
+            || command.Contains("secret_ciphertext", StringComparison.OrdinalIgnoreCase)
+            || command.Contains("password_hash", StringComparison.OrdinalIgnoreCase)
+            || command.Contains("email_smtp", StringComparison.OrdinalIgnoreCase))).IsFalse();
+        await Assert.That(db.ChangeTracker.Entries().Count()).IsEqualTo(0);
+    });
+
+    [Test, Timeout(300_000)]
+    public Task Individual_and_batch_context_validation_preserve_policy_privileges_and_revocation(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = Container(); await postgres.StartAsync(ct); var options = Options(postgres);
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-07T00:00:00Z"));
+        await using var db = new NoCtfDbContext(options); await db.Database.MigrateAsync(ct);
+        var ordinary = User(Guid.NewGuid(), UserKind.Human); ordinary.Role = UserRole.User;
+        var owner = User(Guid.NewGuid(), UserKind.Human); owner.Role = UserRole.User;
+        var manager = User(Guid.NewGuid(), UserKind.Human); manager.Role = UserRole.User;
+        var judge = User(Guid.NewGuid(), UserKind.Human); judge.Role = UserRole.User;
+        var observer = User(Guid.NewGuid(), UserKind.Human); observer.Role = UserRole.User;
+        var administrator = User(Guid.NewGuid(), UserKind.Human);
+        var organizer = User(Guid.NewGuid(), UserKind.Human); organizer.Role = UserRole.Organizer;
+        var mandated = User(Guid.NewGuid(), UserKind.Human); mandated.Role = UserRole.User; mandated.MfaRequired = true;
+        var enrolled = User(Guid.NewGuid(), UserKind.Human); enrolled.Role = UserRole.User;
+        var disabled = User(Guid.NewGuid(), UserKind.Human); disabled.AccountStatus = UserAccountStatus.Disabled;
+        var bot = User(Guid.NewGuid(), UserKind.Bot);
+        db.Users.AddRange(ordinary, owner, manager, judge, observer, administrator, organizer, mandated, enrolled, disabled, bot);
+        var competition = new CtfCompetition { Id = Guid.NewGuid(), Title = "Authentication privileges", NormalizedTitle = "AUTHENTICATION PRIVILEGES", OwnerId = owner.Id,
+            ManagerIds = [manager.Id], JudgeIds = [judge.Id], ObserverIds = [observer.Id], ModeConfiguration = new CtfCompetitionModeConfiguration(),
+            StartAt = clock.GetUtcNow(), EndAt = clock.GetUtcNow().AddHours(1) };
+        db.Competitions.Add(competition);
+        var credential = new UserTotpCredential { Id = Guid.NewGuid(), UserId = enrolled.Id, SecretCiphertext = [1, 2, 3], EnabledAt = clock.GetUtcNow(), RecoveryBatchId = Guid.NewGuid() };
+        db.UserTotpCredentials.Add(credential);
+        var settings = await db.PlatformSettings.SingleAsync(ct); settings.MfaPolicy = MfaPolicy.Optional;
+        await db.SaveChangesAsync(ct);
+        var store = new MfaAuthenticationStore(db, new MfaCryptography(), Protector(), clock);
+        var primary = new AuthenticationContext(AuthenticationMethod.Password, clock.GetUtcNow());
+        var local = primary with { MfaSource = MfaSource.Totp, MfaAuthenticatedAt = clock.GetUtcNow(), CredentialId = credential.Id };
+        await CheckAsync((ordinary.Id, primary, null), (administrator.Id, primary, null), (mandated.Id, primary, MfaFailure.NotEnrolled),
+            (enrolled.Id, primary, MfaFailure.LocalMfaRequired), (enrolled.Id, local, null), (bot.Id, null, null),
+            (disabled.Id, primary, MfaFailure.AccountUnavailable), (Guid.NewGuid(), primary, MfaFailure.AccountUnavailable),
+            (ordinary.Id, null, MfaFailure.PrimaryAuthenticationRequired),
+            (ordinary.Id, primary with { Method = AuthenticationMethod.Bot }, MfaFailure.PrimaryAuthenticationRequired),
+            (ordinary.Id, primary with { AuthenticatedAt = clock.GetUtcNow().AddSeconds(31) }, MfaFailure.PrimaryAuthenticationRequired),
+            (enrolled.Id, local with { CredentialId = Guid.NewGuid() }, MfaFailure.PrimaryAuthenticationRequired),
+            (enrolled.Id, local with { MfaAuthenticatedAt = clock.GetUtcNow().AddDays(-30) }, MfaFailure.PrimaryAuthenticationRequired),
+            (enrolled.Id, local with { MfaAuthenticatedAt = clock.GetUtcNow().AddSeconds(31) }, MfaFailure.PrimaryAuthenticationRequired));
+        settings.MfaPolicy = MfaPolicy.RequirePrivileged; await db.SaveChangesAsync(ct);
+        await CheckAsync((ordinary.Id, primary, null), (observer.Id, primary, null), (owner.Id, primary, MfaFailure.NotEnrolled),
+            (manager.Id, primary, MfaFailure.NotEnrolled), (judge.Id, primary, MfaFailure.NotEnrolled),
+            (administrator.Id, primary, MfaFailure.NotEnrolled), (organizer.Id, primary, MfaFailure.NotEnrolled), (bot.Id, null, null));
+        competition.DeletedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct);
+        await CheckAsync((owner.Id, primary, null), (manager.Id, primary, null), (judge.Id, primary, null));
+        settings.MfaPolicy = MfaPolicy.RequireAllHumanUsers; await db.SaveChangesAsync(ct);
+        await CheckAsync((ordinary.Id, primary, MfaFailure.NotEnrolled), (enrolled.Id, local, null), (bot.Id, null, null));
+        db.UserTotpCredentials.Remove(credential); ordinary.TokenVersion++; bot.TokenVersion++; await db.SaveChangesAsync(ct);
+        await CheckAsync((enrolled.Id, local, MfaFailure.PrimaryAuthenticationRequired), (ordinary.Id, primary, MfaFailure.AccountUnavailable), (bot.Id, null, MfaFailure.AccountUnavailable));
+
+        async Task CheckAsync(params (Guid Id, AuthenticationContext? Context, MfaFailure? Failure)[] cases)
+        {
+            var requests = cases.Select((value, index) => new MfaContextValidationRequest(index.ToString(), value.Id, 0, value.Context)).ToArray();
+            var result = await store.ValidateContextsAsync(requests, ct);
+            for (var index = 0; index < cases.Length; index++)
+            {
+                await Assert.That(result[index.ToString()]).IsEqualTo(cases[index].Failure);
+                await Assert.That(await store.ValidateContextAsync(cases[index].Id, 0, cases[index].Context, ct)).IsEqualTo(cases[index].Failure);
+            }
+        }
+    });
+
+    [Test, Timeout(300_000)]
+    public Task Context_validation_rechecks_passkey_ownership_and_oidc_trust_without_cached_authorization(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = Container(); await postgres.StartAsync(ct); var options = Options(postgres);
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-07T00:00:00Z"));
+        await using var db = new NoCtfDbContext(options); await db.Database.MigrateAsync(ct);
+        var user = User(Guid.NewGuid(), UserKind.Human); var other = User(Guid.NewGuid(), UserKind.Human);
+        db.Users.AddRange(user, other);
+        var passkey = new NoCTF.Domain.Identity.Passkeys.UserPasskey { Id = Guid.NewGuid(), UserId = user.Id, CredentialId = [1], PublicKey = [2], Name = "Key", RelyingPartyId = "noctf.test" };
+        db.UserPasskeys.Add(passkey);
+        var provider = new OidcSsoProviderConfiguration { Id = Guid.NewGuid(), Name = "OIDC", Issuer = "https://identity.test", DiscoveryUrl = "https://identity.test/.well-known/openid-configuration", ClientId = "test", Enabled = true, AllowLogin = true, MfaTrustEnabled = true, MfaTrustPolicyId = Guid.NewGuid() };
+        db.Set<OidcSsoProviderConfiguration>().Add(provider);
+        var settings = await db.PlatformSettings.SingleAsync(ct); settings.MfaPolicy = MfaPolicy.Optional; settings.SsoEnabled = true;
+        await db.SaveChangesAsync(ct);
+        var store = new MfaAuthenticationStore(db, new MfaCryptography(), Protector(), clock);
+        var primary = new AuthenticationContext(AuthenticationMethod.Passkey, clock.GetUtcNow(), PrimaryCredentialId: passkey.Id);
+        var oidc = new AuthenticationContext(AuthenticationMethod.Oidc, clock.GetUtcNow(), MfaSource.Oidc, clock.GetUtcNow(), ProviderId: provider.Id, TrustPolicyId: provider.MfaTrustPolicyId);
+        await CheckAsync(user.Id, primary, null); await CheckAsync(other.Id, primary, MfaFailure.PrimaryAuthenticationRequired);
+        await CheckAsync(user.Id, oidc, null);
+        await CheckAsync(user.Id, oidc with { ProviderId = null }, MfaFailure.PrimaryAuthenticationRequired);
+        await CheckAsync(user.Id, oidc with { TrustPolicyId = Guid.Empty }, MfaFailure.PrimaryAuthenticationRequired);
+        settings.SsoEnabled = false; await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, oidc, MfaFailure.PrimaryAuthenticationRequired);
+        settings.SsoEnabled = true; provider.AllowLogin = false; await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, oidc, MfaFailure.PrimaryAuthenticationRequired);
+        provider.AllowLogin = true; provider.Enabled = false; await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, oidc, MfaFailure.PrimaryAuthenticationRequired);
+        provider.Enabled = true; provider.MfaTrustEnabled = false; await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, oidc, MfaFailure.PrimaryAuthenticationRequired);
+        provider.MfaTrustEnabled = true; provider.MfaTrustPolicyId = Guid.NewGuid(); await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, oidc, MfaFailure.PrimaryAuthenticationRequired);
+        db.UserPasskeys.Remove(passkey); await db.SaveChangesAsync(ct);
+        await CheckAsync(user.Id, primary, MfaFailure.PrimaryAuthenticationRequired);
+
+        async Task CheckAsync(Guid id, AuthenticationContext context, MfaFailure? expected)
+        {
+            await Assert.That(await store.ValidateContextAsync(id, 0, context, ct)).IsEqualTo(expected);
+            var batch = await store.ValidateContextsAsync([new("connection", id, 0, context)], ct);
+            await Assert.That(batch["connection"]).IsEqualTo(expected);
+        }
+    });
+
     [Test, Timeout(300_000)]
     public Task Account_enrollment_requires_relogin_and_recovery_code_consumption_is_global(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
@@ -287,6 +429,17 @@ public sealed class MfaPersistenceTests
         await Assert.That(await store.ValidateContextAsync(userId, 0, null, ct)).IsEqualTo(MfaFailure.PrimaryAuthenticationRequired);
         await Assert.That((await store.ReadFlowAsync(blocked, ct)).FailureCode).IsEqualTo(MfaFailure.PolicyChanged);
     });
+
+    private sealed class AuthenticationQueryRecorder : DbCommandInterceptor
+    {
+        public List<string> Commands { get; } = [];
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            Commands.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
 
     private sealed class FailCredentialInsertion : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
     {

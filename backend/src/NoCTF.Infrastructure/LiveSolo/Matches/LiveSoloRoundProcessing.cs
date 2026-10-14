@@ -34,7 +34,9 @@ public sealed partial class LiveSoloMatchStore
             var flags = await db.ChallengeFlags.AsNoTracking().Where(x => x.DeletedAt == null
                 && (directory.Values.Select(d => d.Template.Id).Contains(x.ChallengeId ?? Guid.Empty)
                     || directory.Keys.Contains(x.CompetitionChallengeId ?? Guid.Empty))).ToArrayAsync(ct);
-            var judged = new List<LiveSoloOrderedResult>(); var evaluator = new LiveSoloFlagEvaluator();
+            var resolution = new LiveSoloOrderedResolution(round.LastAdmissionSequence);
+            var priorByQuestion = new Dictionary<Guid, List<GameplayFact>>();
+            var evaluator = new LiveSoloFlagEvaluator();
             foreach (var association in associations)
             {
                 var fact = facts[association.GameplayFactId];
@@ -43,6 +45,8 @@ public sealed partial class LiveSoloMatchStore
                     if (fact.State != GameplayFactState.Completed) { fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.Rejected; fact.FailureCode = GameplayFactFailureCode.RoundOutOfRange; fact.UpdatedAt = now; }
                     continue;
                 }
+                if (!priorByQuestion.TryGetValue(association.RoundQuestionId, out var prior))
+                    priorByQuestion[association.RoundQuestionId] = prior = [];
                 if (fact.State is GameplayFactState.Queued or GameplayFactState.Pending or GameplayFactState.Processing)
                 {
                     var question = round.Questions.Single(x => x.Id == association.RoundQuestionId);
@@ -57,8 +61,7 @@ public sealed partial class LiveSoloMatchStore
                         _ => false
                     }).Where(flag => flag.ChallengeId == challenge.Template.Id || flag.CompetitionChallengeId == challenge.Entry.Id).ToArray();
                     var assignedFlags = LiveSoloAttachmentFlagPolicy.Bind(applicable, assignments, question.Id, challenge.Entry.Id, fact.TeamId!.Value, fact.OccurredAt);
-                    var decision = evaluator.Evaluate(new(fact, associations.Where(a => a.RoundQuestionId == question.Id && a.AdmissionSequence < association.AdmissionSequence)
-                        .Select(a => facts[a.GameplayFactId]).ToArray(), assignedFlags, null, competition.ModeConfiguration!, challenge.Entry.Rules!,
+                    var decision = evaluator.Evaluate(new(fact, prior, assignedFlags, null, competition.ModeConfiguration!, challenge.Entry.Rules!,
                         ChallengeDefinition: challenge.Template.Definition));
                     fact.Result = decision.Result; fact.FailureCode = decision.FailureCode; fact.VictimTeamId = decision.VictimTeamId;
                     fact.State = decision.Result is null ? GameplayFactState.PlatformFailed : GameplayFactState.Completed; fact.UpdatedAt = now;
@@ -73,13 +76,14 @@ public sealed partial class LiveSoloMatchStore
                                 fact.CompetitionChallengeId!.Value, fact.FailureCode!.Value, fact.OccurredAt));
                     }
                 }
-                judged.Add(new(association.AdmissionSequence, fact.Id, fact.TeamId!.Value, fact.State, fact.Result));
-                var outcome = LiveSoloRoundRules.Resolve(round.LastAdmissionSequence, judged);
+                prior.Add(fact);
+                resolution.Observe(new(association.AdmissionSequence, fact.Id, fact.TeamId!.Value, fact.State, fact.Result));
+                var outcome = resolution.Decision;
                 if (outcome.State == LiveSoloResolution.Winner) LiveSoloRoundRules.ApplyWinner(match, round, outcome, now);
             }
             if (round.State != LiveSoloRoundState.Won)
             {
-                var outcome = LiveSoloRoundRules.Resolve(round.LastAdmissionSequence, judged);
+                var outcome = resolution.Decision;
                 round.LastResolvedSequence = outcome.ResolvedThrough;
                 if (LiveSoloRoundRules.TryVoid(round, outcome, now))
                 { match.State = LiveSoloMatchState.Preparing; LiveSoloResults.Confirm(round, match, LiveSoloEndReason.TimeLimit); }

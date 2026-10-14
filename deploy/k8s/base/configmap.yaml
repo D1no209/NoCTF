@@ -77,6 +77,8 @@ data:
   Runtime__RunnerPool: kubernetes
   Worker__Queues__4: webhook
   Worker__Concurrency__Webhook: '32'
+  Worker__Queues__5: livesolo-media
+  Worker__Concurrency__LiveSoloMedia: '4'
   Authentication__RefreshCookieSecure: 'true'
   Authentication__RefreshAllowedOrigins__0: https://noctf.invalid
   Webhooks__PublicBaseUrl: https://noctf.invalid

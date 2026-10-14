@@ -56,6 +56,21 @@ through EF Core in a serializable transaction. Allocation rows retain ownership 
 declared limits. A Running Runtime's reservation is released only after an observation
 at or after `RunningAt` confirms its resource usage was sampled.
 
+Allocation transactions retain the global process-local gate and the single EF
+`runtime_capacity_ledger` concurrency row. Domain-parallel transactions were rejected
+after the isolated Serializable workload showed repeated serialization failures,
+higher client CPU and worse tail latency. Reservation queries still select only the
+needed columns for the selected resource domain, covering every owner including
+pending work left by a previous Runner. The domain index supports this read path.
+
+Claim/release decisions use current database allocation rows rather than a possibly
+stale tracked collection. Writes validate the tracked Runtime's original concurrency
+stamp against the transaction's snapshot; workload identities remain unique. Bounded
+retries restart the complete transaction. Caller-owned transactions retain retry and
+rollback responsibility. Dispatch and release publish committed messages outside
+the transaction retry boundary; a publication failure propagates without replaying
+the committed transaction.
+
 The Worker accepts only schema-3 registrations. A Runner pauses admission, owns the
 execution domain, compares EF allocations with provider resources and republishes
 NATS availability before becoming Ready:

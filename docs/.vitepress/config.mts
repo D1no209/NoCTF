@@ -83,6 +83,10 @@ const groups: DefaultTheme.SidebarItem[] = [
         "link": "/player/challenges"
       },
       {
+        "text": "理论答题",
+        "link": "/player/theory"
+      },
+      {
         "text": "赛制参赛",
         "link": "/player/modes",
         "items": [
@@ -113,6 +117,10 @@ const groups: DefaultTheme.SidebarItem[] = [
               {
                 "text": "场内解题",
                 "link": "/player/modes/live-solo/playing"
+              },
+              {
+                "text": "历史题目与结果回看",
+                "link": "/player/modes/live-solo/review"
               },
               {
                 "text": "延迟观赛",
@@ -162,6 +170,10 @@ const groups: DefaultTheme.SidebarItem[] = [
       {
         "text": "权限、引用与删除",
         "link": "/challenge-bank/permissions-placement"
+      },
+      {
+        "text": "理论题库与授权",
+        "link": "/challenge-bank/theory"
       }
     ]
   },
@@ -218,12 +230,20 @@ const groups: DefaultTheme.SidebarItem[] = [
                 "link": "/competition/modes/live-solo/settings"
               },
               {
+                "text": "本场题目池与模板",
+                "link": "/competition/modes/live-solo/question-pool"
+              },
+              {
                 "text": "题组与备用组",
                 "link": "/competition/modes/live-solo/question-groups"
               },
               {
                 "text": "种子与赛程",
                 "link": "/competition/modes/live-solo/bracket"
+              },
+              {
+                "text": "工作人员对局工作区",
+                "link": "/competition/modes/live-solo/workspace"
               },
               {
                 "text": "裁判操作",
@@ -259,6 +279,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "CTF 闯关与勋章",
             "link": "/competition/content/progression"
+          },
+          {
+            "text": "理论答题与组卷",
+            "link": "/competition/content/theory"
           }
         ]
       },
@@ -297,6 +321,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "题解审核",
             "link": "/competition/judging/writeups"
+          },
+          {
+            "text": "理论答卷与纠错",
+            "link": "/competition/judging/theory"
           }
         ]
       },
@@ -351,6 +379,15 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "赛事导出",
             "link": "/competition/integrations/exports"
+          }
+        ]
+      },
+      {
+        "text": "独立理论活动",
+        "items": [
+          {
+            "text": "个人练习与限时测验",
+            "link": "/competition/activities/theory"
           }
         ]
       }

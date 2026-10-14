@@ -38,25 +38,51 @@
 
 动态用户/队伍/Runtime 详情由所在列表的抽屉承载，也看对应列表章节。比赛大屏和动态、咨询属于 `/competitions/比赛ID/...`，分别见 [动态与大屏](../competition/operations/events-live.md)和 [咨询](../competition/communication/questions.md)。
 
-## LiveSolo 独立工作区
+## LiveSolo 管理与参赛工作区
 
 LiveSolo 的操作不放在普通积分排行榜或旧题目工作区。草稿读取和写入按实际工作人员角色授权，尚未完成的正式验收见 [能力边界](../operations/live-solo-readiness.md)。
 
 | 路由 | 手册 |
 | --- | --- |
-| `/competitions/:id/live-solo` | [导读](../competition/modes/live-solo/index.md) |
-| `/competitions/:id/live-solo/settings` | [操作说明](../competition/modes/live-solo/settings.md) |
-| `/competitions/:id/live-solo/groups` | [操作说明](../competition/modes/live-solo/question-groups.md) |
-| `/competitions/:id/live-solo/groups/:groupId` | [操作说明](../competition/modes/live-solo/question-groups.md) |
-| `/competitions/:id/live-solo/bracket` | [操作说明](../competition/modes/live-solo/bracket.md) |
+| `/admin/competitions/:id/live-solo/bracket` | [操作说明](../competition/modes/live-solo/bracket.md) |
+| `/admin/competitions/:id/live-solo/corrections/:matchId/:correctionId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/admin/competitions/:id/live-solo/corrections/:matchId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/admin/competitions/:id/live-solo/events` | [操作说明](../competition/modes/live-solo/workspace.md) |
+| `/admin/competitions/:id/live-solo/groups/:groupId` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/admin/competitions/:id/live-solo/groups` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/admin/competitions/:id/live-solo` | [操作说明](../competition/modes/live-solo/workspace.md) |
+| `/admin/competitions/:id/live-solo/matches/:matchId/:workspace*` | [操作说明](../competition/modes/live-solo/workspace.md) |
+| `/admin/competitions/:id/live-solo/postgame/:matchId/:roundId/:questionId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/admin/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/admin/competitions/:id/live-solo/question-pool` | [操作说明](../competition/modes/live-solo/question-pool.md) |
+| `/admin/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/admin/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/admin/competitions/:id/live-solo/settings` | [操作说明](../competition/modes/live-solo/settings.md) |
+| `/admin/competitions/:id/live-solo/staff` | [操作说明](../competition/integrations/staff-webhooks.md) |
+| `/admin/competitions/:id/live-solo/writeups` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/competitions/:id/live-solo` | [操作说明](../player/modes/live-solo/index.md) |
 | `/competitions/:id/live-solo/matches/:matchId/:workspace*` | [操作说明](../player/modes/live-solo/preparation.md) |
-| `/competitions/:id/live-solo/program/:matchId` | [操作说明](../player/modes/live-solo/program.md) |
-| `/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../competition/modes/live-solo/recordings.md) |
-| `/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../competition/modes/live-solo/recordings.md) |
-| `/competitions/:id/live-solo/corrections/:matchId` | [操作说明](../competition/modes/live-solo/corrections.md) |
-| `/competitions/:id/live-solo/corrections/:matchId/:correctionId` | [操作说明](../competition/modes/live-solo/corrections.md) |
-| `/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../player/modes/live-solo/postgame.md) |
 | `/competitions/:id/live-solo/postgame/:matchId/:roundId/:questionId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/competitions/:id/live-solo/program/:matchId` | [操作说明](../player/modes/live-solo/program.md) |
+| `/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/writeups` | [操作说明](../player/modes/live-solo/postgame.md) |
+
+## 理论题库与活动入口
+
+| 路由 | 手册 |
+| --- | --- |
+| `/admin/competitions/:id/theory` | [操作说明](../competition/content/theory.md) |
+| `/admin/theory/activities/:activityId` | [操作说明](../competition/activities/theory.md) |
+| `/admin/theory/activities` | [操作说明](../competition/activities/theory.md) |
+| `/admin/theory/activities/new` | [操作说明](../competition/activities/theory.md) |
+| `/admin/theory/questions/:questionId` | [操作说明](../challenge-bank/theory.md) |
+| `/admin/theory/questions` | [操作说明](../challenge-bank/theory.md) |
+| `/admin/theory/questions/new` | [操作说明](../challenge-bank/theory.md) |
+| `/competitions/:id/theory` | [操作说明](../player/theory.md) |
+| `/theory/:activityId` | [操作说明](../player/theory.md) |
+| `/theory` | [操作说明](../player/theory.md) |
 
 ## 页面内操作补充
 

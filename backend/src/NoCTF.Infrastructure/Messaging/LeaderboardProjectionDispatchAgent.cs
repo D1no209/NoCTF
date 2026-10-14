@@ -27,7 +27,7 @@ public sealed class LeaderboardProjectionDispatchAgent(
                 {
                     await using var scope = scopeFactory.CreateAsyncScope();
                     var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-                    await bus.PublishAsync(new ProjectLeaderboard(competitionId));
+                    await bus.PublishAsync(new ProjectLeaderboard(competitionId, LeaderboardRefreshMode.IfMissing));
                     NoCtfTelemetry.RecordLeaderboardMergeDispatch("success");
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

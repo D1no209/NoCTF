@@ -127,9 +127,8 @@ public sealed class CompetitionHubAudienceRouter(
 {
     public async Task<ICompetitionHubClient> AllKnownAsync(Guid competitionId, CancellationToken ct)
     {
-        var eligible = await guard.EligibleAsync(MfaHubKind.Competition, null, ct);
-        var subscribed = subscriptions.Get(competitionId).Select(value => value.ConnectionId).ToHashSet();
-        return new SpectatorInvalidatingClient(hub.Clients.Clients(eligible.Where(subscribed.Contains).ToArray()),
+        var eligible = await EligibleAsync(competitionId, staffOnly: false, ct);
+        return new SpectatorInvalidatingClient(hub.Clients.Clients(eligible),
             spectators.Clients.Group(SpectatorHub.Group(competitionId)));
     }
 
@@ -144,10 +143,19 @@ public sealed class CompetitionHubAudienceRouter(
         {
             CompetitionAccessMode.Public => await AllKnownAsync(competitionId, cancellationToken),
             CompetitionAccessMode.StaffOnly =>
-                hub.Clients.Clients((await guard.EligibleAsync(MfaHubKind.Competition, null, cancellationToken))
-                    .Where(id => subscriptions.Get(competitionId).Any(value => value.ConnectionId == id && value.IsStaff)).ToArray()),
+                hub.Clients.Clients(await EligibleAsync(competitionId, staffOnly: true, cancellationToken)),
             _ => null
         };
+    }
+
+    private async Task<string[]> EligibleAsync(Guid competitionId, bool staffOnly, CancellationToken ct)
+    {
+        var candidates = subscriptions.Get(competitionId)
+            .Where(value => !staffOnly || value.IsStaff)
+            .Select(value => value.ConnectionId).ToArray();
+        var eligible = await guard.EligibleConnectionsAsync(MfaHubKind.Competition, candidates, ct);
+        return eligible.Where(id => subscriptions.TryGet(id, competitionId, out var subscription)
+            && (!staffOnly || subscription.IsStaff)).ToArray();
     }
 }
 

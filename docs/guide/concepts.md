@@ -8,9 +8,9 @@
 
 ## LiveSolo 的 Match 与 Round
 
-LiveSolo 是第五赛制，一场比赛可有多场两队 Match，每场通过多个 Round 累计胜局。名单按 Match 锁定，题目、附件、Runtime、Flag 与受理顺序按 RoundQuestion 作用域隔离。
+LiveSolo 采用对局赛制，一场比赛可有多场两队 Match，每场通过多个 Round 累计胜局。名单按 Match 锁定，题目、附件、Runtime、Flag 与受理顺序按 RoundQuestion 作用域隔离。
 
-它不使用普通题目积分/血奖，胜局由共同受理序号中第一条有效正确 Flag 决定。媒体就绪、延迟节目、录像及纠正属于独立操作，见 [专用手册](../competition/modes/live-solo/index.md)。前四赛制保持各自原有规则。
+它不使用普通题目积分/血奖，胜局由共同受理序号中第一条有效正确 Flag 决定。开启平台直播时才需要媒体就绪、延迟节目和可选录像；结果纠正使用对局流程，见 [专用手册](../competition/modes/live-solo/index.md)。前四赛制保持各自原有规则。
 
 ## 题库模板与比赛题目
 
@@ -20,6 +20,14 @@ LiveSolo 是第五赛制，一场比赛可有多场两队 Match，每场通过�
 | 比赛题目 `CompetitionChallenge` | 展示名称、排序、发布、计分规则、提示 | 当前比赛 |
 
 先在题库创建模板，再在比赛中引用。模板的模式必须与比赛一致。比赛中修改展示名称不会修改题库标题；修改模板题面会被引用方读取，修改 Runtime 定义则在后续启动或重置时使用，已有运行环境不会自动替换。
+
+LiveSolo 还可以直接创建本场材料，排除在全局题库之外。投放的全局模板在首次实际内容编辑前保持引用，编辑时脱离并保留本场实例 ID；已开放历史题目使用开放时快照。详见 [本场题目池](../competition/modes/live-solo/question-pool.md)。
+
+## 理论题目、活动与试卷
+
+理论题目有独立版本、答案键与使用授权，不是实践 Challenge。活动定义组卷、时间、次数和计分，发布时冻结候选；每次开卷生成真实试卷。独立活动按个人作答，CTF/AWD/AWDP 的比赛活动按队共享试卷。
+
+理论整卷交卷产生关联实际 TheoryPaperId 的成绩事实，不使用空 ID 或虚构实践题。理论分独立进入比赛总榜，保存某道题的选择不产生正式成绩。详见 [理论答题](../player/theory.md)。
 
 ## Runtime、Checker 与 Flag
 

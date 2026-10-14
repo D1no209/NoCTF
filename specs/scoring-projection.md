@@ -21,8 +21,8 @@
 
 1. 立即删除该比赛的 FusionCache/Redis 榜单键；
 2. 把 CompetitionId 加入接收该 JetStream 事件的 Worker 进程内合并集合；
-3. 固定等待 500 ms，同一进程窗口只派发一次 durable 全量投影消息；
-4. Handler 从 PostgreSQL 计算完整不可变响应；
+3. 固定等待 500 ms，同一进程窗口只派发一次 durable `IfMissing` 全量投影消息；
+4. Handler 在共享计算租约内复查失效状态，仍缺失时从 PostgreSQL 计算完整不可变响应；
 5. 成功后原子替换缓存，再发布强类型 SignalR 刷新通知；
 6. 失败时保持 cache miss 并按 durable 消息策略重试。
 
@@ -32,8 +32,11 @@
 
 ## Cache miss
 
-同一 API 实例使用进程内 keyed lock 合并相同 CompetitionId 的并发 miss。多个 API 实例允许同时做
-等价全量投影；只有完整结果可替换缓存。缓存仍使用命名 `leaderboards` FusionCache，稳定键为：
+同一 API 实例使用进程内 keyed lock 合并相同 CompetitionId 的并发 miss。多个 API/Worker 实例使用
+NATS KV 中按比赛划分的短期计算租约，并每 10 秒续约；等待者取得租约后复查缓存，复用已经完成且
+未失效的完整结果。丢失租约会取消计算并产生可重试失败；发布前再次确认租约，已有发布 fence 仍
+负责阻止旧结果覆盖新结果。不同比赛独立重建。显式 `RefreshAsync` 和默认 `Force` 消息总是重新
+计算，保留事实恢复等未预先失效路径的语义。缓存仍使用命名 `leaderboards` FusionCache，稳定键为：
 
 ```text
 leaderboard:{competitionId:N}

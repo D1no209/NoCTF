@@ -25,6 +25,16 @@ public sealed class MfaConnectionGuard(IMfaConnectionContextValidator validator,
         var candidates = connections.Values.Where(value => value.Kind == kind && (users is null || Guid.TryParse(value.Context.UserIdentifier, out var id) && users.Contains(id))).ToArray();
         return await ValidateAsync(candidates, ct);
     }
+    public Task<string[]> EligibleConnectionsAsync(MfaHubKind kind, IReadOnlyCollection<string> connectionIds, CancellationToken ct)
+    {
+        var candidates = new List<Connection>(connectionIds.Count);
+        foreach (var id in connectionIds)
+            if (connections.TryGetValue(id, out var connection) && connection.Kind == kind)
+                candidates.Add(connection);
+        return ValidateAsync(candidates, ct);
+    }
+    public Task RevalidateAsync(string connectionId, CancellationToken ct) =>
+        ValidateAsync(connections.TryGetValue(connectionId, out var connection) ? [connection] : [], ct);
     public Task RevalidateAsync(CancellationToken ct) => ValidateAsync(connections.Values.ToArray(), ct);
     private async Task<string[]> ValidateAsync(IReadOnlyList<Connection> candidates, CancellationToken ct)
     {
@@ -34,20 +44,26 @@ public sealed class MfaConnectionGuard(IMfaConnectionContextValidator validator,
             var principal = candidate.Context.User;
             if (principal is null || !Guid.TryParse(candidate.Context.UserIdentifier, out var id) || !int.TryParse(principal.FindFirstValue("token_version"), out var version)
                 || !long.TryParse(principal.FindFirstValue("exp"), out var expires) || expires <= clock.GetUtcNow().ToUnixTimeSeconds())
-            { candidate.Context.Abort(); Remove(candidate.Context.ConnectionId); continue; }
+            { Abort(candidate); continue; }
             requests.Add(new(candidate.Context.ConnectionId, id, version, AuthenticationContextClaims.Read(principal)));
         }
+        if (requests.Count == 0) return [];
         IReadOnlyDictionary<string, MfaFailure?> decisions;
         try { decisions = await validator.ValidateAsync(requests, ct); }
-        catch (Exception) when (!ct.IsCancellationRequested) { foreach (var candidate in candidates) { candidate.Context.Abort(); Remove(candidate.Context.ConnectionId); } return []; }
+        catch (Exception) when (!ct.IsCancellationRequested) { foreach (var candidate in candidates) Abort(candidate); return []; }
         var valid = new List<string>();
         foreach (var candidate in candidates)
         {
-            if (!connections.ContainsKey(candidate.Context.ConnectionId)) continue;
+            if (!connections.TryGetValue(candidate.Context.ConnectionId, out var current) || !ReferenceEquals(current, candidate)) continue;
             if (decisions.TryGetValue(candidate.Context.ConnectionId, out var failure) && failure is null) valid.Add(candidate.Context.ConnectionId);
-            else { candidate.Context.Abort(); Remove(candidate.Context.ConnectionId); }
+            else Abort(candidate);
         }
         return valid.ToArray();
+    }
+    private void Abort(Connection connection)
+    {
+        if (connections.TryRemove(new KeyValuePair<string, Connection>(connection.Context.ConnectionId, connection)))
+            connection.Context.Abort();
     }
 }
 
@@ -58,14 +74,14 @@ public sealed class MfaHubFilter(MfaConnectionGuard guard) : IHubFilter
         if (context.Hub is SpectatorHub) { await next(context); return; }
         var kind = context.Hub switch { CompetitionHub => MfaHubKind.Competition, NotificationHub => MfaHubKind.Notifications,
             NoCTF.API.LiveSolo.Realtime.LiveSoloHub => MfaHubKind.LiveSolo, _ => MfaHubKind.PlatformLogs };
-        guard.Register(context.Context, kind); await guard.RevalidateAsync(context.Context.ConnectionAborted);
+        guard.Register(context.Context, kind); await guard.RevalidateAsync(context.Context.ConnectionId, context.Context.ConnectionAborted);
         if (!guard.IsRegistered(context.Context.ConnectionId)) throw new HubException("Authentication is no longer sufficient.");
         await next(context);
     }
     public async ValueTask<object?> InvokeMethodAsync(HubInvocationContext context, Func<HubInvocationContext, ValueTask<object?>> next)
     {
         if (context.Hub is SpectatorHub) return await next(context);
-        await guard.RevalidateAsync(context.Context.ConnectionAborted);
+        await guard.RevalidateAsync(context.Context.ConnectionId, context.Context.ConnectionAborted);
         if (!guard.IsRegistered(context.Context.ConnectionId)) throw new HubException("Authentication is no longer sufficient.");
         context.Context.ConnectionAborted.ThrowIfCancellationRequested(); return await next(context);
     }

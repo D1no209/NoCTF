@@ -119,16 +119,16 @@ public sealed class PersistedRunnerCapacityGate(
         RunnerCapacityRequest request, string? runnerId, CancellationToken ct)
     {
         var hasAmbientTransaction = db.Database.CurrentTransaction is not null;
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < RunnerCapacityTransactionRetry.MaximumAttempts; attempt++)
         {
             try { return await ClaimAsync(request, runnerId, ct); }
-            catch (Exception exception) when (!hasAmbientTransaction && attempt < 2
+            catch (Exception exception) when (!hasAmbientTransaction && RunnerCapacityTransactionRetry.CanRetry(attempt)
                 && IsTransactionFailure(exception))
             {
                 NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(
                     RunnerCapacityTransactionOperation.Claim);
                 db.ChangeTracker.Clear();
-                await Task.Delay(Random.Shared.Next(2, 18), ct);
+                await RunnerCapacityTransactionRetry.DelayAsync(attempt, ct);
             }
             catch (Exception exception) when (!hasAmbientTransaction
                 && IsTransactionFailure(exception))
@@ -165,141 +165,43 @@ public sealed class PersistedRunnerCapacityGate(
             }
 
             eligible = eligible.Where(candidate => candidate.ProcessesPerService == request.ProcessesPerService).ToArray();
-            using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
-            await using var transaction = db.Database.CurrentTransaction is null
-                ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
-                : null;
-            var ledger = await db.RuntimeCapacityLedgers.SingleAsync(
-                item => item.Id == 1, ct);
-            var current = await db.RuntimeInstances.AsNoTracking()
+            // Selection is advisory. Each attempt revalidates the Runtime inside its
+            // transaction. The global gate bounds local Serializable contention.
+            var target = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
                 .Where(item => item.Id == request.RuntimeInstanceId)
-                .Select(item => new { item.State, item.RunnerId })
+                .Select(item => new { item.RunnerId, item.ExecutionScopeId })
                 .SingleOrDefaultAsync(ct);
-            var runtime = await db.RuntimeInstances
-                .Include(item => item.CapacityAllocationEntries)
-                .AsSplitQuery()
-                .SingleOrDefaultAsync(item => item.Id == request.RuntimeInstanceId, ct);
-            if (runtime is null || current is null
-                || current.State is RuntimeState.Stopped or RuntimeState.Stopping
-                    or RuntimeState.Failed)
+            if (target is null)
                 return new(RunnerCapacityAvailability.Unavailable,
                     Failure: RunnerAdmissionFailure.NoEligibleRunner);
-
-            var identity = request.Workload ?? PrimaryIdentity(runtime);
-            if (runtime.ExecutionScopeId is not null)
-                eligible = eligible.Where(candidate => candidate.ExecutionIsolation == RuntimeIsolationState.Verified).ToArray();
-            identity.Validate();
-            if (identity.RuntimeInstanceId != runtime.Id)
-                throw new InvalidOperationException(
-                    "The capacity identity belongs to another Runtime.");
-            if (!identity.IsAuxiliary && identity != PrimaryIdentity(runtime)
-                || current.RunnerId is { } owner && requestedRunnerId is not null
-                    && owner != requestedRunnerId)
-                return new(RunnerCapacityAvailability.Unavailable,
-                    Failure: RunnerAdmissionFailure.NoEligibleRunner);
-            if (identity.IsAuxiliary && (request.GameplayFactId is not Guid factId
-                || !await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
-                    && fact.State == GameplayFactState.Processing
-                    && fact.CompetitionChallengeId == runtime.CompetitionChallengeId
-                    && fact.TeamId == runtime.TeamId
-                    && (identity.Kind == RuntimeWorkloadKind.AwdChecker
-                        && fact.Kind == GameplayFactKind.AwdServiceTransition
-                        && fact.Awd != null && fact.Awd.AttemptId == identity.OperationId
-                        && fact.Awd.RuntimeId == runtime.Id
-                        && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
-                        || identity.Kind == RuntimeWorkloadKind.PatchChecker
-                            && runtime.GameplayFactId == fact.Id), ct)))
-                return new(RunnerCapacityAvailability.Unavailable,
-                    Failure: RunnerAdmissionFailure.NoEligibleRunner);
-
-            var existing = runtime.CapacityAllocations.Items.SingleOrDefault(
-                item => item.Identity == identity);
-            var limit = existing?.Limit ?? request.Limit
-                ?? new RuntimeResourceAmount(
-                    request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
-            var budget = existing?.Budget ?? new RuntimeResourceAmount(
-                request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
-            limit.Validate();
-            budget.Validate();
-            if (existing is not null)
-            {
-                if (requestedRunnerId is not null
-                    && existing.RunnerId != requestedRunnerId)
-                    return new(RunnerCapacityAvailability.Unavailable,
-                        Failure: RunnerAdmissionFailure.NoEligibleRunner);
-                var previousOwner = eligible.FirstOrDefault(item =>
-                    item.RunnerId == existing.RunnerId
-                    && item.Admission.Observation?.ResourceDomain
-                        == existing.ResourceDomain);
-                return previousOwner is null
-                    ? new(RunnerCapacityAvailability.Unavailable,
-                        Failure: RunnerAdmissionFailure.NoEligibleRunner)
-                    : new(RunnerCapacityAvailability.Claimed,
-                        existing.RunnerId, RunnerCapacityClaimState.AlreadyOwned);
-            }
-
-            var candidates = eligible.Where(item => current.RunnerId is null
-                    || item.RunnerId == current.RunnerId)
+            var candidates = eligible.Where(item => (target.RunnerId is null
+                    || item.RunnerId == target.RunnerId)
+                    && (target.ExecutionScopeId is null
+                        || item.ExecutionIsolation == RuntimeIsolationState.Verified))
                 .OrderBy(AdmissionPressure)
                 .ThenBy(item => item.RunnerId, StringComparer.Ordinal)
                 .Take(8).ToArray();
-            var candidateIds = candidates.Select(item => item.RunnerId).ToArray();
-            var allocatedRuntimes = candidateIds.Length == 0 ? []
-                : await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
-                    .Include(item => item.CapacityAllocationEntries)
-                    .Where(item => item.CapacityAllocationEntries.Any(allocation =>
-                        candidateIds.Contains(allocation.RunnerId)))
-                    .AsSplitQuery().ToArrayAsync(ct);
-            var auxiliaryFactIds = allocatedRuntimes
-                .SelectMany(item => item.CapacityAllocations.Items)
-                .Where(item => item.Identity.IsAuxiliary
-                    && item.GameplayFactId is not null)
-                .Select(item => item.GameplayFactId!.Value).Distinct().ToArray();
-            var processingFacts = auxiliaryFactIds.Length == 0
-                ? new HashSet<Guid>()
-                : (await db.GameplayFacts.AsNoTracking()
-                    .Where(fact => auxiliaryFactIds.Contains(fact.Id)
-                        && fact.State == GameplayFactState.Processing)
-                    .Select(fact => fact.Id).ToArrayAsync(ct)).ToHashSet();
+            if (candidates.Length == 0)
+            {
+                var result = await ClaimOnDomainAsync(request, requestedRunnerId, eligible, null, ct);
+                availability = result.Availability;
+                return result;
+            }
+
             RunnerAdmissionFailure? firstFailure = null;
             foreach (var candidate in candidates)
             {
                 attempts++;
-                var reservations = allocatedRuntimes.SelectMany(item =>
-                    item.CapacityAllocations.Items.Where(allocation =>
-                        allocation.RunnerId == candidate.RunnerId
-                        && (!allocation.Identity.IsAuxiliary
-                            && (item.State != RuntimeState.Running
-                                || item.RunningAt is null
-                                || candidate.Admission.Observation!.ObservedAt
-                                    < item.RunningAt.Value)
-                            || allocation.Identity.IsAuxiliary
-                                && allocation.GameplayFactId is Guid factId
-                                && processingFacts.Contains(factId))))
-                    .ToArray();
-                var failure = CheckCapacity(candidate, limit, reservations, identity.IsAuxiliary);
-                if (failure is not null)
+                var result = await ClaimOnDomainAsync(request, requestedRunnerId, eligible, candidate, ct);
+                if (result.Availability != RunnerCapacityAvailability.Insufficient)
                 {
-                    firstFailure ??= failure;
-                    continue;
+                    availability = result.Availability;
+                    return result;
                 }
-                var domain = candidate.Admission.Observation!.ResourceDomain;
-                var entry = RuntimeCapacityAllocationEntry.FromValue(new(
-                    identity, request.GameplayFactId, domain,
-                    candidate.RunnerId, budget, limit));
-                runtime.CapacityAllocationEntries.Add(entry);
-                db.Entry(entry).State = EntityState.Added;
-                ledger.ConcurrencyStamp = Guid.NewGuid();
-                await db.SaveChangesAsync(ct);
-                if (transaction is not null)
-                    await transaction.CommitAsync(ct);
-                availability = RunnerCapacityAvailability.Claimed;
-                return new(availability, candidate.RunnerId,
-                    RunnerCapacityClaimState.Acquired);
+                firstFailure ??= result.Failure;
             }
             availability = RunnerCapacityAvailability.Insufficient;
-            return new(availability, Failure: firstFailure
-                ?? RunnerAdmissionFailure.NoEligibleRunner);
+            return new(availability, Failure: firstFailure ?? RunnerAdmissionFailure.NoEligibleRunner);
         }
         finally
         {
@@ -314,10 +216,167 @@ public sealed class PersistedRunnerCapacityGate(
         }
     }
 
+    private async Task<RunnerCapacityClaim> ClaimOnDomainAsync(
+        RunnerCapacityRequest request, string? requestedRunnerId,
+        IReadOnlyList<RunnerAvailabilityRegistration> eligible,
+        RunnerAvailabilityRegistration? candidate, CancellationToken ct)
+    {
+        var domain = candidate?.Admission.Observation?.ResourceDomain;
+        using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
+            : null;
+        var current = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
+            .Where(item => item.Id == request.RuntimeInstanceId)
+            .Select(item => new
+            {
+                item.Id, item.ConcurrencyStamp, item.Purpose, item.State, item.RunnerId,
+                item.ExecutionScopeId, item.CompetitionChallengeId, item.TeamId, item.GameplayFactId
+            })
+            .SingleOrDefaultAsync(ct);
+        if (current is null
+            || current.State is RuntimeState.Stopped or RuntimeState.Stopping or RuntimeState.Failed)
+            return new(RunnerCapacityAvailability.Unavailable,
+                Failure: RunnerAdmissionFailure.NoEligibleRunner);
+
+        var identity = request.Workload ?? PrimaryIdentity(current.Purpose, current.Id);
+        if (current.ExecutionScopeId is not null)
+            eligible = eligible.Where(item => item.ExecutionIsolation == RuntimeIsolationState.Verified).ToArray();
+        identity.Validate();
+        if (identity.RuntimeInstanceId != current.Id)
+            throw new InvalidOperationException("The capacity identity belongs to another Runtime.");
+        if (!identity.IsAuxiliary && identity != PrimaryIdentity(current.Purpose, current.Id)
+            || current.RunnerId is { } owner && requestedRunnerId is not null && owner != requestedRunnerId)
+            return new(RunnerCapacityAvailability.Unavailable,
+                Failure: RunnerAdmissionFailure.NoEligibleRunner);
+        if (identity.IsAuxiliary && (request.GameplayFactId is not Guid factId
+            || !await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
+                && fact.State == GameplayFactState.Processing
+                && fact.CompetitionChallengeId == current.CompetitionChallengeId
+                && fact.TeamId == current.TeamId
+                && (identity.Kind == RuntimeWorkloadKind.AwdChecker
+                    && fact.Kind == GameplayFactKind.AwdServiceTransition
+                    && fact.Awd != null && fact.Awd.AttemptId == identity.OperationId
+                    && fact.Awd.RuntimeId == current.Id
+                    && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
+                    || identity.Kind == RuntimeWorkloadKind.PatchChecker
+                        && current.GameplayFactId == fact.Id), ct)))
+            return new(RunnerCapacityAvailability.Unavailable,
+                Failure: RunnerAdmissionFailure.NoEligibleRunner);
+
+        var existing = (await ReadAllocationAsync(identity, ct))?.ToValue();
+        var limit = existing?.Limit ?? request.Limit
+            ?? new RuntimeResourceAmount(request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
+        var budget = existing?.Budget
+            ?? new RuntimeResourceAmount(request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
+        limit.Validate();
+        budget.Validate();
+        if (existing is not null)
+        {
+            if (requestedRunnerId is not null && existing.RunnerId != requestedRunnerId)
+                return new(RunnerCapacityAvailability.Unavailable,
+                    Failure: RunnerAdmissionFailure.NoEligibleRunner);
+            var previousOwner = eligible.FirstOrDefault(item => item.RunnerId == existing.RunnerId
+                && item.Admission.Observation?.ResourceDomain == existing.ResourceDomain);
+            return previousOwner is null
+                ? new(RunnerCapacityAvailability.Unavailable, Failure: RunnerAdmissionFailure.NoEligibleRunner)
+                : new(RunnerCapacityAvailability.Claimed, existing.RunnerId, RunnerCapacityClaimState.AlreadyOwned);
+        }
+        if (candidate is null || domain is null
+            || current.RunnerId is { } currentOwner && candidate.RunnerId != currentOwner
+            || current.ExecutionScopeId is not null && candidate.ExecutionIsolation != RuntimeIsolationState.Verified)
+            return new(RunnerCapacityAvailability.Insufficient,
+                Failure: RunnerAdmissionFailure.NoEligibleRunner);
+
+        var ledger = await ReadLedgerAsync(ct);
+        var observedAt = candidate.Admission.Observation!.ObservedAt;
+        // Count every owner in the real resource domain, including pending allocations
+        // left by a previous Runner. Loading only a RunnerId can under-reserve at handoff.
+        var reservations = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
+            .SelectMany(item => item.CapacityAllocationEntries, (item, allocation) => new
+            {
+                item.State, item.RunningAt, Allocation = allocation
+            })
+            .Where(item => item.Allocation.ResourceDomain == domain
+                && (item.Allocation.WorkloadKind != RuntimeWorkloadKind.AwdChecker
+                    && item.Allocation.WorkloadKind != RuntimeWorkloadKind.PatchChecker
+                    && (item.State != RuntimeState.Running || item.RunningAt == null || observedAt < item.RunningAt)
+                    || (item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
+                        || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker)
+                        && item.Allocation.GameplayFactId != null
+                        && db.GameplayFacts.Any(fact => fact.Id == item.Allocation.GameplayFactId
+                            && fact.State == GameplayFactState.Processing)))
+            .Select(item => new CapacityReservation(item.Allocation.WorkloadKind,
+                item.Allocation.LimitMemoryBytes, item.Allocation.LimitCpuMillicores, item.Allocation.LimitPidsLimit))
+            .ToArrayAsync(ct);
+        var failure = CheckCapacity(candidate, limit, reservations, identity.IsAuxiliary);
+        if (failure is not null)
+            return new(RunnerCapacityAvailability.Insufficient, Failure: failure);
+
+        var entry = RuntimeCapacityAllocationEntry.FromValue(new(
+            identity, request.GameplayFactId, domain, candidate.RunnerId, budget, limit));
+        var runtime = await ReadRuntimeForWriteAsync(current.Id, current.ConcurrencyStamp, ct);
+        runtime.CapacityAllocationEntries.Add(entry);
+        db.Entry(entry).State = EntityState.Added;
+        // The global row fences budget transactions across processes. The Runtime
+        // version also prevents stale tracked allocation graphs from being reused.
+        runtime.ConcurrencyStamp = Guid.NewGuid();
+        ledger.ConcurrencyStamp = Guid.NewGuid();
+        await SaveAllocationChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+        return new(RunnerCapacityAvailability.Claimed, candidate.RunnerId, RunnerCapacityClaimState.Acquired);
+    }
+
+    private Task<RuntimeCapacityAllocationEntry?> ReadAllocationAsync(
+        RuntimeWorkloadIdentity identity, CancellationToken ct) =>
+        db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
+            .Where(item => item.Id == identity.RuntimeInstanceId)
+            .SelectMany(item => item.CapacityAllocationEntries)
+            .SingleOrDefaultAsync(item => item.WorkloadKind == identity.Kind
+                && item.WorkloadRuntimeInstanceId == identity.RuntimeInstanceId
+                && item.OperationId == identity.OperationId, ct);
+
+    private async Task<RuntimeInstance> ReadRuntimeForWriteAsync(Guid id, Guid observedStamp, CancellationToken ct)
+    {
+        // Do not clear/reload an ambient caller's pending changes. Its original version
+        // must still match the authoritative snapshot before using the tracked graph.
+        var runtime = await db.RuntimeInstances.IgnoreAutoIncludes()
+            .Include(item => item.ActiveSlot)
+            .Include(item => item.CapacityAllocationEntries)
+            .AsSplitQuery().SingleOrDefaultAsync(item => item.Id == id, ct)
+            ?? throw new DbUpdateConcurrencyException("The capacity Runtime disappeared.");
+        if (db.Entry(runtime).Property(item => item.ConcurrencyStamp).OriginalValue != observedStamp)
+            throw new DbUpdateConcurrencyException("The tracked capacity Runtime no longer matches the current transaction.");
+        return runtime;
+    }
+
+    private Task<RuntimeCapacityLedger> ReadLedgerAsync(CancellationToken ct) =>
+        db.RuntimeCapacityLedgers.SingleAsync(item => item.Id == 1, ct);
+
+    private async Task SaveAllocationChangesAsync(CancellationToken ct)
+    {
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException exception) when (exception.GetBaseException() is System.Data.Common.DbException { SqlState: "23505" }
+            && exception.Entries.Any(entry => entry.State == EntityState.Added
+                && entry.Entity is RuntimeCapacityAllocationEntry))
+        {
+            // A duplicate workload identity may be inserted by another process.
+            // Restart the complete transaction, including its reads.
+            throw new DbUpdateConcurrencyException("Capacity allocation initialization conflicted with another transaction.", exception);
+        }
+    }
+
+    private sealed record CapacityReservation(
+        RuntimeWorkloadKind Kind, long MemoryBytes, long CpuMillicores, long PidsLimit)
+    {
+        public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker;
+    }
+
     private static RunnerAdmissionFailure? CheckCapacity(
         RunnerAvailabilityRegistration candidate,
         RuntimeResourceAmount requested,
-        IReadOnlyCollection<RuntimeCapacityAllocation> reservations,
+        IReadOnlyCollection<CapacityReservation> reservations,
         bool auxiliary)
     {
         var projection = candidate.Admission.Capacity!;
@@ -326,15 +385,15 @@ public sealed class PersistedRunnerCapacityGate(
             || projection.ObservedTotal.PidsLimit is long totalPids
                 && requested.PidsLimit > totalPids)
             return RunnerAdmissionFailure.RequestExceedsNodeCapacity;
-        var starting = reservations.Count(item => item.Identity.IsAuxiliary == auxiliary);
+        var starting = reservations.Count(item => item.IsAuxiliary == auxiliary);
         var maximum = auxiliary
             ? candidate.AdmissionOptions.AuxiliaryConcurrency
             : candidate.AdmissionOptions.MainStartupConcurrency;
         if (starting >= maximum)
             return RunnerAdmissionFailure.StartupConcurrencyLimited;
-        var reservedMemory = reservations.Sum(item => item.Limit.MemoryBytes);
-        var reservedCpu = reservations.Sum(item => item.Limit.CpuMillicores);
-        var reservedPids = reservations.Sum(item => item.Limit.PidsLimit);
+        var reservedMemory = reservations.Sum(item => item.MemoryBytes);
+        var reservedCpu = reservations.Sum(item => item.CpuMillicores);
+        var reservedPids = reservations.Sum(item => item.PidsLimit);
         if (requested.MemoryBytes > Math.Max(0,
                 projection.AdmissionAvailable.MemoryBytes - reservedMemory))
             return RunnerAdmissionFailure.MemoryActualCapacityInsufficient;
@@ -389,20 +448,22 @@ public sealed class PersistedRunnerCapacityGate(
         RuntimeWorkloadIdentity identity, string runnerId, CancellationToken ct)
     {
         var hasAmbientTransaction = db.Database.CurrentTransaction is not null;
+        RunnerCapacityReleaseOutcome result;
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                return await ReleaseWorkloadOnceAsync(identity, runnerId, ct);
+                result = await ReleaseWorkloadOnceAsync(identity, runnerId, ct);
+                break;
             }
-            catch (Exception exception) when (!hasAmbientTransaction && attempt < 2
+            catch (Exception exception) when (!hasAmbientTransaction && RunnerCapacityTransactionRetry.CanRetry(attempt)
                 && IsTransactionFailure(exception))
             {
                 outbox.DiscardPendingMessages();
                 db.ChangeTracker.Clear();
                 NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(
                     RunnerCapacityTransactionOperation.Release);
-                await Task.Delay(Random.Shared.Next(2, 18), ct);
+                await RunnerCapacityTransactionRetry.DelayAsync(attempt, ct);
             }
             catch (Exception exception) when (!hasAmbientTransaction
                 && IsTransactionFailure(exception))
@@ -413,46 +474,63 @@ public sealed class PersistedRunnerCapacityGate(
                 throw;
             }
         }
+        // Publication has an external outcome and must never enter the database retry
+        // loop after a successful commit. Ambient callers own their publication boundary.
+        if (!hasAmbientTransaction && result == RunnerCapacityReleaseOutcome.Released)
+            await outbox.FlushCommittedMessagesAsync();
+        return result;
     }
 
     private async Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadOnceAsync(
         RuntimeWorkloadIdentity identity, string runnerId, CancellationToken ct)
     {
+        var scope = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
+            .Where(item => item.Id == identity.RuntimeInstanceId)
+            .SelectMany(item => item.CapacityAllocationEntries)
+            .Where(item => item.WorkloadKind == identity.Kind
+                && item.WorkloadRuntimeInstanceId == identity.RuntimeInstanceId
+                && item.OperationId == identity.OperationId)
+            .Select(item => new { item.ResourceDomain, item.RunnerId })
+            .SingleOrDefaultAsync(ct);
+        if (scope is null) return RunnerCapacityReleaseOutcome.AlreadyReleased;
+        if (scope.RunnerId != runnerId) return RunnerCapacityReleaseOutcome.OwnerMismatch;
         using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct) : null;
-        var ledger = await db.RuntimeCapacityLedgers.SingleAsync(item => item.Id == 1, ct);
-        var runtime = await db.RuntimeInstances
-            .Include(item => item.CapacityAllocationEntries)
-            .AsSplitQuery()
-            .SingleOrDefaultAsync(item => item.Id == identity.RuntimeInstanceId, ct);
-        var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(
-            item => item.Identity == identity);
+        var stamp = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes()
+            .Where(item => item.Id == identity.RuntimeInstanceId)
+            .Select(item => (Guid?)item.ConcurrencyStamp).SingleOrDefaultAsync(ct);
+        var allocation = await ReadAllocationAsync(identity, ct);
         if (allocation is null) return RunnerCapacityReleaseOutcome.AlreadyReleased;
         if (allocation.RunnerId != runnerId)
             return RunnerCapacityReleaseOutcome.OwnerMismatch;
-        runtime!.CapacityAllocationEntries.RemoveAll(entry =>
-            entry.ToValue().Identity == identity);
+        if (allocation.ResourceDomain != scope.ResourceDomain)
+            return RunnerCapacityReleaseOutcome.RecoveryRequired;
+        if (stamp is null) return RunnerCapacityReleaseOutcome.AlreadyReleased;
+        var runtime = await ReadRuntimeForWriteAsync(identity.RuntimeInstanceId, stamp.Value, ct);
+        var ledger = await ReadLedgerAsync(ct);
+        var trackedAllocation = runtime.CapacityAllocationEntries.SingleOrDefault(entry => entry.Id == allocation.Id)
+            ?? throw new DbUpdateConcurrencyException("The tracked capacity allocation no longer matches the current transaction.");
+        runtime.CapacityAllocationEntries.Remove(trackedAllocation);
+        runtime.ConcurrencyStamp = Guid.NewGuid();
         ledger.ConcurrencyStamp = Guid.NewGuid();
         await outbox.PublishAsync(new ReleaseRunnerCapacity(identity, runnerId));
-        await db.SaveChangesAsync(ct);
+        await SaveAllocationChangesAsync(ct);
         if (transaction is not null)
-        {
             await transaction.CommitAsync(ct);
-            ledgerLease.Dispose();
-            await outbox.FlushCommittedMessagesAsync();
-        }
         return RunnerCapacityReleaseOutcome.Released;
     }
 
     private static bool IsTransactionFailure(Exception exception) =>
         TransactionFailureClassifier.IsRetryable(exception);
 
-    public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => new(
-        runtime.Purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
+    public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => PrimaryIdentity(runtime.Purpose, runtime.Id);
+
+    private static RuntimeWorkloadIdentity PrimaryIdentity(RuntimePurpose purpose, Guid runtimeId) => new(
+        purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
             ? RuntimeWorkloadKind.VerificationTarget
             : RuntimeWorkloadKind.Runtime,
-        runtime.Id, runtime.Id);
+        runtimeId, runtimeId);
 
     private static string WaitingKey(Guid runtimeId) =>
         $"runtime:waiting:{runtimeId:N}";

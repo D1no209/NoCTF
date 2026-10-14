@@ -1,3 +1,5 @@
 namespace NoCTF.Application.Messaging;
 
-public sealed record ProjectLeaderboard(Guid CompetitionId);
+public enum LeaderboardRefreshMode { Force, IfMissing }
+
+public sealed record ProjectLeaderboard(Guid CompetitionId, LeaderboardRefreshMode Mode = LeaderboardRefreshMode.Force);

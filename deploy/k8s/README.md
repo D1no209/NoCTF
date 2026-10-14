@@ -8,6 +8,19 @@ each with explicit `Hosting__Roles__0`. One Runner owns the cluster resource
 domain through a NATS KV fencing lease. **Adding Runner replicas does not add
 capacity.** Add attested Runtime nodes and tune bounded startup/checker concurrency.
 
+The `/hubs` route uses an Envoy Gateway 1.9 cookie session to keep SignalR
+negotiation, SSE and long-polling requests on the same API Pod. Other HTTP routes
+remain independently balanced. Browser Hub clients must accept the gateway's
+`noctf-hub-affinity` routing cookie; this cookie grants no application identity.
+The public spectator Hub still uses its own connection without a bearer token or
+staff groups. Non-browser clients must retain cookies across negotiation and
+transport requests. Validate scale-out through the actual Gateway as well as the
+per-Pod broadcast checks in `Test-Scaling.ps1`; port-forward tests bypass affinity.
+
+The Worker queue list includes `livesolo-media` so optional LiveSolo media work
+has a durable consumer. Media services and their credentials still require the
+separate LiveSolo deployment setup.
+
 ## Docker Desktop / Windows
 
 Prerequisites: PowerShell 7, Docker Desktop Linux containers, kubectl, .NET 10;

@@ -40,10 +40,13 @@ features:
 | 报名参加比赛 | [建队、邀请与报名](./player/teams.md) |
 | 从零配置一场比赛 | [举办第一场比赛](./competition/quick-start.md) |
 | 选择赛制并参赛 | [五种赛制参赛指南](./player/modes.md) |
+| 参加个人测验或团队理论答题 | [理论作答指南](./player/theory.md) |
+| 维护理论题、举办个人练习或测验 | [理论题库](./challenge-bank/theory.md)、[独立活动](./competition/activities/theory.md) |
+| 为比赛组卷并审核理论成绩 | [比赛组卷](./competition/content/theory.md)、[答卷纠错](./competition/judging/theory.md) |
 | 配置 LiveSolo 对局与裁判 | [比赛管理中的 LiveSolo](./competition/modes/live-solo/index.md) |
 | 设置单题自动开放和提交截止 | [题目时间](./competition/content/timing.md) |
 | 定位登录、题目环境或评测故障 | [常见故障排查](./operations/troubleshooting.md) |
 
 本手册面向仓库当前版本。安装步骤以 `deploy/` 中的模板和脚本为依据，界面入口以当前 ClientApp 为依据；安装旧版本时，应读取对应 Git revision 的手册。开发者领域契约仍由仓库 `specs/` 维护。
 
-最近内容核对：2026-10-11。新增及修正见 [更新说明](./reference/updates.md)；LiveSolo 的局部验证不代表完整生产投产验收。
+最近内容核对：2026-10-14。新增及修正见 [更新说明](./reference/updates.md)；LiveSolo 的局部验证不代表完整生产投产验收。

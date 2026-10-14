@@ -8,6 +8,7 @@ LiveSolo 与 CTF、AWD、AWDP、KoH 同属平台赛制。本页面向队长、�
 | --- | --- |
 | 锁定上场名单、确认准备、主动共享 | [对局准备](./preparation.md) |
 | 已开放题目、附件、Runtime、Flag 和时限 | [场内解题](./playing.md) |
+| 已开放题面快照、附件与权威结果 | [历史回看](./review.md) |
 | 入场名额、延迟视频和比分 | [观赛](./program.md) |
 | 按 Match/Round/Question 查看或提交题解 | [赛后题解](./postgame.md) |
 

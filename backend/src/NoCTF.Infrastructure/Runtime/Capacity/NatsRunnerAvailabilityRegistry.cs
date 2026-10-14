@@ -41,16 +41,28 @@ public sealed class NatsRunnerAvailabilityRegistry(
     INatsConnection connection, TimeProvider clock)
 {
     private const string Bucket = "NOCTF_RUNNER_AVAILABILITY_V3";
+    private readonly NatsKeyValueStoreAccess storeAccess = new(ct =>
+        connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
+            new NatsKVConfig(Bucket)
+            {
+                Description = "NoCTF Runner schema 3 online registrations",
+                History = 1
+            }, ct));
+
+    private readonly NatsKeyValueStoreAccess ownershipStoreAccess = new(ct =>
+        connection.CreateKeyValueStoreContext().GetStoreAsync("NOCTF_LEASES_V2", ct));
 
     public async Task PublishHeartbeatAsync(
         string pool, string runnerId, RuntimeProvider provider,
         TimeSpan ttl, CancellationToken ct)
     {
         await EnsurePoolMemberAsync(pool, runnerId, ct);
-        var store = await OpenAsync(ct);
-        await store.PutAsync(HeartbeatKey(runnerId), Serialize(new RunnerHeartbeat(
-            pool, runnerId, provider, clock.GetUtcNow().Add(ttl))),
-            cancellationToken: ct);
+        await storeAccess.ExecuteAsync(async store =>
+        {
+            await store.PutAsync(HeartbeatKey(runnerId), Serialize(new RunnerHeartbeat(
+                pool, runnerId, provider, clock.GetUtcNow().Add(ttl))),
+                cancellationToken: ct);
+        }, ct);
     }
 
     public async Task<RunnerAvailabilityRegistrationOutcome> RegisterAsync(
@@ -62,11 +74,11 @@ public sealed class NatsRunnerAvailabilityRegistry(
         if (registration.TimeToLive <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(registration));
         await EnsurePoolMemberAsync(registration.RunnerPool, registration.RunnerId, ct);
-        var store = await OpenAsync(ct);
         var now = clock.GetUtcNow();
         var row = new RunnerRegistrationState(3, registration, now.Add(registration.TimeToLive));
-        await store.PutAsync(RegistrationKey(registration.RunnerId), Serialize(row),
-            cancellationToken: ct);
+        await storeAccess.ExecuteAsync(async store =>
+            await store.PutAsync(RegistrationKey(registration.RunnerId), Serialize(row),
+                cancellationToken: ct), ct);
         var outcome = Evaluate(row, now);
         if (outcome == RunnerAvailabilityRegistrationOutcome.Online
             && !await HasCurrentOwnershipAsync(registration, ct))
@@ -89,11 +101,13 @@ public sealed class NatsRunnerAvailabilityRegistry(
     {
         try
         {
-            var store = await OpenAsync(ct);
-            var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
-            return heartbeat is not null && heartbeat.Pool == pool
-                && heartbeat.ExpiresAt > clock.GetUtcNow()
-                ? RunnerHeartbeatStatus.Online : RunnerHeartbeatStatus.Offline;
+            return await storeAccess.ExecuteAsync<RunnerHeartbeatStatus>(async store =>
+            {
+                var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
+                return heartbeat is not null && heartbeat.Pool == pool
+                    && heartbeat.ExpiresAt > clock.GetUtcNow()
+                    ? RunnerHeartbeatStatus.Online : RunnerHeartbeatStatus.Offline;
+            }, ct);
         }
         catch (NatsException)
         {
@@ -106,10 +120,12 @@ public sealed class NatsRunnerAvailabilityRegistry(
     {
         try
         {
-            var store = await OpenAsync(ct);
-            var index = await ReadPoolAsync(store, pool, ct);
-            return new(RunnerPoolInventoryAvailability.Available,
-                index.RunnerIds.Order(StringComparer.Ordinal).ToArray());
+            return await storeAccess.ExecuteAsync<RunnerPoolInventory>(async store =>
+            {
+                var index = await ReadPoolAsync(store, pool, ct);
+                return new(RunnerPoolInventoryAvailability.Available,
+                    index.RunnerIds.Order(StringComparer.Ordinal).ToArray());
+            }, ct);
         }
         catch (NatsException)
         {
@@ -124,25 +140,27 @@ public sealed class NatsRunnerAvailabilityRegistry(
         var outcome = "success";
         try
         {
-            var store = await OpenAsync(ct);
-            var index = await ReadPoolAsync(store, pool, ct);
-            var now = clock.GetUtcNow();
-            var eligible = new List<RunnerAvailabilityRegistration>();
-            foreach (var runnerId in index.RunnerIds)
+            return await storeAccess.ExecuteAsync<IReadOnlyList<RunnerAvailabilityRegistration>>(async store =>
             {
-                var registration = await ReadRegistrationAsync(store, runnerId, ct);
-                if (registration is null
-                    || registration.Registration.RunnerPool != pool
-                    || Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online)
-                    continue;
-                var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
-                if (heartbeat is null || heartbeat.ExpiresAt <= now
-                    || heartbeat.Pool != pool) continue;
-                if (!await HasCurrentOwnershipAsync(registration.Registration, ct))
-                    continue;
-                eligible.Add(registration.Registration);
-            }
-            return eligible;
+                var index = await ReadPoolAsync(store, pool, ct);
+                var now = clock.GetUtcNow();
+                var eligible = new List<RunnerAvailabilityRegistration>();
+                foreach (var runnerId in index.RunnerIds)
+                {
+                    var registration = await ReadRegistrationAsync(store, runnerId, ct);
+                    if (registration is null
+                        || registration.Registration.RunnerPool != pool
+                        || Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online)
+                        continue;
+                    var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
+                    if (heartbeat is null || heartbeat.ExpiresAt <= now
+                        || heartbeat.Pool != pool) continue;
+                    if (!await HasCurrentOwnershipAsync(registration.Registration, ct))
+                        continue;
+                    eligible.Add(registration.Registration);
+                }
+                return eligible;
+            }, ct);
         }
         catch
         {
@@ -166,18 +184,20 @@ public sealed class NatsRunnerAvailabilityRegistry(
     public async Task<RunnerAvailabilityRegistration?> ReadEligibleRunnerAsync(
         string runnerId, CancellationToken ct)
     {
-        var store = await OpenAsync(ct);
-        var now = clock.GetUtcNow();
-        var registration = await ReadRegistrationAsync(store, runnerId, ct);
-        if (registration is null
-            || Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online)
-            return null;
-        var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
-        return heartbeat is not null
-            && heartbeat.Pool == registration.Registration.RunnerPool
-            && heartbeat.ExpiresAt > now
-            && await HasCurrentOwnershipAsync(registration.Registration, ct)
-            ? registration.Registration : null;
+        return await storeAccess.ExecuteAsync<RunnerAvailabilityRegistration?>(async store =>
+        {
+            var now = clock.GetUtcNow();
+            var registration = await ReadRegistrationAsync(store, runnerId, ct);
+            if (registration is null
+                || Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online)
+                return null;
+            var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
+            return heartbeat is not null
+                && heartbeat.Pool == registration.Registration.RunnerPool
+                && heartbeat.ExpiresAt > now
+                && await HasCurrentOwnershipAsync(registration.Registration, ct)
+                ? registration.Registration : null;
+        }, ct);
     }
 
     private static RunnerAvailabilityRegistrationOutcome Evaluate(
@@ -206,49 +226,52 @@ public sealed class NatsRunnerAvailabilityRegistry(
         if (string.IsNullOrWhiteSpace(domain)) return false;
         try
         {
-            var store = await connection.CreateKeyValueStoreContext()
-                .GetStoreAsync("NOCTF_LEASES_V2", ct);
-            var entry = await store.GetEntryAsync<string>(
-                NatsClusterLeaseManager.ResourceDomainKey(domain),
-                cancellationToken: ct);
-            return entry.Revision == registration.ResourceDomainFencingToken
-                && entry.Value?.StartsWith(registration.RunnerId + "|",
-                    StringComparison.Ordinal) == true;
+            return await ownershipStoreAccess.ExecuteAsync<bool>(async store =>
+            {
+                var entry = await store.GetEntryAsync<string>(
+                    NatsClusterLeaseManager.ResourceDomainKey(domain),
+                    cancellationToken: ct);
+                return entry.Revision == registration.ResourceDomainFencingToken
+                    && entry.Value?.StartsWith(registration.RunnerId + "|",
+                        StringComparison.Ordinal) == true;
+            }, ct);
         }
         catch (NatsKVException) { return false; }
     }
 
     private async Task EnsurePoolMemberAsync(string pool, string runnerId, CancellationToken ct)
     {
-        var store = await OpenAsync(ct);
-        var key = PoolKey(pool);
-        for (var attempt = 0; attempt < 8; attempt++)
+        await storeAccess.ExecuteAsync(async store =>
         {
-            var current = await ReadEntryAsync(store, key, ct);
-            var index = current is null
-                ? new RunnerPoolIndex([])
-                : JsonSerializer.Deserialize(current.Value.Value,
-                    RunnerAvailabilityJsonContext.Default.RunnerPoolIndex)
-                    ?? throw new InvalidOperationException("Invalid Runner pool index.");
-            if (index.RunnerIds.Contains(runnerId, StringComparer.Ordinal))
-                return;
-            var next = new RunnerPoolIndex([.. index.RunnerIds, runnerId]);
-            try
+            var key = PoolKey(pool);
+            for (var attempt = 0; attempt < 8; attempt++)
             {
-                if (current is null)
-                    await store.CreateAsync(key, Serialize(next), cancellationToken: ct);
-                else
-                    await store.UpdateAsync(key, Serialize(next),
-                        current.Value.Revision, cancellationToken: ct);
-                return;
+                var current = await ReadEntryAsync(store, key, ct);
+                var index = current is null
+                    ? new RunnerPoolIndex([])
+                    : JsonSerializer.Deserialize(current.Value.Value,
+                        RunnerAvailabilityJsonContext.Default.RunnerPoolIndex)
+                        ?? throw new InvalidOperationException("Invalid Runner pool index.");
+                if (index.RunnerIds.Contains(runnerId, StringComparer.Ordinal))
+                    return;
+                var next = new RunnerPoolIndex([.. index.RunnerIds, runnerId]);
+                try
+                {
+                    if (current is null)
+                        await store.CreateAsync(key, Serialize(next), cancellationToken: ct);
+                    else
+                        await store.UpdateAsync(key, Serialize(next),
+                            current.Value.Revision, cancellationToken: ct);
+                    return;
+                }
+                catch (NatsKVException exception) when (attempt < 7
+                    && exception is NatsKVCreateException or NatsKVWrongLastRevisionException)
+                {
+                    await Task.Delay(Random.Shared.Next(1, 9), ct);
+                }
             }
-            catch (NatsKVException exception) when (attempt < 7
-                && exception is NatsKVCreateException or NatsKVWrongLastRevisionException)
-            {
-                await Task.Delay(Random.Shared.Next(1, 9), ct);
-            }
-        }
-        throw new InvalidOperationException("Runner pool index contention exceeded the retry limit.");
+            throw new InvalidOperationException("Runner pool index contention exceeded the retry limit.");
+        }, ct);
     }
 
     private async Task<RunnerPoolIndex> ReadPoolAsync(
@@ -290,14 +313,6 @@ public sealed class NatsRunnerAvailabilityRegistry(
         catch (NatsKVKeyNotFoundException) { return null; }
         catch (NatsKVKeyDeletedException) { return null; }
     }
-
-    private async Task<INatsKVStore> OpenAsync(CancellationToken ct) =>
-        await connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
-            new NatsKVConfig(Bucket)
-            {
-                Description = "NoCTF Runner schema 3 online registrations",
-                History = 1
-            }, ct);
 
     private static string PoolKey(string pool) => "pool." +
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(pool)))

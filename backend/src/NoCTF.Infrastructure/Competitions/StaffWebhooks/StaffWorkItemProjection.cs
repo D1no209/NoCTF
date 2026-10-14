@@ -12,6 +12,7 @@ namespace NoCTF.Infrastructure.Competitions.StaffWebhooks;
 
 internal static class StaffWorkItemProjection
 {
+    internal sealed record Scope(Guid[] IncidentIds, Guid[] ConsultationIds);
     internal sealed record Event(Guid Id, CompetitionEventKind Kind, Guid? FactId, Guid? ParentId,
         Guid? TeamId, Guid? ActorId, DateTimeOffset At);
     internal sealed record Node(Guid Id, Guid? RootId, NotificationKind Kind, Guid? TeamId, Guid? ChallengeId,
@@ -24,45 +25,68 @@ internal static class StaffWorkItemProjection
         CompetitionEventKind.CheatIncidentCorrected, CompetitionEventKind.TeamBanned,
         CompetitionEventKind.TeamBanAppealSubmitted, CompetitionEventKind.TeamBanAppealAccepted, CompetitionEventKind.TeamBanAppealUpheld];
 
-    public static async Task<IReadOnlyList<StaffWorkItemSummary>> ReadAsync(NoCtfDbContext db, Guid competitionId, CancellationToken ct)
+    public static async Task<IReadOnlyList<StaffWorkItemSummary>> ReadAsync(NoCtfDbContext db, Guid competitionId, CancellationToken ct, Scope? scope = null)
     {
-        var facts = (await db.GameplayFacts.AsNoTracking().Where(value => value.CompetitionId == competitionId
-            && value.CompetitionChallengeId != null && value.FailureCode != null && CheatIncidentFailures.All.Contains(value.FailureCode.Value))
+        var factQuery = db.GameplayFacts.AsNoTracking().Where(value => value.CompetitionId == competitionId
+            && value.CompetitionChallengeId != null && value.FailureCode != null && CheatIncidentFailures.All.Contains(value.FailureCode.Value));
+        if (scope is not null) factQuery = factQuery.Where(value => scope.IncidentIds.Contains(value.Id));
+        var facts = (scope is { IncidentIds.Length: 0 } ? [] : await factQuery
             .Select(value => new Fact(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId!.Value,
                 value.FailureCode, value.OccurredAt, value.UpdatedAt)).ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var entry in db.ChangeTracker.Entries<GameplayFact>().Where(value => value.Entity.CompetitionId == competitionId
+                     && (scope is null || scope.IncidentIds.Contains(value.Entity.Id))
                      && value.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
         {
             var value = entry.Entity;
             if (value.CompetitionChallengeId is null || entry.State == EntityState.Deleted || !CheatIncidentFailures.IsIncident(value.FailureCode)) facts.Remove(value.Id);
             else facts[value.Id] = new(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId!.Value, value.FailureCode, value.OccurredAt, value.UpdatedAt);
         }
-        var events = (await db.CompetitionEvents.AsNoTracking().Where(value => value.CompetitionId == competitionId && RelevantEvents.Contains(value.Kind))
+        var eventQuery = db.CompetitionEvents.AsNoTracking().Where(value => value.CompetitionId == competitionId && RelevantEvents.Contains(value.Kind));
+        if (scope is not null) eventQuery = eventQuery.Where(value => value.GameplayFactId != null && scope.IncidentIds.Contains(value.GameplayFactId.Value)
+            && (value.Kind == CompetitionEventKind.CheatIncidentConfirmed || value.Kind == CompetitionEventKind.CheatIncidentDismissed
+                || value.Kind == CompetitionEventKind.CheatIncidentSuperseded || value.Kind == CompetitionEventKind.CheatIncidentCorrected));
+        var events = (scope is { IncidentIds.Length: 0 } ? [] : await eventQuery
             .Select(value => new Event(value.Id, value.Kind, value.GameplayFactId, value.ParentEventId, value.TeamId, value.ActorUserId, value.OccurredAt))
             .ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var value in db.ChangeTracker.Entries<CompetitionEvent>().Where(entry => entry.State == EntityState.Added
-                     && entry.Entity.CompetitionId == competitionId && RelevantEvents.Contains(entry.Entity.Kind)).Select(entry => entry.Entity))
+                     && entry.Entity.CompetitionId == competitionId && RelevantEvents.Contains(entry.Entity.Kind)
+                     && (scope is null || entry.Entity.GameplayFactId is { } factId && scope.IncidentIds.Contains(factId)
+                         && entry.Entity.Kind is CompetitionEventKind.CheatIncidentConfirmed or CompetitionEventKind.CheatIncidentDismissed
+                             or CompetitionEventKind.CheatIncidentSuperseded or CompetitionEventKind.CheatIncidentCorrected)).Select(entry => entry.Entity))
             events[value.Id] = new(value.Id, value.Kind, value.GameplayFactId, value.ParentEventId, value.TeamId, value.ActorUserId, value.OccurredAt);
-        var nodes = (await db.Notifications.AsNoTracking().Where(value => value.TargetType == NotificationTargetType.CompetitionCollaborators && value.TargetId == competitionId
+        var nodeQuery = db.Notifications.AsNoTracking().Where(value => value.TargetType == NotificationTargetType.CompetitionCollaborators && value.TargetId == competitionId
                 && (value.Kind == NotificationKind.QuestionOpened || value.Kind == NotificationKind.QuestionStatusChanged
-                    || value.Kind == NotificationKind.Message && value.ThreadRootId != null))
-            .Select(value => new Node(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId!.Value,
+                    || value.Kind == NotificationKind.Message && value.ThreadRootId != null));
+        if (scope is not null) nodeQuery = nodeQuery.Where(value => scope.ConsultationIds.Contains(value.Id)
+            || value.ThreadRootId != null && scope.ConsultationIds.Contains(value.ThreadRootId.Value));
+        var nodes = (scope is { ConsultationIds.Length: 0 } ? [] : await nodeQuery
+            .Select(value => new Node(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt))
             .ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var value in db.ChangeTracker.Entries<Notification>().Where(entry => entry.State == EntityState.Added
                      && entry.Entity.TargetType == NotificationTargetType.CompetitionCollaborators
+                     && (scope is null || scope.ConsultationIds.Contains(entry.Entity.ThreadRootId ?? entry.Entity.Id))
                      && entry.Entity.TargetId == competitionId && (entry.Entity.Kind == NotificationKind.QuestionOpened
                          || entry.Entity.ThreadRootId != null && entry.Entity.QuestionStatus != null)).Select(entry => entry.Entity))
-            nodes[value.Id] = new(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId!.Value,
+            nodes[value.Id] = new(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt);
-        var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking().Where(value => value.CompetitionId == competitionId)
+        var teamIds = facts.Values.Select(value => value.TeamId).Concat(facts.Values.Select(value => value.RelatedTeamId))
+            .Concat(nodes.Values.Select(value => value.TeamId)).Concat(events.Values.Select(value => value.TeamId)).OfType<Guid>().Distinct().ToArray();
+        var teamQuery = db.Teams.IgnoreQueryFilters().AsNoTracking().Where(value => value.CompetitionId == competitionId);
+        if (scope is not null) teamQuery = teamQuery.Where(value => teamIds.Contains(value.Id));
+        var teams = scope is not null && teamIds.Length == 0 ? [] : await teamQuery
             .Select(value => new { value.Id, value.Name, value.IsBanned }).ToDictionaryAsync(value => value.Id, ct);
-        foreach (var team in db.Teams.Local.Where(value => value.CompetitionId == competitionId))
+        foreach (var team in db.Teams.Local.Where(value => value.CompetitionId == competitionId && (scope is null || teamIds.Contains(value.Id))))
             teams[team.Id] = new { team.Id, team.Name, team.IsBanned };
-        var challenges = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().Where(value => value.CompetitionId == competitionId)
+        var challengeIds = facts.Values.Select(value => (Guid?)value.ChallengeId).Concat(nodes.Values.Select(value => value.ChallengeId)).OfType<Guid>().Distinct().ToArray();
+        var challengeQuery = db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().Where(value => value.CompetitionId == competitionId);
+        if (scope is not null) challengeQuery = challengeQuery.Where(value => challengeIds.Contains(value.Id));
+        var challenges = scope is not null && challengeIds.Length == 0 ? [] : await challengeQuery
             .Join(db.Challenges.IgnoreQueryFilters(), value => value.ChallengeId, template => template.Id,
                 (value, template) => new { value.Id, template.Title, template.Direction }).ToDictionaryAsync(value => value.Id, ct);
-        var instances = await db.CompetitionChallenges.AsNoTracking().Where(value => value.CompetitionId == competitionId)
+        var instanceQuery = db.CompetitionChallenges.AsNoTracking().Where(value => value.CompetitionId == competitionId);
+        if (scope is not null) instanceQuery = instanceQuery.Where(value => challengeIds.Contains(value.Id));
+        var instances = scope is not null && challengeIds.Length == 0 || !db.Challenges.Local.Any() ? [] : await instanceQuery
             .Select(value => new { value.Id, value.ChallengeId }).ToArrayAsync(ct);
         foreach (var template in db.Challenges.Local)
             foreach (var instance in instances.Where(value => value.ChallengeId == template.Id))

@@ -15,6 +15,7 @@ internal static class ScoringInfrastructure
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddSingleton<LeaderboardProjectionKeyedLock>();
+        services.AddSingleton<LeaderboardSnapshotDeserializer>();
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
         services.AddScoped<IScoreboardDetailReader, ScoreboardDetailReader>();
@@ -22,7 +23,10 @@ internal static class ScoringInfrastructure
         services.AddScoped<BuildScoreboardTrends>();
         services.AddScoped<GetSpectatorScreen>();
         if (!development)
+        {
             services.AddSingleton<ILeaderboardPublicationFence, NatsLeaderboardPublicationFence>();
+            services.AddSingleton<LeaderboardRebuildCoordinator>();
+        }
         return services;
     }
 }

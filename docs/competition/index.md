@@ -22,6 +22,7 @@
 | 赛道 | [赛道与准入](./participants/tracks.md) | 分组资格、内部测试、邀请码与 SSO |
 | 方向 | [方向目录](./settings/directions.md) | 题目分类、图标和排序 |
 | 题目 | [比赛题目](./content/challenges.md)、[提示与 Flag](./content/hints-flags.md) | 引用模板、发布、单题规则和敏感内容 |
+| 理论答题 | [组卷与运行](./content/theory.md)、[答卷纠错](./judging/theory.md) | CTF/AWD/AWDP 的团队共享试卷与理论成绩 |
 | 队伍管理 | [队伍审核](./participants/teams.md) | 报名、详情、赛道、调分、封禁与申诉 |
 | 大屏/控制屏、动态 | [赛事动态与大屏](./operations/events-live.md) | 展示公开进展，追溯管理事件 |
 | 提交 | [评测与重判](./judging/submissions.md) | 查询尝试、手动派发、证据和差异预览 |
@@ -38,7 +39,7 @@
 
 咨询入口在比赛选手工作区，并由线程授权区分管理操作，见 [咨询处理](./communication/questions.md)。删除/恢复/永久删除在概览，见 [比赛删除](./operations/deletion.md)。
 
-LiveSolo 管理菜单增加独立大厅、设置、题组、赛程，见 [第五赛制手册](./modes/live-solo/index.md)。不显示普通积分榜、CTF 闯关及其他赛制的大屏。Judge/Observer 保留各自读取/裁定范围，运营配置不因能进入工作区而全部开放。
+LiveSolo 管理菜单提供对局、本场题目池、题组、赛程和赛制设置，见 [LiveSolo 比赛管理](./modes/live-solo/index.md)。不显示普通积分榜、CTF 闯关及其他赛制的大屏。Judge/Observer 保留各自读取/裁定范围，运营配置不因能进入工作区而全部开放。
 
 ## 推荐工作流
 
@@ -49,3 +50,7 @@ LiveSolo 管理菜单增加独立大厅、设置、题组、赛程，见 [第五
 列表筛选后回到第一页，核对是否包含已删除记录；详情抽屉可以保持列表，但操作仍作用于当前详情 UUID。表单内修改不等于已保存，分区拥有各自保存按钮。202 代表异步受理，最终状态需轮询/刷新核对；重判、终止和调分客户端超时后先查询是否已入库，避免重复。
 
 权限不足、无效状态和业务引用冲突是不同问题。409 不一律代表“版本冲突”；按具体错误码、引用预览和资源 ID 修复。只在确实提供并发图标记的闯关保存等操作中处理对应并发冲突。
+
+## 不依附比赛的理论活动
+
+需要个人练习或限时测验时，从 `/admin/theory/activities` 创建 [独立理论活动](./activities/theory.md)，参与者从 `/theory` 进入。无需为个人测验创建比赛队伍；活动组织与内容权限仍逐项检查。

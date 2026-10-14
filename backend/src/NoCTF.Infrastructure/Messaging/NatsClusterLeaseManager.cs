@@ -26,6 +26,14 @@ public sealed class NatsClusterLeaseManager(
     public static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan RenewalInterval = TimeSpan.FromSeconds(10);
     private const string Bucket = "NOCTF_LEASES_V2";
+    private readonly NatsKeyValueStoreAccess storeAccess = new(ct =>
+        connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
+            new NatsKVConfig(Bucket)
+            {
+                Description = "NoCTF process ownership leases",
+                History = 1,
+                MaxAge = LeaseDuration
+            }, ct));
 
     public static string ResourceDomainKey(string domain) =>
         "resource-domain-" + Convert.ToHexString(
@@ -45,25 +53,21 @@ public sealed class NatsClusterLeaseManager(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        var context = connection.CreateKeyValueStoreContext();
-        var store = await context.CreateOrUpdateStoreAsync(new NatsKVConfig(Bucket)
+        return await storeAccess.ExecuteAsync<NatsClusterLease?>(async store =>
         {
-            Description = "NoCTF process ownership leases",
-            History = 1,
-            MaxAge = LeaseDuration
+            try
+            {
+                var revision = await store.CreateAsync(
+                    key,
+                    LeaseValue(owner, clock.GetUtcNow()),
+                    cancellationToken: cancellationToken);
+                return new(store, key, owner, revision, clock);
+            }
+            catch (NatsKVException)
+            {
+                return null;
+            }
         }, cancellationToken);
-        try
-        {
-            var revision = await store.CreateAsync(
-                key,
-                LeaseValue(owner, clock.GetUtcNow()),
-                cancellationToken: cancellationToken);
-            return new(store, key, owner, revision, clock);
-        }
-        catch (NatsKVException)
-        {
-            return null;
-        }
     }
 
     internal static string LeaseValue(string owner, DateTimeOffset renewedAt) =>

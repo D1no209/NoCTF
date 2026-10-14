@@ -6,6 +6,7 @@ using NATS.Client.KeyValueStore;
 using NATS.Net;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Messaging;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
@@ -26,6 +27,13 @@ public sealed class NatsLeaderboardPublicationFence(
     INatsConnection connection, IFusionCacheProvider caches) : ILeaderboardPublicationFence
 {
     private const string Bucket = "NOCTF_SCOREBOARD_PUBLICATIONS_V3";
+    private readonly NatsKeyValueStoreAccess storeAccess = new(ct =>
+        connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
+            new NatsKVConfig(Bucket)
+            {
+                Description = "NoCTF scoreboard publication versions",
+                History = 1
+            }, ct));
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private static readonly FusionCacheEntryOptions PayloadOptions = new()
     {
@@ -47,27 +55,39 @@ public sealed class NatsLeaderboardPublicationFence(
         {
             await cache.SetAsync(PayloadKey(competitionId, fence), payload,
                 PayloadOptions, token: ct);
-            var store = await OpenAsync(ct);
-            for (var attempt = 0; attempt < 16; attempt++)
+            return await storeAccess.ExecuteAsync<bool>(async store =>
             {
-                var entry = await ReadAsync(store, competitionId, ct);
-                if (entry is null || entry.Value.Value.IssuedVersion != fence)
-                    return false;
-                if (entry.Value.Value.PublishedVersion == fence)
-                    return true;
-                var next = entry.Value.Value with { PublishedVersion = fence };
-                try
+                for (var attempt = 0; attempt < 16; attempt++)
                 {
-                    await store.UpdateAsync(Key(competitionId), Serialize(next),
-                        entry.Value.Revision, cancellationToken: ct);
-                    return true;
+                    var entry = await ReadAsync(store, competitionId, ct);
+                    if (entry is null || entry.Value.Value.IssuedVersion != fence)
+                    {
+                        outcome = "rejected";
+                        // IssueAsync can advance IssuedVersion while retaining the current
+                        // published payload. A duplicate commit must not remove that payload.
+                        if (entry is { } rejected && rejected.Value.IssuedVersion > fence
+                            && rejected.Value.PublishedVersion != fence)
+                            await RetirePayloadAsync(competitionId, fence, ct);
+                        return false;
+                    }
+                    if (entry.Value.Value.PublishedVersion == fence)
+                        return true;
+                    var next = entry.Value.Value with { PublishedVersion = fence };
+                    try
+                    {
+                        await store.UpdateAsync(Key(competitionId), Serialize(next),
+                            entry.Value.Revision, cancellationToken: ct);
+                        if (entry.Value.Value.PublishedVersion is { } previous)
+                            await RetirePayloadAsync(competitionId, previous, ct);
+                        return true;
+                    }
+                    catch (NatsKVWrongLastRevisionException) when (attempt < 15)
+                    {
+                        await Task.Delay(Random.Shared.Next(1, 9), ct);
+                    }
                 }
-                catch (NatsKVWrongLastRevisionException) when (attempt < 15)
-                {
-                    await Task.Delay(Random.Shared.Next(1, 9), ct);
-                }
-            }
-            throw new InvalidOperationException("Scoreboard publication contention exceeded the retry limit.");
+                throw new InvalidOperationException("Scoreboard publication contention exceeded the retry limit.");
+            }, ct);
         }
         catch
         {
@@ -84,21 +104,25 @@ public sealed class NatsLeaderboardPublicationFence(
     public async Task<LeaderboardFencedPayload?> GetAsync(
         Guid competitionId, CancellationToken ct)
     {
-        var store = await OpenAsync(ct);
-        var entry = await ReadAsync(store, competitionId, ct);
-        if (entry?.Value.PublishedVersion is not long version)
-            return null;
-        var payload = await cache.GetOrDefaultAsync<string?>(
-            PayloadKey(competitionId, version), null, token: ct);
-        return payload is null ? null : new(version, payload);
+        return await storeAccess.ExecuteAsync<LeaderboardFencedPayload?>(async store =>
+        {
+            var entry = await ReadAsync(store, competitionId, ct);
+            if (entry?.Value.PublishedVersion is not long version)
+                return null;
+            var payload = await cache.GetOrDefaultAsync<string?>(
+                PayloadKey(competitionId, version), null, token: ct);
+            return payload is null ? null : new(version, payload);
+        }, ct);
     }
 
     public async Task<bool> IsCurrentAsync(
         Guid competitionId, long fence, CancellationToken ct)
     {
-        var store = await OpenAsync(ct);
-        var entry = await ReadAsync(store, competitionId, ct);
-        return entry?.Value.PublishedVersion == fence;
+        return await storeAccess.ExecuteAsync<bool>(async store =>
+        {
+            var entry = await ReadAsync(store, competitionId, ct);
+            return entry?.Value.PublishedVersion == fence;
+        }, ct);
     }
 
     public async Task InvalidateAsync(
@@ -112,32 +136,36 @@ public sealed class NatsLeaderboardPublicationFence(
         var outcome = "success";
         try
         {
-            var store = await OpenAsync(ct);
-            for (var attempt = 0; attempt < 16; attempt++)
+            return await storeAccess.ExecuteAsync<long>(async store =>
             {
-                var current = await ReadAsync(store, competitionId, ct);
-                var previousVersion = current?.Value.IssuedVersion ?? 0;
-                var version = Math.Max(minimumFence,
-                    checked(previousVersion + 1));
-                var next = new LeaderboardPublicationState(version,
-                    invalidate ? null : current?.Value.PublishedVersion);
-                try
+                for (var attempt = 0; attempt < 16; attempt++)
                 {
-                    if (current is null)
-                        await store.CreateAsync(Key(competitionId), Serialize(next),
-                            cancellationToken: ct);
-                    else
-                        await store.UpdateAsync(Key(competitionId), Serialize(next),
-                            current.Value.Revision, cancellationToken: ct);
-                    return version;
+                    var current = await ReadAsync(store, competitionId, ct);
+                    var previousVersion = current?.Value.IssuedVersion ?? 0;
+                    var version = Math.Max(minimumFence,
+                        checked(previousVersion + 1));
+                    var next = new LeaderboardPublicationState(version,
+                        invalidate ? null : current?.Value.PublishedVersion);
+                    try
+                    {
+                        if (current is null)
+                            await store.CreateAsync(Key(competitionId), Serialize(next),
+                                cancellationToken: ct);
+                        else
+                            await store.UpdateAsync(Key(competitionId), Serialize(next),
+                                current.Value.Revision, cancellationToken: ct);
+                        if (invalidate && current?.Value.PublishedVersion is { } previous)
+                            await RetirePayloadAsync(competitionId, previous, ct);
+                        return version;
+                    }
+                    catch (NatsKVException exception) when (attempt < 15
+                        && exception is NatsKVCreateException or NatsKVWrongLastRevisionException)
+                    {
+                        await Task.Delay(Random.Shared.Next(1, 9), ct);
+                    }
                 }
-                catch (NatsKVException exception) when (attempt < 15
-                    && exception is NatsKVCreateException or NatsKVWrongLastRevisionException)
-                {
-                    await Task.Delay(Random.Shared.Next(1, 9), ct);
-                }
-            }
-            throw new InvalidOperationException("Scoreboard version contention exceeded the retry limit.");
+                throw new InvalidOperationException("Scoreboard version contention exceeded the retry limit.");
+            }, ct);
         }
         catch
         {
@@ -152,13 +180,26 @@ public sealed class NatsLeaderboardPublicationFence(
         }
     }
 
-    private async Task<INatsKVStore> OpenAsync(CancellationToken ct) =>
-        await connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
-            new NatsKVConfig(Bucket)
-            {
-                Description = "NoCTF scoreboard publication versions",
-                History = 1
-            }, ct);
+    private async Task RetirePayloadAsync(Guid competitionId, long fence, CancellationToken ct)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "success";
+        try
+        {
+            await cache.RemoveAsync(PayloadKey(competitionId, fence), PayloadOptions, ct);
+        }
+        catch (Exception)
+        {
+            // Publication/invalidation already committed. Keep its result authoritative;
+            // the immutable entry's TTL bounds retention if best-effort cleanup fails.
+            outcome = "failure";
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordNatsOperation("leaderboard_payload_retire", outcome,
+                Stopwatch.GetElapsedTime(started).TotalSeconds);
+        }
+    }
 
     private static async Task<(LeaderboardPublicationState Value, ulong Revision)?> ReadAsync(
         INatsKVStore store, Guid competitionId, CancellationToken ct)

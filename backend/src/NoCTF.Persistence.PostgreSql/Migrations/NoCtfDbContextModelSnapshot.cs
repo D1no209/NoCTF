@@ -13604,6 +13604,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             b1.HasKey("Id")
                                 .HasName("pk_runtime_capacity_allocations");
 
+                            b1.HasIndex("ResourceDomain")
+                                .HasDatabaseName("ix_runtime_capacity_allocations_resource_domain");
+
                             b1.HasIndex("runtime_instance_id")
                                 .HasDatabaseName("ix_runtime_capacity_allocations_runtime_instance_id");
 

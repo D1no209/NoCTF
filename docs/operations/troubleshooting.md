@@ -85,3 +85,13 @@ Docker host port 由 Docker 随机分配；重置后读取新地址，不把平�
 ## 报障最小资料
 
 保留模式、Git/镜像 revision、精确时间、competition/challenge/team/runtime/fact ID、状态/failure code、步骤和脱敏错误。附少量必要日志，不贴 `.env`、Secret、JWT、Flag 或完整 SQL。
+
+## 多 Api 连接反复断开
+
+先区分普通 API 请求失败和 SignalR 协商/传输失败。使用多副本 Kubernetes 时检查 `/hubs` 的 Gateway 会话保持以及浏览器是否接收 `noctf-hub-affinity` Cookie；非浏览器客户端需跨请求保留 Cookie。逐 Pod 正常而 Gateway 失败时重点检查路由，不能通过端口转发成功就排除会话保持问题。
+
+## 理论重算或 LiveSolo 准备停滞
+
+理论纠错先查当前目标修订、答卷最终状态与 Worker/NATS 消费，再查排行榜投影；已受理不等于所有受影响试卷已重算。LiveSolo 准备失败先按工作区的资源、隔离或依赖原因修复，再对当前 Round/未开放题目重试。启用直播时额外检查 `livesolo-media` 消费队列及独立媒体服务。
+
+排查榜单延迟时先确认行为或答卷已有最终结果。当前 Worker 合并事件后以 NATS 租约协调重建，缓存可由关系事实恢复；增加 Worker 数量不应被当成绕过协调和数据库容量限制的办法。

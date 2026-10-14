@@ -1,6 +1,6 @@
 namespace NoCTF.Infrastructure.Runtime.Capacity;
 
-public sealed class RunnerCapacityLedgerCoordinator
+public sealed class RunnerCapacityLedgerCoordinator : IDisposable
 {
     private readonly SemaphoreSlim gate = new(1, 1);
 
@@ -9,6 +9,8 @@ public sealed class RunnerCapacityLedgerCoordinator
         await gate.WaitAsync(ct);
         return new Lease(gate);
     }
+
+    public void Dispose() => gate.Dispose();
 
     private sealed class Lease(SemaphoreSlim gate) : IDisposable
     {

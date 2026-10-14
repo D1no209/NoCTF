@@ -20,6 +20,14 @@ public sealed class NatsClusterSchedulerStatusStore(INatsConnection connection)
     : IClusterSchedulerStatusStore
 {
     private const string Bucket = "NOCTF_SCHEDULER_STATUS_V3";
+    private readonly NatsKeyValueStoreAccess storeAccess = new(ct =>
+        connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
+            new NatsKVConfig(Bucket)
+            {
+                Description = "NoCTF scheduler health status",
+                History = 1,
+                MaxAge = Lifetime
+            }, ct));
     private const string Key = "active";
     private static readonly TimeSpan Lifetime = TimeSpan.FromSeconds(15);
     private ulong ownedRevision;
@@ -27,9 +35,9 @@ public sealed class NatsClusterSchedulerStatusStore(INatsConnection connection)
     public async Task TakeOverAsync(
         ClusterSchedulerStatus status, CancellationToken cancellationToken)
     {
-        var store = await OpenAsync(cancellationToken);
-        ownedRevision = await store.PutAsync(Key, Serialize(status),
-            cancellationToken: cancellationToken);
+        ownedRevision = await storeAccess.ExecuteAsync(async store =>
+            await store.PutAsync(Key, Serialize(status),
+                cancellationToken: cancellationToken), cancellationToken);
     }
 
     public async Task RenewAsync(
@@ -38,9 +46,9 @@ public sealed class NatsClusterSchedulerStatusStore(INatsConnection connection)
         var revision = ownedRevision;
         if (revision == 0)
             throw new InvalidOperationException("The scheduler diagnostic lease is not owned.");
-        var store = await OpenAsync(cancellationToken);
-        ownedRevision = await store.UpdateAsync(Key, Serialize(status), revision,
-            cancellationToken: cancellationToken);
+        ownedRevision = await storeAccess.ExecuteAsync(async store =>
+            await store.UpdateAsync(Key, Serialize(status), revision,
+                cancellationToken: cancellationToken), cancellationToken);
     }
 
     public async Task ReleaseAsync(
@@ -49,48 +57,43 @@ public sealed class NatsClusterSchedulerStatusStore(INatsConnection connection)
         var revision = ownedRevision;
         ownedRevision = 0;
         if (revision == 0) return;
-        var store = await OpenAsync(cancellationToken);
-        try
+        await storeAccess.ExecuteAsync(async store =>
         {
-            await store.DeleteAsync(Key,
-                new NatsKVDeleteOpts { Revision = revision }, cancellationToken);
-        }
-        catch (NatsKVException)
-        {
-            // A new scheduler already owns the diagnostic entry.
-        }
+            try
+            {
+                await store.DeleteAsync(Key,
+                    new NatsKVDeleteOpts { Revision = revision }, cancellationToken);
+            }
+            catch (NatsKVException)
+            {
+                // A new scheduler already owns the diagnostic entry.
+            }
+        }, cancellationToken);
     }
 
     public async Task<ClusterSchedulerStatus?> ReadAsync(CancellationToken cancellationToken)
     {
-        var store = await OpenAsync(cancellationToken);
-        try
+        return await storeAccess.ExecuteAsync<ClusterSchedulerStatus?>(async store =>
         {
-            var entry = await store.GetEntryAsync<byte[]>(Key,
-                cancellationToken: cancellationToken);
-            return entry.Value is null
-                ? null
-                : JsonSerializer.Deserialize(entry.Value,
-                    ClusterSchedulerStatusJsonContext.Default.ClusterSchedulerStatus);
-        }
-        catch (NatsKVKeyNotFoundException)
-        {
-            return null;
-        }
-        catch (NatsKVKeyDeletedException)
-        {
-            return null;
-        }
-    }
-
-    private async Task<INatsKVStore> OpenAsync(CancellationToken ct) =>
-        await connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
-            new NatsKVConfig(Bucket)
+            try
             {
-                Description = "NoCTF scheduler health status",
-                History = 1,
-                MaxAge = Lifetime
-            }, ct);
+                var entry = await store.GetEntryAsync<byte[]>(Key,
+                    cancellationToken: cancellationToken);
+                return entry.Value is null
+                    ? null
+                    : JsonSerializer.Deserialize(entry.Value,
+                        ClusterSchedulerStatusJsonContext.Default.ClusterSchedulerStatus);
+            }
+            catch (NatsKVKeyNotFoundException)
+            {
+                return null;
+            }
+            catch (NatsKVKeyDeletedException)
+            {
+                return null;
+            }
+        }, cancellationToken);
+    }
 
     private static byte[] Serialize(ClusterSchedulerStatus status) =>
         JsonSerializer.SerializeToUtf8Bytes(status,

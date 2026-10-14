@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
+using NoCTF.Application.Authentication.Mfa;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
@@ -10,6 +12,66 @@ namespace NoCTF.Tests.Unit.API;
 
 public sealed class CompetitionHubAudienceTests
 {
+    [Test]
+    [Arguments(CompetitionAccessMode.Public, 2)]
+    [Arguments(CompetitionAccessMode.StaffOnly, 1)]
+    public async Task Router_validates_only_subscribers_in_the_requested_audience(CompetitionAccessMode mode, int candidateCount)
+    {
+        var competitionId = Guid.NewGuid(); var otherCompetitionId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var registry = new CompetitionHubSubscriptionRegistry();
+        registry.Set(new("public", userId, competitionId, CompetitionHubGroups.Public(competitionId), false));
+        registry.Set(new("staff", userId, competitionId, CompetitionHubGroups.Staff(competitionId), true));
+        registry.Set(new("other", userId, otherCompetitionId, CompetitionHubGroups.Public(otherCompetitionId), false));
+        var validator = Substitute.For<IMfaConnectionContextValidator>();
+        validator.ValidateAsync(Arg.Any<IReadOnlyList<MfaContextValidationRequest>>(), Arg.Any<CancellationToken>())
+            .Returns(call => (IReadOnlyDictionary<string, MfaFailure?>)call.Arg<IReadOnlyList<MfaContextValidationRequest>>()!
+                .ToDictionary(value => value.Key, _ => (MfaFailure?)null));
+        var guard = new MfaConnectionGuard(validator, TimeProvider.System);
+        foreach (var id in new[] { "public", "staff", "other", "unsubscribed" })
+        {
+            var caller = Substitute.For<HubCallerContext>();
+            caller.ConnectionId.Returns(id); caller.UserIdentifier.Returns(userId.ToString());
+            caller.User.Returns(new ClaimsPrincipal(new ClaimsIdentity([new("token_version", "0"),
+                new("exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds().ToString())], "Bearer")));
+            guard.Register(caller, MfaHubKind.Competition);
+        }
+        var access = Substitute.For<ICompetitionHubAudienceAccess>();
+        access.GetAccessModeAsync(competitionId, Arg.Any<CancellationToken>()).Returns(mode);
+        var context = Substitute.For<IHubContext<CompetitionHub, ICompetitionHubClient>>();
+        var router = new CompetitionHubAudienceRouter(access, context, registry, guard,
+            Substitute.For<IHubContext<SpectatorHub, ISpectatorHubClient>>());
+
+        _ = await router.CurrentAsync(competitionId, CancellationToken.None);
+
+        await validator.Received(1).ValidateAsync(Arg.Is<IReadOnlyList<MfaContextValidationRequest>>(requests => requests != null && requests.Count == candidateCount
+            && requests.All(value => value.Key == "staff" || mode == CompetitionAccessMode.Public && value.Key == "public")), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task A_subscription_removed_during_validation_cannot_receive_a_push()
+    {
+        var competitionId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var registry = new CompetitionHubSubscriptionRegistry();
+        registry.Set(new("staff", userId, competitionId, CompetitionHubGroups.Staff(competitionId), true));
+        var caller = Substitute.For<HubCallerContext>(); caller.ConnectionId.Returns("staff"); caller.UserIdentifier.Returns(userId.ToString());
+        caller.User.Returns(new ClaimsPrincipal(new ClaimsIdentity([new("token_version", "0"),
+            new("exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds().ToString())], "Bearer")));
+        var validator = Substitute.For<IMfaConnectionContextValidator>();
+        validator.ValidateAsync(Arg.Any<IReadOnlyList<MfaContextValidationRequest>>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            registry.Remove("staff", competitionId);
+            return (IReadOnlyDictionary<string, MfaFailure?>)new Dictionary<string, MfaFailure?> { ["staff"] = null };
+        });
+        var guard = new MfaConnectionGuard(validator, TimeProvider.System); guard.Register(caller, MfaHubKind.Competition);
+        var context = Substitute.For<IHubContext<CompetitionHub, ICompetitionHubClient>>();
+        var router = new CompetitionHubAudienceRouter(Substitute.For<ICompetitionHubAudienceAccess>(), context, registry, guard,
+            Substitute.For<IHubContext<SpectatorHub, ISpectatorHubClient>>());
+
+        _ = await router.AllKnownAsync(competitionId, CancellationToken.None);
+
+        _ = context.Clients.Received(1).Clients(Arg.Is<IReadOnlyList<string>>(ids => ids != null && ids.Count == 0));
+    }
+
     [Test]
     public async Task Router_targets_both_groups_for_public_and_only_staff_for_hidden()
     {

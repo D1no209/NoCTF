@@ -2,6 +2,8 @@
 
 入口为 `/competitions/比赛ID/staff`，订阅也可在现有 Webhook 管理页配置。创建前确认接收端有权接收所选工作人员摘要。
 
+LiveSolo 的工作人员工作台位于 `/admin/competitions/比赛ID/live-solo/staff`，保留比赛管理侧栏；事件时间线另从 `/admin/competitions/比赛ID/live-solo/events` 查看。
+
 只有平台管理员、赛事所有者或 Manager 可以配置；Judge 与 Observer 可查看名称、状态和投递结果，不能读取目标 URL 或签名密钥。允许草稿和 StaffOnly 比赛。
 
 ## 配置
