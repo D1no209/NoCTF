@@ -1,20 +1,55 @@
 import { nextTick } from 'vue'
 
-type RevealTransitionLayer = 'theme' | 'wallpaper'
+/**
+ * 明暗切换与壁纸切换共用的分层动效:
+ *
+ *   背景图 → 背景切换动效 → 组件 → 组件动效
+ *
+ * - 背景切换动效由「幽灵层」承担:切换前把当前背景层克隆成组件之下的固定层
+ *   (内联冻结旧主题的背景色、壁纸与模糊变量),由它自上而下移出,露出实时新背景。
+ * - 组件动效由组件自己承担:切换窗口内为实时组件打开颜色/阴影过渡,与背景同时进行。
+ * - 全程不使用 View Transitions 快照:快照会把组件压成图层,卡片 backdrop-filter
+ *   失去背景采样(发灰/虚化丢失),且切换期间组件不可交互。
+ */
 
-interface RevealTransitionDocument {
-  startViewTransition?: (update: () => void | Promise<void>) => {
-    finished: Promise<void>
-    skipTransition?: () => void
-  }
+type SwitchLayer = 'theme' | 'wallpaper'
+
+/** 背景交叉淡出时长(仅 opacity,合成器动画);组件颜色过渡与之同步收尾。 */
+export const switchBackgroundDurationMs = 360
+/** 组件自身动效时长(与背景同一条缓动曲线)。 */
+export const switchComponentDurationMs = 320
+export const switchTransitionDeadlineMs = 1_500
+
+const BACKGROUND_GHOST_ATTRIBUTE = 'wallpaperGhost'
+const BACKGROUND_VARIABLES = ['--background', '--page-wallpaper-image', '--page-wallpaper-blur'] as const
+
+let switchInProgress = false
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export const revealTransitionDeadlineMs = 1_500
+/** 冻结当前背景观感,生成位于组件之下的幽灵层。 */
+function createBackgroundGhost(): HTMLElement | null {
+  const wallpaper = document.querySelector<HTMLElement>('[data-page-wallpaper="true"]')
+  if (!wallpaper) return null
 
-let revealInProgress = false
+  const computed = window.getComputedStyle(wallpaper)
+  const ghost = wallpaper.cloneNode(true) as HTMLElement
+  for (const name of BACKGROUND_VARIABLES) {
+    const value = computed.getPropertyValue(name).trim()
+    if (value) ghost.style.setProperty(name, value)
+  }
+  ghost.setAttribute('aria-hidden', 'true')
+  ghost.dataset[BACKGROUND_GHOST_ATTRIBUTE] = ''
+  // 插到背景层之后:同为负层级,幽灵层盖住旧背景却仍在组件之下。
+  wallpaper.after(ghost)
+  return ghost
+}
 
-async function waitForTransition(transition: { finished: Promise<void>, skipTransition?: () => void }): Promise<void> {
-  await new Promise<void>((resolve) => {
+function waitForGhost(ghost: HTMLElement | null): Promise<void> {
+  if (!ghost) return Promise.resolve()
+  return new Promise<void>((resolve) => {
     let settled = false
     const finish = () => {
       if (settled) return
@@ -22,17 +57,16 @@ async function waitForTransition(transition: { finished: Promise<void>, skipTran
       clearTimeout(deadline)
       resolve()
     }
-    const deadline = setTimeout(() => {
-      transition.skipTransition?.()
-      finish()
-    }, revealTransitionDeadlineMs)
-    void transition.finished.then(finish, finish)
+    const deadline = setTimeout(finish, switchTransitionDeadlineMs)
+    ghost.addEventListener('animationend', finish, { once: true })
+    // 元素被移除或动画未触发时也不能卡住切换状态。
+    window.setTimeout(finish, switchBackgroundDurationMs + 120)
   })
 }
 
-/** Runs the shared top-to-bottom reveal, scoped to the requested visual layer. */
-export async function runDownRevealTransition(
-  layer: RevealTransitionLayer,
+/** 运行分层切换:背景由幽灵层揭示,组件在实时 DOM 上完成自身动效。 */
+export async function runSwitchTransition(
+  layer: SwitchLayer,
   update: () => void | Promise<void>,
 ): Promise<void> {
   if (typeof document === 'undefined' || typeof window === 'undefined') {
@@ -40,38 +74,24 @@ export async function runDownRevealTransition(
     return
   }
 
-  const transitionDocument = document as RevealTransitionDocument
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reducedMotion || !transitionDocument.startViewTransition || revealInProgress) {
+  const datasetKey = layer === 'theme' ? 'themeTransition' : 'wallpaperTransition'
+  if (prefersReducedMotion() || switchInProgress) {
     await update()
     await nextTick()
     return
   }
 
-  const datasetKey = layer === 'theme' ? 'themeTransition' : 'wallpaperTransition'
-  revealInProgress = true
-  document.documentElement.dataset[datasetKey] = 'down'
-  let updateStarted = false
+  switchInProgress = true
+  const ghost = createBackgroundGhost()
+  document.documentElement.dataset[datasetKey] = ''
   try {
-    const transition = transitionDocument.startViewTransition(async () => {
-      updateStarted = true
-      await update()
-      await nextTick()
-    })
-    await waitForTransition(transition)
-    if (!updateStarted) {
-      await update()
-      await nextTick()
-    }
-  }
-  catch {
-    if (!updateStarted) {
-      await update()
-      await nextTick()
-    }
+    await update()
+    await nextTick()
+    await waitForGhost(ghost)
   }
   finally {
+    ghost?.remove()
     delete document.documentElement.dataset[datasetKey]
-    revealInProgress = false
+    switchInProgress = false
   }
 }

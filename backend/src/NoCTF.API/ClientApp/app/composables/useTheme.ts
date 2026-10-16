@@ -1,5 +1,5 @@
 import { useDark, useToggle } from '@vueuse/core'
-import { runDownRevealTransition } from '../motion/reveal-transition'
+import { runSwitchTransition } from '../motion/reveal-transition'
 
 /** 深浅色主题:默认深色,用户选择经 localStorage 持久化(vueuse-color-scheme)。 */
 export function useTheme() {
@@ -10,7 +10,7 @@ export function useTheme() {
   function toggle() {
     if (!import.meta.client || themeTransitioning.value) return
     themeTransitioning.value = true
-    void runDownRevealTransition('theme', () => {
+    void runSwitchTransition('theme', () => {
       toggleDark()
     }).finally(() => {
       themeTransitioning.value = false

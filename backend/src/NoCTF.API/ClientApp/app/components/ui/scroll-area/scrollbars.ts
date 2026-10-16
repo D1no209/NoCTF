@@ -196,9 +196,16 @@ export function createScrollbars(
     schedulePinnedScrollbarUpdate()
   }
 
+  let currentAxis = axis
+
   return {
     instance,
     update(nextAxis) {
+      // 重新下发 overflow 会触发 OverlayScrollbars 全量重测(逐属性 getComputedStyle +
+      // 重建滚动条 DOM)。resetKey 与指令 updated 钩子在每次路由切换或渲染更新时都会
+      // 调用这里,而轴几乎不变,轴相同时没有可下发的变更,直接返回。
+      if (nextAxis === currentAxis) return
+      currentAxis = nextAxis
       instance.options({ overflow: overflowOptions(nextAxis) })
       if (pinnedScrollbar) invalidatePinGeometry()
     },

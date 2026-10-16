@@ -22,7 +22,7 @@ import PasskeyAccountSecurityComponent from '../authentication/passkeys/PasskeyA
 import MfaAccountSecurityComponent from '../authentication/mfa/MfaAccountSecurity.vue'
 import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 import { exceedsUploadLimit } from './upload-limits'
-import { runDownRevealTransition } from '../../motion/reveal-transition'
+import { runSwitchTransition } from '../../motion/reveal-transition'
 
 export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'security'
 
@@ -205,7 +205,7 @@ export function useAccountPanel() {
       })
       if (error || !data) throw error
       const nextEnabled = data.appearance?.wallpaperEnabled ?? enabled
-      await runDownRevealTransition('wallpaper', () => {
+      await runSwitchTransition('wallpaper', () => {
         if (user.value)
           user.value = { ...user.value, wallpaperEnabled: nextEnabled }
       })

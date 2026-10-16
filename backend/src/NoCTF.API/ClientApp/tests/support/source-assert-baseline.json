@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2503,
+  "textAssertions": 2476,
   "sourceTextAssertions": {
-    "total": 1809,
+    "total": 1779,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -70,6 +70,7 @@
       "public-profile-layout.test.ts": 52,
       "realtime-retry.test.ts": 3,
       "remaining-attempts.test.ts": 3,
+      "reveal-transition.test.ts": 8,
       "route-loading-performance.test.ts": 11,
       "route-scroll-reset.test.ts": 3,
       "runtime-card.test.ts": 9,
@@ -85,14 +86,12 @@
       "terminal-command.test.ts": 13,
       "theme-color.test.ts": 7,
       "theme-palette.test.ts": 12,
-      "theme-transition.test.ts": 26,
       "topbar-layout.test.ts": 28,
-      "wallpaper-transition.test.ts": 12,
       "writeup-review.test.ts": 72
     }
   },
   "pureSyntaxAssertions": {
-    "total": 112,
+    "total": 111,
     "files": {
       "account-privacy.test.ts": 1,
       "admin-challenge-navigation.test.ts": 5,
@@ -133,7 +132,6 @@
       "scoreboard-matrix.test.ts": 10,
       "sso.test.ts": 1,
       "theme-color.test.ts": 2,
-      "theme-transition.test.ts": 1,
       "writeup-review.test.ts": 5
     }
   }
