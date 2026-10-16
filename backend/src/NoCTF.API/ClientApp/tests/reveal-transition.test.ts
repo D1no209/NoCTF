@@ -13,35 +13,33 @@ function cssRules(css: string): { selector: string, body: string }[] {
 const motion = await sourceFile('app/motion/motion.css').text()
 const rules = cssRules(motion)
 
-test('background and components animate on their own live layers without snapshots', () => {
-  // 背景切换动效:幽灵层位于组件之下,只用 opacity 走合成器(遮罩/剪裁会让整屏逐帧重绘)。
-  const ghost = rules.find(rule => rule.selector.includes('[data-wallpaper-ghost]'))
-  expect(ghost).toBeDefined()
-  expect(ghost!.body).toContain('z-index: -1')
-  expect(ghost!.body).toContain('noctf-background-scan-down')
-  expect(ghost!.body).toContain('mask-position: bottom')
+test('the scan runs on a top layer while components animate in place', () => {
+  // 扫描光带在最顶层:固定定位、pointer-events none、只做 transform 合成。
+  const veil = rules.find(rule => rule.selector.includes('[data-switch-scan-veil]'))
+  expect(veil).toBeDefined()
+  expect(veil!.body).toContain('pointer-events: none')
+  expect(veil!.body).toContain('noctf-scan-sweep')
+  expect(motion).toContain('translate3d(0, calc(100vh + 38vh), 0)')
 
-  // 组件动效:只收敛到承载主题色的表面,禁止对整棵树逐元素过渡。
-  const componentMotion = rules.find(rule => rule.body.includes('background-color') && rule.selector.includes("data-slot='card'"))
+  // 组件动效:有界容器集合,且不含 box-shadow(逐元素阴影过渡会整屏重绘)。
+  const componentMotion = rules.find(rule => rule.selector.includes("data-slot='card-header'") && rule.body.includes('transition-property'))
   expect(componentMotion).toBeDefined()
-  expect(componentMotion!.selector).toContain("html[data-theme-transition]")
-  expect(motion).not.toContain(':where(*, *::before, *::after)')
+  expect(componentMotion!.body).not.toContain('box-shadow')
 
-  // 快照会把组件压成图层并失去 backdrop-filter 采样,因此不得再使用。
+  // 不再使用快照或背景幽灵层。
   expect(motion).not.toContain('::view-transition')
+  expect(motion).not.toContain('wallpaper-ghost')
 })
 
-test('the driver freezes the old background into a ghost layer and skips motion on request', async () => {
-  const reveal = await sourceFile('app/motion/reveal-transition.ts').text()
+test('the driver sweeps a top layer and skips motion on request', async () => {
+  const driver = await sourceFile('app/motion/reveal-transition.ts').text()
 
-  expect(reveal).toContain('wallpaper.after(ghost)')
-  for (const name of ['--background', '--page-wallpaper-image', '--page-wallpaper-blur'])
-    expect(reveal).toContain(name)
-  expect(reveal).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-  expect(reveal).not.toContain('startViewTransition')
+  expect(driver).toContain('document.body.appendChild(veil)')
+  expect(driver).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
+  expect(driver).not.toContain('startViewTransition')
 })
 
-test('both switches drive the shared layered driver', async () => {
+test('both switches drive the shared driver', async () => {
   const theme = await sourceFile('app/composables/useTheme.ts').text()
   const account = await sourceFile('app/features/account/useAccountPanel.ts').text()
 
