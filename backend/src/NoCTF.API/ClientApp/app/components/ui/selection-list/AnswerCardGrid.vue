@@ -18,7 +18,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       <Button
         type="button"
         size="icon"
-        :variant="item.answered ? 'default' : 'secondary'"
+        variant="secondary"
         :disabled="disabled"
         role="option"
         :aria-selected="item.active"
@@ -29,7 +29,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
         :class="cn(
           'size-9 rounded-[10px] font-mono text-sm tabular-nums',
           !item.answered && 'bg-muted/40 text-foreground/80',
-          item.answered && 'text-primary-foreground',
+          item.answered && 'bg-primary/40 text-foreground',
           item.active && 'shadow-[0_0_0_2px_var(--primary)]',
         )"
         @click="emit('update:modelValue', item.value)"
