@@ -2,6 +2,7 @@ import type { ComponentPublicInstance } from 'vue'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { isCredentialSafeUrl } from '../../../lib/credential-url'
 import { capturePdfAnchor, createPdfLayout, pdfCanvasSize, pdfPageAtOffset, pdfPageGap, pdfReadingWindow, restorePdfAnchor } from './pdf-page-window'
 import type { PdfPageLayout, PdfPageSize } from './pdf-page-window'
 
@@ -215,11 +216,14 @@ export function usePdfPreview(props: PdfPreviewOptions) {
     scrollTop.value = 0
     zoomFactor.value = 1
     try {
-      pdfLibraryPromise ??= import('pdfjs-dist')
+      // 失败必须复位:否则被拒绝的 import promise 会被本会话一直复用,PDF 预览永久不可用。
+      pdfLibraryPromise ??= import('pdfjs-dist').catch((error) => { pdfLibraryPromise = null; throw error })
       const library = await pdfLibraryPromise
       library.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
       if (request !== documentRequest) return
-      const task = library.getDocument({ url: source, httpHeaders: props.httpHeaders, enableXfa: false, disableAutoFetch: true, disableStream: true })
+      // 纵深防御:pdf.js 会把 httpHeaders 附加到任意 http(s) URL,跨源时一律不携带凭证。
+      const httpHeaders = isCredentialSafeUrl(source) ? props.httpHeaders : undefined
+      const task = library.getDocument({ url: source, httpHeaders, enableXfa: false, disableAutoFetch: true, disableStream: true })
       loadingTask = task
       const document = await task.promise
       if (request !== documentRequest) { await task.destroy().catch(() => undefined); return }

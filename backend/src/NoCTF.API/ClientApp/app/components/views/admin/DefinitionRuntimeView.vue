@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
+const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings, egressPolicyOptions, onUpdateModelValueRuntimeEgressPolicy } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -32,6 +32,23 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
         {{ runtime.allocation === RuntimeAllocation.Shared ? $t('common.label.share') : $t('runtime.label.teamIndependent') }}
       </Badge>
     </div>
+
+    <Field>
+      <FieldLabel>{{ $t('runtime.label.egressPolicy') }}</FieldLabel>
+      <Select
+        :model-value="String(runtime.egressPolicy)"
+        :disabled="disabled"
+        @update:model-value="onUpdateModelValueRuntimeEgressPolicy"
+      >
+        <SelectTrigger class="w-full sm:max-w-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem v-for="option in egressPolicyOptions" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription>{{ $t('runtime.description.egressPolicy') }}</FieldDescription>
+    </Field>
 
     <Field v-if="showDynamicFlagInjection" orientation="horizontal">
       <Switch

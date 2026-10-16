@@ -5,7 +5,7 @@ import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toRefs, watch } from 'vue'
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
 import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract,
-  emptyDefinition, emptyRuntimeTemplate, FlagSource, RuntimeAllocation, UrlExposure } from '../app/utils/game-config'
+  EgressPolicy, emptyDefinition, emptyRuntimeTemplate, FlagSource, RuntimeAllocation, UrlExposure } from '../app/utils/game-config'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
@@ -24,14 +24,14 @@ async function harness(path: string, name: string, props?: object) {
   const deps: Record<string, any> = { ...soloNavigation, competitionChallengeManagementPath,
     useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
     gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
-    definitionModelToContract, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,
+    definitionModelToContract, EgressPolicy, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,
     challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition,
     bytesToMib: (x: number) => x, cpuMillicoresToCores: (x: number) => x,
     translate, gameModeLabel: (x: string) => x, describeMessage: (key: string) => key,
     useRoute: () => ({ params: { id: 'contest' }, path: '/admin/competitions/contest', query: {} }),
     useAuth: () => ({ canOrganize: ref(true), isAdministrator: ref(true), user: ref({ userId: 'admin' }) }),
     usePlatform: () => ({ configuration: ref({}) }),
-    onMounted: (callback: () => unknown) => mounted.push(callback),
+    onMounted: (callback: () => unknown) => mounted.push(callback), ensureLocaleDomains: async () => {},
     useAdminCompetitionResource: () => testAdminResource(async () => ({ data: { competition: competition.value } })), watchCompetition: () => () => {}, onUnmounted: () => {},
     provide: () => {}, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(), adminWorkspacePath: (x: string) => x,
     localInputToIso: (x: string) => new Date(x).toISOString(),

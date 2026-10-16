@@ -3,6 +3,7 @@ import type { UiMessage } from '../../../utils/i18n'
 import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
+import { safeInternalPath } from '~/lib/safe-redirect'
 
 /** Owns the standalone registration page workflow. */
 export function useAuthRegisterPage() {
@@ -24,12 +25,7 @@ export function useAuthRegisterPage() {
   const resendDone = ref(false)
   const resendError = ref<UiMessage | null>(null)
   const loginTarget = computed(() => {
-    const candidate = route.query.redirect
-    const redirect = typeof candidate === 'string'
-      && candidate.startsWith('/')
-      && !candidate.startsWith('//')
-      ? candidate
-      : null
+    const redirect = safeInternalPath(route.query.redirect, '')
     return redirect
       ? { path: '/auth/login', query: { redirect } }
       : { path: '/auth/login' }

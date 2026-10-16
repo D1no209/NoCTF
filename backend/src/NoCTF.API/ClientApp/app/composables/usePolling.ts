@@ -1,3 +1,5 @@
+import { onScopeDispose, ref } from 'vue'
+
 export interface PollingOptions {
   /** Initial delay in ms. */
   interval?: number
@@ -20,18 +22,24 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
   const timedOut = ref(false)
   const error = ref<unknown | null>(null)
 
-  let stopped = false
+  let disposed = false
+  /**
+   * Run token: start()/stop() bump it so any in-flight tick chain becomes stale.
+   * Without it a probe that is awaiting while start() runs resumes into a second
+   * chain, and two chains keep scheduling the same `timer` handle concurrently.
+   */
+  let run = 0
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  async function tick(delay: number, elapsed: number, attempt: number): Promise<void> {
-    if (stopped) return
+  async function tick(token: number, delay: number, elapsed: number, attempt: number): Promise<void> {
+    if (disposed || token !== run) return
     if (elapsed >= timeout) {
       polling.value = false
       timedOut.value = true
       return
     }
     timer = setTimeout(async () => {
-      if (stopped) return
+      if (disposed || token !== run) return
       let done = false
       try {
         done = await probe()
@@ -41,34 +49,38 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
         error.value = probeError
         // Keep polling through transient failures until the timeout.
       }
-      if (done || stopped) {
-        polling.value = false
+      if (done || disposed || token !== run) {
+        if (token === run) polling.value = false
         return
       }
       const nextDelay = delays[attempt + 1]
         ?? Math.min(delay * 1.5, maxInterval)
-      await tick(nextDelay, elapsed + delay, attempt + 1)
+      await tick(token, nextDelay, elapsed + delay, attempt + 1)
     }, delay)
   }
 
   function start(): void {
+    // A disposed scope must never arm a new chain: late await continuations would
+    // otherwise keep polling with no remaining cleanup path.
+    if (disposed) return
     stop()
-    stopped = false
+    const token = ++run
     timedOut.value = false
     error.value = null
     polling.value = true
-    void tick(delays[0] ?? interval, 0, 0)
+    void tick(token, delays[0] ?? interval, 0, 0)
   }
 
   function stop(): void {
-    stopped = true
+    run += 1
     polling.value = false
     timedOut.value = false
     error.value = null
     if (timer) clearTimeout(timer)
+    timer = undefined
   }
 
-  onScopeDispose(stop)
+  onScopeDispose(() => { disposed = true; stop() })
 
   return { polling, timedOut, error, start, stop }
 }

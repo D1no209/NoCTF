@@ -129,6 +129,7 @@ export type RuntimeDefinitionModel = ContainerDefinitionModel | OvaDefinitionMod
 
 export interface RuntimeTemplateModel {
   allocation: number
+  egressPolicy: number
   definition: RuntimeDefinitionModel
   limits: RuntimeLimitsModel
   ttlSeconds: number | null
@@ -212,6 +213,7 @@ export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel 
     : UrlExposure.Participants
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
+    egressPolicy: EgressPolicy.Isolated,
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
@@ -325,6 +327,10 @@ function protocolAllocation(value: unknown): number {
   return value === 'Shared' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
 }
 
+function protocolEgressPolicy(value: unknown): number {
+  return value === 'InternetOnly' ? EgressPolicy.InternetOnly : EgressPolicy.Isolated
+}
+
 function protocolFlagSource(value: unknown): number {
   return value === 'PerTeam'
     ? FlagSource.PerTeam
@@ -358,6 +364,7 @@ function definitionContractRuntime(
   const bindings = Array.isArray(value.urlBindings) ? value.urlBindings : []
   return {
     allocation: protocolAllocation(value.allocation),
+    egressPolicy: protocolEgressPolicy(value.egressPolicy),
     definition,
     limits: {
       memoryBytes: asNumber(limits.memoryBytes),
@@ -728,7 +735,7 @@ function runtimeModelToContract(
       : runtime.flagSource === FlagSource.AwdRotation
         ? 'AwdRotation' as const
         : 'Static' as const,
-    egressPolicy: 'Isolated' as const,
+    egressPolicy: runtime.egressPolicy === EgressPolicy.InternetOnly ? 'InternetOnly' as const : 'Isolated' as const,
     urlBindings: [
       ...runtime.urlBindings.map(binding => ({
         urlTemplate: binding.urlTemplate,

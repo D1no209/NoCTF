@@ -1,4 +1,4 @@
-import { message as describeMessage } from '../../../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { ArrowLeft } from '@lucide/vue'
 import { competitionChallengesPath } from '../../../../utils/app-routes'
@@ -101,6 +101,7 @@ export function useCompetitionsByIdEventsPage() {
   let unwatch: (() => void) | undefined
 
   onMounted(() => {
+    void ensureLocaleDomains(['runtime'])
     unwatch = watchCompetition(competitionId, {
       competitionEventChanged: event => {
         const occurredAt = Date.parse(event.occurredAt)

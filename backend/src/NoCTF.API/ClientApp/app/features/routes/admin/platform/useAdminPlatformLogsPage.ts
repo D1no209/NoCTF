@@ -13,17 +13,35 @@ type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 
 /** Owns state, effects and commands for AdminPlatformLogsPage. */
 export function useAdminPlatformLogsPage() {
-  const LEVEL_LABELS: Record<string, string> = {
+  const LEVEL_MESSAGE_KEYS = {
     Trace: "administration.label.track", Debug: "administration.label.debugging", Information: "common.label.information", Warning: "common.label.warning", Error: "common.label.wrong", Critical: "administration.label.serious",
-  }
+  } as const satisfies Record<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, string>
 
-  const SERVICE_LABELS: Record<string, string> = {
+  const SERVICE_MESSAGE_KEYS = {
     Api: "administration.label.api", Worker: "administration.label.worker", Runner: "common.label.runner", Host: "administration.label.host.platformLogsPage",
+  } as const satisfies Record<NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol, string>
+
+  const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const satisfies readonly NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol[]
+
+  /** 未知等级按最高严重级处理,避免诊断日志被静默过滤掉。 */
+  const levelOrdinal = (level?: string | number) => {
+    if (typeof level === 'number') return level
+    const index = LEVEL_ORDER.indexOf(level as NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol)
+    return index < 0 ? Number.POSITIVE_INFINITY : index
   }
 
-  const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
+  const levelLabel = (level?: string | number | null): string => {
+    if (level === undefined || level === null) return ''
+    const protocol = typeof level === 'number' ? LEVEL_ORDER[level] : level
+    if (!protocol) return String(level)
+    const key = (LEVEL_MESSAGE_KEYS as Record<string, string | undefined>)[protocol]
+    return key ? translate(key) : String(level)
+  }
 
-  const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
+  const serviceLabel = (service?: string | null): string => {
+    if (service === undefined || service === null) return ''
+    return translate((SERVICE_MESSAGE_KEYS as Record<string, string | undefined>)[service] ?? service)
+  }
 
   const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
 
@@ -181,8 +199,8 @@ export function useAdminPlatformLogsPage() {
   return {
       Download,
       Radio,
-      LEVEL_LABELS,
-      SERVICE_LABELS,
+      levelLabel,
+      serviceLabel,
       levelOrdinal,
       minimumLevel,
       service,

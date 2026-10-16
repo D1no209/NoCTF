@@ -75,6 +75,8 @@ function harness(provider = 'Cap', delayConfiguration = false) {
     authenticationSsoListProviders: async () => ({ data: { items: [] } }),
     authenticationSsoBeginLogin: async () => ({}),
     navigateTo: async (path: string) => { navigations.push(path); scopes[0]!.stop() },
+    safeInternalPath: (value: unknown, fallback = '/') =>
+      typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') ? value : fallback,
   }
   const factory = new Function('dependencies', `const { ${Object.keys(dependencies).join(', ')} } = dependencies;
     ${verificationSource}; ${loginSource}; return { useAuthLoginPage, useHumanVerification };`)(dependencies)

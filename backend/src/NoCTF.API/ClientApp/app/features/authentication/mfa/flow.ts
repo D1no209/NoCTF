@@ -1,4 +1,5 @@
 import type { NoCtfApplicationAuthenticationMfaMfaVerificationMethod, NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse } from '../../../api'
+import { safeInternalPath } from '../../../lib/safe-redirect'
 export function normalizeMfaCode(code: string, method: NoCtfApplicationAuthenticationMfaMfaVerificationMethod): string {
   return method === 'Totp' ? code.replace(/\s/g, '') : code.trim().replaceAll('-', '').toUpperCase()
 }
@@ -9,6 +10,6 @@ export function isEnrollmentFlow(flow: NoCtfapiEndpointsAuthenticationMfaMfaFlow
   return flow?.purpose === 'Enrollment' || flow?.purpose === 'Rebind' || flow?.purpose === 'RecoveryEnrollment'
 }
 export function safeMfaReturnPath(value: unknown): string {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')
-    && !value.startsWith('/auth/') ? value : '/'
+  const path = safeInternalPath(value)
+  return path.startsWith('/auth/') ? '/' : path
 }

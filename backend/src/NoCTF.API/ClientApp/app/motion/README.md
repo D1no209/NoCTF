@@ -14,7 +14,7 @@
 - `useTypewriterMotion`: sequential Unicode code-point reveal for the current pseudo-terminal output. It restarts when a command replaces the output, pauses while the document is hidden, reveals immediately for reduced motion and disposes its timer after completion or unmount.
 - `status-mark`: 320ms scale-and-rotate reveal for newly mounted challenge completion marks. The settled rotation comes from the status token; reduced motion disables the reveal.
 
-UI primitives call `motionAttributes`. `MotionSurface` bridges a preset to content composed by rendering views. Selection, keyboard navigation and network state do not belong in this library. Do not attach global keyboard handlers, hijack Tab, or create one animation loop per item.
+UI primitives call `motionAttributes` to bridge a preset to composed content. Selection, keyboard navigation and network state do not belong in this library. Do not attach global keyboard handlers, hijack Tab, or create one animation loop per item.
 
 Both animation presets are disabled by `prefers-reduced-motion: reduce`. Library styling is imported once by the shared stylesheet.
 

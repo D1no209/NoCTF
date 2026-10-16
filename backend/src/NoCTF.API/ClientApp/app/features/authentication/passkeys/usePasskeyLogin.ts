@@ -3,6 +3,7 @@ import { passkeyBrowserSupported, requestPasskey, passkeyCancelled } from './web
 import { message } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { safeMfaReturnPath } from '../mfa/flow'
+import { safeInternalPath } from '../../../lib/safe-redirect'
 export function usePasskeyLogin() {
   const auth = useAuth()
   const route = useRoute()
@@ -20,7 +21,7 @@ export function usePasskeyLogin() {
       const credentialJson = await requestPasskey(options.data.publicKey, abort.signal)
       const complete = await completePasskeyLoginEndpoint({ body: { credentialJson }, signal: abort.signal })
       if (complete.error || !complete.data) throw complete.error
-      if (await auth.acceptAuthentication(complete.data)) await navigateTo(complete.data.state === 'Authenticated' ? complete.data.returnPath : '/')
+      if (await auth.acceptAuthentication(complete.data)) await navigateTo(complete.data.state === 'Authenticated' ? safeInternalPath(complete.data.returnPath) : '/')
     } catch (requestError) {
       error.value = passkeyCancelled(requestError) ? message('passkeys.cancelled') : parseApiError(requestError, message('passkeys.failed')).displayMessage
       await cancelPasskeyCeremonyEndpoint()

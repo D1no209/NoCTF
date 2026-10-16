@@ -6,6 +6,7 @@ import {
   authenticationSsoCompleteLogin,
 } from '../api'
 import type { NoCtfapiEndpointsAuthenticationAuthenticationResponse, NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
+import { safeInternalPath } from '../lib/safe-redirect'
 import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
@@ -125,7 +126,8 @@ export function useAuth() {
     if (error || !data)
       throw parseApiError(error)
     if (!await acceptAuthentication(data)) return '/auth/mfa'
-    return data.state === 'Authenticated' ? data.returnPath : '/auth/mfa'
+    // 回跳路径来自服务端回传,必须按站内路径校验后再导航。
+    return data.state === 'Authenticated' ? safeInternalPath(data.returnPath) : '/auth/mfa'
   }
 
   async function startImpersonation(input: {
@@ -148,7 +150,7 @@ export function useAuth() {
       targetUserId: input.targetUserId,
       targetUserName: input.targetUserName,
       expiresAt: input.expiresAt,
-      returnPath: input.returnPath,
+      returnPath: safeInternalPath(input.returnPath),
     }
     await fetchMe()
     if (user.value?.userId !== input.targetUserId) {
@@ -174,7 +176,7 @@ export function useAuth() {
         await navigateTo('/auth/login')
         return
       }
-      await navigateTo(active.returnPath)
+      await navigateTo(safeInternalPath(active.returnPath))
     })().finally(() => {
       impersonationEnding.value = false
       endingImpersonation = null

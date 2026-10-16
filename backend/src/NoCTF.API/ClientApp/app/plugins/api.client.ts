@@ -51,6 +51,8 @@ export default defineNuxtPlugin(() => {
     const headers = new Headers(request.headers)
     headers.set('Authorization', `Bearer ${getAccessToken()}`)
     headers.set('Accept-Language', currentLocale())
+    // 调用方已取消(组件卸载/筛选切换)时不得再重发。
+    if (request.signal.aborted) return response
     const body = (options.serializedBody as BodyInit | undefined) ?? (options.body as BodyInit | undefined)
     const retried = await fetch(
       new Request(request.url, {
@@ -58,6 +60,8 @@ export default defineNuxtPlugin(() => {
         headers,
         body: options.method === 'GET' || options.method === 'HEAD' ? undefined : body,
         credentials: 'same-origin',
+        // 保留原取消信号,避免卸载后重试请求仍完成并回写状态。
+        signal: request.signal,
       }),
     )
     if (retried.ok) observeCommandResponse(request, retried.status)

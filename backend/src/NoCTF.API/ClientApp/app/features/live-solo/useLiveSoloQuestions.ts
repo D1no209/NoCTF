@@ -8,7 +8,7 @@ import type { NoCtfapiEndpointsLiveSoloLiveSoloQuestionResponse as Question, NoC
   NoCtfapiEndpointsLiveSoloLiveSoloRuntimeActionProtocol as RuntimeAction } from '~/api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import RuntimeAccessUrl from '~/features/challenges/RuntimeAccessUrl.vue'
-import { message, type UiMessage } from '~/utils/i18n'
+import { ensureLocaleDomains, message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
 import { startAttachmentBrowserDownload } from '~/utils/download'
 import { gameplayFactResultLabel, gameplayFactFailureCodeLabel } from '~/utils/labels'
@@ -148,7 +148,7 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     request++; resourceRequest++; hintRequest++; accepted = null; statusPolling.stop(); runtimePolling.stop()
     drafts.value = {}; questions.value = []; selected.value = null; hints.value = []; attachments.value = null; runtime.value = null; feedback.value = null
   })
-  onMounted(() => { void tick() })
+  onMounted(() => { void ensureLocaleDomains(['runtime', 'administration', 'challenges']); void tick() })
   onScopeDispose(() => { disposed = true; request++; resourceRequest++; hintRequest++; if (timer) clearTimeout(timer); accepted = null })
   return { loading, error, current, selected, options, select, input, submitting, submit, feedback, attachments, runtime, hints,
     resourceError: computed(() => resourceError.value ?? hintsError.value), downloading, download, runtimeBusy, environment, RuntimeAccess: markRaw(RuntimeAccessUrl),

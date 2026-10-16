@@ -81,6 +81,9 @@ export function useCompetitionsByIdAwdpLivePage() {
 
   let unwatch: (() => void) | undefined
 
+  // 组件可能在首屏 await 期间被卸载；未加守卫会在卸载后注册定时器与 Hub 订阅且再无清理路径。
+  let disposed = false
+
   const PLAYBACK_DURATION_MS = 5_400
 
   const PLAYBACK_GAP_MS = 320
@@ -339,7 +342,9 @@ export function useCompetitionsByIdAwdpLivePage() {
     window.addEventListener('resize', resizeCanvas)
     document.addEventListener('fullscreenchange', syncFullscreen)
     await ensureLoaded()
+    if (disposed) return
     await refreshLatest()
+    if (disposed) return
     clockTimer = setInterval(() => { clock.value = Date.now() }, 1_000)
     refreshTimer = setInterval(() => void refreshLatest(), 10_000)
     carouselTimer = setInterval(advanceTeamCarousel, 8_000)
@@ -352,6 +357,7 @@ export function useCompetitionsByIdAwdpLivePage() {
   })
 
   onUnmounted(() => {
+    disposed = true
     if (clockTimer) clearInterval(clockTimer)
     if (refreshTimer) clearInterval(refreshTimer)
     if (carouselTimer) clearInterval(carouselTimer)

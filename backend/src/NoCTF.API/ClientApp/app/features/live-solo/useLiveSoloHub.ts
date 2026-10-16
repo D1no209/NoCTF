@@ -17,9 +17,17 @@ export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string |
   const eligible = dependencies?.eligible ?? computed(() => !!auth?.user.value?.userId)
   const connected = ref(false), invalidate = createTrailingRefresh(refresh)
   let hub: HubConnection | null = null, disposed = false, revision = 0, heartbeat: ReturnType<typeof setInterval> | undefined
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  const RETRY_DELAY_MS = 5_000
   function clearHeartbeat() { if (heartbeat) clearInterval(heartbeat); heartbeat = undefined }
+  function clearRetry() { if (retryTimer) clearTimeout(retryTimer); retryTimer = undefined }
+  /** 心跳失败或连接意外关闭后按固定退避重连;否则本对局剩余时间内的实时失效会永久消失。 */
+  function scheduleRetry() {
+    if (disposed || retryTimer || !eligible.value || !matchId.value) return
+    retryTimer = setTimeout(() => { retryTimer = undefined; if (!disposed && eligible.value) void start() }, RETRY_DELAY_MS)
+  }
   async function start() {
-    const generation = ++revision, previous = hub; hub = null; connected.value = false; clearHeartbeat()
+    const generation = ++revision, previous = hub; hub = null; connected.value = false; clearHeartbeat(); clearRetry()
     if (previous) await previous.stop().catch(() => {})
     if (disposed || generation !== revision || !eligible.value || !competitionId.value || !matchId.value) return
     const competition = competitionId.value, match = matchId.value, audience = staff.value ? 1 : 0
@@ -30,7 +38,7 @@ export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string |
       if (!current()) { await candidate.stop(); return }
       connected.value = true; clearHeartbeat()
       heartbeat = setInterval(() => {
-        void candidate.invoke('HeartbeatMatch', match).catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop() })
+        void candidate.invoke('HeartbeatMatch', match).catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop(); scheduleRetry() })
       }, 5000)
       await invalidate()
     }
@@ -39,11 +47,11 @@ export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string |
     })
     candidate.onreconnecting(() => { if (current()) { connected.value = false; clearHeartbeat() } })
     candidate.onreconnected(() => { if (current()) void join().catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop() }) })
-    candidate.onclose(() => { if (current()) { connected.value = false; clearHeartbeat() } })
+    candidate.onclose(() => { if (current()) { connected.value = false; clearHeartbeat(); scheduleRetry() } })
     try { await candidate.start(); if (current()) await join(); else await candidate.stop() }
-    catch { if (current()) { connected.value = false; clearHeartbeat(); await candidate.stop().catch(() => {}) } }
+    catch { if (current()) { connected.value = false; clearHeartbeat(); await candidate.stop().catch(() => {}); scheduleRetry() } }
   }
   watch([competitionId, matchId, staff, eligible], () => { void start() }, { immediate: true })
-  onScopeDispose(() => { disposed = true; revision++; clearHeartbeat(); const previous = hub; hub = null; connected.value = false; if (previous) void previous.stop() })
+  onScopeDispose(() => { disposed = true; revision++; clearHeartbeat(); clearRetry(); const previous = hub; hub = null; connected.value = false; if (previous) void previous.stop() })
   return { connected }
 }
