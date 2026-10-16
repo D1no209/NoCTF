@@ -4,6 +4,7 @@ import { toRaw } from 'vue'
 import { awdOptionFields } from './awd-config-fields'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
   NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol,
@@ -41,7 +42,6 @@ export const ScoreDecayMode = {
   Custom: 5,
 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
-export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as const
 
 const scoreDecayProtocols = [
   'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
@@ -161,7 +161,7 @@ export interface FlagInjectionModel {
 }
 
 export interface DefinitionModel {
-  interactionKind: number
+  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
   checker: { job: RunnerJobModel; targetServiceName: string } | null
@@ -240,7 +240,7 @@ export function emptyFlagTemplate(): FlagTemplateModel {
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
   return {
-    interactionKind: CtfInteraction.FlagSubmission,
+    interactionKind: 'FlagSubmission',
     runtime: null,
     checker: null,
     checkerJob: null,
@@ -327,6 +327,7 @@ export const runtimeAllocationProtocols = ['Shared', 'PerTeam'] as const satisfi
 export const runtimeEgressPolicyProtocols = ['Isolated', 'InternetOnly'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol[]
 export const runtimeFlagSourceProtocols = ['Static', 'PerTeam', 'AwdRotation'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol[]
 export const runtimeExposureProtocols = ['OwnerOnly', 'Participants'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol[]
+export const ctfInteractionProtocols = ['FlagSubmission', 'PatchVerification'] as const satisfies readonly NoCtfapiEndpointsChallengesCtfInteractionKindProtocol[]
 
 /**
  * 读取生成契约中的协议值。未知值必须显式失败:静默回退成默认值会在下次保存时
@@ -342,6 +343,11 @@ function requiredProtocol<T extends string>(value: unknown, allowed: readonly T[
 export function protocolValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T, label: string): T {
   if (value === null || value === undefined) return fallback
   return requiredProtocol(value, allowed, label)
+}
+
+/** UI 输入(下拉框)读取:无法识别的值保持原状,不会写坏模型,也不抛给事件处理器。 */
+export function protocolInput<T extends string>(value: unknown, allowed: readonly T[], current: T): T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? value as T : current
 }
 
 const optionalProtocol = protocolValue
@@ -398,9 +404,7 @@ export function definitionContractToModel(
     throw new Error('Invalid challenge definition branch.')
   const model = emptyDefinition(mode)
   model.flagTemplate = contract.flagTemplate ? parseFlagTemplate(contract.flagTemplate) : null
-  model.interactionKind = contract.ctf?.interactionKind === 'PatchVerification'
-    ? CtfInteraction.PatchVerification
-    : CtfInteraction.FlagSubmission
+  model.interactionKind = optionalProtocol(contract.ctf?.interactionKind, ctfInteractionProtocols, 'FlagSubmission', 'CTF interaction kind')
   model.runtime = contract.runtime ? definitionContractRuntime(contract.runtime) : null
   const checker = asObject(contract.checker)
   if (checker) {
@@ -440,10 +444,10 @@ export function definitionContractToModel(
 
 export function applyCtfInteraction(
   model: DefinitionModel,
-  interactionKind: number,
+  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
 ): void {
   model.interactionKind = interactionKind
-  if (interactionKind === CtfInteraction.PatchVerification) {
+  if (interactionKind === 'PatchVerification') {
     model.runtime ??= emptyRuntimeTemplate('Ctf')
     if (model.runtime.definition.kind !== 'container')
       model.runtime.definition = emptyContainerDefinition(false)
@@ -822,7 +826,7 @@ export function definitionModelToContract(
       return {
         mode,
         ...common,
-        ctf: { interactionKind: model.interactionKind === CtfInteraction.PatchVerification
+        ctf: { interactionKind: model.interactionKind === 'PatchVerification'
           ? 'PatchVerification'
           : 'FlagSubmission' },
       }

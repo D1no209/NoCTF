@@ -8,7 +8,6 @@ import {
   BloodRewardPolicy,
   challengeRuleFields,
   competitionConfigFields,
-  CtfInteraction,
   defaultDefinition,
   definitionContractToModel,
   definitionModelToContract,
@@ -240,7 +239,7 @@ describe('typed game configuration contracts', () => {
 
   test('CTF interaction is represented by the typed branch', () => {
     const model = emptyDefinition('Ctf')
-    model.interactionKind = CtfInteraction.PatchVerification
+    model.interactionKind = 'PatchVerification'
     const contract = definitionModelToContract('Ctf', model) as unknown as Record<string, unknown>
     expect(contract.mode).toBe('Ctf')
     expect((contract.ctf as Record<string, unknown>).interactionKind).toBe('PatchVerification')

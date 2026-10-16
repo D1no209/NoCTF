@@ -2,7 +2,7 @@ import { toRefs } from 'vue'
 
 import { Plus, X } from '@lucide/vue'
 import type { UrlBindingModel } from '../../utils/game-config'
-import { protocolValue, runtimeExposureProtocols } from '../../utils/game-config'
+import { protocolInput, runtimeExposureProtocols } from '../../utils/game-config'
 
 const HTTP_DISPLAY_TEMPLATE = 'http://{HOST}:{PORT}'
 const NETCAT_DISPLAY_TEMPLATE = 'nc {HOST} {PORT}'
@@ -39,7 +39,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
 
   /** 下拉框给出的原始值同样按协议表校验,不把未知值写进模型。 */
   function updateExposure(index: number, value: unknown): void {
-    update(index, { exposure: protocolValue(value, runtimeExposureProtocols, 'Participants', 'URL exposure') })
+    update(index, { exposure: protocolInput(value, runtimeExposureProtocols, props.modelValue[index]?.exposure ?? 'Participants') })
   }
 
   function remove(index: number): void {

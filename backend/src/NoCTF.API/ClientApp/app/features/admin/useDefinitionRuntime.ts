@@ -1,13 +1,13 @@
 import { computed, markRaw, toRefs, watch } from 'vue'
 import type { DefinitionModel, GameModeValue, RuntimeTemplateModel, UrlBindingModel } from '../../utils/game-config'
-import { bytesToMib, coresToMillicores, CtfInteraction, emptyContainerDefinition, emptyOvaDefinition, mibToBytes, cpuMillicoresToCores, protocolValue, runtimeEgressPolicyProtocols, runtimeFlagSourceProtocols } from '../../utils/game-config'
+import { bytesToMib, coresToMillicores, emptyContainerDefinition, emptyOvaDefinition, mibToBytes, cpuMillicoresToCores, protocolInput, runtimeEgressPolicyProtocols, runtimeFlagSourceProtocols } from '../../utils/game-config'
 import DefinitionContainerComponent from './DefinitionContainer.vue'
 import UrlBindingListComponent from './UrlBindingList.vue'
 
 export function useDefinitionRuntime(props: Readonly<{
-  runtime: RuntimeTemplateModel; model: DefinitionModel; mode: GameModeValue; interactionKind: number; disabled: boolean
+  runtime: RuntimeTemplateModel; model: DefinitionModel; mode: GameModeValue; interactionKind: DefinitionModel['interactionKind']; disabled: boolean
 }>) {
-  const isPatchVerification = computed(() => props.mode === 'Ctf' && props.interactionKind === CtfInteraction.PatchVerification)
+  const isPatchVerification = computed(() => props.mode === 'Ctf' && props.interactionKind === 'PatchVerification')
   const singleServiceOnly = computed(() => props.mode === 'Awdp' || isPatchVerification.value)
   const hasServices = computed(() => props.runtime.definition.kind === 'container')
   const serviceNames = computed(() => props.runtime.definition.kind === 'container' ? props.runtime.definition.services.map(service => service.name) : [])
@@ -63,11 +63,11 @@ export function useDefinitionRuntime(props: Readonly<{
   function onUpdateModelValueRuntimeTtlSeconds(value: number | null): void { props.runtime.ttlSeconds = value }
   function onUpdateModelValueRuntimeOperationTimeoutSeconds(value: number | null): void { props.runtime.operationTimeoutSeconds = value }
   function onUpdateModelValueRuntimeFlagSource(value: unknown): void {
-    props.runtime.flagSource = protocolValue(value, runtimeFlagSourceProtocols, 'Static', 'runtime flag source')
+    props.runtime.flagSource = protocolInput(value, runtimeFlagSourceProtocols, props.runtime.flagSource)
     synchronizeFlagInjection()
   }
   function onUpdateModelValueRuntimeEgressPolicy(value: unknown): void {
-    props.runtime.egressPolicy = protocolValue(value, runtimeEgressPolicyProtocols, 'Isolated', 'runtime egress policy')
+    props.runtime.egressPolicy = protocolInput(value, runtimeEgressPolicyProtocols, props.runtime.egressPolicy)
   }
   function onUpdateModelValueRuntimeUrlBindings(value: RuntimeTemplateModel['urlBindings']): void { props.runtime.urlBindings = value }
   function onUpdateModelValueRuntimeLimitsMemoryBytes(value: number | null): void { props.runtime.limits.memoryBytes = mibToBytes(value) }

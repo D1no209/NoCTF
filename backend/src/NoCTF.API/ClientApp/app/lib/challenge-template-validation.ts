@@ -1,7 +1,6 @@
 import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
 import type { DefinitionModel, RunnerJobModel } from '../utils/game-config'
 import {
-  CtfInteraction,
   HARD_MAXIMUM_PATCH_UPLOAD_BYTES,
 } from '../utils/game-config'
 import { translate } from '../utils/i18n'
@@ -202,7 +201,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     case 'Ctf':
       if (runtime.allocation !== 'PerTeam')
         addIssue(issues, translate("challenges.challengeTemplate.validation.ctfRuntimesFormat"))
-      if (model.interactionKind === CtfInteraction.PatchVerification) {
+      if (model.interactionKind === 'PatchVerification') {
         if (runtime.flagSource !== 'Static')
           addIssue(issues, translate("challenges.challengeTemplate.validation.ctfPatchFormat"))
         if (definition.kind !== 'container' || definition.services.length !== 1)

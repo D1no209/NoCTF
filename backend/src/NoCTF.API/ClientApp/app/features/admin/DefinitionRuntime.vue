@@ -9,7 +9,7 @@ const props = withDefaults(defineProps<{
   model: DefinitionModel
   runtime: RuntimeTemplateModel
   mode: GameModeValue
-  interactionKind: number
+  interactionKind: DefinitionModel['interactionKind']
   disabled?: boolean
 }>(), {
   disabled: false,

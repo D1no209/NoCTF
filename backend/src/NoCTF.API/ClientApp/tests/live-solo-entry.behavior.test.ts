@@ -4,7 +4,7 @@ import { competitionChallengeManagementPath } from '../app/features/admin/admin-
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toRefs, watch } from 'vue'
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
-import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract,
+import { applyCtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract,
   emptyDefinition, emptyRuntimeTemplate } from '../app/utils/game-config'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
@@ -23,7 +23,7 @@ async function harness(path: string, name: string, props?: object) {
   const events: any[] = []
   const deps: Record<string, any> = { ...soloNavigation, competitionChallengeManagementPath,
     useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
-    gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
+    gameModeOptions, isGameMode, applyCtfInteraction, defaultDefinition, definitionContractToModel,
     definitionModelToContract, useDefinitionModel, validateChallengeTemplateDraft,
     challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition,
     bytesToMib: (x: number) => x, cpuMillicoresToCores: (x: number) => x,
@@ -132,7 +132,7 @@ describe('LiveSolo authoring entry points', () => {
   test('LiveSolo runtime offers independent flags and only own-team access', async () => {
     const model = emptyDefinition('LiveSolo'); model.runtime = emptyRuntimeTemplate('LiveSolo')
     const app = await harness('features/admin/useDefinitionRuntime.ts', 'useDefinitionRuntime',
-      { runtime: model.runtime, model, mode: 'LiveSolo', interactionKind: CtfInteraction.FlagSubmission, disabled: false })
+      { runtime: model.runtime, model, mode: 'LiveSolo', interactionKind: 'FlagSubmission', disabled: false })
     try {
       expect(app.state.runtime.value.allocation).toBe('PerTeam')
       expect(app.state.showDynamicFlagInjection.value).toBe(true)

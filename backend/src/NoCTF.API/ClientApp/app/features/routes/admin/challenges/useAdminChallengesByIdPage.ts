@@ -10,7 +10,7 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentRes
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
-import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract } from '../../../../utils/game-config'
+import { applyCtfInteraction, ctfInteractionProtocols, defaultDefinition, definitionContractToModel, definitionModelToContract, protocolInput } from '../../../../utils/game-config'
 import { gameModeOptions, isGameMode } from '../../../../utils/game-modes'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
@@ -92,7 +92,7 @@ export function useAdminChallengesByIdPage() {
 
   const hasModeDefinition = computed(() => {
     if (form.mode === 'Awd' || form.mode === 'Awdp') return true
-    if (form.mode === 'Ctf' || form.mode === 'LiveSolo') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
+    if (form.mode === 'Ctf' || form.mode === 'LiveSolo') return definitionModel.value?.interactionKind === 'PatchVerification'
       || definitionModel.value?.runtime?.flagSource === 'PerTeam'
     return false
   })
@@ -131,15 +131,13 @@ export function useAdminChallengesByIdPage() {
 
   const showInteractionKind = computed(() => form.mode === 'Ctf'
     && (patchVerificationEnabled.value
-      || definitionModel.value?.interactionKind === CtfInteraction.PatchVerification),
+      || definitionModel.value?.interactionKind === 'PatchVerification'),
   )
 
   function setInteractionKind(value: unknown): void {
-    if (!definitionModel.value || isDeleted.value || typeof value !== 'string') return
-    const interactionKind = value === 'PatchVerification'
-      ? CtfInteraction.PatchVerification
-      : CtfInteraction.FlagSubmission
-    if (interactionKind === CtfInteraction.PatchVerification
+    if (!definitionModel.value || isDeleted.value) return
+    const interactionKind = protocolInput(value, ctfInteractionProtocols, definitionModel.value.interactionKind)
+    if (interactionKind === 'PatchVerification'
       && !patchVerificationEnabled.value) return
     applyCtfInteraction(definitionModel.value, interactionKind)
   }
@@ -358,7 +356,7 @@ export function useAdminChallengesByIdPage() {
     }
     else if (updated.mode === 'Ctf' && runtimeDefinitionModel.value) {
       applyCtfInteraction(runtimeDefinitionModel.value, definitionModel.value?.interactionKind
-        ?? CtfInteraction.FlagSubmission)
+        ?? 'FlagSubmission')
     }
   }
 
@@ -564,7 +562,7 @@ export function useAdminChallengesByIdPage() {
 
   const supportsRegularExpression = computed(() => regularExpressionCapability.value
     || (template.value?.mode === 'Ctf' || template.value?.mode === 'LiveSolo')
-      && persistedDefinitionModel.value?.interactionKind === CtfInteraction.FlagSubmission
+      && persistedDefinitionModel.value?.interactionKind === 'FlagSubmission'
       && !usesRuntimeFlagInjection.value)
 
   const flagsLoading = ref(false)
@@ -805,7 +803,6 @@ export function useAdminChallengesByIdPage() {
       usesRuntimeFlagInjection,
       runtimeDisabled,
       runtimeDefinitionDirty,
-      CtfInteraction,
       patchVerificationEnabled,
       showInteractionKind,
       setInteractionKind,
