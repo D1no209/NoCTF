@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings, egressPolicyOptions, onUpdateModelValueRuntimeEgressPolicy } = toRefs(viewProps.state)
+const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlExposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings, egressPolicyOptions, onUpdateModelValueRuntimeEgressPolicy } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -29,14 +29,14 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
         </Select>
       </Field>
       <Badge variant="secondary" class="mb-1 h-8 px-3">
-        {{ runtime.allocation === RuntimeAllocation.Shared ? $t('common.label.share') : $t('runtime.label.teamIndependent') }}
+        {{ runtime.allocation === 'Shared' ? $t('common.label.share') : $t('runtime.label.teamIndependent') }}
       </Badge>
     </div>
 
     <Field>
       <FieldLabel>{{ $t('runtime.label.egressPolicy') }}</FieldLabel>
       <Select
-        :model-value="String(runtime.egressPolicy)"
+        :model-value="runtime.egressPolicy"
         :disabled="disabled"
         @update:model-value="onUpdateModelValueRuntimeEgressPolicy"
       >
@@ -88,7 +88,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
       <Field v-if="mode !== 'Ctf' && mode !== 'Awdp' && mode !== 'LiveSolo'">
         <FieldLabel>{{ $t('runtime.label.flagSource') }}</FieldLabel>
         <Select
-          :model-value="String(runtime.flagSource)"
+          :model-value="runtime.flagSource"
           :disabled="disabled"
           @update:model-value="onUpdateModelValueRuntimeFlagSource"
         >
@@ -114,7 +114,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
         <FieldLabel>{{ $t('runtime.label.controlCheckEntry') }}</FieldLabel>
         <component :is="UrlBindingList"
           v-model="controlBindingList"
-          :exposure-options="[{ value: UrlExposure.Participants, label: $t('runtime.label.platformCheckUsage') }]"
+          :exposure-options="controlExposureOptions"
           :show-service-name="hasServices"
           :service-names="serviceNames"
           :add-label="$t('runtime.definitionRuntime.label.setControlCheckEntry')"

@@ -6,6 +6,10 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
@@ -20,10 +24,8 @@ export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 // ---------- Editor enums ----------
 
-export const RuntimeAllocation = { Shared: 0, PerTeam: 1 } as const
-export const EgressPolicy = { Isolated: 0, InternetOnly: 1 } as const
-export const FlagSource = { Static: 0, PerTeam: 1, AwdRotation: 2 } as const
-export const UrlExposure = { OwnerOnly: 0, Participants: 1 } as const
+// Runtime 协议值直接使用生成契约的字符串联合,不再维护数字镜像枚举;
+// 读写两侧都由下面的 protocol 读取器校验,未知值显式失败而不是静默回退。
 export const BloodRewardPolicy = {
   FixedPoints: 0,
   InitialPointsPercentage: 1,
@@ -97,7 +99,7 @@ export interface RuntimeLimitsModel {
 
 export interface UrlBindingModel {
   urlTemplate: string
-  exposure: number
+  exposure: NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol
   containerPort: number | null
   serviceName: string
 }
@@ -128,14 +130,14 @@ export interface OvaDefinitionModel {
 export type RuntimeDefinitionModel = ContainerDefinitionModel | OvaDefinitionModel
 
 export interface RuntimeTemplateModel {
-  allocation: number
-  egressPolicy: number
+  allocation: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol
+  egressPolicy: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol
   definition: RuntimeDefinitionModel
   limits: RuntimeLimitsModel
   ttlSeconds: number | null
   operationTimeoutSeconds: number | null
   urlBindings: UrlBindingModel[]
-  flagSource: number
+  flagSource: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol
   controlCheckUrlBinding: UrlBindingModel | null
 }
 
@@ -203,27 +205,27 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
 }
 
 export function emptyUrlBinding(): UrlBindingModel {
-  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: UrlExposure.Participants, containerPort: null, serviceName: 'main' }
+  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: 'Participants', containerPort: null, serviceName: 'main' }
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
   const accessBinding = emptyUrlBinding()
   accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-    ? UrlExposure.OwnerOnly
-    : UrlExposure.Participants
+    ? 'OwnerOnly'
+    : 'Participants'
   return {
-    allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
-    egressPolicy: EgressPolicy.Isolated,
+    allocation: mode === 'Koh' ? 'Shared' : 'PerTeam',
+    egressPolicy: 'Isolated',
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: [accessBinding],
     flagSource: mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-      ? FlagSource.PerTeam
+      ? 'PerTeam'
       : mode === 'Awd'
-        ? FlagSource.AwdRotation
-        : FlagSource.Static,
+        ? 'AwdRotation'
+        : 'Static',
     controlCheckUrlBinding: null,
   }
 }
@@ -295,9 +297,7 @@ function parseUrlBinding(raw: unknown): UrlBindingModel {
   const obj = asObject(raw) ?? {}
   return {
     urlTemplate: asString(obj.urlTemplate),
-    exposure: obj.exposure === 'OwnerOnly'
-      ? UrlExposure.OwnerOnly
-      : UrlExposure.Participants,
+    exposure: optionalProtocol(obj.exposure, runtimeExposureProtocols, 'Participants', 'URL exposure'),
     containerPort: asNumber(obj.containerPort),
     serviceName: asString(obj.serviceName),
   }
@@ -323,21 +323,28 @@ export function emptyOvaDefinition(): OvaDefinitionModel {
   return { kind: 'ova', sourceUrl: '', sha256: '' }
 }
 
-function protocolAllocation(value: unknown): number {
-  return value === 'Shared' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
+export const runtimeAllocationProtocols = ['Shared', 'PerTeam'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol[]
+export const runtimeEgressPolicyProtocols = ['Isolated', 'InternetOnly'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol[]
+export const runtimeFlagSourceProtocols = ['Static', 'PerTeam', 'AwdRotation'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol[]
+export const runtimeExposureProtocols = ['OwnerOnly', 'Participants'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol[]
+
+/**
+ * 读取生成契约中的协议值。未知值必须显式失败:静默回退成默认值会在下次保存时
+ * 把服务端配置改写成另一个值。
+ */
+function requiredProtocol<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
+  if (typeof value === 'string' && (allowed as readonly string[]).includes(value))
+    return value as T
+  throw new Error(`Unknown ${label} protocol value.`)
 }
 
-function protocolEgressPolicy(value: unknown): number {
-  return value === 'InternetOnly' ? EgressPolicy.InternetOnly : EgressPolicy.Isolated
+/** 编辑器赋值入口:下拉框给出的原始值同样按协议表校验,不接受未知值。 */
+export function protocolValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T, label: string): T {
+  if (value === null || value === undefined) return fallback
+  return requiredProtocol(value, allowed, label)
 }
 
-function protocolFlagSource(value: unknown): number {
-  return value === 'PerTeam'
-    ? FlagSource.PerTeam
-    : value === 'AwdRotation'
-      ? FlagSource.AwdRotation
-      : FlagSource.Static
-}
+const optionalProtocol = protocolValue
 
 function definitionContractRuntime(
   runtime: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
@@ -363,8 +370,8 @@ function definitionContractRuntime(
   const limits = asObject(value.limits) ?? {}
   const bindings = Array.isArray(value.urlBindings) ? value.urlBindings : []
   return {
-    allocation: protocolAllocation(value.allocation),
-    egressPolicy: protocolEgressPolicy(value.egressPolicy),
+    allocation: optionalProtocol(value.allocation, runtimeAllocationProtocols, 'PerTeam', 'runtime allocation'),
+    egressPolicy: optionalProtocol(value.egressPolicy, runtimeEgressPolicyProtocols, 'Isolated', 'runtime egress policy'),
     definition,
     limits: {
       memoryBytes: asNumber(limits.memoryBytes),
@@ -374,7 +381,7 @@ function definitionContractRuntime(
     ttlSeconds: asNumber(value.ttlSeconds),
     operationTimeoutSeconds: asNumber(value.operationTimeoutSeconds),
     urlBindings: bindings.filter(item => asObject(item)?.isControlCheck !== true).map(parseUrlBinding),
-    flagSource: protocolFlagSource(value.flagSource),
+    flagSource: optionalProtocol(value.flagSource, runtimeFlagSourceProtocols, 'Static', 'runtime flag source'),
     controlCheckUrlBinding: bindings.find(item => asObject(item)?.isControlCheck === true)
       ? parseUrlBinding(bindings.find(item => asObject(item)?.isControlCheck === true))
       : null,
@@ -440,7 +447,7 @@ export function applyCtfInteraction(
     model.runtime ??= emptyRuntimeTemplate('Ctf')
     if (model.runtime.definition.kind !== 'container')
       model.runtime.definition = emptyContainerDefinition(false)
-    model.runtime.flagSource = FlagSource.Static
+    model.runtime.flagSource = 'Static'
     for (const service of model.runtime.definition.services) service.flagEnvironmentVariableName = ''
     model.checkerJob ??= emptyRunnerJob()
     model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
@@ -455,7 +462,7 @@ export function applyCtfInteraction(
   model.checkerJob = null
   model.checkerFixInput = false
   if (model.runtime) {
-    model.runtime.flagSource = FlagSource.PerTeam
+    model.runtime.flagSource = 'PerTeam'
     if (model.runtime.definition.kind === 'container')
       model.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
   }
@@ -722,7 +729,7 @@ function runtimeModelToContract(
   runtime: RuntimeTemplateModel,
 ): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
-    allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
+    allocation: runtime.allocation,
     limits: runtime.definition.kind === 'ova' ? {
       memoryBytes: runtime.limits.memoryBytes ?? 0,
       cpuMillicores: runtime.limits.cpuMillicores ?? 0,
@@ -730,16 +737,12 @@ function runtimeModelToContract(
     } : null,
     ttlSeconds: runtime.ttlSeconds,
     operationTimeoutSeconds: runtime.operationTimeoutSeconds,
-    flagSource: runtime.flagSource === FlagSource.PerTeam
-      ? 'PerTeam' as const
-      : runtime.flagSource === FlagSource.AwdRotation
-        ? 'AwdRotation' as const
-        : 'Static' as const,
-    egressPolicy: runtime.egressPolicy === EgressPolicy.InternetOnly ? 'InternetOnly' as const : 'Isolated' as const,
+    flagSource: runtime.flagSource,
+    egressPolicy: runtime.egressPolicy,
     urlBindings: [
       ...runtime.urlBindings.map(binding => ({
         urlTemplate: binding.urlTemplate,
-        exposure: binding.exposure === UrlExposure.OwnerOnly ? 'OwnerOnly' as const : 'Participants' as const,
+        exposure: binding.exposure,
         containerPort: binding.containerPort,
         serviceName: binding.serviceName || null,
         vmId: null,
@@ -749,9 +752,7 @@ function runtimeModelToContract(
       ...(runtime.controlCheckUrlBinding
         ? [{
             urlTemplate: runtime.controlCheckUrlBinding.urlTemplate,
-            exposure: runtime.controlCheckUrlBinding.exposure === UrlExposure.OwnerOnly
-              ? 'OwnerOnly' as const
-              : 'Participants' as const,
+            exposure: runtime.controlCheckUrlBinding.exposure,
             containerPort: runtime.controlCheckUrlBinding.containerPort,
             serviceName: runtime.controlCheckUrlBinding.serviceName || null,
             vmId: null,

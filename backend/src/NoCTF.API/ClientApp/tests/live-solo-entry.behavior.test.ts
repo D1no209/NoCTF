@@ -5,7 +5,7 @@ import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toRefs, watch } from 'vue'
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
 import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract,
-  EgressPolicy, emptyDefinition, emptyRuntimeTemplate, FlagSource, RuntimeAllocation, UrlExposure } from '../app/utils/game-config'
+  emptyDefinition, emptyRuntimeTemplate } from '../app/utils/game-config'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
@@ -24,7 +24,7 @@ async function harness(path: string, name: string, props?: object) {
   const deps: Record<string, any> = { ...soloNavigation, competitionChallengeManagementPath,
     useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
     gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
-    definitionModelToContract, EgressPolicy, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,
+    definitionModelToContract, useDefinitionModel, validateChallengeTemplateDraft,
     challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition,
     bytesToMib: (x: number) => x, cpuMillicoresToCores: (x: number) => x,
     translate, gameModeLabel: (x: string) => x, describeMessage: (key: string) => key,
@@ -134,11 +134,11 @@ describe('LiveSolo authoring entry points', () => {
     const app = await harness('features/admin/useDefinitionRuntime.ts', 'useDefinitionRuntime',
       { runtime: model.runtime, model, mode: 'LiveSolo', interactionKind: CtfInteraction.FlagSubmission, disabled: false })
     try {
-      expect(app.state.runtime.value.allocation).toBe(RuntimeAllocation.PerTeam)
+      expect(app.state.runtime.value.allocation).toBe('PerTeam')
       expect(app.state.showDynamicFlagInjection.value).toBe(true)
-      expect(app.state.exposureOptions.value.map((x: any) => x.value)).toEqual([UrlExposure.OwnerOnly])
+      expect(app.state.exposureOptions.value.map((x: any) => x.value)).toEqual(['OwnerOnly'])
       app.state.setDynamicFlagInjection(false)
-      expect(app.state.runtime.value.flagSource).toBe(FlagSource.Static)
+      expect(app.state.runtime.value.flagSource).toBe('Static')
       expect(app.state.runtime.value.definition.services[0].flagEnvironmentVariableName).toBe('')
       app.state.setDynamicFlagInjection(true)
       expect(app.state.runtime.value.definition.services[0].flagEnvironmentVariableName).toBe('FLAG')
@@ -168,7 +168,7 @@ describe('LiveSolo authoring entry points', () => {
     const draft = { mode: 'LiveSolo' as const, title: 'Synthetic', direction: 'Misc', definition: model }
     expect(validateChallengeTemplateDraft(draft)).toEqual([])
     model.runtime = emptyRuntimeTemplate('LiveSolo')
-    model.runtime.allocation = RuntimeAllocation.Shared
+    model.runtime.allocation = 'Shared'
     expect(validateChallengeTemplateDraft(draft)).toContain(translate('liveSolo.templates.independentRuntime'))
     model.runtime = null; model.checkerFixInput = true
     expect(validateChallengeTemplateDraft(draft)).toContain(translate('liveSolo.templates.flagSubmissionOnly'))

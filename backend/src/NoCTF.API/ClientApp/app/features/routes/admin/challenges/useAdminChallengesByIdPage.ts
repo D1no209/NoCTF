@@ -10,7 +10,7 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentRes
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
-import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract, FlagSource } from '../../../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract } from '../../../../utils/game-config'
 import { gameModeOptions, isGameMode } from '../../../../utils/game-modes'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
@@ -93,7 +93,7 @@ export function useAdminChallengesByIdPage() {
   const hasModeDefinition = computed(() => {
     if (form.mode === 'Awd' || form.mode === 'Awdp') return true
     if (form.mode === 'Ctf' || form.mode === 'LiveSolo') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
-      || definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+      || definitionModel.value?.runtime?.flagSource === 'PerTeam'
     return false
   })
 
@@ -108,7 +108,7 @@ export function useAdminChallengesByIdPage() {
   const usesRuntimeFlagInjection = computed(() => {
     const value = template.value
     return (value?.mode === 'Ctf' || value?.mode === 'Awdp' || value?.mode === 'LiveSolo')
-      && persistedDefinitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+      && persistedDefinitionModel.value?.runtime?.flagSource === 'PerTeam'
   })
 
   const runtimeDisabled = computed(() =>

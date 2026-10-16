@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionFlagTemplateSectionViewState } from '~/features/admin/useDefinitionFlagTemplateSection'
 
 const viewProps = defineProps<{ state: DefinitionFlagTemplateSectionViewState }>()
-const { FlagSource, toggleFlagTemplate, FlagTemplateEditor, model, mode, disabled } = toRefs(viewProps.state)
+const { toggleFlagTemplate, FlagTemplateEditor, model, mode, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const { FlagSource, toggleFlagTemplate, FlagTemplateEditor, model, mode, disable
   </FieldSet>
 
   <FieldSet
-    v-else-if="(mode === 'Ctf' || mode === 'LiveSolo') && model.runtime?.flagSource === FlagSource.PerTeam"
+    v-else-if="(mode === 'Ctf' || mode === 'LiveSolo') && model.runtime?.flagSource === 'PerTeam'"
     class="rounded-md border p-4"
   >
     <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.dynamicFlagTemplateOverride') }}</FieldLegend>

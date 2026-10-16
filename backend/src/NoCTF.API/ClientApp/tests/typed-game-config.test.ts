@@ -16,10 +16,8 @@ import {
   emptyDefinition,
   emptyOvaDefinition,
   emptyRuntimeTemplate,
-  FlagSource,
   readConfigValues,
   ScoreDecayMode,
-  UrlExposure,
 } from '../app/utils/game-config'
 import {
   challengeRuntimeDefinitionsEqual,
@@ -123,7 +121,7 @@ describe('typed game configuration contracts', () => {
     model.runtime.definition = emptyContainerDefinition(true)
     model.runtime.definition.services[0]!.image = 'challenge:latest'
     model.runtime.definition.services[0]!.cpuCores = 0.501
-    model.runtime.urlBindings = [{ serviceName: 'main', containerPort: 8080, urlTemplate: 'nc {HOST} {PORT}', exposure: UrlExposure.OwnerOnly }]
+    model.runtime.urlBindings = [{ serviceName: 'main', containerPort: 8080, urlTemplate: 'nc {HOST} {PORT}', exposure: 'OwnerOnly' }]
     const contract = definitionModelToContract('Ctf', model)
     const restored = definitionContractToModel(contract, 'Ctf')
     expect(restored.runtime?.definition).toEqual(model.runtime.definition)
@@ -144,15 +142,15 @@ describe('typed game configuration contracts', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
     model.runtime.urlBindings = [
-      { urlTemplate: 'http://{HOST}:{PORT}', exposure: UrlExposure.OwnerOnly, containerPort: 80, serviceName: '' },
-      { urlTemplate: 'tcp://{HOST}:{PORT}', exposure: UrlExposure.Participants, containerPort: 81, serviceName: '' },
+      { urlTemplate: 'http://{HOST}:{PORT}', exposure: 'OwnerOnly', containerPort: 80, serviceName: '' },
+      { urlTemplate: 'tcp://{HOST}:{PORT}', exposure: 'Participants', containerPort: 81, serviceName: '' },
     ]
 
     const contract = definitionModelToContract('Ctf', model)
     const restored = definitionContractToModel(contract, 'Ctf')
     expect(restored.runtime?.urlBindings.map(binding => binding.exposure)).toEqual([
-      UrlExposure.OwnerOnly,
-      UrlExposure.Participants,
+      'OwnerOnly',
+      'Participants',
     ])
   })
 

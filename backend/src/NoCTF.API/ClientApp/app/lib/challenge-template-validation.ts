@@ -2,10 +2,7 @@ import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
 import type { DefinitionModel, RunnerJobModel } from '../utils/game-config'
 import {
   CtfInteraction,
-  FlagSource,
   HARD_MAXIMUM_PATCH_UPLOAD_BYTES,
-  RuntimeAllocation,
-  UrlExposure,
 } from '../utils/game-config'
 import { translate } from '../utils/i18n'
 
@@ -128,7 +125,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
 
   const model = draft.definition
   if (draft.mode === 'LiveSolo') {
-    if (model.runtime && model.runtime.allocation !== RuntimeAllocation.PerTeam)
+    if (model.runtime && model.runtime.allocation !== 'PerTeam')
       addIssue(issues, translate('liveSolo.templates.independentRuntime'))
     if (model.checker || model.checkerJob || model.patchEntrypoint || model.patchCommand.length
       || model.patchTimeoutSeconds !== null || model.maximumPatchUploadBytes !== null || model.checkerFixInput)
@@ -181,7 +178,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         || service.flagEnvironmentVariableName.toUpperCase().startsWith('NOCTF_')))
         addIssue(issues, translate('challenges.challengeTemplate.error.flagEnvironmentVariableInvalid'))
     }
-    if (runtime.flagSource === FlagSource.PerTeam && !services.some(service => service.flagEnvironmentVariableName.trim()))
+    if (runtime.flagSource === 'PerTeam' && !services.some(service => service.flagEnvironmentVariableName.trim()))
       addIssue(issues, translate('challenges.challengeTemplate.description.teamFlagsRequireFlag'))
     internalPorts = services[0]?.internalPorts.filter(validPort) ?? []
     publicPorts = [...new Set(runtime.urlBindings.map(binding => binding.containerPort).filter(validPort))]
@@ -203,10 +200,10 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
 
   switch (draft.mode) {
     case 'Ctf':
-      if (runtime.allocation !== RuntimeAllocation.PerTeam)
+      if (runtime.allocation !== 'PerTeam')
         addIssue(issues, translate("challenges.challengeTemplate.validation.ctfRuntimesFormat"))
       if (model.interactionKind === CtfInteraction.PatchVerification) {
-        if (runtime.flagSource !== FlagSource.Static)
+        if (runtime.flagSource !== 'Static')
           addIssue(issues, translate("challenges.challengeTemplate.validation.ctfPatchFormat"))
         if (definition.kind !== 'container' || definition.services.length !== 1)
           addIssue(issues, translate("challenges.challengeTemplate.description.ctfPatchVerificationSupports"))
@@ -215,19 +212,19 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         validateRunnerJob(issues, model.checkerJob, translate('challenges.checker.label'))
         validatePatchSettings(issues, model)
       }
-      else if (runtime.flagSource !== FlagSource.Static
-        && runtime.flagSource !== FlagSource.PerTeam) {
+      else if (runtime.flagSource !== 'Static'
+        && runtime.flagSource !== 'PerTeam') {
         addIssue(issues, translate("challenges.challengeTemplate.validation.ctfContainerFormat"))
       }
-      if (runtime.urlBindings.some(binding => binding.exposure !== UrlExposure.OwnerOnly))
+      if (runtime.urlBindings.some(binding => binding.exposure !== 'OwnerOnly'))
         addIssue(issues, translate("challenges.challengeTemplate.validation.ctfAccessFormat"))
       break
     case 'Awd':
-      if (runtime.allocation !== RuntimeAllocation.PerTeam)
+      if (runtime.allocation !== 'PerTeam')
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdRuntimesFormat"))
-      if (runtime.flagSource !== FlagSource.AwdRotation)
+      if (runtime.flagSource !== 'AwdRotation')
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdRuntimesFormat.challengeTemplateError"))
-      if (!runtime.urlBindings.some(binding => binding.exposure === UrlExposure.Participants))
+      if (!runtime.urlBindings.some(binding => binding.exposure === 'Participants'))
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdRuntimesFormat.participantVisibleAccess"))
       if (!model.flagInjection) {
         addIssue(issues, translate("challenges.challengeTemplate.description.awdRuntimeRequiresFlag"))
@@ -247,9 +244,9 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         addIssue(issues, translate("runtime.error.runtimeServiceReferenceInvalid"))
       break
     case 'Awdp':
-      if (runtime.allocation !== RuntimeAllocation.PerTeam)
+      if (runtime.allocation !== 'PerTeam')
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdpRuntimesFormat"))
-      if (runtime.flagSource !== FlagSource.PerTeam)
+      if (runtime.flagSource !== 'PerTeam')
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdpRuntimesFormat.challengeTemplateError"))
       if (definition.kind !== 'container' || definition.services.length !== 1)
         addIssue(issues, translate("challenges.challengeTemplate.description.awdpSupportsSingleContainer"))
@@ -261,7 +258,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdpInternalFormat"))
       if (runtime.urlBindings.length === 0)
         addIssue(issues, translate("challenges.challengeTemplate.description.awdpRequiresLeastOne"))
-      if (runtime.urlBindings.some(binding => binding.exposure !== UrlExposure.OwnerOnly))
+      if (runtime.urlBindings.some(binding => binding.exposure !== 'OwnerOnly'))
         addIssue(issues, translate("challenges.challengeTemplate.validation.awdpAccessFormat"))
       if (internalPorts.length === 1
         && runtime.urlBindings.some(binding => binding.containerPort !== internalPorts[0]))
@@ -270,7 +267,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       validatePatchSettings(issues, model)
       break
     case 'Koh':
-      if (runtime.allocation !== RuntimeAllocation.Shared)
+      if (runtime.allocation !== 'Shared')
         addIssue(issues, translate("challenges.challengeTemplate.validation.kohRuntimesFormat"))
       break
   }

@@ -3,7 +3,6 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionCon
 import {
   definitionContractToModel,
   definitionModelToContract,
-  EgressPolicy,
   emptyRuntimeTemplate,
 } from '../app/utils/game-config'
 
@@ -55,7 +54,7 @@ function contractWith(egressPolicy?: string) {
 
 test('a saved runtime keeps InternetOnly instead of silently reverting to Isolated', () => {
   const model = definitionContractToModel(contractWith('InternetOnly'), 'Ctf')
-  expect(model.runtime?.egressPolicy).toBe(EgressPolicy.InternetOnly)
+  expect(model.runtime?.egressPolicy).toBe('InternetOnly')
 
   const written = definitionModelToContract('Ctf', model)
   expect(written.runtime?.egressPolicy).toBe('InternetOnly')
@@ -63,10 +62,10 @@ test('a saved runtime keeps InternetOnly instead of silently reverting to Isolat
 
 test('a runtime without an egress policy still defaults to Isolated', () => {
   const model = definitionContractToModel(contractWith(), 'Ctf')
-  expect(model.runtime?.egressPolicy).toBe(EgressPolicy.Isolated)
+  expect(model.runtime?.egressPolicy).toBe('Isolated')
   expect(definitionModelToContract('Ctf', model).runtime?.egressPolicy).toBe('Isolated')
 })
 
 test('the empty runtime template starts isolated', () => {
-  expect(emptyRuntimeTemplate('Ctf').egressPolicy).toBe(EgressPolicy.Isolated)
+  expect(emptyRuntimeTemplate('Ctf').egressPolicy).toBe('Isolated')
 })
