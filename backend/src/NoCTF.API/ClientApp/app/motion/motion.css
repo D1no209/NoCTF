@@ -103,16 +103,34 @@
    失去背景采样而发灰/丢虚化),且切换期间组件不可交互。
    背景切换动效由 `[data-wallpaper-ghost]` 承担(由 motion/reveal-transition.ts
    在切换前克隆旧背景生成,位于组件之下),组件动效由下面的过渡窗口承担。 */
-/* 背景切换动效只用 opacity:整层走合成器,不触发布局与重绘。
-   遮罩/剪裁类动画会让整屏每帧重新栅格化,是切换卡顿的主因。 */
+/* 背景切换动效:自上而下的扫描揭示。幽灵层是真实元素(位于组件之下),
+   用遮罩把旧背景从上方逐步移出,露出实时新背景 —— 组件不参与该遮罩,
+   因此全程保持实时渲染与交互。 */
 [data-wallpaper-ghost] {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 1;
-  will-change: opacity;
-  animation: noctf-background-crossfade 360ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 0.72) 2rem,
+    #000 5rem
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 0.72) 2rem,
+    #000 5rem
+  );
+  -webkit-mask-position: bottom;
+  mask-position: bottom;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% calc(100% + 5rem);
+  mask-size: 100% calc(100% + 5rem);
+  will-change: -webkit-mask-size, mask-size;
+  animation: noctf-background-scan-down 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 /* 组件动效:只覆盖真正承载主题色的少数表面,避免对整棵树逐元素过渡
    (上千个元素的 background-color/box-shadow 过渡会逐帧重绘,造成卡顿)。
@@ -122,14 +140,14 @@
   html[data-wallpaper-transition]
 ) :is([data-slot='card'], .card-surface, [data-slot='topbar-capsule'], [data-slot='topbar-frame'], [data-page-wallpaper='true'], [data-slot='button'], [data-slot='input'], [data-slot='select-trigger'], [data-slot='scroll-surface']) {
   transition:
-    background-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 320ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 320ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color 460ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 460ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 460ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 460ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-@keyframes noctf-background-crossfade {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes noctf-background-scan-down {
+  from { -webkit-mask-size: 100% calc(100% + 5rem); mask-size: 100% calc(100% + 5rem); }
+  to { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; }
 }
 @keyframes noctf-status-mark-enter {
   from { opacity: 0; transform: scale(0.62) rotate(-18deg); }
@@ -154,7 +172,7 @@
   .noctf-motion-challenge-details,
   .noctf-motion-challenge-watermark { transition: none; will-change: auto; }
   .noctf-motion-terminal-caret, .noctf-motion-status-mark, .noctf-motion-home-signal-flow { animation: none; }
-  [data-wallpaper-ghost] { animation: none; opacity: 0; }
+  [data-wallpaper-ghost] { animation: none; -webkit-mask-image: none; mask-image: none; }
   :is(html[data-theme-transition], html[data-wallpaper-transition]) :is([data-slot='card'], .card-surface, [data-slot='topbar-capsule'], [data-slot='topbar-frame'], [data-page-wallpaper='true'], [data-slot='button'], [data-slot='input'], [data-slot='select-trigger'], [data-slot='scroll-surface']) { transition: none; }
   .noctf-disclosure-content[data-state], .noctf-disclosure-chevron { animation: none; transition: none; }
   .noctf-film-up-enter-active, .noctf-film-up-leave-active { transition: none; }

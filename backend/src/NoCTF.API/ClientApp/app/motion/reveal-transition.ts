@@ -14,10 +14,9 @@ import { nextTick } from 'vue'
 
 type SwitchLayer = 'theme' | 'wallpaper'
 
-/** 背景交叉淡出时长(仅 opacity,合成器动画);组件颜色过渡与之同步收尾。 */
-export const switchBackgroundDurationMs = 360
-/** 组件自身动效时长(与背景同一条缓动曲线)。 */
-export const switchComponentDurationMs = 320
+/** 背景自上而下扫描揭示的时长;组件颜色过渡与之同时长、同缓动。 */
+export const switchBackgroundDurationMs = 460
+export const switchComponentDurationMs = 460
 export const switchTransitionDeadlineMs = 1_500
 
 const BACKGROUND_GHOST_ATTRIBUTE = 'wallpaperGhost'
@@ -83,8 +82,8 @@ export async function runSwitchTransition(
 
   switchInProgress = true
   const ghost = createBackgroundGhost()
-  document.documentElement.dataset[datasetKey] = ''
   try {
+    document.documentElement.dataset[datasetKey] = ''
     await update()
     await nextTick()
     await waitForGhost(ghost)

@@ -18,7 +18,8 @@ test('background and components animate on their own live layers without snapsho
   const ghost = rules.find(rule => rule.selector.includes('[data-wallpaper-ghost]'))
   expect(ghost).toBeDefined()
   expect(ghost!.body).toContain('z-index: -1')
-  expect(ghost!.body).toContain('noctf-background-crossfade')
+  expect(ghost!.body).toContain('noctf-background-scan-down')
+  expect(ghost!.body).toContain('mask-position: bottom')
 
   // 组件动效:只收敛到承载主题色的表面,禁止对整棵树逐元素过渡。
   const componentMotion = rules.find(rule => rule.body.includes('background-color') && rule.selector.includes("data-slot='card'"))
