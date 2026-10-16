@@ -1,5 +1,5 @@
 import { getTheorySession, listTheoryActivities } from '~/api'
-import type { NoCtfApplicationTheoryActivitiesTheoryActivitySummary as Activity } from '~/api'
+import type { NoCtfApplicationTheoryActivitiesTheoryActivitySummary as Activity, NoCtfApplicationTheoryPapersTheoryPaperView as PaperView } from '~/api'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseApiError } from '~/utils/api-error'
 import { activityStateLabel, scoringLabel } from './theory-labels'
@@ -11,12 +11,19 @@ export function useTheoryActivityCatalogPage() {
   const loading = ref(false), error = ref<UiMessage | null>(null)
   /** 每人每活动的作答状态:列表载荷不含该信息,按当前页逐行探一次 session。 */
   const started = ref<Record<string, boolean>>({})
+  /** 探测到的每题会话,用于不可作答时的摘要弹窗。 */
+  const sessions = ref<Record<string, PaperView>>({})
+  const summaryOpen = ref(false)
+  const summaryActivity = ref<Activity | null>(null)
+  function openSummary(activity: Activity) { summaryActivity.value = activity; summaryOpen.value = true }
+  function closeSummary() { summaryOpen.value = false }
   async function probeStarted(): Promise<void> {
     if (staff.value) return
     await Promise.all(rows.value.filter(row => row.id).map(async (row) => {
       const id = row.id!
       try {
         const response = await getTheorySession({ path: { activityId: id } })
+        if (response.data) sessions.value[id] = response.data
         started.value[id] = Boolean(response.data?.paper) || (response.data?.issuedCount ?? 0) > 0
       }
       catch { started.value[id] = true }
@@ -31,6 +38,7 @@ export function useTheoryActivityCatalogPage() {
       if (current === epoch) {
         rows.value = response.data.items ?? []; total.value = response.data.total ?? 0; error.value = null
         started.value = {}
+        sessions.value = {}
         void probeStarted()
       }
     }
@@ -46,7 +54,7 @@ export function useTheoryActivityCatalogPage() {
   }
   watch(search, () => { clearTimeout(timer); timer = setTimeout(() => setPage(1), 250) })
   onMounted(load); onBeforeUnmount(() => { epoch++; clearTimeout(timer) })
-  return { staff, rows, started, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
+  return { staff, rows, started, sessions, summaryOpen, summaryActivity, openSummary, closeSummary, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
     pageCount: computed(() => Math.max(1, Math.ceil(total.value / limit.value))),
     create: () => router.push('/admin/theory/activities/new'), manage: () => router.push('/admin/theory/activities'),
     participate: () => router.push('/theory') }
