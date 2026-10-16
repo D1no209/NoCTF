@@ -50,7 +50,7 @@ public sealed class RunnerProviderReadinessDependencyTests
     }
 
     [Test]
-    public async Task Recent_provider_resource_failure_blocks_readiness_until_recovery_or_cooldown()
+    public async Task Workload_failures_do_not_block_a_healthy_provider()
     {
         var docker = Substitute.For<IRuntimeProviderAvailabilityProbe>();
         docker.Provider.Returns(RuntimeProvider.Docker);
@@ -69,19 +69,28 @@ public sealed class RunnerProviderReadinessDependencyTests
             RuntimeProvider.Docker,
             RunnerProviderFailureKind.ProvisionRejected,
             runtimeId);
-        var blocked = () => dependency.CheckAsync(CancellationToken.None);
-        await Assert.That(blocked).Throws<InvalidOperationException>();
+        await dependency.CheckAsync(CancellationToken.None);
+        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsTrue();
         await docker.Received(1).CheckAvailabilityAsync(CancellationToken.None);
 
-        health.ReportSuccess(RuntimeProvider.Docker);
-        await dependency.CheckAsync(CancellationToken.None);
+    }
 
-        health.ReportFailure(
-            RuntimeProvider.Docker,
-            RunnerProviderFailureKind.ProvisionRejected,
-            runtimeId);
-        clock.Advance(TimeSpan.FromSeconds(61));
+    [Test]
+    public async Task A_failed_probe_blocks_admission_and_a_successful_probe_restores_it()
+    {
+        var docker = Substitute.For<IRuntimeProviderAvailabilityProbe>();
+        docker.Provider.Returns(RuntimeProvider.Docker);
+        docker.CheckAvailabilityAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("Daemon unavailable")));
+        var health = CreateHealth();
+        var dependency = new RunnerProviderReadinessDependency(
+            Options.Create(new RunnerOptions { Provider = RuntimeProvider.Docker }),
+            new RuntimeProviderAvailabilityCatalog([docker]), health);
+        await Assert.That(() => dependency.CheckAsync(CancellationToken.None)).Throws<InvalidOperationException>();
+        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsFalse();
+        docker.CheckAvailabilityAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         await dependency.CheckAsync(CancellationToken.None);
+        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsTrue();
     }
 
     private static RunnerProviderHealthState CreateHealth(

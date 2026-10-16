@@ -17,8 +17,17 @@ public sealed class RunnerProviderReadinessDependency(
         var provider = options.Value.Provider
             ?? throw new InvalidOperationException("Runner provider is not configured.");
         var probe = probes.Get(provider);
-        await probe.CheckAvailabilityAsync(cancellationToken);
-        providerHealth.EnsureReady(provider);
+        try
+        {
+            await probe.CheckAvailabilityAsync(cancellationToken);
+            providerHealth.ReportSuccess(provider);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch
+        {
+            providerHealth.ReportUnavailable(provider);
+            throw;
+        }
     }
 }
 
