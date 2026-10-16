@@ -265,6 +265,16 @@
 [data-slot='topbar-capsule'] [data-slot='button'] {
   position: relative; flex: none; border-radius: 9999px;
 }
+/* 承载表格的卡片不再提供卡片表面:表格以题库管理页为标准直接落在页面上。 */
+[data-slot='card']:has([data-slot='table-container']) {
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    padding-block: 0;
+    overflow: visible;
+}
+
 @media (hover: hover) and (pointer: fine) {
   [data-slot='topbar-capsule'] :is([data-slot='button'], [data-slot='popover-trigger']):hover:not(:disabled, [aria-disabled='true'], [data-disabled]) {
     box-shadow:
@@ -416,7 +426,7 @@
   box-shadow: var(--card-shadow);
 }
 @media (hover: hover) and (pointer: fine) {
-  [data-slot='card']:hover { transform: translateY(-4px); box-shadow: var(--card-shadow-hover); }
+  [data-slot='card']:not(:has([data-slot='table-container'])):hover { transform: translateY(-4px); box-shadow: var(--card-shadow-hover); }
 }
 :is([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger'], [data-slot='input-group']) {
   border-radius: var(--control-radius);
