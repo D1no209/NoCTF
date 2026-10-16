@@ -2,6 +2,7 @@ using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.API.Serialization;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authorization;
 
 namespace NoCTF.API.Security;
 
@@ -38,7 +39,9 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
                 context.User.FindFirst("user_kind")?.Value,
                 "Human",
                 StringComparison.Ordinal)
-            || AllowedPaths.Contains(context.Request.Path))
+            || AllowedPaths.Contains(context.Request.Path)
+            || ((HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+                && context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null))
         {
             await next(context);
             return;
