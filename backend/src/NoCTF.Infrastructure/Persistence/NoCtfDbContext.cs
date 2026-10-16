@@ -576,6 +576,10 @@ public sealed class NoCtfDbContext(
             var instance = ownerEntry.Entity;
             if (instance.ActiveSlot is not null)
                 continue;
+            // A reset may already have handed this slot to a replacement in another
+            // context. Cleanup must never reclaim it for the stopping Runtime.
+            if (instance.State == RuntimeState.Stopping)
+                continue;
             var key = group.Key;
             var reusable = slotEntries.FirstOrDefault(slot => slot.Entity.Key == key);
             if (reusable is not null)

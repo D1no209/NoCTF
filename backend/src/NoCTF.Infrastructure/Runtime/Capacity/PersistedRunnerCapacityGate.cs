@@ -307,7 +307,11 @@ public sealed class PersistedRunnerCapacityGate(
                         && db.GameplayFacts.Any(fact => fact.Id == item.Allocation.GameplayFactId
                             && fact.State == GameplayFactState.Processing)))
             .Select(item => new CapacityReservation(item.Allocation.WorkloadKind,
-                item.Allocation.LimitMemoryBytes, item.Allocation.LimitCpuMillicores, item.Allocation.LimitPidsLimit))
+                item.Allocation.LimitMemoryBytes, item.Allocation.LimitCpuMillicores, item.Allocation.LimitPidsLimit,
+                item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
+                    || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker
+                    || item.State == RuntimeState.Queued || item.State == RuntimeState.Provisioning
+                    || item.State == RuntimeState.Running))
             .ToArrayAsync(ct);
         var failure = CheckCapacity(candidate, limit, reservations, identity.IsAuxiliary);
         if (failure is not null)
@@ -368,7 +372,8 @@ public sealed class PersistedRunnerCapacityGate(
     }
 
     private sealed record CapacityReservation(
-        RuntimeWorkloadKind Kind, long MemoryBytes, long CpuMillicores, long PidsLimit)
+        RuntimeWorkloadKind Kind, long MemoryBytes, long CpuMillicores, long PidsLimit,
+        bool CountsTowardStartup)
     {
         public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker;
     }
@@ -385,7 +390,9 @@ public sealed class PersistedRunnerCapacityGate(
             || projection.ObservedTotal.PidsLimit is long totalPids
                 && requested.PidsLimit > totalPids)
             return RunnerAdmissionFailure.RequestExceedsNodeCapacity;
-        var starting = reservations.Count(item => item.IsAuxiliary == auxiliary);
+        // Cleanup keeps its physical resource budget until absence is confirmed,
+        // but it must not hold a startup slot while another Runtime is being started.
+        var starting = reservations.Count(item => item.IsAuxiliary == auxiliary && item.CountsTowardStartup);
         var maximum = auxiliary
             ? candidate.AdmissionOptions.AuxiliaryConcurrency
             : candidate.AdmissionOptions.MainStartupConcurrency;

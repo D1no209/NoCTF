@@ -406,7 +406,9 @@ internal static partial class BackendMessageOperations
             var instance = assignments[index];
             var runnerId = instance.RunnerId!;
             var heartbeat = heartbeatStatuses[index];
-            if (heartbeat == RunnerHeartbeatStatus.Online)
+            // A prior stop may have failed after deleting the provider resources.
+            // Online heartbeats do not prove that its durable cleanup completed.
+            if (heartbeat == RunnerHeartbeatStatus.Online && instance.State != RuntimeState.Stopping)
                 continue;
 
             if (instance.State is RuntimeState.Stopping or RuntimeState.Failed)
