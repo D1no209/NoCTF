@@ -95,6 +95,9 @@ const htmlOptions: sanitizeHtml.IOptions = {
   nonTextTags: ['script', 'style', 'textarea', 'option', 'iframe', 'object', 'svg', 'math', 'template'],
 }
 
+/** 渲染层只允许重建清洗白名单认可的标签(白名单变化时自动跟随)。 */
+export const sanitizedMarkdownTags: ReadonlySet<string> = new Set(htmlOptions.allowedTags as string[])
+
 /** Sanitize the complete result, including Markdown-generated links and author HTML. */
 export function renderMarkdown(source: string, highlighter?: CodeHighlighter, assets?: Readonly<Record<string, string>>): string {
   if (highlighter && !highlightedMarkdown)

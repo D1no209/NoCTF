@@ -7,13 +7,13 @@ export interface AuthThemeArtwork {
 
 const artworkLoaders = {
   dark: async (): Promise<AuthThemeArtwork> => ({
-    src: (await import('~/assets/images/auth/login-character.png')).default,
+    src: (await import('~/assets/images/auth/login-character.webp')).default,
     width: 1200,
     height: 835,
     corner: 'left-bottom',
   }),
   light: async (): Promise<AuthThemeArtwork> => ({
-    src: (await import('~/assets/images/auth/register-character.png')).default,
+    src: (await import('~/assets/images/auth/register-character.webp')).default,
     width: 574,
     height: 466,
     corner: 'right-top',

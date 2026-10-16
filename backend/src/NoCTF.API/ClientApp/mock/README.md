@@ -51,7 +51,7 @@ bun mock/dev.ts
 ## 目录
 
 - `data/fixtures.ts`：虚构内容与账号种子。
-- `data/competition-poster.png`：用户提供的本地测试海报，经 Mock 海报接口返回；前端默认等比 cover 填充，不进入生产素材目录。
+- `data/competition-poster.webp`：用户提供的本地测试海报，经 Mock 海报接口返回；前端默认等比 cover 填充，不进入生产素材目录。
 - `api.ts`：本地状态与接口行为。
 - `schema.ts`：只读使用现有 OpenAPI 文档，生成完整响应结构，避免复制或修改生产 SDK。
 - `leaderboard.ts`：虚构榜单与提交后的得分计算。

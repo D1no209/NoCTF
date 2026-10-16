@@ -387,9 +387,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       else if (route === '/auth/me/wallpaper') {
         if (!user?.wallpaperRevision) return problem(404, '尚未上传壁纸 / No wallpaper uploaded')
         const wallpaper = wallpapers.get(user.userId)
-          ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+          ?? Bun.file(new URL('./data/competition-poster.webp', import.meta.url))
         return new Response(wallpaper, {
-          headers: { 'Content-Type': wallpaper.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+          headers: { 'Content-Type': wallpaper.type || 'image/webp', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
       }
       else if (route === '/users/{userId}/profile-cover') {
@@ -402,7 +402,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       if (route === '/competitions/{competitionId}/poster') {
         const storedPoster = competitionPosters.get(p.competitionId!)
         if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
-        const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+        const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.webp', import.meta.url))
         const currentRevision = competition?.posterUrl
           ? new URL(competition.posterUrl, url).searchParams.get('revision')
           : null

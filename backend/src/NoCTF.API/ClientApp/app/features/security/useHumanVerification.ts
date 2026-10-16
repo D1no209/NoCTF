@@ -94,6 +94,8 @@ async function solveCapChallenge(
   try {
     const { default: Cap } = await import('@cap.js/widget')
     if (challenge.value?.id !== id) return
+    // 只覆盖主 WASM。@cap.js/widget 对第二个 hashwx.wasm 的默认回退仍是 jsDelivr CDN;
+    // 需 Cap 服务端先托管该资源,再补 CAP_CUSTOM_HASHWX_URL,否则会 404 破坏校验。
     window.CAP_CUSTOM_WASM_URL = new URL(
       '../assets/cap_wasm_bg.wasm',
       current.apiEndpoint,

@@ -288,7 +288,7 @@
 
 [data-page-wallpaper='true'] {
   --page-wallpaper-blur: var(--user-page-wallpaper-blur-light, 0px);
-  --page-wallpaper-image: url('../images/backgrounds/light-pages-wallpaper.jpg');
+  --page-wallpaper-image: url('../images/backgrounds/light-pages-wallpaper.webp');
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -314,7 +314,7 @@
 }
 .dark [data-page-wallpaper='true'] {
   --page-wallpaper-blur: var(--user-page-wallpaper-blur-dark, 0px);
-  --page-wallpaper-image: url('../images/backgrounds/dark-pages-wallpaper.jpg');
+  --page-wallpaper-image: url('../images/backgrounds/dark-pages-wallpaper.webp');
 }
 [data-page-wallpaper='true'][data-personal-wallpaper='true'],
 .dark [data-page-wallpaper='true'][data-personal-wallpaper='true'] {

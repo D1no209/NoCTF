@@ -100,7 +100,11 @@ function dispatch<TEvent extends keyof CompetitionHubClientEvents>(
       | ((notification: CompetitionHubClientEvents[TEvent]) => void)
       | undefined
     if (!handler) continue
-    if (!direct && competitionId && normalizeGuid(subscriber.competitionId) !== competitionId) continue
+    // 缺少竞赛标识的分组事件不得广播给所有订阅者,否则会跨竞赛串扰。
+    if (!direct) {
+      if (!competitionId) continue
+      if (normalizeGuid(subscriber.competitionId) !== competitionId) continue
+    }
     handler(payload)
   }
 }

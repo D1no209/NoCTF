@@ -3,3 +3,6 @@
 deploy/**/*.sh text eol=lf
 
 deploy/**/*.py text eol=lf
+
+# 生成的前端资源(api.json)以 LF 写入,固定行尾避免 CRLF 检出下出现无内容差异的“已修改”。
+backend/src/NoCTF.API/ClientApp/app/locales/** text eol=lf
