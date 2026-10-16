@@ -57,7 +57,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 首页 View 直接组合信号装饰层以连接品牌区与终端；四条线路与节点来自 `assets/svg/decorations/home-signal-paths.svg`，主题着色和遮罩集中在 main.css，移动高光放在 motion.css，装饰不接收指针事件并支持减少动态效果。不要为这一处静态标签组合创建单独共享原语。
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
-- 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。
+- 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。Cap 的两个 WASM 都必须是同源可用资源、不得回退到第三方 CDN：`cap_wasm_bg.wasm` 取自 Cap 服务端（后端探针校验），`hashwx.wasm` 由 `app/assets/wasm/` 自托管；升级 `@cap.js/widget` 时必须同步该副本（`tests/cap-wasm-asset.test.ts` 会校验版本与摘要）。
 - 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置和消息中心；右侧依次容纳中英切换、主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；桌面端正方形主 Card 以头像为水平中线显示，窄屏保留末端对齐。账户摘要区直接进入个人页；设置详情以同宽但不定高的子 Card 在主 Card 下方向下展开并通过 ScrollSurface 滚动，不显示上传规格、字符计数或解释性注释。
 - 中间顶栏导航项的悬停和键盘焦点仅使用胶囊内侧柔光；不要叠加 `ghost` 底色或会被横向滚动面裁成矩形的外阴影。保留活动项的主题色下划线。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
