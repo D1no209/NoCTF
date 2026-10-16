@@ -207,6 +207,12 @@ export function useTheoryAnswerPage() {
   function setLeaveOpen(value: boolean) { if (!value) stay() }
   function beforeUnload(event: BeforeUnloadEvent) { if (unsaved.value) { event.preventDefault(); event.returnValue = '' } }
   onBeforeRouteLeave(confirmLeave); onBeforeRouteUpdate((to, from) => to.path === from.path ? true : confirmLeave())
+  // 列表页「开始新试卷」意图:进入作答页后若可发卷则直接发卷,随后清掉参数避免刷新重复发卷。
+  watch(() => [route.query.new, view.value?.canIssue, busy.value] as const, () => {
+    if (route.query.new !== '1' || !view.value?.canIssue || busy.value || issueRequest) return
+    void router.replace({ query: {} })
+    void start()
+  }, { immediate: true })
   onMounted(() => {
     void load(true); window.addEventListener('beforeunload', beforeUnload)
     unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining && !unsaved.value && queue.size === 0) void load() }, onReconnected: () => void load() })
