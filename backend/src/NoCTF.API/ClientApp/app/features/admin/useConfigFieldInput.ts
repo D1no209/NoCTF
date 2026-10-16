@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { BloodRewardValue, ConfigFieldDef, FlagTemplateModel, PointsCurveValue } from '../../utils/game-config'
-import { BLOOD_REWARD_POLICIES, BloodRewardPolicy, emptyFlagTemplate, SCORE_DECAY_MODES, ScoreDecayMode } from '../../utils/game-config'
+import { bloodRewardProtocols, BLOOD_REWARD_POLICIES, emptyFlagTemplate, protocolInput, SCORE_DECAY_MODES, scoreDecayProtocols } from '../../utils/game-config'
 import PointsDecayCurveComponent from './PointsDecayCurve.vue'
 
 /** Owns state, effects and commands for ConfigFieldInput. */
@@ -42,7 +42,7 @@ emit: { (event: "update:modelValue", ...args: [value: unknown]): void }) {
       initialPoints: v?.initialPoints ?? null,
       minimumPoints: v?.minimumPoints ?? null,
       decayTeamCount: v?.decayTeamCount ?? null,
-      decayMode: v?.decayMode ?? ScoreDecayMode.Quadratic,
+      decayMode: v?.decayMode ?? 'Quadratic',
       customExpression: v?.customExpression ?? null,
     }
   })
@@ -52,17 +52,23 @@ emit: { (event: "update:modelValue", ...args: [value: unknown]): void }) {
   }
 
   function updateDecayMode(value: unknown) {
-    const decayMode = parseNullableNumber(value) ?? curve.value.decayMode
+    const decayMode = protocolInput(value, scoreDecayProtocols, curve.value.decayMode)
     updateCurve({
       decayMode,
-      customExpression: decayMode === ScoreDecayMode.Custom ? curve.value.customExpression : null,
+      customExpression: decayMode === 'Custom' ? curve.value.customExpression : null,
     })
   }
 
   const rewards = computed<BloodRewardValue[]>(() => Array.isArray(props.modelValue) ? props.modelValue : [])
 
   function addReward() {
-    emitValue([...rewards.value, { policy: BloodRewardPolicy.FixedPoints, value: null }])
+    emitValue([...rewards.value, { policy: 'FixedPoints', value: null }])
+  }
+
+  /** 奖励策略下拉:只接受协议表内的取值,未识别输入保持原值。 */
+  function updateRewardPolicy(index: number, value: unknown): void {
+    const current = rewards.value[index]?.policy ?? 'FixedPoints'
+    updateReward(index, { policy: protocolInput(value, bloodRewardProtocols, current) })
   }
 
   function updateReward(index: number, part: Partial<BloodRewardValue>) {
@@ -93,7 +99,6 @@ emit: { (event: "update:modelValue", ...args: [value: unknown]): void }) {
       ...toRefs(props),
       BLOOD_REWARD_POLICIES,
       SCORE_DECAY_MODES,
-      ScoreDecayMode,
       emitValue,
       parseNullableNumber,
       numberText,
@@ -106,6 +111,7 @@ emit: { (event: "update:modelValue", ...args: [value: unknown]): void }) {
       rewards,
       addReward,
       updateReward,
+      updateRewardPolicy,
       removeReward,
       flagTemplateValue,
       updateFlagTemplate,

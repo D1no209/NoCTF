@@ -70,7 +70,7 @@ describe('generated protocol usage', () => {
   test('the definition editor uses generated runtime protocols instead of numeric mirrors', async () => {
     const gameConfig = await sourceFile(new URL('../app/utils/game-config.ts', import.meta.url)).text()
 
-    for (const name of ['RuntimeAllocation', 'EgressPolicy', 'FlagSource', 'UrlExposure', 'CtfInteraction']) {
+    for (const name of ['RuntimeAllocation', 'EgressPolicy', 'FlagSource', 'UrlExposure', 'CtfInteraction', 'BloodRewardPolicy', 'ScoreDecayMode', 'EvaluationDispatch']) {
       expect(gameConfig).not.toContain(`export const ${name} = {`)
     }
     expect(gameConfig).toContain("export const runtimeAllocationProtocols = ['Shared', 'PerTeam'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol[]")
@@ -78,6 +78,9 @@ describe('generated protocol usage', () => {
     // 未知协议值必须显式失败,不允许静默回退成另一个值:旧的静默映射函数已移除。
     expect(gameConfig).not.toContain('function protocolAllocation(')
     expect(gameConfig).toContain("export const ctfInteractionProtocols = ['FlagSubmission', 'PatchVerification'] as const satisfies readonly NoCtfapiEndpointsChallengesCtfInteractionKindProtocol[]")
+    expect(gameConfig).toContain("export const scoreDecayProtocols = [")
+    // 静默把未知协议映射到默认值的辅助函数必须保持移除状态。
+    expect(gameConfig).not.toContain('function protocolIndex(')
     expect(gameConfig).toContain('export function protocolValue')
     expect(gameConfig).toContain('protocol value.')
   })

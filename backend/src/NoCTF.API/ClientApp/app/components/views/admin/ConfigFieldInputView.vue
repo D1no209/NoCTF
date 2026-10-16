@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ConfigFieldInputViewState } from '~/features/admin/useConfigFieldInput'
 
 const viewProps = defineProps<{ state: ConfigFieldInputViewState }>()
-const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, parseNullableNumber, numberText, textValue, boolValue, selectValue, curve, updateCurve, updateDecayMode, rewards, addReward, updateReward, removeReward, flagTemplateValue, updateFlagTemplate, PointsDecayCurve, field, disabled } = toRefs(viewProps.state)
+const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, emitValue, parseNullableNumber, numberText, textValue, boolValue, selectValue, curve, updateCurve, updateDecayMode, rewards, addReward, updateReward, updateRewardPolicy, removeReward, flagTemplateValue, updateFlagTemplate, PointsDecayCurve, field, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -112,7 +112,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         />
       </div>
     </div>
-    <div v-if="curve.decayMode === ScoreDecayMode.Custom" class="flex flex-col gap-1.5">
+    <div v-if="curve.decayMode === 'Custom'" class="flex flex-col gap-1.5">
       <span class="text-xs text-muted-foreground">{{ $t('administration.label.customDecayFormula') }}</span>
       <Textarea
         :model-value="curve.customExpression ?? ''"
@@ -132,7 +132,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
       <Select
         :model-value="reward.policy"
         :disabled="disabled"
-        @update:model-value="updateReward(index, { policy: parseNullableNumber($event) ?? reward.policy })"
+        @update:model-value="updateRewardPolicy(index, $event)"
       >
         <SelectTrigger class="w-56">
           <SelectValue />

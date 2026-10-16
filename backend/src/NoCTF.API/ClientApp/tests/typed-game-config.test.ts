@@ -5,7 +5,6 @@ import { createClient } from '../app/api/client'
 
 import {
   buildConfigValues,
-  BloodRewardPolicy,
   challengeRuleFields,
   competitionConfigFields,
   defaultDefinition,
@@ -16,7 +15,6 @@ import {
   emptyOvaDefinition,
   emptyRuntimeTemplate,
   readConfigValues,
-  ScoreDecayMode,
 } from '../app/utils/game-config'
 import {
   challengeRuntimeDefinitionsEqual,
@@ -164,8 +162,8 @@ describe('typed game configuration contracts', () => {
       },
     }
     const parsed = readConfigValues(source, fields, { rules: false })
-    expect(parsed?.values.defaultScoreCurve).toMatchObject({ decayMode: ScoreDecayMode.Custom })
-    expect(parsed?.values.bloodRewards).toEqual([{ policy: BloodRewardPolicy.CurrentPointsPercentage, value: 10 }])
+    expect(parsed?.values.defaultScoreCurve).toMatchObject({ decayMode: 'Custom' })
+    expect(parsed?.values.bloodRewards).toEqual([{ policy: 'CurrentPointsPercentage', value: 10 }])
 
     const written = buildConfigValues('Ctf', fields, parsed!.values, { rules: false })
     expect((written.ctf as Record<string, unknown>).defaultScoreCurve).toMatchObject({ decayMode: 'Custom', customExpression: '500-x' })
@@ -179,7 +177,7 @@ describe('typed game configuration contracts', () => {
       flagTemplate: { header: 'flag', bodyTemplate: '[GUID]', leetLiteralText: false },
       awdp: { evaluationDispatchMode: 'Manual' },
     }, fields, { rules: false })
-    expect(parsed?.values.evaluationDispatchMode).toBe(1)
+    expect(parsed?.values.evaluationDispatchMode).toBe('Manual')
     const written = buildConfigValues('Awdp', fields, parsed!.values, { rules: false })
     expect((written.awdp as Record<string, unknown>).evaluationDispatchMode).toBe('Manual')
   })

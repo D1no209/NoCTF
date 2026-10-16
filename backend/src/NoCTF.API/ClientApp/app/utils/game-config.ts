@@ -27,36 +27,15 @@ export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 // Runtime 协议值直接使用生成契约的字符串联合,不再维护数字镜像枚举;
 // 读写两侧都由下面的 protocol 读取器校验,未知值显式失败而不是静默回退。
-export const BloodRewardPolicy = {
-  FixedPoints: 0,
-  InitialPointsPercentage: 1,
-  SolveTimePointsPercentage: 2,
-  CurrentPointsPercentage: 3,
-} as const
-export const ScoreDecayMode = {
-  Fixed: 0,
-  Linear: 1,
-  Quadratic: 2,
-  Exponential: 3,
-  Logarithmic: 4,
-  Custom: 5,
-} as const
-export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
-
-const scoreDecayProtocols = [
+export const scoreDecayProtocols = [
   'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
-const bloodRewardProtocols = [
+export const bloodRewardProtocols = [
   'FixedPoints', 'InitialPointsPercentage', 'SolveTimePointsPercentage', 'CurrentPointsPercentage',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
-const evaluationDispatchProtocols = [
+export const evaluationDispatchProtocols = [
   'Automatic', 'Manual',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
-
-function protocolIndex(value: unknown, names: readonly string[], fallback: number): number {
-  const index = names.indexOf(value as string)
-  return index < 0 ? fallback : index
-}
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: "common.label.fixedScoreAttack" },
@@ -69,25 +48,25 @@ export const CTF_SCORE_SETTLEMENT_MODES = [
 ] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: "common.label.fixedPoints" },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: "common.label.initialScorePercentage" },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: "common.description.problemSolvingTimeScore" },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: "common.label.scorePercentage" },
-] as const
+  { value: 'FixedPoints', label: "common.label.fixedPoints" },
+  { value: 'InitialPointsPercentage', label: "common.label.initialScorePercentage" },
+  { value: 'SolveTimePointsPercentage', label: "common.description.problemSolvingTimeScore" },
+  { value: 'CurrentPointsPercentage', label: "common.label.scorePercentage" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol, label: string }[]
 
 export const SCORE_DECAY_MODES = [
-  { value: ScoreDecayMode.Fixed, label: "common.label.fixedPoints" },
-  { value: ScoreDecayMode.Linear, label: "common.label.linearDecay" },
-  { value: ScoreDecayMode.Quadratic, label: "common.label.quadraticDecay" },
-  { value: ScoreDecayMode.Exponential, label: "common.label.exponentialDecay" },
-  { value: ScoreDecayMode.Logarithmic, label: "common.label.logarithmicDecay" },
-  { value: ScoreDecayMode.Custom, label: "common.label.customFormula" },
-] as const
+  { value: 'Fixed', label: "common.label.fixedPoints" },
+  { value: 'Linear', label: "common.label.linearDecay" },
+  { value: 'Quadratic', label: "common.label.quadraticDecay" },
+  { value: 'Exponential', label: "common.label.exponentialDecay" },
+  { value: 'Logarithmic', label: "common.label.logarithmicDecay" },
+  { value: 'Custom', label: "common.label.customFormula" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol, label: string }[]
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: "common.label.automaticAssessment" },
-  { value: EvaluationDispatch.ManualBatch, label: "common.label.manualBatchEvaluation" },
-] as const
+  { value: 'Automatic', label: "common.label.automaticAssessment" },
+  { value: 'Manual', label: "common.label.manualBatchEvaluation" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol, label: string }[]
 
 // ---------- 题目模板 Definition 模型 ----------
 
@@ -486,7 +465,7 @@ export type ConfigFieldType =
   | 'flagTemplate'
 
 export interface ConfigFieldOption {
-  value: string | number
+  value: string
   label: string
 }
 
@@ -511,7 +490,7 @@ export interface PointsCurveValue {
   initialPoints: number | null
   minimumPoints: number | null
   decayTeamCount: number | null
-  decayMode: number
+  decayMode: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol
   customExpression: string | null
 }
 
@@ -525,23 +504,23 @@ export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: numbe
   const progress = Math.min(1, Math.max(0, (normalizedCount - 1) / (decayTeamCount - 1)))
   let score: number
   switch (decayMode) {
-    case ScoreDecayMode.Fixed:
+    case 'Fixed':
       score = initialPoints
       break
-    case ScoreDecayMode.Linear:
+    case 'Linear':
       score = initialPoints + (minimumPoints - initialPoints) * progress
       break
-    case ScoreDecayMode.Quadratic:
+    case 'Quadratic':
       score = initialPoints + (minimumPoints - initialPoints) * progress * progress
       break
-    case ScoreDecayMode.Exponential: {
+    case 'Exponential': {
       const steepness = 4
       const normalized = (Math.exp(-steepness * progress) - Math.exp(-steepness))
         / (1 - Math.exp(-steepness))
       score = minimumPoints + (initialPoints - minimumPoints) * normalized
       break
     }
-    case ScoreDecayMode.Logarithmic:
+    case 'Logarithmic':
       score = initialPoints + (minimumPoints - initialPoints) * Math.log10(1 + 9 * progress)
       break
     default:
@@ -551,7 +530,7 @@ export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: numbe
 }
 
 export interface BloodRewardValue {
-  policy: number
+  policy: NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol
   value: number | null
 }
 
@@ -561,7 +540,7 @@ const POINTS_CURVE_DEFAULT: PointsCurveValue = {
   initialPoints: 500,
   minimumPoints: 100,
   decayTeamCount: 10,
-  decayMode: ScoreDecayMode.Quadratic,
+  decayMode: 'Quadratic',
   customExpression: null,
 }
 
@@ -599,7 +578,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'flagWrongPenalty', label: translate("common.label.wrongFlagPenalty"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'exploitSucceededPenalty', label: translate("common.label.exploitSuccessPenalty"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'serviceAbnormalPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: 'Automatic' },
         { key: 'flagTemplate', label: translate("common.label.breakFlagTemplate"), type: 'flagTemplate', description: translate("common.description.optionalGenerateDynamicFlags") },
       ]
     case 'Koh':
@@ -661,7 +640,7 @@ function parsePointsCurve(raw: unknown): PointsCurveValue {
     initialPoints: asNumber(obj.initialPoints),
     minimumPoints: asNumber(obj.minimumPoints),
     decayTeamCount: asNumber(obj.decayTeamCount),
-    decayMode: protocolIndex(obj.decayMode, scoreDecayProtocols, ScoreDecayMode.Quadratic),
+    decayMode: optionalProtocol(obj.decayMode, scoreDecayProtocols, 'Quadratic', 'score decay mode'),
     customExpression: asString(obj.customExpression),
   }
 }
@@ -671,7 +650,7 @@ function parseBloodRewards(raw: unknown): BloodRewardValue[] {
   return raw.map((item) => {
     const obj = asObject(item) ?? {}
     return {
-      policy: protocolIndex(obj.policy, bloodRewardProtocols, BloodRewardPolicy.FixedPoints),
+      policy: optionalProtocol(obj.policy, bloodRewardProtocols, 'FixedPoints', 'blood reward policy'),
       value: asNumber(obj.value),
     }
   })
@@ -696,7 +675,7 @@ export function fieldDefaultValue(field: ConfigFieldDef): unknown {
         initialPoints: null,
         minimumPoints: null,
         decayTeamCount: null,
-        decayMode: ScoreDecayMode.Quadratic,
+        decayMode: 'Quadratic',
         customExpression: null,
       }
     case 'bloodRewards':
@@ -716,10 +695,12 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
       return asString(raw)
     case 'bool':
       return asBool(raw)
-    case 'select':
-      if (field.key === 'evaluationDispatchMode')
-        return protocolIndex(raw, evaluationDispatchProtocols, EvaluationDispatch.Automatic)
-      return typeof raw === 'string' || typeof raw === 'number' ? raw : (field.options?.[0]?.value ?? '')
+    case 'select': {
+      // 未列出的历史取值必须原样保留:交给 awdInvalidFields 等校验显式暴露,
+      // 静默改写成默认值会让用户在无提示的情况下丢掉配置。
+      if (typeof raw === 'string') return raw
+      return field.options?.[0]?.value ?? ''
+    }
     case 'pointsCurve':
       return parsePointsCurve(raw)
     case 'bloodRewards':
@@ -906,11 +887,7 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       return
     }
     case 'select': {
-      if (field.key === 'evaluationDispatchMode') {
-        out[field.key] = evaluationDispatchProtocols[value as number] ?? evaluationDispatchProtocols[EvaluationDispatch.Automatic]
-        return
-      }
-      if (typeof value === 'string' || typeof value === 'number') out[field.key] = value
+      if (typeof value === 'string') out[field.key] = value
       return
     }
     case 'pointsCurve': {
@@ -919,9 +896,8 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       putNumber(obj, 'initialPoints', curve?.initialPoints ?? null)
       putNumber(obj, 'minimumPoints', curve?.minimumPoints ?? null)
       putNumber(obj, 'decayTeamCount', curve?.decayTeamCount ?? null)
-      obj.decayMode = scoreDecayProtocols[curve?.decayMode ?? ScoreDecayMode.Quadratic]
-        ?? scoreDecayProtocols[ScoreDecayMode.Quadratic]
-      if (curve?.decayMode === ScoreDecayMode.Custom && curve.customExpression?.trim())
+      obj.decayMode = curve?.decayMode ?? 'Quadratic'
+      if (curve?.decayMode === 'Custom' && curve.customExpression?.trim())
         obj.customExpression = curve.customExpression.trim()
       if (Object.keys(obj).length > 0) out[field.key] = obj
       return
@@ -929,7 +905,7 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
     case 'bloodRewards': {
       const rewards = (value as BloodRewardValue[]) ?? []
       out[field.key] = rewards.map(r => ({
-        policy: bloodRewardProtocols[r.policy] ?? bloodRewardProtocols[BloodRewardPolicy.FixedPoints],
+        policy: r.policy,
         ...(r.value !== null ? { value: r.value } : {}),
       }))
       return
