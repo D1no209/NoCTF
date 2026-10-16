@@ -28,6 +28,8 @@ export function useLiveSoloPostgameWriteUps() {
   const backLabel=computed(()=>fromWriteUps.value?'liveSolo.navigation.backToWriteUps' as const:'liveSolo.navigation.backToMatch' as const)
   const mode=ref<'Public'|'Mine'|'Official'|'Review'>('Public'),questions=ref<Question[]>([]),listing=ref<Listing|null>(null),selected=ref<string|null>(null)
   const loading=ref(true),busy=ref(false),error=ref<UiMessage|null>(null),content=ref<Content|null>(null),pdf=ref<string|null>(null)
+  const listingIdentity=computed(()=>`${user.value?.userId??''}:${competitionId.value}:${matchId.value}:${questionId.value??''}:${mode.value}`),listingActor=ref('')
+  const listingAuthorized=computed(()=>listing.value!==null&&listingActor.value===listingIdentity.value)
   const format=ref<Format>('Markdown'),markdown=ref(''),file=ref<File|null>(null),original=ref(''),uploadKey=ref(0)
   const settingStamp=ref<string|null>(null),settingEnabled=ref(false)
   const official=computed(()=>mode.value==='Official'),editor=computed(()=>mode.value==='Mine'||official.value)
@@ -51,10 +53,10 @@ export function useLiveSoloPostgameWriteUps() {
   const items=computed(()=>(listing.value?.items??[]).filter(row=>mode.value==='Public'?!!row.publishedVersionId:true).filter(row=>row.id)
     .map(row=>({value:row.id!,label:row.source==='Official'?row.challengeTitle??'—':row.authorName??'—',row})))
   const dirty=computed(()=>editor.value&&!loading.value&&original.value!==''&&(file.value!=null||JSON.stringify([format.value,markdown.value])!==original.value))
-  const canSave=computed(()=>context?.managementFresh?.value!==false&&editor.value&&!loading.value&&listing.value?.access?.settings?.enabled===true&&(official.value?listing.value.access.canManage===true:
+  const canSave=computed(()=>listingAuthorized.value&&editor.value&&!loading.value&&listing.value?.access?.settings?.enabled===true&&(official.value?listing.value.access.canManage===true:
     listing.value.access.canSubmit===true&&!!listing.value.access.settings.deadlineAt&&Date.parse(listing.value.access.settings.deadlineAt)>=now.value.getTime()))
   const canSubmit=computed(()=>canSave.value&&!!root.value?.draft&&!dirty.value&&!busy.value)
-  const reviewable=computed(()=>context?.managementFresh?.value!==false&&!!root.value&&!!version.value&&(listing.value?.access?.canJudge||listing.value?.access?.canManage))
+  const reviewable=computed(()=>listingAuthorized.value&&!!root.value&&!!version.value&&(listing.value?.access?.canJudge||listing.value?.access?.canManage))
   const stateKey=computed(()=>writeUpStatusKey(root.value))
   function path() { const q=currentQuestion.value!;return {competitionId:competitionId.value,matchId:matchId.value,roundId:q.roundId!,questionId:q.id!} }
   async function selectQuestion(id:string) {const q=questions.value.find(row=>row.id===id);if(q?.roundId)await router.push({path:`${liveSoloBasePath(competitionId.value, route.path)}/postgame/${matchId.value}/${q.roundId}/${id}`,query:{...route.query}})}
@@ -79,21 +81,21 @@ export function useLiveSoloPostgameWriteUps() {
   }
   async function load() {
     if(disposed||busy.value)return
-    const sequence=++request;bodyRequest++;previewLease.close();content.value=null;loading.value=true
+    const sequence=++request,identity=listingIdentity.value;listingActor.value='';bodyRequest++;previewLease.close();content.value=null;loading.value=true
     try {
       if(!context?.competition.value)await context?.refresh()
       if(!initialized){if(staff.value)mode.value='Review';initialized=true}
       if(manager.value){const policy=await getChallengeWriteUpSettings({path:{competitionId:competitionId.value}});if(policy.data){settingStamp.value=policy.data.concurrencyStamp??null;settingEnabled.value=policy.data.settings?.enabled??false}}
       const result=await listLiveSoloPostgameQuestions({path:{competitionId:competitionId.value,matchId:matchId.value}})
-      if(disposed||sequence!==request)return
+      if(disposed||sequence!==request||identity!==listingIdentity.value)return
       if(result.error||!result.data)throw parseApiError(result.error,message('liveSolo.postgame.loadFailed'))
       questions.value=result.data.items??[]
       if(!questionId.value&&questionOptions.value[0]) {allowLeave=true;await selectQuestion(questionOptions.value[0].value);return}
       if(!currentQuestion.value) {listing.value=null;return}
       const listed=await listLiveSoloWriteUps({path:path(),query:{staff:official.value||mode.value==='Review'}})
-      if(disposed||sequence!==request)return
+      if(disposed||sequence!==request||identity!==listingIdentity.value)return
       if(listed.error||!listed.data)throw parseApiError(listed.error,message('liveSolo.postgame.loadFailed'))
-      listing.value=listed.data;error.value=null;selected.value=items.value.some(row=>row.value===selected.value)?selected.value:items.value[0]?.value??null
+      listing.value=listed.data;listingActor.value=identity;error.value=null;selected.value=items.value.some(row=>row.value===selected.value)?selected.value:items.value[0]?.value??null
       if(editor.value&&!root.value){format.value='Markdown';markdown.value='';file.value=null;original.value=JSON.stringify([format.value,markdown.value])}
       else await read()
     }catch(cause){if(!disposed&&sequence===request)error.value=parseApiError(cause,message('liveSolo.postgame.loadFailed')).displayMessage}

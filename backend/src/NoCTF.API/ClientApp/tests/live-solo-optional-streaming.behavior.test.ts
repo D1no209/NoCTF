@@ -16,6 +16,7 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player', mana
   const preparationWrites: any[] = []
   const candidates: any[] = [{ id: 'question-list', name: 'Synthetic list', available: true, concurrencyStamp: 'group-stamp', selectionRevision: 'selection-stamp', risks: [] }]
   const config = { platformStreamingEnabled: policy }
+  const parentFresh = ref(true), actor = ref({ userId: 'player', userName: 'Synthetic player' }); let denied = false
   const round = { id: 'round', state: 'Preparing', platformStreamingEnabled: prepared }
   const match = { id: 'match', state: 'Preparing', concurrencyStamp: 'match-stamp', currentRoundId: prepared === undefined ? null : 'round',
     rosters: [{ teamId: 'left', userIds: ['player'], locked: true }, { teamId: 'right', userIds: ['opponent'], locked: true }] }
@@ -25,12 +26,12 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player', mana
   const workspaceQueries: boolean[] = []
   const deps = { ...soloNavigation, translate, computed, markRaw, ref, shallowRef, watch, message, canJudgeLiveSolo, canLockLiveSoloRoster,
     canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds, canManageLiveSolo,
-    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }) }),
+    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }), managementFresh: parentFresh }),
     useRoute: () => ({ path: management ? '/admin/competitions/contest/live-solo/matches/match' : '/competitions/contest/live-solo/matches/match', params: { id: 'contest', matchId: 'match' } }), useRouter: () => ({ push: async () => {} }),
-    useAuth: () => ({ user: ref({ userId: 'player', userName: 'Synthetic player' }) }),
+    useAuth: () => ({ user: actor }),
     useLiveSoloHub: () => {}, onMounted: () => {}, onBeforeRouteLeave: () => {}, onScopeDispose: () => {},
     useLiveSoloScreen: () => screen, parseLiveSoloError: () => ({ displayMessage: message('liveSolo.error.load') }),
-    getLiveSoloWorkspace: async ({ query }: any) => { workspaceQueries.push(query.staff); return { data: { match, round: prepared === undefined ? null : { ...round }, allowedOperations: [], missingConditions: [] } } }, getLiveSoloPlayerPolicy: async () => ({ data: config }),
+    getLiveSoloWorkspace: async ({ query }: any) => { workspaceQueries.push(query.staff); if (denied) return { error: {}, response: new Response(null, { status: 403 }) }; return { data: { match, round: prepared === undefined ? null : { ...round }, allowedOperations: management ? ['PrepareRound', 'ManageQuestionPool', 'StartCountdown'] : ['ConfirmReady', 'SubmitFlag'], missingConditions: [] } } }, getLiveSoloPlayerPolicy: async () => ({ data: config }),
     resultPresentation, LiveSoloReview: {},
     getMyTeamEndpoint: async () => ({ data: { id: 'left', captainId, memberIds: ['player'] } }),
     listLiveSoloQuestionGroupCandidates: async () => ({ data: { items: candidates } }),
@@ -45,7 +46,7 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player', mana
   }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; ${compiled}; return useLiveSoloMatch;`)(deps)
   const scope = effectScope(), state = scope.run(() => factory())!
-  return { state, config, round, match, workspaceQueries, mediaReads: () => mediaReads, mediaPreparations: () => mediaPreparations,
+  return { state, config, round, match, workspaceQueries, parentFresh, actor, deny: () => { denied = true }, mediaReads: () => mediaReads, mediaPreparations: () => mediaPreparations,
     candidates, preparationWrites, readyCalls: () => readyCalls, disconnected: () => disconnected, stop: () => scope.stop() }
 }
 
@@ -170,4 +171,21 @@ test('settings save both switch directions and reset previous save feedback', as
     await state.save(); expect(state.saved.value).toBe(true); expect(state.dirty.value).toBe(false)
     expect(writes).toEqual([true, false]); expect(configuration.recordingEnabled).toBe(true)
   } finally { scope.stop() }
+})
+
+
+test('fresh match capabilities survive a parent read failure but not a revoked match read or identity change', async () => {
+  const f = fixture(false)
+  try {
+    f.parentFresh.value = false
+    await f.state.load(); await f.state.prepareRound()
+    expect(f.preparationWrites).toHaveLength(1)
+    f.actor.value = { userId: 'other', userName: 'Other' }
+    await f.state.prepareRound()
+    expect(f.preparationWrites).toHaveLength(1)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    f.deny(); await f.state.load(); await f.state.prepareRound()
+    expect(f.preparationWrites).toHaveLength(1)
+    expect(f.state.workspace.value).toBeNull()
+  } finally { f.stop() }
 })
