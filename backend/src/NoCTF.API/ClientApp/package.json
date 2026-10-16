@@ -13,7 +13,8 @@
     "postinstall": "bun run locales:prepare && nuxt prepare",
     "api:gen": "openapi-ts",
     "typecheck": "bun run locales:prepare && nuxi typecheck",
-    "locales:prepare": "bun scripts/prepare-locales.ts"
+    "locales:prepare": "bun scripts/prepare-locales.ts",
+    "test:quality-baseline": "bun scripts/source-assert-baseline.ts"
   },
   "dependencies": {
     "@cap.js/widget": "0.1.58",

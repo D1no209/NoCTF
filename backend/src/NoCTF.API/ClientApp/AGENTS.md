@@ -8,6 +8,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - `bun run typecheck`:全量类型检查,改动后必须通过。
 - `bun run audit:architecture`:检查 i18n、渲染层、路由壳与 UI 原语边界；改动后必须通过。`bun test` 包含同一架构检查及行为回归。
 - `bun run api:gen`:从 `../wwwroot/openapi/v1.json` 重新生成 API SDK 到 `app/api/`(@hey-api/openapi-ts,配置在 `openapi-ts.config.ts`)。后端接口变更后先重新导出 OpenAPI(`dotnet run -- --export-openapi`)再跑此命令;生成产物提交入库。
+- `bun run test:quality-baseline`:重新生成源码断言基线 `tests/support/source-assert-baseline.json`。只在断言确实迁移成行为测试(或测试文件改名/删除)后运行;基线只允许下降。
 - shadcn-vue 组件用 `bunx --bun shadcn-vue@latest add <name>` 添加(CLI 一律走 bunx)。
 
 ## 结构(app/ 下)
@@ -26,6 +27,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 
 ## 约定
 
+- 测试策略:新增覆盖必须写成行为测试(导入真实模块,驱动真实输入并断言可观察结果)。不得再新增"读取 `app/` 源码再断言代码文本或语法"的断言;这类断言由 `tests/test-quality-ratchet.test.ts` 按基线钉死,只允许减少。需要长期覆盖页面逻辑时,先把逻辑从页面提取到 `features/` 控制器,再对控制器写行为测试。当前债务基线:1809 条源码文本断言(85 个文件)、112 条纯语法断言。
 - 全站控件遵循根 `DESIGN.md` 与已批准的 `UI-REDESIGN-PROPOSAL.md`：20px 圆角卡片，45% 不透明背景、12px 背景高斯模糊与右下阴影，悬停上移 4px / 180ms；控件 10px 圆角、常规 40px 高，浅色品牌蓝/冷蓝灰、深色 #39FF14 强调色。
 - 页面和业务视图禁止直接使用原生 form、日期/数值/文件等选择类型、DOM title 提示、window.alert/confirm/prompt。分别使用 `UiForm`、`DateTimePicker`、`NumberInput`、`FileUpload`、`Hint` 和共享对话框。原语内部可保留必要 HTML 语义与隐藏系统文件 input。
 - 已有完整业务校验的表单使用 `UiForm validation="feature"`；其他表单由 UiForm 显示自定义约束反馈。业务规则仍在功能层，不将校验、请求或导航处理放进 View。
