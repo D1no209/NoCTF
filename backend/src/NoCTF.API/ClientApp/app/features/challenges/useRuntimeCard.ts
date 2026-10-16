@@ -132,11 +132,12 @@ export function useRuntimeCard(props: Readonly<Omit<{
     action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
     failMessage: string,
     onAccepted?: () => void,
+    requiresHumanVerification = true,
   ) {
     if (acting.value) return
     acting.value = true
     try {
-    const verificationHeaders = await requestHumanVerification('runtime')
+    const verificationHeaders = requiresHumanVerification ? await requestHumanVerification('runtime') : {}
     if (verificationHeaders === null) return
     const { error } = await action(verificationHeaders)
     if (error) {
@@ -171,7 +172,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     }), translate("runtime.error.stopEnvironmentFailed"), () => {
       if (runtime.value?.id === current.id)
         runtime.value = { ...runtime.value, state: 'Stopping' }
-    })
+    }, false)
   }
 
   const reset = () => runtime.value && act(verificationHeaders => createRuntime({

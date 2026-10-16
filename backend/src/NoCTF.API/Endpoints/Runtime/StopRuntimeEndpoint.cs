@@ -17,8 +17,7 @@ public sealed class StopRuntimeEndpoint(
     {
         Delete("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
-        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
-        Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
+        Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeRelease)));
         Options(builder => builder.WithMetadata(
             new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
                 NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerStop)));
