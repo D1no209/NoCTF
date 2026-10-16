@@ -29,8 +29,16 @@ export function useTheoryAnswerPage() {
   const canAnswer = computed(() => view.value?.canAnswer === true && !busy.value)
   const unsaved = computed(() => Object.values(drafts).some(draft => draft.dirty || draft.saving || draft.pending !== null))
   const answered = computed(() => questions.value.filter(question => question.id && (drafts[question.id]?.selected.length ?? 0) > 0).length)
-  const answerItems = computed(() => questions.value.map((question, index) => ({ value: String(index),
-    label: `${t('theory.questionNumber', { number: index + 1 })} · ${question.id && (drafts[question.id]?.selected.length ?? 0) > 0 ? t('theory.answered') : t('theory.unanswered')}${question.id && marks.has(question.id) ? ' ⚑' : ''}` })))
+  const answerItems = computed(() => questions.value.map((question, index) => {
+    const isAnswered = Boolean(question.id && (drafts[question.id]?.selected.length ?? 0) > 0)
+    return {
+      value: String(index),
+      number: index + 1,
+      answered: isAnswered,
+      active: index === current.value,
+      label: `${t('theory.questionNumber', { number: index + 1 })} · ${isAnswered ? t('theory.answered') : t('theory.unanswered')}${question.id && marks.has(question.id) ? ' ⚑' : ''}`,
+    }
+  }))
   const remaining = computed(() => {
     const at = new Date(view.value?.deadline?.at ?? '').getTime()
     const now = view.value?.deadline?.paused ? new Date(view.value?.serverTime ?? '').getTime() : clock.value + offset.value
