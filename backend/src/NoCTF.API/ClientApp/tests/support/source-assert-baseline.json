@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2503,
+  "textAssertions": 2502,
   "sourceTextAssertions": {
-    "total": 1809,
+    "total": 1808,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -82,7 +82,7 @@
       "status-icons.test.ts": 8,
       "team-achievements.test.ts": 6,
       "team-runtime-manager.test.ts": 11,
-      "terminal-command.test.ts": 13,
+      "terminal-command.test.ts": 12,
       "theme-color.test.ts": 7,
       "theme-palette.test.ts": 12,
       "theme-transition.test.ts": 26,
