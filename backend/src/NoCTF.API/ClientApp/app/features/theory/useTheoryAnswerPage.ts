@@ -23,6 +23,8 @@ export function useTheoryAnswerPage() {
   let readPending = false, draining: Promise<void> | null = null, issueRequest = '', tickCount = 0
   let unwatch: (() => void) | undefined
   let lastAssetSignature = ''
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let saveFailures = 0
   const queue = new Set<string>()
   const questions = computed(() => view.value?.paper?.questions ?? [])
   const selected = computed(() => questions.value[current.value] ?? null)
@@ -118,6 +120,7 @@ export function useTheoryAnswerPage() {
           if (response.error || !response.data) throw response.error
           if (disposed || view.value?.paper?.id !== paperId) return
           const server = response.data.paper?.questions?.find(question => question.id === itemId)
+          saveFailures = 0
           if (server) acknowledgeAnswer(local, request, saved(server))
           receive(response.data); error.value = null
           if (local.dirty && !local.conflict && response.data.paper?.state === 0) queue.add(itemId)
@@ -127,7 +130,15 @@ export function useTheoryAnswerPage() {
           local.saving = false
           const failure = parseApiError(cause, message('theory.saveFailed')); error.value = failure.displayMessage
           if (failure.code === 'AnswerConflict') { local.conflict = true; local.pending = null; await load() }
-          queue.clear(); break
+          queue.clear()
+          // 保存失败自动重试(有界),不再暴露手动「重试」按钮。
+          if (failure.code !== 'AnswerConflict' && saveFailures < 3) {
+            saveFailures += 1
+            queue.add(itemId)
+            clearTimeout(retryTimer)
+            retryTimer = setTimeout(() => void drain(), 1500)
+          }
+          break
         }
         finally { mutation++ }
       }
@@ -201,7 +212,7 @@ export function useTheoryAnswerPage() {
     unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining && !unsaved.value && queue.size === 0) void load() }, onReconnected: () => void load() })
     interval = setInterval(() => { clock.value = Date.now(); tickCount++; if ((tickCount % 15 === 0 || remaining.value === 0 && view.value?.paper?.state === 0) && !busy.value && !draining && !submitOpen.value) void load() }, 1000)
   })
-  onBeforeUnmount(() => { disposed = true; epoch++; unwatch?.(); clearInterval(interval); clearTimeout(saveTimer); window.removeEventListener('beforeunload', beforeUnload); leaveResolver?.(false) })
+  onBeforeUnmount(() => { disposed = true; epoch++; unwatch?.(); clearInterval(interval); clearTimeout(saveTimer); clearTimeout(retryTimer); window.removeEventListener('beforeunload', beforeUnload); leaveResolver?.(false) })
   return { view, loading, busy, error, questions, answerItems, current, selected, draft, drafts, marks, sheetOpen, canAnswer, unsaved, answered, remainingLabel, remaining,
     assets: files.assets, load, start, chooseSingle, chooseMultiple, clearAnswer: () => choose([]), go, selectNumber: (value: string) => go(Number(value)), mark, useRemote, keepLocal, retrySave,
     boardPage, boardLimit, boardLoading, setBoardPage, setBoardLimit, lostUnsynced, boardPageCount: computed(() => Math.max(1, Math.ceil((board.value?.total ?? 0) / boardLimit.value))),
