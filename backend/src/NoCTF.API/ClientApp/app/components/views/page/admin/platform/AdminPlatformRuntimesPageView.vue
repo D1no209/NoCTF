@@ -268,7 +268,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           <Button
             type="button"
             variant="destructive"
-            :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 8"
+            :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 1"
             @click="submitForceTermination"
           >
             <Spinner v-if="forceTerminatePending" data-icon="inline-start" /> {{ $t('runtime.label.confirmForcedTermination') }}

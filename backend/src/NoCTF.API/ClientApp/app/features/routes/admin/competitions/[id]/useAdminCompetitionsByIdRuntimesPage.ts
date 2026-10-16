@@ -260,7 +260,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   async function submitForceTermination() {
     const rt = forceTerminateDialog.value
     const reason = forceTerminateReason.value.trim()
-    if (!rt?.id || reason.length < 8 || !forceTerminateConfirmed.value) return
+    if (!rt?.id || reason.length < 1 || !forceTerminateConfirmed.value) return
     const token = beginRuntimeOperation(rt, 'force-terminate')
     if (!token) return
     try {

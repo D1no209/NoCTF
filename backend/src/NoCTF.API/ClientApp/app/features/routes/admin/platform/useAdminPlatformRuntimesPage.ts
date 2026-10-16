@@ -152,7 +152,7 @@ export function useAdminPlatformRuntimesPage() {
     const runtime = runtimeOf(forceTerminateTarget.value)
     const reason = forceTerminateReason.value.trim()
     if (!runtime?.id
-      || reason.length < 8
+      || reason.length < 1
       || !forceTerminateConfirmed.value
       || forceTerminatePending.value)
       return
