@@ -78,7 +78,7 @@ public sealed class CompetitionWebhookOutboxDispatchTests
                     services.AddSingleton(TimeProvider.System);
                     services.AddSingleton(protector);
                     services.AddSingleton(new CompetitionWebhookOptions(
-                        new Uri("https://noctf.example.test/"), 3,
+                        3,
                         new HashSet<string>(["127.0.0.1"]),
                         new HashSet<string>(["127.0.0.1"])));
                     services.AddSingleton<IChallengeManagementStore>(

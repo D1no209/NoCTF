@@ -20614,7 +20614,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Updates the global SSO switch and public base URL.",
+        "summary": "Updates the global SSO switch.",
         "description": "Executes PATCH /api/v1/admin/platform/sso.",
         "operationId": "AdminPlatformSsoPatchConfiguration",
         "requestBody": {
@@ -20646,16 +20646,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -46895,6 +46885,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "publicBaseUrl": {
+            "type": "string"
           }
         }
       },
@@ -47829,6 +47822,11 @@
             "maxLength": 500,
             "minLength": 0,
             "nullable": true
+          },
+          "publicBaseUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0
           }
         }
       },
@@ -47888,7 +47886,6 @@
         "additionalProperties": false,
         "required": [
           "enabled",
-          "publicBaseUrl",
           "tokenLifetimeMinutes",
           "resendCooldownSeconds",
           "passwordResetTokenLifetimeMinutes",
@@ -47905,11 +47902,6 @@
         "properties": {
           "enabled": {
             "type": "boolean"
-          },
-          "publicBaseUrl": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 0
           },
           "tokenLifetimeMinutes": {
             "type": "integer",
@@ -48042,18 +48034,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "enabled",
-          "publicBaseUrl"
+          "enabled"
         ],
         "properties": {
           "enabled": {
             "type": "boolean"
-          },
-          "publicBaseUrl": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 0,
-            "nullable": false
           }
         }
       },

@@ -181,7 +181,7 @@ def generate_kubernetes(s, stage, directory):
     copy_tree(ROOT/'shared',stage/'shared')
     custom=stage/'k8s/overlays/configured'; custom.mkdir(parents=True,exist_ok=True)
     data={'Database__AutoMigrate':'true','SeedAdmin__UserName':s['SEED_ADMIN_USERNAME'],'SeedAdmin__Email':s['SEED_ADMIN_EMAIL'],
-          'Storage__PublicBaseUrl':s['S3_PUBLIC_URL'],'Storage__S3__Bucket':s['S3_BUCKET'],'Webhooks__PublicBaseUrl':s['NOCTF_PUBLIC_URL'],
+          'Storage__PublicBaseUrl':s['S3_PUBLIC_URL'],'Storage__S3__Bucket':s['S3_BUCKET'],
           'Authentication__RefreshAllowedOrigins__0':s['NOCTF_PUBLIC_URL'],'Cors__AllowedOrigins__0':s['NOCTF_PUBLIC_URL'],
           'HumanVerification__Validation__PublicOrigin':s['NOCTF_PUBLIC_URL'],'ForwardedHeaders__KnownNetworks__0':s['NOCTF_PROXY_NETWORK'],
           'ForwardedHeaders__AllowedHosts__0':s['NOCTF_PUBLIC_HOST'],'Runtime__Kubernetes__PublicHost':s['DOCKER_PUBLISHED_HOST'],

@@ -1414,5 +1414,6 @@
   "administration.awd.tieBreak.field.HealthyRounds": "Complete healthy question-rounds",
   "administration.awd.tieBreak.field.AttackCount": "Accepted captures",
   "administration.awd.tieBreak.field.LastAttackAt": "Last accepted attack time",
-  "administration.awd.tieBreak.field.RegistrationTime": "Team registration time"
+  "administration.awd.tieBreak.field.RegistrationTime": "Team registration time",
+  "administration.label.publicAddressUsage": "Used for email links, SSO callbacks and competition Webhooks."
 }

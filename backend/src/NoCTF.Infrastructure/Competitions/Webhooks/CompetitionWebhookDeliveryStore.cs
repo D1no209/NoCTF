@@ -13,12 +13,12 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Competitions.Webhooks;
 
 public sealed record CompetitionWebhookOptions(
-    Uri PublicBaseUrl,
     int TimeoutSeconds,
     IReadOnlySet<string> PrivateNetworkAllowList,
     IReadOnlySet<string> InsecureHttpHostAllowList);
@@ -29,7 +29,6 @@ public sealed class CompetitionWebhookDeliveryStore(
     GetChallenge getChallenge,
     GetCompetitionTracks getTracks,
     ILeaderboardCache leaderboard,
-    CompetitionWebhookOptions options,
     TimeProvider timeProvider,
     ILogger<CompetitionWebhookDeliveryStore> logger) : ICompetitionWebhookDeliveryStore
 {
@@ -618,17 +617,18 @@ public sealed class CompetitionWebhookDeliveryStore(
                 command.TargetId);
         }
         var now = timeProvider.GetUtcNow();
+        var publicBaseUrl = await PlatformPublicAddress.ReadAsync(db, cancellationToken);
         var body = JsonSerializer.SerializeToUtf8Bytes(new
         {
             specversion = "1.0",
             id = command.DeliveryId,
-            source = new Uri(options.PublicBaseUrl,
+            source = new Uri(publicBaseUrl,
                 $"api/v1/competitions/{competition.Id}").AbsoluteUri,
             type = "com.noctf.webhook.test.v1",
             subject = $"competitions/{competition.Id}",
             time = command.RequestedAt,
             datacontenttype = "application/json",
-            dataschema = new Uri(options.PublicBaseUrl,
+            dataschema = new Uri(publicBaseUrl,
                 "schemas/webhooks/competition-events-v1.schema.json").AbsoluteUri,
             data = new
             {
@@ -740,11 +740,12 @@ public sealed class CompetitionWebhookDeliveryStore(
             throw new CompetitionWebhookProjectionNotReadyException(
                 CompetitionWebhookProjectionFailure.MissingPublicChallenge);
         var capturedAt = timeProvider.GetUtcNow();
+        var publicBaseUrl = await PlatformPublicAddress.ReadAsync(db, cancellationToken);
         var source = new Uri(
-            options.PublicBaseUrl,
+            publicBaseUrl,
             $"api/v1/competitions/{competition.Id}").AbsoluteUri;
         var schema = new Uri(
-            options.PublicBaseUrl,
+            publicBaseUrl,
             "schemas/webhooks/competition-events-v1.schema.json").AbsoluteUri;
         var payload = new
         {

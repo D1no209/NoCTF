@@ -21,7 +21,6 @@ RUN export ASPNETCORE_ENVIRONMENT=Production \
     ConnectionStrings__PostgreSql='Host=localhost;Database=noctf_codegen;Username=postgres;Password=unused' \
     RunnerScoring__SigningKey="$(head -c 32 /dev/urandom | base64)" \
     RunnerScoring__CallbackBaseUrl=http://localhost:5080 \
-    Webhooks__PublicBaseUrl=https://noctf.invalid \
     Runner__Id=codegen-runner \
     Runner__Pool=codegen \
     Runner__Provider=Docker \

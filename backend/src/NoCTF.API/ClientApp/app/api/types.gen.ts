@@ -4921,6 +4921,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
     description?: string | null;
     logoUrl?: string | null;
     updatedAt?: string;
+    publicBaseUrl?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse = {
@@ -5160,6 +5161,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest = {
     name: string;
     description: string | null;
+    publicBaseUrl?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest = {
@@ -5175,7 +5177,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatc
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest = {
     enabled: boolean;
-    publicBaseUrl: string;
     tokenLifetimeMinutes: number;
     resendCooldownSeconds: number;
     passwordResetTokenLifetimeMinutes: number;
@@ -5211,7 +5212,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountSta
 
 export type NoCtfapiEndpointsAdministrationPlatformPatchSsoConfigurationRequest = {
     enabled: boolean;
-    publicBaseUrl: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest = {
@@ -17300,10 +17300,6 @@ export type AdminPlatformSsoPatchConfigurationData = {
 
 export type AdminPlatformSsoPatchConfigurationErrors = {
     /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
      * Unauthorized
      */
     401: unknown;
@@ -17312,8 +17308,6 @@ export type AdminPlatformSsoPatchConfigurationErrors = {
      */
     403: unknown;
 };
-
-export type AdminPlatformSsoPatchConfigurationError = AdminPlatformSsoPatchConfigurationErrors[keyof AdminPlatformSsoPatchConfigurationErrors];
 
 export type AdminPlatformSsoPatchConfigurationResponses = {
     /**

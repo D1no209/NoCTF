@@ -1414,5 +1414,6 @@
   "administration.awd.tieBreak.field.HealthyRounds": "正常完整题轮数",
   "administration.awd.tieBreak.field.AttackCount": "有效捕获数",
   "administration.awd.tieBreak.field.LastAttackAt": "最后有效攻击时间",
-  "administration.awd.tieBreak.field.RegistrationTime": "队伍报名时间"
+  "administration.awd.tieBreak.field.RegistrationTime": "队伍报名时间",
+  "administration.label.publicAddressUsage": "用于邮件链接、SSO 回调和竞赛 Webhook。"
 }

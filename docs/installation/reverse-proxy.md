@@ -122,9 +122,10 @@ ForwardedHeaders__KnownNetworks__0=实际代理CIDR
 ForwardedHeaders__AllowedHosts__0=noctf.example.com
 Authentication__RefreshAllowedOrigins__0=https://noctf.example.com
 Cors__AllowedOrigins__0=https://noctf.example.com
-Webhooks__PublicBaseUrl=https://noctf.example.com
 HumanVerification__Validation__PublicOrigin=https://noctf.example.com
 ```
+
+在管理后台「平台配置」设置统一的平台公开地址（例如 `https://noctf.example.com`），邮件链接、SSO 回调和 Webhook 共用此值。升级会保留原邮件公开地址；原 SSO 地址或 `Webhooks__PublicBaseUrl` 若与其不同，升级前请先统一。`Webhooks__PublicBaseUrl` 已移除，Runner 内部回调地址和题目容器公开主机不受影响。
 
 Origin 精确匹配 scheme、host 和端口，不含路径、不用 `*`。刷新 Cookie 使用 Secure/HttpOnly，生产通过 HTTPS 访问。域名变更时同时更新 Refresh/CORS、SSO 回调、Cap/Turnstile、Webhook 和文件公开地址，并重启必要角色。
 

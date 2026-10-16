@@ -143,24 +143,10 @@ internal static class CompetitionInfrastructure
         services.AddScoped<UpdateCompetitionWebhookTarget>();
         services.AddScoped<RotateCompetitionWebhookSecret>();
         services.AddScoped<DeleteCompetitionWebhookTarget>();
-        var publicBaseUrlValue = configuration["Webhooks:PublicBaseUrl"]
-            ?? (development ? "http://localhost:5000" : "https://localhost");
-        if (!Uri.TryCreate(publicBaseUrlValue, UriKind.Absolute, out var webhookPublicBaseUrl)
-            || webhookPublicBaseUrl.Scheme is not ("https" or "http")
-            || webhookPublicBaseUrl.UserInfo.Length > 0
-            || webhookPublicBaseUrl.AbsolutePath != "/"
-            || webhookPublicBaseUrl.Query.Length > 0
-            || webhookPublicBaseUrl.Fragment.Length > 0
-            || !development && webhookPublicBaseUrl.Scheme != Uri.UriSchemeHttps)
-        {
-            throw new InvalidOperationException(
-                "Webhooks:PublicBaseUrl must be an absolute HTTPS origin in production.");
-        }
         var webhookTimeoutSeconds = configuration.GetValue("Webhooks:TimeoutSeconds", 10);
         if (webhookTimeoutSeconds is < 1 or > 120)
             throw new InvalidOperationException("Webhooks:TimeoutSeconds must be between 1 and 120.");
         services.AddSingleton(new CompetitionWebhookOptions(
-            new Uri(webhookPublicBaseUrl.AbsoluteUri.TrimEnd('/') + "/"),
             webhookTimeoutSeconds,
             ReadAllowList(configuration.GetSection(
                 "Webhooks:PrivateNetworkAllowList").Get<string[]>()),

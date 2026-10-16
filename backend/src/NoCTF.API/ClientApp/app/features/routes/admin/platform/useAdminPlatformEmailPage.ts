@@ -192,7 +192,6 @@ export function useAdminPlatformEmailPage() {
 
   const form = reactive({
     enabled: false,
-    publicBaseUrl: '',
     tokenLifetimeMinutes: 30,
     resendCooldownSeconds: 60,
     passwordResetTokenLifetimeMinutes: 30,
@@ -228,7 +227,6 @@ export function useAdminPlatformEmailPage() {
 
   function syncForm(value: EmailConfiguration): void {
     form.enabled = value.enabled ?? false
-    form.publicBaseUrl = value.publicBaseUrl ?? ''
     form.tokenLifetimeMinutes = value.tokenLifetimeMinutes ?? 30
     form.resendCooldownSeconds = value.resendCooldownSeconds ?? 60
     form.passwordResetTokenLifetimeMinutes = value.passwordResetTokenLifetimeMinutes ?? 30

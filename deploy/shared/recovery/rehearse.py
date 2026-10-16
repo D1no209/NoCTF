@@ -80,7 +80,7 @@ def main():
                  'ConnectionStrings__Redis':'unused:6379','ConnectionStrings__Nats':f'nats://{ns}:4222',
                  'Authentication__SigningKey':'j'*64,'RunnerScoring__SigningKey':'r'*64,'EmailVerification__EncryptionKey':base64.b64encode(b'e'*32).decode(),
                  'SeedAdmin__UserName':'recovery-admin','SeedAdmin__Email':'admin@rehearsal.test','SeedAdmin__Password':'rehearsal-admin-only',
-                 'Webhooks__PublicBaseUrl':'https://rehearsal.example.test','HumanVerification__Validation__PublicOrigin':'https://rehearsal.example.test',
+                 'HumanVerification__Validation__PublicOrigin':'https://rehearsal.example.test',
                  'Observability__Enabled':'false','OTEL_SDK_DISABLED':'true'}
             cmd=['run','--rm','--network',prefix]
             for key,value in env.items():cmd+=['--env',key+'='+value]

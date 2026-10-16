@@ -220,8 +220,6 @@ public sealed class CompetitionWebhookOutboxPersistenceTests
             new GetChallenge(Substitute.For<IChallengeManagementStore>()),
             new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
             Substitute.For<ILeaderboardCache>(),
-            new CompetitionWebhookOptions(new Uri("https://noctf.example.test/"),
-                10, new HashSet<string>(), new HashSet<string>()),
             TimeProvider.System,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<
                 CompetitionWebhookDeliveryStore>.Instance);

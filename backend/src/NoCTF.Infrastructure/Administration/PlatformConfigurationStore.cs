@@ -46,13 +46,15 @@ public sealed class PlatformConfigurationStore(
         string name,
         string? description,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? publicBaseUrl = null)
     {
         var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         settings.Name = name;
         settings.Description = description;
+        if (publicBaseUrl is not null) settings.PublicBaseUrl = publicBaseUrl;
         settings.UpdatedAt = now;
         return await SaveAsync(settings, ct);
     }
@@ -139,7 +141,7 @@ public sealed class PlatformConfigurationStore(
             settings.UpdatedAt,
             settings.CtfPatchVerificationEnabled,new(settings.LiveSoloVideoMaximumWidth,settings.LiveSoloVideoMaximumHeight,
                 settings.LiveSoloVideoMaximumFramesPerSecond,settings.LiveSoloVideoMaximumBitrateBitsPerSecond,
-                settings.LiveSoloVideoMaximumBitrateBitsPerSecond,settings.LiveSoloVideoPolicyStamp));
+                settings.LiveSoloVideoMaximumBitrateBitsPerSecond,settings.LiveSoloVideoPolicyStamp), settings.PublicBaseUrl);
 }
 
 public sealed class NoOpPlatformConfigurationStore
@@ -160,9 +162,11 @@ public sealed class NoOpPlatformConfigurationStore
         string name,
         string? description,
         DateTimeOffset now,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        string? publicBaseUrl = null) =>
         Task.FromResult(Default with
         {
+            PublicBaseUrl = publicBaseUrl ?? Default.PublicBaseUrl,
             Name = name,
             Description = description,
             UpdatedAt = now

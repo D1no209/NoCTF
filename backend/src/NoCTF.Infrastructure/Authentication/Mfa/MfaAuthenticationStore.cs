@@ -298,7 +298,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
     private static bool MailConfigured(PlatformSettings settings) => settings.EmailSmtpHost.Length > 0 && settings.EmailSmtpFromAddress.Length > 0
         && settings.EmailSmtpPort is > 0 and <= 65535 && settings.EmailSmtpSecurityMode is not null
         && (string.IsNullOrWhiteSpace(settings.EmailSmtpUserName) || settings.EmailSmtpPasswordCiphertext is { Length: > 0 })
-        && Uri.TryCreate(settings.EmailPublicBaseUrl, UriKind.Absolute, out var address) && address.Scheme is "http" or "https";
+        && Uri.TryCreate(settings.PublicBaseUrl, UriKind.Absolute, out var address) && address.Scheme is "http" or "https";
     private static string FailureKey(string kind, string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"rate:mfa-failure:{kind}:{value}")));
     private static string SafeReturnPath(string path) => path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\\') ? path : "/";
     private static string ProvisioningUri(string issuer, string account, string secret) => $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(account)}?secret={secret}&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits=6&period=30";

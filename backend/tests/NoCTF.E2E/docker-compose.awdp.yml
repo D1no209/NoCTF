@@ -70,7 +70,6 @@ services:
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Nats: nats://nats:4222
-      Webhooks__PublicBaseUrl: https://e2e.invalid
       EmailVerification__EncryptionKey: ${NOCTF_E2E_ENCRYPTION_KEY}
       Authentication__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       Authentication__Issuer: NoCTF.E2E

@@ -35,7 +35,7 @@ internal sealed class PlatformSettingsConfiguration
             HumanVerificationTurnstileSiteKey = string.Empty,
             HumanVerificationTurnstileSecretCiphertext = null,
             EmailVerificationEnabled = false,
-            EmailPublicBaseUrl = "http://localhost:5000",
+            PublicBaseUrl = "http://localhost:5000",
             EmailVerificationTokenLifetimeMinutes = 1440,
             EmailVerificationResendCooldownSeconds = 60,
             EmailPasswordResetTokenLifetimeMinutes = 30,
@@ -50,7 +50,6 @@ internal sealed class PlatformSettingsConfiguration
             EmailSmtpFromName = "NoCTF",
             EmailSmtpTimeoutSeconds = 30,
             SsoEnabled = false,
-            SsoPublicBaseUrl = string.Empty,
             UpdatedAt = DateTimeOffset.UnixEpoch
         });
         // Existing deployments required verification for Runtime and Evaluation operations.

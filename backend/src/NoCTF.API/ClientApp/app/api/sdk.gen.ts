@@ -5321,7 +5321,7 @@ export const adminPlatformSsoGetConfiguration = <ThrowOnError extends boolean = 
 });
 
 /**
- * Updates the global SSO switch and public base URL.
+ * Updates the global SSO switch.
  *
  * Executes PATCH /api/v1/admin/platform/sso.
  */

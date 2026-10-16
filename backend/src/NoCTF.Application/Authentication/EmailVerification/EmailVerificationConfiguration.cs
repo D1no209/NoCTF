@@ -23,7 +23,6 @@ public sealed record EmailVerificationConfigurationView(
 
 public sealed record UpdateEmailVerificationConfigurationCommand(
     bool Enabled,
-    string PublicBaseUrl,
     int TokenLifetimeMinutes,
     int ResendCooldownSeconds,
     int PasswordResetTokenLifetimeMinutes,
@@ -131,16 +130,6 @@ public sealed class ManageEmailVerificationConfiguration(
         bool passwordConfigured)
     {
         var errors = new List<EmailVerificationConfigurationError>();
-        if (!Uri.TryCreate(command.PublicBaseUrl, UriKind.Absolute, out var publicBaseUrl)
-            || !string.Equals(publicBaseUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(publicBaseUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrEmpty(publicBaseUrl.Query)
-            || !string.IsNullOrEmpty(publicBaseUrl.Fragment)
-            || !string.IsNullOrEmpty(publicBaseUrl.UserInfo)
-            || command.PublicBaseUrl.Length > 2048)
-        {
-            errors.Add(EmailVerificationConfigurationError.PublicBaseUrlInvalid);
-        }
         if (command.TokenLifetimeMinutes is < 5 or > 10_080)
             errors.Add(EmailVerificationConfigurationError.TokenLifetimeInvalid);
         if (command.ResendCooldownSeconds is < 30 or > 3600)

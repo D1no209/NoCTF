@@ -6643,12 +6643,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("email_password_reset_token_lifetime_minutes");
 
-                    b.Property<string>("EmailPublicBaseUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("email_public_base_url");
-
                     b.Property<string>("EmailSmtpFromAddress")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -6796,15 +6790,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<bool>("SsoEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("sso_enabled");
-
-                    b.Property<string>("SsoPublicBaseUrl")
+                    b.Property<string>("PublicBaseUrl")
                         .IsRequired()
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
-                        .HasColumnName("sso_public_base_url");
+                        .HasColumnName("public_base_url");
+
+                    b.Property<bool>("SsoEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sso_enabled");
 
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("bigint")
@@ -6827,7 +6821,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             EmailPasswordResetCooldownSeconds = 60,
                             EmailPasswordResetMaxRequestsPerHour = 5,
                             EmailPasswordResetTokenLifetimeMinutes = 30,
-                            EmailPublicBaseUrl = "http://localhost:5000",
                             EmailSmtpFromAddress = "",
                             EmailSmtpFromName = "NoCTF",
                             EmailSmtpHost = "",
@@ -6851,8 +6844,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             MfaPolicy = (short)0,
                             MfaPolicyStamp = new Guid("00000000-0000-0000-0000-000000000002"),
                             Name = "NoCTF",
+                            PublicBaseUrl = "http://localhost:5000",
                             SsoEnabled = false,
-                            SsoPublicBaseUrl = "",
                             UpdatedAt = 621355968000000000L
                         });
                 });

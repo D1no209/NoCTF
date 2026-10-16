@@ -24,7 +24,7 @@ Webhook 专项 `2/2`、前端全量测试 `598/598`、typecheck、架构审计�
 
 ## 投产前核对
 
-- 设置 `Webhooks__PublicBaseUrl` 为平台公开 HTTPS Origin。
+- 在管理后台「平台配置」设置统一的平台公开 HTTPS 地址；邮件、SSO 和 Webhook 共用此值。
 - 若接收方位于内网，按最小范围配置私网允许列表；不要把整段 Docker/Kubernetes 网络默认放开。
 - 监控 `NOCTF_WEBHOOK` stream、`noctf-webhook` consumer、Wolverine error queue 和 Worker HTTP 失败日志。
 - 用管理页测试事件核对接收端原始字节验签、时间窗口和事件 ID 去重。

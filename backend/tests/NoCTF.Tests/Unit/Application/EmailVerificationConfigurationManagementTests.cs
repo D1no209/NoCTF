@@ -89,7 +89,6 @@ public sealed class EmailVerificationConfigurationManagementTests
     private static UpdateEmailVerificationConfigurationCommand Command(bool enabled) =>
         new(
             Enabled: enabled,
-            PublicBaseUrl: "https://noctf.example",
             TokenLifetimeMinutes: 1440,
             ResendCooldownSeconds: 60,
             PasswordResetTokenLifetimeMinutes: 30,

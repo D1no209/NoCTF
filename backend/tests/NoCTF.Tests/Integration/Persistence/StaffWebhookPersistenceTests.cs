@@ -28,6 +28,7 @@ public sealed class StaffWebhookPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.ConnectionString).UseSnakeCaseNamingConvention().Options;
             var now = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options); await db.Database.EnsureCreatedAsync(ct);
+            await db.PlatformSettings.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PublicBaseUrl, "https://noctf.example"), ct);
             var owner = Guid.NewGuid(); var competition = Guid.NewGuid(); var teamId = Guid.NewGuid(); var templateId = Guid.NewGuid(); var challengeId = Guid.NewGuid();
             db.Users.Add(new User { Id = owner, UserName = "owner", NormalizedUserName = "OWNER", Email = "owner@example.test", NormalizedEmail = "OWNER@EXAMPLE.TEST", PasswordHash = "test" });
             db.Competitions.Add(new CtfCompetition { Id = competition, OwnerId = owner, Title = "Private", ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf) });
@@ -81,6 +82,7 @@ public sealed class StaffWebhookPersistenceTests
                 value => value.MigrationsAssembly(typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName)).UseSnakeCaseNamingConvention().Options;
             var clock = new MutableClock(DateTimeOffset.UtcNow);
             await using var db = new NoCtfDbContext(options, clock); await db.Database.MigrateAsync(ct);
+            await db.PlatformSettings.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PublicBaseUrl, "https://noctf.example"), ct);
             var owner = Guid.NewGuid(); var replacement = Guid.NewGuid(); var competition = Guid.NewGuid();
             db.Users.AddRange(new User { Id = owner, UserName = "owner", NormalizedUserName = "OWNER", Email = "owner@example.test", NormalizedEmail = "OWNER@EXAMPLE.TEST", PasswordHash = "test" },
                 new User { Id = replacement, UserName = "replacement", NormalizedUserName = "REPLACEMENT", Email = "replacement@example.test", NormalizedEmail = "REPLACEMENT@EXAMPLE.TEST", PasswordHash = "test" });
@@ -91,8 +93,7 @@ public sealed class StaffWebhookPersistenceTests
             await Assert.That(await db.StaffWebhookEvents.CountAsync(ct)).IsEqualTo(0);
             var protector = new NoCTF.Infrastructure.Authentication.PlatformSecretProtector(Microsoft.Extensions.Options.Options.Create(
                 new NoCTF.Infrastructure.Authentication.EmailVerificationProtectionOptions { EncryptionKey = Convert.ToBase64String(new byte[32]) }));
-            var settings = new NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookOptions(new("https://noctf.example/"), 10, new HashSet<string>(), new HashSet<string>());
-            var store = new StaffWebhookStore(db, protector, settings, clock);
+            var store = new StaffWebhookStore(db, protector, clock);
             var created = await store.SaveAsync(new(competition, owner, null, "Staff", "https://bot.example/staff", true, [StaffWorkItemKind.Consultation]), ct);
             await Assert.That(created.Succeeded).IsTrue();
             var target = created.Value!.Target.Id;
@@ -108,7 +109,7 @@ public sealed class StaffWebhookPersistenceTests
                 await store.TickAsync(false, ct);
             await Assert.That(await db.StaffWebhookEvents.AnyAsync(value => value.DispatchedAt == null, ct)).IsFalse();
             await using var competitor = new NoCtfDbContext(options, clock);
-            var otherStore = new StaffWebhookStore(competitor, protector, settings, clock);
+            var otherStore = new StaffWebhookStore(competitor, protector, clock);
             var claims = (await Task.WhenAll(store.ClaimAsync(200, ct), otherStore.ClaimAsync(200, ct))).SelectMany(value => value).ToArray();
             await Assert.That(claims.Select(value => (value.EventId, value.TargetId)).Distinct().Count()).IsEqualTo(claims.Length);
             var delta = claims.Single(value => value.EventId == deltaId);
@@ -145,6 +146,7 @@ public sealed class StaffWebhookPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.ConnectionString).UseSnakeCaseNamingConvention().Options;
             var clock = new MutableClock(DateTimeOffset.UtcNow);
             await using var db = new NoCtfDbContext(options, clock); await db.Database.EnsureCreatedAsync(ct);
+            await db.PlatformSettings.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PublicBaseUrl, "https://noctf.example"), ct);
             var owner = Guid.NewGuid(); var judge = Guid.NewGuid(); var competition = Guid.NewGuid();
             db.Users.AddRange(new User { Id = owner, UserName = "owner", NormalizedUserName = "OWNER", Email = "owner@example.test", NormalizedEmail = "OWNER@EXAMPLE.TEST", PasswordHash = "test" },
                 new User { Id = judge, UserName = "judge", NormalizedUserName = "JUDGE", Email = "judge@example.test", NormalizedEmail = "JUDGE@EXAMPLE.TEST", PasswordHash = "test" });
@@ -154,9 +156,7 @@ public sealed class StaffWebhookPersistenceTests
             await db.SaveChangesAsync(ct);
             var protector = new NoCTF.Infrastructure.Authentication.PlatformSecretProtector(Microsoft.Extensions.Options.Options.Create(
                 new NoCTF.Infrastructure.Authentication.EmailVerificationProtectionOptions { EncryptionKey = Convert.ToBase64String(new byte[32]) }));
-            var settings = new NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookOptions(new("https://noctf.example/"), 10,
-                new HashSet<string>(), new HashSet<string>());
-            var store = new StaffWebhookStore(db, protector, settings, clock);
+            var store = new StaffWebhookStore(db, protector, clock);
             var created = await store.SaveAsync(new(competition, owner, null, "Staff BOT", "https://bot.example/staff/private-key", true,
                 [StaffWorkItemKind.Consultation]), ct);
             await Assert.That(created.Succeeded).IsTrue();
@@ -224,6 +224,7 @@ public sealed class StaffWebhookPersistenceTests
             await using var postgres = new PostgreSqlContainerFixture(); await postgres.InitializeAsync();
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.ConnectionString).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options); await db.Database.EnsureCreatedAsync(ct);
+            await db.PlatformSettings.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PublicBaseUrl, "https://noctf.example"), ct);
             var now = DateTimeOffset.UtcNow; var actorId = Guid.NewGuid(); var competitionId = Guid.NewGuid(); var rootId = Guid.NewGuid();
             db.Users.Add(new User { Id = actorId, UserName = "staff", Email = "staff@example.test", PasswordHash = "test", CreatedAt = now, UpdatedAt = now });
             db.Competitions.Add(new CtfCompetition { Id = competitionId, OwnerId = actorId, Title = "Draft", ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf) });

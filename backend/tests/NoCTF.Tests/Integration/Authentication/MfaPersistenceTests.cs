@@ -223,7 +223,7 @@ public sealed class MfaPersistenceTests
         var providerId = Guid.NewGuid(); var policyId = Guid.NewGuid();
         db.Set<NoCTF.Domain.Platform.OidcSsoProviderConfiguration>().Add(new() { Id = providerId, Name = "Verified OIDC", Issuer = "https://identity.test", DiscoveryUrl = "https://identity.test/.well-known/openid-configuration", ClientId = "test", Enabled = true, AllowLogin = true, MfaTrustEnabled = true, MfaTrustPolicyId = policyId,
             MfaAcrEntries = [new() { SsoProviderId = providerId, Position = 0, Value = "urn:test:mfa" }] });
-        var settings = await db.PlatformSettings.SingleAsync(ct); settings.SsoEnabled = true; settings.SsoPublicBaseUrl = "https://noctf.test";
+        var settings = await db.PlatformSettings.SingleAsync(ct); settings.SsoEnabled = true; settings.PublicBaseUrl = "https://noctf.test";
         await db.SaveChangesAsync(ct); var store = new MfaAuthenticationStore(db, crypto, protector, clock);
         var account = (await store.ReadAccountAsync(userId, ct))!;
         var config = await store.ReadConfigurationAsync(new(userId, 0, new(AuthenticationMethod.Password, clock.GetUtcNow())), ct);
@@ -333,7 +333,7 @@ public sealed class MfaPersistenceTests
         await using var db = new NoCtfDbContext(options); await db.Database.MigrateAsync(ct);
         var user = User(userId, UserKind.Human); user.EmailVerifiedAt = clock.GetUtcNow(); db.Users.Add(user);
         var settings = await db.PlatformSettings.SingleAsync(ct); settings.EmailSmtpHost = "smtp.test.invalid"; settings.EmailSmtpFromAddress = "no-reply@test.invalid";
-        settings.EmailSmtpSecurityMode = SmtpSecurityMode.None; settings.EmailPublicBaseUrl = "https://noctf.test";
+        settings.EmailSmtpSecurityMode = SmtpSecurityMode.None; settings.PublicBaseUrl = "https://noctf.test";
         await db.SaveChangesAsync(ct); var store = new MfaAuthenticationStore(db, crypto, protector, clock);
         var granted = await store.GrantRecoveryAsync(null, null, userId, "Offline operator verified account ownership", ct);
         await Assert.That(granted.Succeeded).IsTrue();

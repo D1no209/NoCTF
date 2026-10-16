@@ -14,7 +14,7 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.Competitions.StaffWebhooks;
 
 public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector secrets,
-    CompetitionWebhookOptions options, TimeProvider clock) : IStaffWebhookStore
+    TimeProvider clock) : IStaffWebhookStore
 {
     private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30),
         TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(30), TimeSpan.FromHours(2), TimeSpan.FromHours(8)];
@@ -44,7 +44,7 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
         if (!await AuthorizedAsync(command.ActorId, command.CompetitionId, true, ct)) return Fail<StaffWebhookMutation>(StaffWebhookFailure.Forbidden);
         var name = command.Name.Trim();
         if (name.Length is < 1 or > 100 || name.Any(char.IsControl)) return Fail<StaffWebhookMutation>(StaffWebhookFailure.InvalidName);
-        if (options.PublicBaseUrl.Scheme != "https" || !Uri.TryCreate(command.EndpointUrl.Trim(), UriKind.Absolute, out var uri) || uri.Scheme != "https"
+        if ((await NoCTF.Infrastructure.Administration.PlatformPublicAddress.ReadAsync(db, ct)).Scheme != "https" || !Uri.TryCreate(command.EndpointUrl.Trim(), UriKind.Absolute, out var uri) || uri.Scheme != "https"
             || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 || uri.AbsoluteUri.Length > 2048) return Fail<StaffWebhookMutation>(StaffWebhookFailure.InvalidEndpoint);
         if (command.Categories.Count == 0 || command.Categories.Any(value => !Enum.IsDefined(value))
             || command.Categories.Distinct().Count() != command.Categories.Count) return Fail<StaffWebhookMutation>(StaffWebhookFailure.InvalidCategories);
@@ -135,9 +135,10 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
         var eligible = current.Where(value => !pendingOnly || value.RequiresStaffAction);
         var ordered = descending ? eligible.OrderByDescending(value => value.ActionRequiredSince ?? value.UpdatedAt) : eligible.OrderBy(value => value.ActionRequiredSince ?? value.UpdatedAt);
         var filtered = ordered.ThenBy(value => value.Id).ToArray();
+        var publicBaseUrl = await NoCTF.Infrastructure.Administration.PlatformPublicAddress.ReadAsync(db, ct);
         var items = filtered.Skip(offset).Take(limit).Select(value => new StaffWorkItemView(value.Kind, value.Id, value.CheatStatus,
             value.ConsultationStatus, value.AppealStatus, value.RequiresStaffAction, value.ActionRequiredSince, value.CreatedAt, value.UpdatedAt,
-            value.TeamId, value.TeamName, value.ChallengeId, value.ChallengeTitle, value.ReasonCode, StaffWebhookProtocol.ManagementUrl(value.Kind, value.Id, competitionId, options.PublicBaseUrl))).ToArray();
+            value.TeamId, value.TeamName, value.ChallengeId, value.ChallengeTitle, value.ReasonCode, StaffWebhookProtocol.ManagementUrl(value.Kind, value.Id, competitionId, publicBaseUrl))).ToArray();
         await transaction.CommitAsync(ct); return Ok(new StaffWorkItemPage(items, filtered.Length));
     }
     public async Task TickAsync(bool recovering, CancellationToken ct)
@@ -211,7 +212,7 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
             { row.State = StaffWebhookDeliveryState.Pending; row.NextAttemptAt = Now.AddSeconds(5); row.LeaseUntil = null; return Ok(new StaffWebhookPreparedDelivery(null, true)); }
             // The durable claim is transferred to one handler; duplicates cannot both prepare HTTP sends.
             row.LeaseUntil = Now.AddMinutes(2); row.PreparedAt = Now; row.Attempts++;
-            var body = StaffWebhookProtocol.Serialize(item, target!.Id, options.PublicBaseUrl);
+            var body = StaffWebhookProtocol.Serialize(item, target!.Id, await NoCTF.Infrastructure.Administration.PlatformPublicAddress.ReadAsync(db, ct));
             if (body.Length > 1024 * 1024) { row.State = StaffWebhookDeliveryState.DeadLetter; row.CompletedAt = Now; return Ok(new StaffWebhookPreparedDelivery(null)); }
             return Ok(new StaffWebhookPreparedDelivery(new(CompetitionWebhookDeliveryReadState.Ready, command.CompetitionId, command.EventId, command.TargetId,
                 new Uri(target.EndpointUrl), body, Unprotect(target.SecretCiphertext, target),

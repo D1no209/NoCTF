@@ -12,7 +12,6 @@ public sealed class EmailVerificationConfigurationProtocolTests
         var request = new PlatformEmailVerificationPatchRequest
         {
             Enabled = true,
-            PublicBaseUrl = "https://noctf.test",
             TokenLifetimeMinutes = 1440,
             ResendCooldownSeconds = 60,
             PasswordResetTokenLifetimeMinutes = 30,

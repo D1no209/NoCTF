@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Authentication;
-using NoCTF.Infrastructure.Competitions.Webhooks;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
@@ -19,18 +18,16 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookSender _competitionWebhookSender;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Infrastructure.Authentication.PlatformSecretProtector _platformSecretProtector;
-        private readonly NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookOptions _competitionWebhookOptions;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
 
-        public DeliverStaffWebhookHandler445896360(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookSender competitionWebhookSender, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookOptions competitionWebhookOptions, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2)
+        public DeliverStaffWebhookHandler445896360(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookSender competitionWebhookSender, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _competitionWebhookSender = competitionWebhookSender;
             _notificationChangePublisher = notificationChangePublisher;
             _platformSecretProtector = platformSecretProtector;
-            _competitionWebhookOptions = competitionWebhookOptions;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
         }
@@ -40,7 +37,7 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
-            var staffWebhookStore = new NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookStore(noCtfDbContext, _platformSecretProtector, _competitionWebhookOptions, _timeProvider2);
+            var staffWebhookStore = new NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookStore(noCtfDbContext, _platformSecretProtector, _timeProvider2);
             // The actual message body
             var deliverStaffWebhook = (NoCTF.Application.Competitions.StaffWebhooks.DeliverStaffWebhook)context.Envelope.Message;
 

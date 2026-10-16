@@ -81,7 +81,6 @@ data:
   Worker__Concurrency__LiveSoloMedia: '4'
   Authentication__RefreshCookieSecure: 'true'
   Authentication__RefreshAllowedOrigins__0: https://noctf.invalid
-  Webhooks__PublicBaseUrl: https://noctf.invalid
   HumanVerification__Validation__PublicOrigin: https://noctf.invalid
   SeedAdmin__UserName: admin
   SeedAdmin__Email: admin@noctf.invalid

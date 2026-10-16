@@ -27,7 +27,6 @@ public sealed class EmailVerificationConfigurationStore(
             .Where(settings => settings.Id == SettingsId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(settings => settings.EmailVerificationEnabled, command.Enabled)
-                .SetProperty(settings => settings.EmailPublicBaseUrl, command.PublicBaseUrl.TrimEnd('/'))
                 .SetProperty(settings => settings.EmailVerificationTokenLifetimeMinutes, command.TokenLifetimeMinutes)
                 .SetProperty(settings => settings.EmailVerificationResendCooldownSeconds, command.ResendCooldownSeconds)
                 .SetProperty(
@@ -94,7 +93,7 @@ public sealed class EmailVerificationConfigurationStore(
 
         return new(
             settings.EmailVerificationEnabled,
-            settings.EmailPublicBaseUrl,
+            settings.PublicBaseUrl,
             settings.EmailSmtpHost,
             settings.EmailSmtpPort,
             ResolveSecurityMode(settings),
@@ -113,7 +112,7 @@ public sealed class EmailVerificationConfigurationStore(
         PlatformSettings settings) =>
         new(
             settings.EmailVerificationEnabled,
-            settings.EmailPublicBaseUrl,
+            settings.PublicBaseUrl,
             settings.EmailVerificationTokenLifetimeMinutes,
             settings.EmailVerificationResendCooldownSeconds,
             settings.EmailPasswordResetTokenLifetimeMinutes,
