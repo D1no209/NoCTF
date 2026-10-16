@@ -146,8 +146,8 @@ export function useAdminCompetitionsByIdPage() {
           { to: `${base}/cheats`, label: translate('administration.label.cheating'), icon: ShieldAlert },
           { to: `${base}/traffic-captures`, label: translate('runtime.trafficCaptures'), icon: Network },
         ] : []),
+        ...(canJudge.value ? [{ to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail }] : []),
         ...(canWrite.value ? [
-          { to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail },
           { to: `${base}/exports`, label: translate('administration.label.export'), icon: Download },
         ] : []),
       ],
@@ -195,7 +195,7 @@ export function useAdminCompetitionsByIdPage() {
     {
       label: translate("common.label.management"),
       items: [
-        ...(canWrite.value ? [{ to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail }] : []),
+        ...(canJudge.value ? [{ to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail }] : []),
         { to: `${base}/writeups`, label: translate(canJudge.value ? 'writeUp.review' : 'administration.navigation.viewWriteups'), icon: ClipboardCheck },
         ...(canWrite.value ? [
           { to: `${base}/exports`, label: translate("administration.label.export"), icon: Download },
