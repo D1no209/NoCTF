@@ -3782,15 +3782,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "X-NoCTF-Human-Verification",
-            "in": "header",
-            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
-            "schema": {
-              "type": "string",
-              "maxLength": 4096
-            }
           }
         ],
         "responses": {
@@ -3831,24 +3822,7 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Human verification is required or was rejected.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "messageKey": {
-                      "type": "string",
-                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
-                    },
-                    "messageArguments": {
-                      "type": "object",
-                      "description": "Named interpolation arguments."
-                    }
-                  },
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
-                }
-              }
-            }
+            "description": "Forbidden"
           }
         },
         "security": [

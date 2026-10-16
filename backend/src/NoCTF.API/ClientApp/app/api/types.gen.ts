@@ -8672,12 +8672,6 @@ export type CreateRuntimeResponse = CreateRuntimeResponses[keyof CreateRuntimeRe
 
 export type StopRuntimeEndpointData = {
     body?: never;
-    headers?: {
-        /**
-         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
-         */
-        'X-NoCTF-Human-Verification'?: string;
-    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -8693,9 +8687,9 @@ export type StopRuntimeEndpointErrors = {
      */
     401: unknown;
     /**
-     * Human verification is required or was rejected.
+     * Forbidden
      */
-    403: MicrosoftAspNetCoreMvcProblemDetails;
+    403: unknown;
     /**
      * Not Found
      */
