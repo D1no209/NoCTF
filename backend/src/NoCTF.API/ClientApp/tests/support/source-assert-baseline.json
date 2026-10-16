@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2476,
+  "textAssertions": 2475,
   "sourceTextAssertions": {
-    "total": 1779,
+    "total": 1778,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -70,7 +70,7 @@
       "public-profile-layout.test.ts": 52,
       "realtime-retry.test.ts": 3,
       "remaining-attempts.test.ts": 3,
-      "reveal-transition.test.ts": 8,
+      "reveal-transition.test.ts": 7,
       "route-loading-performance.test.ts": 11,
       "route-scroll-reset.test.ts": 3,
       "runtime-card.test.ts": 9,

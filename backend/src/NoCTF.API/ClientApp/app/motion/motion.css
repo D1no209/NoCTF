@@ -98,31 +98,40 @@
   to { background-position: -140% 0; }
 }
 .noctf-motion-home-signal-flow { animation: noctf-home-signal-flow 12s linear infinite; }
-/* 明暗切换与壁纸切换共用的统一动效:背景图 → 背景切换动效 → 组件 → 组件动效 → 顶层扫描。
-   主题与壁纸原子切换,组件只做自身颜色过渡;扫描光带由 motion/reveal-transition.ts
-   插到**最顶层**(组件之上),只做 transform 合成 —— 不重绘、不拦截交互、不使用
-   View Transitions 快照(快照会把组件压成图层并让 backdrop-filter 失去背景采样)。 */
-[data-switch-scan-veil] {
+/* 明暗切换与壁纸切换共用的统一动效:背景图 → 背景切换动效 → 组件 → 组件动效。
+   真扫描擦除:扫描线之上是实时新主题,之下是冻结的旧背景;扫描线由
+   reveal-transition.ts 生成的真实「幽灵层」(位于组件之下)用遮罩自上而下移出,
+   因此组件不被遮罩、不被快照覆盖,始终是实时 DOM。
+   不使用 View Transitions 快照(快照会把组件压成图层,backdrop-filter 失去背景采样)。 */
+[data-wallpaper-ghost] {
   position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 38vh;
-  z-index: 2147483000;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
-  background: linear-gradient(
+  -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    color-mix(in oklch, var(--background) 45%, transparent) 55%,
-    color-mix(in oklch, var(--primary) 18%, transparent) 86%,
-    transparent 100%
+    rgb(0 0 0 / 0.72) 2rem,
+    #000 5rem
   );
-  will-change: transform;
-  animation: noctf-scan-sweep 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 0.72) 2rem,
+    #000 5rem
+  );
+  -webkit-mask-position: bottom;
+  mask-position: bottom;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% calc(100% + 5rem);
+  mask-size: 100% calc(100% + 5rem);
+  will-change: -webkit-mask-size, mask-size;
+  animation: noctf-background-scan-down 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-@keyframes noctf-scan-sweep {
-  from { transform: translate3d(0, -100%, 0); }
-  to { transform: translate3d(0, calc(100vh + 38vh), 0); }
+@keyframes noctf-background-scan-down {
+  from { -webkit-mask-size: 100% calc(100% + 5rem); mask-size: 100% calc(100% + 5rem); }
+  to { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; }
 }
 /* 组件动效:与背景扫描同一套动效,但只在**承载颜色的容器与控件**上建立过渡。
    实测:给整棵树(含每个 span/p/td)逐元素建过渡会让切换帧长跑到 800ms+,
@@ -172,7 +181,7 @@
   .noctf-motion-challenge-details,
   .noctf-motion-challenge-watermark { transition: none; will-change: auto; }
   .noctf-motion-terminal-caret, .noctf-motion-status-mark, .noctf-motion-home-signal-flow { animation: none; }
-  [data-switch-scan-veil] { animation: none; opacity: 0; }
+  [data-wallpaper-ghost] { animation: none; -webkit-mask-image: none; mask-image: none; }
   :is(html[data-theme-transition], html[data-wallpaper-transition]) :is(body, [data-slot='default-layout'], [data-slot='default-layout-foreground'], main, main > *, main section, main article, footer,
     [data-slot='card'], .card-surface, [data-slot='card-header'], [data-slot='card-content'], [data-slot='card-footer'],
     [data-slot='topbar-frame'], [data-slot='topbar-capsule'], [data-slot='scroll-surface'],
