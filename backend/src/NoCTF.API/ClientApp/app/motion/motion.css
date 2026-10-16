@@ -140,10 +140,10 @@
   html[data-wallpaper-transition]
 ) :is([data-slot='card'], .card-surface, [data-slot='topbar-capsule'], [data-slot='topbar-frame'], [data-page-wallpaper='true'], [data-slot='button'], [data-slot='input'], [data-slot='select-trigger'], [data-slot='scroll-surface']) {
   transition:
-    background-color 460ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 460ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 460ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 460ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 @keyframes noctf-background-scan-down {
   from { -webkit-mask-size: 100% calc(100% + 5rem); mask-size: 100% calc(100% + 5rem); }
