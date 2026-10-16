@@ -44,14 +44,14 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, showCompeti
         <Skeleton class="h-12 w-24" />
         <Skeleton class="h-12 w-28" />
       </div>
-      <dl v-else-if="myStanding" class="flex shrink-0 divide-x rounded-lg border bg-card/60">
+      <dl v-else-if="myStanding" :aria-label="standingError ? $t('competitions.label.standingStale') : undefined" class="flex shrink-0 divide-x rounded-lg border bg-card/60">
         <div class="min-w-24 px-4 py-2 text-right">
           <dt class="text-xs text-muted-foreground">{{ $t('competitions.label.teamRank') }}</dt>
           <dd class="font-mono text-lg font-semibold tabular-nums">{{ myStanding.rank ? `#${myStanding.rank}` : '-' }}</dd>
         </div>
         <div class="min-w-28 px-4 py-2 text-right">
           <dt class="text-xs text-muted-foreground">{{ $t('competitions.label.teamPoints') }}</dt>
-          <dd class="font-mono text-lg font-semibold tabular-nums text-primary">{{ myStanding.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</dd>
+          <dd class="font-mono text-lg font-semibold tabular-nums text-primary">{{ myStanding.totalScore ?? '-' }} {{ $t('common.label.pts.scoreTrendChart') }}</dd>
         </div>
       </dl>
     </div>
@@ -71,7 +71,7 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, showCompeti
     </Alert>
     <Alert v-else-if="!isWriteUpReview && standingError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
-        <span>{{ $message(standingError) }}</span>
+        <span>{{ myStanding ? $t('competitions.label.standingStale') : $message(standingError) }}</span>
         <Button type="button" size="sm" variant="outline" @click="refreshMyStanding">{{ $t('common.label.reload') }}</Button>
       </AlertDescription>
     </Alert>

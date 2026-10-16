@@ -6,8 +6,6 @@ import { isLiveSoloManagementPath, liveSoloManagementPath, liveSoloPlayerPath } 
 import { markRaw } from 'vue'
 
 import { Activity, ChartNoAxesCombined, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
-import { adminGetCompetition } from '../../../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import type { WorkspaceNavGroup } from '../../../app/workspace-nav'
 import { CompetitionAdminKey } from '../../../../lib/admin-competition'
 import type { CompetitionAdminRole } from '../../../../lib/admin-competition'
@@ -43,7 +41,8 @@ export function useAdminCompetitionsByIdPage() {
 
   const { user, isAdministrator } = useAuth()
 
-  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
+  const resource = useAdminCompetitionResource(competitionId)
+  const competition = resource.competition
 
   const role = ref<CompetitionAdminRole>('Observer')
 
@@ -51,11 +50,11 @@ export function useAdminCompetitionsByIdPage() {
 
   const error = ref<UiMessage | null>(null)
 
-  const canWrite = computed(() => role.value === 'Owner' || role.value === 'Manager')
+  const canWrite = computed(() => resource.fresh.value && (role.value === 'Owner' || role.value === 'Manager'))
 
-  const canJudge = computed(() => role.value !== 'Observer')
+  const canJudge = computed(() => resource.fresh.value && role.value !== 'Observer')
 
-  const canManagePermissions = computed(() => role.value === 'Owner')
+  const canManagePermissions = computed(() => resource.fresh.value && role.value === 'Owner')
 
   const RoleLabel: Record<CompetitionAdminRole, string> = {
     Owner: "common.label.owner",
@@ -64,18 +63,21 @@ export function useAdminCompetitionsByIdPage() {
     Observer: "common.label.observer",
   }
 
-  async function refresh() {
-    const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
-    if (e || !data) {
-      competition.value = null
-      role.value = 'Observer'
-      error.value = parseApiError(e, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
-      return
+  async function load(force = false) {
+    const actor = user.value?.userId
+    try {
+      const result = await (force ? resource.refresh() : resource.read())
+      if (actor !== user.value?.userId) return
+      error.value = result.error ? parseApiError(result.error, describeMessage('common.error.loadingCompetitionFailed')).displayMessage : null
+      await resolveRole()
+      if ([401, 403, 404].includes(result.response?.status ?? 0)) {
+        await navigateTo(result.response?.status === 401 ? '/auth/login' : `/competitions/${competitionId}`)
+      }
+    } catch (cause) {
+      error.value = parseApiError(cause, describeMessage('common.error.loadingCompetitionFailed')).displayMessage
     }
-    competition.value = data.competition ?? null
-    await resolveRole()
-    error.value = null
   }
+  async function refresh() { await load(true) }
 
   async function resolveRole() {
     if (isAdministrator.value || (user.value?.userId && competition.value?.ownerId === user.value.userId)) {
@@ -86,8 +88,12 @@ export function useAdminCompetitionsByIdPage() {
     role.value = protocolRole ?? 'Observer'
   }
 
+  watch(competition, () => { void resolveRole() }, { immediate: true, flush: 'sync' })
+  watch(resource.error, cause => { error.value = cause ? parseApiError(cause, describeMessage('common.error.loadingCompetitionFailed')).displayMessage : null })
+
   provide(CompetitionAdminKey, {
     competitionId,
+    data: resource.data, read: resource.read, accept: resource.accept,
     competition,
     role,
     canWrite,
@@ -96,7 +102,8 @@ export function useAdminCompetitionsByIdPage() {
     refresh,
   })
   provide(competitionContextKey, {
-    competition: computed(() => competition.value ? { ...competition.value, administrationRole: role.value } : null),
+    competition: computed(() => competition.value ? { ...competition.value, administrationRole: resource.fresh.value ? role.value : 'Observer' } : null),
+    managementFresh: resource.fresh,
     loading, error, refresh,
     standing: ref(null), refreshStanding: async () => {},
     canReadBroadcasts: computed(() => competition.value != null && error.value == null),
@@ -206,9 +213,24 @@ export function useAdminCompetitionsByIdPage() {
 
   onMounted(async () => {
     loading.value = true
-    await refresh()
+    await load()
     loading.value = false
   })
+
+  let unsubscribe: (() => void) | undefined
+  onMounted(() => {
+    unsubscribe = watchCompetition(competitionId, {
+      competitionEventChanged: event => {
+        if (event.kind === 'CompetitionUpdated' || event.kind === 'CompetitionAudienceChanged'
+          || event.kind === 'TrackConfigurationUpdated' || event.kind === 'TrackRegistrationPolicyUpdated'
+          || event.kind === 'LeaderboardVisibilityChanged' || event.kind === 'AwdScoringRulesChanged') void refresh()
+      },
+      competitionLifecycleChanged: () => void refresh(),
+      onReconnected: () => void refresh(),
+    })
+  })
+  watch(() => user.value?.userId, () => { resource.clear(); void navigateTo('/competitions') }, { flush: 'sync' })
+  onUnmounted(() => { unsubscribe?.(); resource.clear() })
 
   const CompetitionStatusBadge = markRaw(CompetitionStatusBadgeComponent)
 
@@ -221,7 +243,7 @@ export function useAdminCompetitionsByIdPage() {
       competition,
       role,
       loading,
-      error,
+      error, refresh,
       RoleLabel,
       navGroups,
       activePath,

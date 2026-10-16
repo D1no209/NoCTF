@@ -266,13 +266,29 @@ describe('player progression workspace', () => {
 })
 
 describe('player progression state', () => {
-  test('focuses the most recently started available challenge without depending on completion color', () => {
-    const base = { kind: 0 as const, active: true, complete: false, visited: true, x: 0, y: 0 }
+  test('focuses an available incomplete challenge by position with a stable id tie-breaker', () => {
+    const base = { kind: 0 as const, active: true, complete: false, x: 0, y: 0 }
+    const nodes = [
+      { ...base, id: 'right', x: 10 },
+      { ...base, id: 'below', y: 10 },
+      { ...base, id: 'b' },
+      { ...base, id: 'a' },
+      { ...base, id: 'locked', active: false, x: -10 },
+      { ...base, id: 'solved', complete: true, x: -20 },
+    ]
+    expect(chooseProgressionFocus(nodes)).toBe('a')
+    expect(chooseProgressionFocus([...nodes].reverse())).toBe('a')
+  })
+
+  test('uses deterministic challenge and badge fallbacks when no incomplete challenge is available', () => {
+    const base = { kind: 0 as const, active: true, complete: true, x: 0, y: 0 }
+    expect(chooseProgressionFocus([{ ...base, id: 'b' }, { ...base, id: 'a' }])).toBe('a')
     expect(chooseProgressionFocus([
-      { ...base, id: 'older', firstOpenedAt: '2026-09-01T00:00:00Z' },
-      { ...base, id: 'newer', firstOpenedAt: '2026-09-02T00:00:00Z' },
-      { ...base, id: 'locked', active: false, firstOpenedAt: '2026-09-03T00:00:00Z' },
-    ])).toBe('newer')
+      { ...base, id: 'b', active: false, complete: false },
+      { ...base, id: 'a', active: false, complete: false },
+    ])).toBe('a')
+    expect(chooseProgressionFocus([{ ...base, kind: 1, id: 'badge' }])).toBe('badge')
+    expect(chooseProgressionFocus([])).toBeNull()
   })
 
   test('both completed and incomplete edge conditions report only unmet direct predecessors', () => {

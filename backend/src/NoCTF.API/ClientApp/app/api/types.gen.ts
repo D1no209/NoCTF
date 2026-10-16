@@ -626,6 +626,43 @@ export type NoCtfapiEndpointsTeamsGetMyTeamRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsTeamsMyTeamStandingResponse = {
+    teamId?: string;
+    rank?: number | null;
+    totalScore?: number | null;
+    challengeBenefits?: Array<NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit>;
+    version?: string;
+    generatedAt?: string;
+    dataAsOf?: string | null;
+    visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
+};
+
+export type NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit = {
+    competitionChallengeId?: string;
+    grossPoints?: number;
+    writeUpDeductionPoints?: number;
+    writeUpDeductionPercent?: number | null;
+    writeUpUnlockedAt?: string | null;
+    netPoints?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse = {
+    competitionId?: string;
+    state?: NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol = 'Processing';
+
+export type NoCtfapiEndpointsTeamsGetMyTeamStandingRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsTeamsGetTeamRequest = {
     [key: string]: never;
 };
@@ -2807,8 +2844,6 @@ export type NoCtfapiEndpointsCompetitionsSpectatorScreenResponse = {
     nextCursor?: string | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
-
 export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
 export type NoCtfApplicationScoringLeaderboardSpectatorScreenTeam = {
@@ -2935,15 +2970,20 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     singleWriteUpDeductionPercent?: number;
     singleWriteUpDeadlineHours?: number;
     singleWriteUpDeadlineAt?: string | null;
+    features?: NoCtfApplicationCompetitionsManagementCompetitionFeatures | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol = 'Public' | 'StaffOnly';
 
 export type NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol = 'Direct' | 'DirectAndWsrx' | 'WsrxOnly';
+
+export type NoCtfApplicationCompetitionsManagementCompetitionFeatures = {
+    progressionEnabled?: boolean;
+    progressionMapVisible?: boolean;
+    hasPublishedTheory?: boolean;
+};
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
@@ -3091,15 +3131,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardChallengeAchievementResponse 
     occurredAt?: string;
 };
 
-export type NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit = {
-    competitionChallengeId?: string;
-    grossPoints?: number;
-    writeUpDeductionPoints?: number;
-    writeUpDeductionPercent?: number | null;
-    writeUpUnlockedAt?: string | null;
-    netPoints?: number;
-};
-
 export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     key?: string;
     name?: string;
@@ -3114,14 +3145,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse
     breakScore?: number | null;
     fixScore?: number | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse = {
-    competitionId?: string;
-    state?: NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol;
-    statusUrl?: string;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol = 'Processing';
 
 export type NoCtfapiEndpointsCompetitionsGetLeaderboardRequest = {
     [key: string]: never;
@@ -3169,9 +3192,7 @@ export type NoCtfapiEndpointsCompetitionsPlayerProgressionNodeContract = {
     direction?: string | null;
     active?: boolean;
     complete?: boolean;
-    visited?: boolean;
     requiresPrerequisites?: boolean;
-    firstOpenedAt?: string | null;
     imageUrl?: string | null;
 };
 
@@ -3755,21 +3776,6 @@ export type NoCtfapiEndpointsChallengesPrepareChallengeAttachmentDownloadRequest
 
 export type NoCtfapiEndpointsChallengesPrepareRandomChallengeAttachmentDownloadRequest = {
     [key: string]: never;
-};
-
-export type NoCtfapiEndpointsChallengesProgressionStartConflict = {
-    code?: NoCtfapiEndpointsChallengesProgressionStartFailureCode;
-    detail?: string;
-    messageKey?: string;
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type NoCtfapiEndpointsChallengesProgressionStartFailureCode = 'GraphChanged';
-
-export type NoCtfapiEndpointsChallengesStartProgressionChallengeRequest = {
-    expectedRevision?: number | null;
 };
 
 export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
@@ -8122,6 +8128,50 @@ export type GetMyTeamEndpointResponses = {
 };
 
 export type GetMyTeamEndpointResponse = GetMyTeamEndpointResponses[keyof GetMyTeamEndpointResponses];
+
+export type GetMyTeamStandingData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/me/standing';
+};
+
+export type GetMyTeamStandingErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type GetMyTeamStandingError = GetMyTeamStandingErrors[keyof GetMyTeamStandingErrors];
+
+export type GetMyTeamStandingResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsMyTeamStandingResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetMyTeamStandingResponse = GetMyTeamStandingResponses[keyof GetMyTeamStandingResponses];
 
 export type GetTeamInvitationEndpointData = {
     body?: never;
@@ -13157,47 +13207,6 @@ export type PrepareRandomChallengeAttachmentDownloadEndpointResponses = {
 };
 
 export type PrepareRandomChallengeAttachmentDownloadEndpointResponse = PrepareRandomChallengeAttachmentDownloadEndpointResponses[keyof PrepareRandomChallengeAttachmentDownloadEndpointResponses];
-
-export type StartProgressionChallengeData = {
-    body: NoCtfapiEndpointsChallengesStartProgressionChallengeRequest;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start';
-};
-
-export type StartProgressionChallengeErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsChallengesProgressionStartConflict;
-};
-
-export type StartProgressionChallengeError = StartProgressionChallengeErrors[keyof StartProgressionChallengeErrors];
-
-export type StartProgressionChallengeResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type StartProgressionChallengeResponse = StartProgressionChallengeResponses[keyof StartProgressionChallengeResponses];
 
 export type UnlockChallengeHintEndpointData = {
     body?: never;

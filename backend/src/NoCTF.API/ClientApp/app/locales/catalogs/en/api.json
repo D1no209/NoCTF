@@ -450,7 +450,6 @@
   "api.endpoints.profileCoverUpload.sizeInvalid": "Size Invalid.",
   "api.endpoints.profileCoverUpload.sourceMetadataMismatch": "Source Metadata Mismatch.",
   "api.endpoints.profileCoverUpload.unsupportedFormat": "Unsupported Format.",
-  "api.endpoints.progressionStart.graphChanged": "Progression rules changed; reload before starting.",
   "api.endpoints.register.emailConflict": "The email address is already registered.",
   "api.endpoints.register.userNameConflict": "The requested account identifier is already in use.",
   "api.endpoints.runnerAdmissionFailure.nodePressureHigh": "Node Pressure High.",

@@ -67,7 +67,7 @@ export function useLiveSoloMatch() {
     } catch (cause) { if (!disposed && id === candidatePreviewRequest) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
     finally { if (id === candidatePreviewRequest) candidatePreviewLoading.value = false }
   }
-  const startAllowed = computed(() => workspace.value?.allowedOperations?.includes('StartCountdown') === true)
+  const startAllowed = computed(() => ctx?.managementFresh?.value !== false && workspace.value?.allowedOperations?.includes('StartCountdown') === true)
   const preparationKey = computed(() => round.value?.resourceReadiness === 'Failed' ? 'liveSolo.preparation.failed' : round.value?.resourceReadiness === 'Ready'
     ? round.value.environmentRequired === false ? 'liveSolo.preparation.notRequired' : 'liveSolo.preparation.ready' : 'liveSolo.preparation.pending')
   const preparationFailures = { None: null, NotFound: 'api.liveSolo.notFound', ResourceCapacityExceeded: 'api.liveSolo.resourceCapacityExceeded',
@@ -96,7 +96,7 @@ export function useLiveSoloMatch() {
   const canLock = computed(() => !match.value?.pendingCorrectionId && canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
   const allLocked = computed(() => match.value?.rosters?.length === 2 && match.value.rosters.every(x => x.locked))
   const platformStreaming = computed(() => round.value?.platformStreamingEnabled ?? configuration.value?.platformStreamingEnabled ?? false)
-  const readOnlyMedia = computed(() => staff.value && !onRoster.value)
+  const readOnlyMedia = computed(() => ctx?.managementFresh?.value === false || staff.value && !onRoster.value)
   const screen = useLiveSoloScreen(competitionId, matchId, media, readOnlyMedia)
   const myScreen = computed(() => media.value?.members?.find(x => x.userId === user.value?.userId))
   const screens = computed(() => (media.value?.members ?? []).map((member, index) => ({
@@ -171,7 +171,7 @@ export function useLiveSoloMatch() {
     finally { pending = false; loading.value = false; if (refreshQueued && !disposed) { refreshQueued = false; void load() } }
   }
   async function operation(work: () => PromiseLike<{ error?: unknown; response?: Response }>) {
-    if (busy.value) return
+    if (busy.value || ctx?.managementFresh?.value === false) return
     busy.value = true; error.value = null
     let failure: UiMessage | null = null
     try { const result = await work(); if (result.error || result.response?.ok === false) throw parseLiveSoloError(result.error, message('liveSolo.error.operation')) }
@@ -317,7 +317,7 @@ export function useLiveSoloMatch() {
     staff, hasStaffAccess, manage, backLabel, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
-    ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => workspace.value?.allowedOperations?.includes('SubmitFlag') === true),
+    ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => ctx?.managementFresh?.value !== false && workspace.value?.allowedOperations?.includes('SubmitFlag') === true),
     flagDock: computed(() => `live-solo-flag-${matchId.value}`),
     questionsVisible: computed(() => onRoster.value && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),
     ...screen, mediaError: computed(() => platformStreaming.value ? screen.error.value : null), error }

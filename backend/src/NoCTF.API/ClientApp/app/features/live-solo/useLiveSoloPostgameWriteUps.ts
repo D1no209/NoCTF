@@ -51,10 +51,10 @@ export function useLiveSoloPostgameWriteUps() {
   const items=computed(()=>(listing.value?.items??[]).filter(row=>mode.value==='Public'?!!row.publishedVersionId:true).filter(row=>row.id)
     .map(row=>({value:row.id!,label:row.source==='Official'?row.challengeTitle??'—':row.authorName??'—',row})))
   const dirty=computed(()=>editor.value&&!loading.value&&original.value!==''&&(file.value!=null||JSON.stringify([format.value,markdown.value])!==original.value))
-  const canSave=computed(()=>editor.value&&!loading.value&&listing.value?.access?.settings?.enabled===true&&(official.value?listing.value.access.canManage===true:
+  const canSave=computed(()=>context?.managementFresh?.value!==false&&editor.value&&!loading.value&&listing.value?.access?.settings?.enabled===true&&(official.value?listing.value.access.canManage===true:
     listing.value.access.canSubmit===true&&!!listing.value.access.settings.deadlineAt&&Date.parse(listing.value.access.settings.deadlineAt)>=now.value.getTime()))
   const canSubmit=computed(()=>canSave.value&&!!root.value?.draft&&!dirty.value&&!busy.value)
-  const reviewable=computed(()=>!!root.value&&!!version.value&&(listing.value?.access?.canJudge||listing.value?.access?.canManage))
+  const reviewable=computed(()=>context?.managementFresh?.value!==false&&!!root.value&&!!version.value&&(listing.value?.access?.canJudge||listing.value?.access?.canManage))
   const stateKey=computed(()=>writeUpStatusKey(root.value))
   function path() { const q=currentQuestion.value!;return {competitionId:competitionId.value,matchId:matchId.value,roundId:q.roundId!,questionId:q.id!} }
   async function selectQuestion(id:string) {const q=questions.value.find(row=>row.id===id);if(q?.roundId)await router.push({path:`${liveSoloBasePath(competitionId.value, route.path)}/postgame/${matchId.value}/${q.roundId}/${id}`,query:{...route.query}})}
@@ -128,7 +128,7 @@ export function useLiveSoloPostgameWriteUps() {
     const target=postgameReviewTarget(root.value,action);if(!target)return;
     reviewTarget.value=target;reviewAction.value=action;reason.value='';reviewOpen.value=true}
   function setReview(value:boolean){if(!busy.value)reviewOpen.value=value}
-  async function review(){const target=reviewTarget.value;if(!target||busy.value)return;busy.value=true;try{
+  async function review(){const target=reviewTarget.value;if(!target||busy.value||!reviewable.value)return;busy.value=true;try{
     const result=await reviewLiveSoloWriteUp({path:{...path(),writeUpId:target.writeUpId},body:{versionId:target.versionId,expectedStamp:target.expectedStamp,action:reviewAction.value,reason:reason.value||null}})
     if(result.error||!result.data)throw parseApiError(result.error,message('challengeWriteUp.saveFailed'));reviewOpen.value=false;error.value=null
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.saveFailed')).displayMessage}finally{busy.value=false;if(!reviewOpen.value)await load()}}

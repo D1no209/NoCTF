@@ -1,4 +1,5 @@
 {
+  "competitions.label.standingStale": "当前显示上次成功获取的本队概况，更新失败，请重试。",
   "awd.rules.changedEvent": "{actor} 修改了 {challenge} 的计分规则",
   "competitions.competitionBroadcast.description.liveSolo": "比赛通知会在这里显示",
   "competitions.label.backToAdministration": "返回管理后台",
@@ -67,10 +68,8 @@
   "progression.badgeUpdateFailed": "更新勋章失败。",
   "progression.badgeUpdated": "勋章已更新。",
   "progression.locked": "未解锁",
-  "progression.inProgress": "进行中",
   "progression.blockedBy": "尚未满足的前驱：{names}",
-  "progression.graphChanged": "闯关规则已变化，请刷新地图后重试。",
-  "progression.startFailed": "无法开始这道题，请刷新后重试。",
+  "progression.startFailed": "这道题目前不可访问，请刷新后重试。",
   "progression.prerequisiteProgress": "前驱 {satisfied}/{total} 已满足",
   "progression.playerDescription": "查看本队当前勋章以及赛事开放的闯关路线。",
   "progression.myTeamBadges": "本队勋章",

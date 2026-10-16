@@ -71,6 +71,32 @@ public sealed class ChallengeAudienceEndpointTests
     }
 
     [Test]
+    public async Task Detail_reads_current_progression_access_without_a_start_request()
+    {
+        var store = new RecordingStore();
+        await using var app = await CreateApplicationAsync(store, canRead: true, teamId: TeamId);
+        using var client = app.GetTestClient();
+        var access = app.Services.GetRequiredService<IProgressionChallengeAccess>();
+        var active = true;
+        access.IsActiveAsync(CompetitionId, ChallengeId, TeamId, Arg.Any<CancellationToken>())
+            .Returns(_ => active);
+
+        using var opened = await client.GetAsync($"/api/v1/competitions/{CompetitionId}/challenges/{ChallengeId}");
+        await Assert.That(opened.StatusCode).IsEqualTo(HttpStatusCode.OK);
+
+        active = false;
+        using var relocked = await client.GetAsync($"/api/v1/competitions/{CompetitionId}/challenges/{ChallengeId}");
+        await Assert.That(relocked.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(store.FindCalls).IsEqualTo(1);
+
+        active = true;
+        using var reopened = await client.GetAsync($"/api/v1/competitions/{CompetitionId}/challenges/{ChallengeId}");
+        await Assert.That(reopened.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(store.FindCalls).IsEqualTo(2);
+        await access.Received(3).IsActiveAsync(CompetitionId, ChallengeId, TeamId, Arg.Any<CancellationToken>());
+    }
+
+    [Test]
     public async Task Detail_reuses_authorized_team_for_attempt_state()
     {
         var store = new RecordingStore();

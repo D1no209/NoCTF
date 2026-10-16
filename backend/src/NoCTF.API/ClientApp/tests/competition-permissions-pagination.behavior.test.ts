@@ -21,7 +21,7 @@ async function harness() {
   const scope = effectScope()
   const state = scope.run(() => factory({
     ref, computed, watch, proxyRefs, useOffsetPagination, X: {},
-    useCompetitionAdmin: () => ({ competitionId: 'competition', canManagePermissions: ref(true), refresh: async () => {} }),
+    useCompetitionAdmin: () => ({ competitionId: 'competition', canManagePermissions: ref(true), refresh: async () => {}, accept: () => {}, read: async () => ({ data: { permissions: structuredClone(permissions) } }) }),
     useAuth: () => ({ user: ref({ userId: 'owner', userName: 'Owner' }) }),
     adminUserPath: (id: string) => `/admin/users/${id}`,
     onMounted: (callback: () => Promise<void>) => { mount = callback },

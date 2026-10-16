@@ -5,13 +5,13 @@ import { proxyRefs } from 'vue'
 
 import { X } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-import { adminGetCompetition, adminListCompetitionPermissionCandidates, adminPatchCompetition } from '../../../../../api'
+import { adminListCompetitionPermissionCandidates, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdPermissionsPage. */
 export function useAdminCompetitionsByIdPermissionsPage() {
-  const { competitionId, canManagePermissions, refresh } = useCompetitionAdmin()
+  const { competitionId, canManagePermissions, refresh, accept, read: readAdminCompetition } = useCompetitionAdmin()
 
   const permissions = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse | null>(null)
 
@@ -38,7 +38,7 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     loading.value = true
     error.value = null
     const [perm, cand] = await Promise.all([
-      adminGetCompetition({ path: { competitionId } }),
+      readAdminCompetition({ path: { competitionId } }),
       adminListCompetitionPermissionCandidates({ path: { competitionId } }),
     ])
     if (perm.error) {
@@ -93,7 +93,7 @@ export function useAdminCompetitionsByIdPermissionsPage() {
   const saving = ref(false)
 
   async function save() {
-    if (!permissions.value) return
+    if (!canManagePermissions.value || !permissions.value) return
     saving.value = true
     try {
       const { data, error } = await adminPatchCompetition({
@@ -108,6 +108,7 @@ export function useAdminCompetitionsByIdPermissionsPage() {
         },
       })
       if (error) throw error
+      if (data) accept(data)
       permissions.value = data?.permissions ?? permissions.value
       toast.success(describeMessage("administration.label.permissionsSaved"))
     }
@@ -126,7 +127,7 @@ export function useAdminCompetitionsByIdPermissionsPage() {
   const transferring = ref(false)
 
   async function transfer() {
-    if (!transferTarget.value) return
+    if (!canManagePermissions.value || !transferTarget.value) return
     transferring.value = true
     try {
       const nextManagers = new Set(managerIds.value)
@@ -145,7 +146,8 @@ export function useAdminCompetitionsByIdPermissionsPage() {
       if (error) throw error
       toast.success(describeMessage("administration.label.ownershipTransferred"))
       transferConfirm.value = false
-      await Promise.all([load(), refresh()])
+      await refresh()
+      await load()
     }
     catch (e) {
       toast.error(parseApiError(e).displayMessage)

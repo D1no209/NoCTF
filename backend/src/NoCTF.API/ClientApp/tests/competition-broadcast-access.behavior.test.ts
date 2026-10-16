@@ -18,8 +18,11 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 const competition = { id: 'competition', mode: 'Ctf' as const, status: 'Running' as const, startTime: '2026-01-01T00:00:00Z' }
 
 async function shell() {
-  const user = ref<any>({ userId: 'actor' })
+  const user = ref<any>({ userId: 'actor', kind: 'Human' })
   let context: any, team: any = null, role: any = null
+  const reads: string[] = []
+  let standingReader = async (): Promise<any> => ({ response: { status: 404 } })
+  let poll!: () => Promise<boolean>, polls = 0, navigation: any
   let competitionReader: (() => Promise<any>) | undefined
   let events: any
   const mounted: Array<() => void> = []
@@ -30,9 +33,9 @@ async function shell() {
     useCompetitionAnnouncementCatchUp: () => ({ refreshMissedAnnouncements: async () => {} }),
     getCompetitionEndpoint: async () => competitionReader ? competitionReader() : ({ data: { ...competition, administrationRole: role } }),
     getMyTeamEndpoint: async () => team ? { data: team } : { response: { status: 404 } },
-    watchNotifications: () => () => {}, getCompetitionTheory: async () => ({ data: [] }),
-    getLeaderboardEndpoint: async () => ({ data: { teams: [] } }), getPlayerCompetitionProgression: async () => ({ data: { enabled: false } }),
-    provide: (key: symbol, value: unknown) => { if (key === contextKey) context = value }, competitionContextKey: contextKey,
+    watchNotifications: () => () => {}, getCompetitionTheory: async () => { reads.push('theory-list'); return { data: [] } },
+    getMyTeamStanding: async () => { reads.push('my-standing'); return standingReader() }, usePolling: (probe: () => Promise<boolean>) => { poll = probe; return { start: () => { polls++ }, stop: () => {}, timedOut: ref(false) } }, getLeaderboardEndpoint: async () => { reads.push('leaderboard'); return { data: { teams: [] } } }, getPlayerCompetitionProgression: async () => { reads.push('progression'); return { data: { enabled: false } } },
+    provide: (key: symbol, value: unknown) => { if (key === contextKey) context = value; if (key === navigationKey) navigation = value }, competitionContextKey: contextKey,
     competitionWorkspaceNavigationKey: navigationKey, competitionPath, adminCompetitionPath, isCompetitionOverviewPath,
     onMounted: (fn: () => void) => mounted.push(fn), onUnmounted: () => {}, onBeforeUnmount: () => {},
     watchCompetition: (_id: string, handlers: unknown) => { events = handlers; return () => {} },
@@ -40,7 +43,8 @@ async function shell() {
   const scope = effectScope(), state = scope.run(build)!
   await state.initialize()
   mounted.forEach(fn => fn())
-  return { state, context, user, scope, setTeam: (value: unknown) => { team = value }, setRole: (value: unknown) => { role = value },
+  return { state, context, user, scope, reads, navigation: () => navigation.value, poll: () => poll(), polls: () => polls,
+    setStandingReader: (reader: typeof standingReader) => { standingReader = reader }, setTeam: (value: unknown) => { team = value }, setRole: (value: unknown) => { role = value },
     setCompetitionReader: (reader: () => Promise<any>) => { competitionReader = reader },
     notify: (kind: string) => events.competitionEventChanged({ kind }), stop: () => scope.stop() }
 }
@@ -175,6 +179,80 @@ describe('broadcast access follows competition eligibility', () => {
       expect(app.state.items.value).toEqual([])
       expect(app.state.error.value).toBeNull()
       expect(app.requests).toHaveLength(1)
+    } finally { app.stop() }
+  })
+})
+
+
+describe('competition workspace lightweight reads', () => {
+  const approved = { id: 'team', registrationStatus: 'Approved', isBanned: false }
+  const ready = { data: { teamId: 'team', rank: 2, totalScore: 42, dataScope: 'Live', challengeBenefits: [] } }
+  test('navigation uses detail configuration and never fetches a complete map, theory list or scoreboard', async () => {
+    const app = await shell()
+    try {
+      app.setCompetitionReader(async () => ({ data: { ...competition, features: {
+        progressionEnabled: true, progressionMapVisible: true, hasPublishedTheory: true,
+      } } }))
+      app.setStandingReader(async () => ready)
+      app.setTeam(approved)
+      await app.state.initialize(); await drain()
+      expect(app.reads.every(read => read === 'my-standing')).toBe(true)
+      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).toContain('/competitions/competition/theory')
+      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).toContain('/competitions/competition/progression')
+      app.state.competition.value.features.progressionMapVisible = false
+      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).not.toContain('/competitions/competition/progression')
+      app.user.value = { userId: 'bot', kind: 'Bot' }
+      await drain()
+      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).not.toContain('/competitions/competition/theory')
+    } finally { app.stop() }
+  })
+
+  test('initial team and page content do not await the pending standing and concurrent consumers share it', async () => {
+    const app = await shell()
+    let finish!: (value: any) => void
+    try {
+      app.setStandingReader(() => new Promise(resolve => { finish = resolve }))
+      app.setTeam(approved)
+      await app.state.refreshMyTeam()
+      expect(app.state.teamLoading.value).toBe(false)
+      expect(app.state.standingLoading.value).toBe(true)
+      const again = app.context.refreshStanding()
+      expect(app.reads).toEqual(['my-standing'])
+      finish(ready); await again
+      expect(app.context.standing.value.totalScore).toBe(42)
+    } finally { app.stop() }
+  })
+
+  test('202 schedules resource polling; transient failure retains a successful snapshot and hidden data clears it', async () => {
+    const app = await shell()
+    try {
+      app.setStandingReader(async () => ({ response: { status: 202 }, data: { state: 'Processing' } }))
+      app.setTeam(approved); await app.state.refreshMyTeam(); await drain()
+      expect(app.polls()).toBeGreaterThan(0)
+      expect(app.state.standingLoading.value).toBe(true)
+      app.setStandingReader(async () => ready)
+      expect(await app.poll()).toBe(true)
+      expect(app.state.standingLoading.value).toBe(false)
+      app.setStandingReader(async () => ({ error: {}, response: { status: 503 } }))
+      await app.context.refreshStanding()
+      expect(app.context.standing.value.totalScore).toBe(42)
+      expect(app.state.standingError.value).toBe('failed')
+      app.setStandingReader(async () => ({ data: { ...ready.data, dataScope: 'Hidden', rank: null, totalScore: null } }))
+      await app.context.refreshStanding()
+      expect(app.context.standing.value).toBeNull()
+    } finally { app.stop() }
+  })
+
+  test('a late private response cannot restore an old account snapshot', async () => {
+    const app = await shell()
+    let finish!: (value: any) => void
+    try {
+      app.setStandingReader(() => new Promise(resolve => { finish = resolve }))
+      app.setTeam(approved); await app.state.refreshMyTeam()
+      const waiting = app.context.refreshStanding()
+      app.user.value = null
+      finish(ready); await waiting; await drain()
+      expect(app.context.standing.value).toBeNull()
     } finally { app.stop() }
   })
 })

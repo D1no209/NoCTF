@@ -1,3 +1,4 @@
+import { testAdminResource } from './support/admin-competition-resource'
 import * as soloNavigation from '../app/features/live-solo/navigation'
 import { competitionChallengeManagementPath } from '../app/features/admin/admin-navigation'
 import { describe, expect, test } from 'bun:test'
@@ -31,6 +32,7 @@ async function harness(path: string, name: string, props?: object) {
     useAuth: () => ({ canOrganize: ref(true), isAdministrator: ref(true), user: ref({ userId: 'admin' }) }),
     usePlatform: () => ({ configuration: ref({}) }),
     onMounted: (callback: () => unknown) => mounted.push(callback),
+    useAdminCompetitionResource: () => testAdminResource(async () => ({ data: { competition: competition.value } })), watchCompetition: () => () => {}, onUnmounted: () => {},
     provide: () => {}, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(), adminWorkspacePath: (x: string) => x,
     localInputToIso: (x: string) => new Date(x).toISOString(),
     toast: { success: () => {}, error: () => {} }, parseApiError: () => ({ displayMessage: 'error' }),

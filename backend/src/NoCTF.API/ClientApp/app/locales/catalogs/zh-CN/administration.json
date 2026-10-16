@@ -1,4 +1,5 @@
 {
+  "administration.label.workspaceStale": "比赛设置更新失败，当前显示上次成功获取的快照，暂时只能查看。",
   "administration.awd.activeIntervalPrecision": "至少 5 秒。平台每 5 秒检查发行，有效期从实际发行时刻开始；不会补造已错过周期的投放。",
   "administration.label.adjustmentReason": "调整理由",
   "administration.description.awdAdjustmentReason": "AWD 必填，理由将保留在工作人员审计日志中。",

@@ -149,11 +149,11 @@ AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore
 ## Player Challenge
 
 ```text
+GET  /api/v1/competitions/{competitionId}/teams/me/standing
 GET  /api/v1/competitions/{competitionId}/challenges
 GET  /api/v1/competitions/{competitionId}/progression
 GET  /api/v1/competitions/{competitionId}/badges/{badgeId}/image
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment
@@ -161,9 +161,9 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hi
 ```
 
 CTF 闯关图只传节点、边、条件与本队状态，不传画布坐标；布局由客户端生成。
-`start` 在读取题目详情前调用，可选提交地图修订 `expectedRevision`，成功为 `204`，
-图修订变化为带 `GraphChanged` 原因的 `409`。它只幂等记录本队首次打开已解锁节点，
-不改变解锁资格；题目详情 GET 始终只读，仍独立执行权限检查。
+题目详情直接通过 GET 读取，保持只读并按最新闯关规则独立执行权限检查。
+不记录队伍的节点访问历史，也不要求选手进入题目时提交地图修订；规则变化后仍开放的题目可以直接进入。
+选手图不返回访问状态或首次打开时间，默认聚焦可进入且未完成的题目。
 
 `attachments` 列表与带 Id 下载只用于 `All`；`attachment` 单数路由只用于 `RandomOnePerTeam`，抽取发生在该 GET 内且请求没有 AttachmentId。策略不匹配返回 404。KoH 详情在 Running 时对本队返回 Control Flag 与 shared Hill 的公开 urls，不返回 ControlCheckUrl；CTF PerTeamRuntime Flag 不单独返回，注入 Runtime 环境。
 
@@ -923,3 +923,11 @@ POST /api/v1/competitions/{competitionId}/live-solo/question-pool/deploy
 POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments
 POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank
 ```
+
+## Competition workspace reads
+
+比赛详情的 `features` 仅包含比赛级 `progressionEnabled`、`progressionMapVisible` 和 `hasPublishedTheory`；最后一项排除草稿与作废理论活动。列表不逐项读取这些配置。入口还须结合当前身份及队伍资格判断，隐藏选手地图时不显示闯关入口。
+
+`GET /api/v1/competitions/{competitionId}/teams/me/standing` 是当前用户本队的私有只读概况，返回排名、总分、题解权益及投影版本与时间，不返回其他队伍或得分明细。沿用排行榜的封榜、黑榜、发布题目及赛道过滤；未知值为 null，不伪造零分。投影准备中返回 202、Retry-After 及指向该资源的 statusUrl；未具备有效本队资格返回 404。响应禁止共享缓存。
+
+管理工作区在内存中共享完整管理比赛响应及在途读取，身份或比赛变化时隔离。事件、保存和重连刷新；暂时失败保留快照并禁用写入，401/403/404 清除访问状态。

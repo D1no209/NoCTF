@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
-import { adminGetCompetition, listStaffWorkItemsEndpoint } from '../../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemView as Item } from '../../../api'
+import { listStaffWorkItemsEndpoint } from '../../../api'
+import type { NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemView as Item } from '../../../api'
 import { CompetitionAdminKey } from '../../../lib/admin-competition'
 import type { CompetitionAdminRole } from '../../../lib/admin-competition'
 import { useOffsetPagination } from '../../../composables/useOffsetPagination'
@@ -14,18 +14,19 @@ import type { UiMessage } from '../../../utils/i18n'
 export function useStaffWorkbench() {
   const route = useRoute(); const router = useRouter(); const auth = useAuth()
   const competitionId = route.params.id as string
-  const competition = shallowRef<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
+  const shared = useAdminCompetitionResource(competitionId)
+  const competition = shared.competition
   const error = shallowRef<UiMessage | null>(null)
   const ready = ref(false)
   const role = computed<CompetitionAdminRole>(() => auth.isAdministrator.value || competition.value?.ownerId === auth.user.value?.userId
     ? 'Owner' : competition.value?.administrationRole ?? 'Observer')
   async function refresh() {
-    const result = await adminGetCompetition({ path: { competitionId } })
+    const result = await shared.refresh()
     if (result.error || !result.data?.competition) { error.value = parseApiError(result.error).displayMessage; ready.value = false; return }
-    competition.value = result.data.competition; error.value = null; ready.value = true
+    error.value = null; ready.value = true
   }
-  provide(CompetitionAdminKey, { competitionId, competition, role, canWrite: computed(() => role.value === 'Owner' || role.value === 'Manager'),
-    canJudge: computed(() => role.value !== 'Observer'), canManagePermissions: computed(() => role.value === 'Owner'), refresh })
+  provide(CompetitionAdminKey, { data: shared.data, read: shared.read, accept: shared.accept, competitionId, competition, role, canWrite: computed(() => shared.fresh.value && (role.value === 'Owner' || role.value === 'Manager')),
+    canJudge: computed(() => shared.fresh.value && role.value !== 'Observer'), canManagePermissions: computed(() => shared.fresh.value && role.value === 'Owner'), refresh })
   const panel = computed(() => route.query.kind === 'CheatIncident' ? 'CheatIncident' : route.query.kind === 'BanAppeal' ? 'BanAppeal' : route.query.kind === 'Webhooks' ? 'Webhooks' : 'Pending')
   const pending = useOffsetPagination<Item>(async ({ offset, limit, desc }) => {
     const result = await listStaffWorkItemsEndpoint({ path: { competitionId }, query: { offset, limit, desc, pendingOnly: true } })

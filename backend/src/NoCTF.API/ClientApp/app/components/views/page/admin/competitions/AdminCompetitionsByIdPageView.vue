@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPageViewState } from '~/features/routes/admin/competitions/useAdminCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPageViewState }>()
-const { competition, role, loading, error, RoleLabel, navGroups, activePath, isProgressionPage, isWriteUpReview, usesPageScroll, isSoloWorkspace, playerPath, playerViewLabel, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav } = toRefs(viewProps.state)
+const { competition, role, loading, error, refresh, RoleLabel, navGroups, activePath, isProgressionPage, isWriteUpReview, usesPageScroll, isSoloWorkspace, playerPath, playerViewLabel, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -20,6 +20,10 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
         </div>
         <Button v-if="competition.mode === 'LiveSolo'" as-child variant="outline" size="sm"><NuxtLink :to="playerPath">{{ $t(playerViewLabel) }}</NuxtLink></Button>
       </div>
+      <Alert v-if="error" variant="destructive">
+        <AlertDescription>{{ $t('administration.label.workspaceStale') }}</AlertDescription>
+        <Button variant="outline" size="sm" @click="refresh">{{ $t('common.label.reload') }}</Button>
+      </Alert>
       <ScrollSurface axis="y" :enabled="!usesPageScroll" :reset-key="activePath" class="w-full"
         :class="usesPageScroll ? 'overflow-visible' : 'min-h-0 flex-1 overscroll-contain pr-3'"
         :aria-label="$t('navigation.competitionAdmin')">

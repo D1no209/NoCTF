@@ -3,7 +3,7 @@ import type { InjectionKey, Ref } from 'vue'
 import { localeTag, translate } from './i18n'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  NoCtfapiEndpointsTeamsMyTeamStandingResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
   NoCtfapiEndpointsNotificationsNotificationResponse,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
@@ -28,11 +28,12 @@ import {
 
 /** 竞赛上下文:由 pages/competitions/[id].vue provide,子路由 inject。 */
 export interface CompetitionContext {
+  managementFresh?: Ref<boolean>
   competition: Ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
   loading: Ref<boolean>
   error: Ref<UiMessage | null>
   refresh: () => Promise<void>
-  standing: Ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>
+  standing: Ref<NoCtfapiEndpointsTeamsMyTeamStandingResponse | null>
   refreshStanding: () => Promise<void>
   canReadBroadcasts: Ref<boolean>
 }

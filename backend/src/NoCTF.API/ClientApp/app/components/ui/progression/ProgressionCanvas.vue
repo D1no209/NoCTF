@@ -145,7 +145,7 @@ async function restoreView() {
     <template #node-read-progression="{ id, data }">
       <Hint :content="data.title">
         <div class="flex w-[240px] min-h-[96px] cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm shadow-sm"
-          :class="[data.complete ? 'bg-success/15 text-success' : !data.active ? 'bg-muted text-muted-foreground' : data.visited ? 'bg-warning/15 text-warning' : 'bg-card text-primary', props.highlightedNodeIds?.has(id) ? 'progression-blocked-node' : '']"
+          :class="[data.complete ? 'bg-success/15 text-success' : !data.active ? 'bg-muted text-muted-foreground' : 'bg-card text-primary', props.highlightedNodeIds?.has(id) ? 'progression-blocked-node' : '']"
           tabindex="0" @keydown.enter.prevent="emit('nodeClick', id)">
           <Handle type="target" :position="props.direction === 'DOWN' ? Position.Top : Position.Left" :connectable="false" />
           <img v-if="data.imageUrl" :src="data.imageUrl" alt="" class="size-9 rounded object-cover" />
@@ -153,7 +153,7 @@ async function restoreView() {
             <p class="line-clamp-2 break-words text-base font-semibold">{{ data.title }}</p>
             <p class="mt-1 flex items-center gap-1 text-sm">
               <LockKeyhole v-if="!data.active" class="size-3" aria-hidden="true" />
-              {{ data.complete ? $t('progression.completed') : data.active ? data.visited ? $t('progression.inProgress') : $t('progression.available') : $t('progression.locked') }}
+              {{ data.complete ? $t('progression.completed') : data.active ? $t('progression.available') : $t('progression.locked') }}
               <span v-if="data.complete && !data.active">· {{ $t('progression.locked') }}</span>
             </p>
           </div>

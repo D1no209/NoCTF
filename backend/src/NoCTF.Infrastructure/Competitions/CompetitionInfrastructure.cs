@@ -43,6 +43,7 @@ internal static class CompetitionInfrastructure
     {
         services.AddScoped<NoCTF.Application.Competitions.Directions.ICompetitionDirectionStore, Directions.CompetitionDirectionStore>();
         services.AddScoped<NoCTF.Application.Competitions.Directions.ManageCompetitionDirections>();
+        services.AddScoped<ICompetitionFeatureReader, CompetitionFeatureReader>();
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
         services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
         services.AddSingleton<ProgressionGraphReadCache>();
@@ -50,7 +51,6 @@ internal static class CompetitionInfrastructure
         services.AddScoped<SaveCompetitionProgression>();
         services.AddScoped<ProgressionReconciler>();
         services.AddScoped<IProgressionChallengeAccess, ProgressionChallengeAccess>();
-        services.AddScoped<IProgressionChallengeStarter, ProgressionChallengeStarter>();
         services.AddScoped<ICompetitionBadgeStore, CompetitionBadgeStore>();
         services.AddScoped<ManageCompetitionBadges>();
         services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();

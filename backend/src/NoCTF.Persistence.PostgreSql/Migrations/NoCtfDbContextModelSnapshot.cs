@@ -3196,36 +3196,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("team_progression_node_states", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeVisit", b =>
-                {
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("node_id");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<long>("FirstOpenedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("first_opened_at");
-
-                    b.HasKey("TeamId", "NodeId")
-                        .HasName("pk_team_progression_node_visits");
-
-                    b.HasIndex("NodeId")
-                        .HasDatabaseName("ix_team_progression_node_visits_node_id");
-
-                    b.HasIndex("CompetitionId", "TeamId")
-                        .HasDatabaseName("ix_team_progression_node_visits_competition_id_team_id");
-
-                    b.ToTable("team_progression_node_visits", (string)null);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -12296,23 +12266,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_team_progression_node_states_teams_team_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeVisit", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Competitions.Progression.ProgressionNode", null)
-                        .WithMany()
-                        .HasForeignKey("NodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_team_progression_node_visits_competition_progression_nodes_");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_team_progression_node_visits_teams_team_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>

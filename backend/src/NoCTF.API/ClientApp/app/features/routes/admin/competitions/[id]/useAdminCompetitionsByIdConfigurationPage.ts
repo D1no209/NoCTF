@@ -3,7 +3,7 @@ import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
-import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
+import { adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
 import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
@@ -16,7 +16,7 @@ const maximumWriteUpDeadlineHours = 24 * 365
 
 /** Owns state, effects and commands for AdminCompetitionsByIdConfigurationPage. */
 export function useAdminCompetitionsByIdConfigurationPage() {
-  const { competitionId, competition, canWrite, refresh } = useCompetitionAdmin()
+  const { competitionId, competition, canWrite, refresh, accept, data: useData, read: readAdminCompetition } = useCompetitionAdmin()
 
   const title = ref('')
 
@@ -90,6 +90,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
   }, { immediate: true })
 
   async function saveMeta() {
+    if (!canWrite.value) return
     metaError.value = null
     const start = localInputToIso(startTime.value)
     const end = localInputToIso(endTime.value)
@@ -118,7 +119,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
     savingMeta.value = true
     try {
-      const { error } = await adminPatchCompetition({
+      const { data, error } = await adminPatchCompetition({
         path: { competitionId },
         body: {
           metadata: {
@@ -147,7 +148,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       })
       if (error) throw error
       toast.success(describeMessage("administration.competitionsBy.label.basicInformationSaved"))
-      await refresh()
+      if (data) accept(data)
+      else await refresh()
     }
     catch (e) {
       toastWriteError(e)
@@ -165,13 +167,13 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   async function loadConfig() {
     configLoading.value = true
-    const { data, error } = await adminGetCompetition({ path: { competitionId } })
+    const { data, error } = await readAdminCompetition({ path: { competitionId } })
     if (!error && data) config.value = data.modeConfiguration ?? null
     configLoading.value = false
   }
 
   async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, reason?: string) {
-    if (!config.value) return
+    if (!canWrite.value || !config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetition({
@@ -179,6 +181,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
         body: { modeConfiguration: { configuration, reason } },
       })
       if (error) throw error
+      if (data) accept(data)
       config.value = data?.modeConfiguration ?? config.value
       toast.success(describeMessage("administration.label.modeConfigurationSaved"))
     }
@@ -190,6 +193,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
   }
 
+  watch(() => useData.value?.modeConfiguration, value => { config.value = value ?? null }, { immediate: true })
   onMounted(loadConfig)
 
   const CompetitionModeConfigEditor = markRaw(CompetitionModeConfigEditorComponent)

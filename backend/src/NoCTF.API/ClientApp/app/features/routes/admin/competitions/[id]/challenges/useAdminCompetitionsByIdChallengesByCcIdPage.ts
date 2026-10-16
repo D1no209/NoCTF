@@ -11,7 +11,7 @@ import { markRaw } from 'vue'
 import SingleWriteUpSettingsComponent from '~/features/writeups/SingleWriteUpSettings.vue'
 import { Plus } from '@lucide/vue'
 import { toast } from '../../../../../../utils/message-toast'
-import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
+import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
@@ -37,7 +37,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const ccId = route.params.ccId as string
 
-  const { competitionId, competition, canWrite, canJudge } = useCompetitionAdmin()
+  const { competitionId, competition, canWrite, canJudge, read: readAdminCompetition } = useCompetitionAdmin()
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
@@ -162,7 +162,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         path: { competitionId, competitionChallengeId: ccId },
         query: { includeDeleted: false },
       }),
-      adminGetCompetition({ path: { competitionId } }),
+      readAdminCompetition({ path: { competitionId } }),
     ])
     if (!challengeResult.error && challengeResult.data) {
       config.value = {

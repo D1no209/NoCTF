@@ -129,7 +129,10 @@ public sealed record CompetitionResponse(
     bool SingleWriteUpsEnabled = false,
     int SingleWriteUpDeductionPercent = 20,
     int SingleWriteUpDeadlineHours = 24,
-    DateTimeOffset? SingleWriteUpDeadlineAt = null);
+    DateTimeOffset? SingleWriteUpDeadlineAt = null)
+{
+    public CompetitionFeatures? Features { get; init; }
+}
 
 internal static class CompetitionMapper
 {
@@ -209,7 +212,8 @@ public sealed class GetCompetitionEndpoint(
     GetCompetition get,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ICompetitionFeatureReader features)
     : Endpoint<GetCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
     public override void Configure() { Get("/competitions/{competitionId}"); AllowAnonymous(); }
@@ -232,6 +236,7 @@ public sealed class GetCompetitionEndpoint(
             view, user, authorizer, ct, accessAlreadyEstablished: staffAccess);
         return TypedResults.Ok(CompetitionMapper.ToResponse(
             view,
-            timeProvider.GetUtcNow()) with { AdministrationRole = role });
+            timeProvider.GetUtcNow()) with { AdministrationRole = role,
+                Features = await features.ReadAsync(competitionId, ct) });
     }
 }

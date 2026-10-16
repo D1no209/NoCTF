@@ -1,4 +1,5 @@
 {
+  "competitions.label.standingStale": "Showing the last successful team standing. Refresh failed; retry to update.",
   "awd.rules.changedEvent": "{actor} changed scoring rules for {challenge}",
   "competitions.competitionBroadcast.description.liveSolo": "Competition notices appear here",
   "competitions.label.backToAdministration": "Back to administration",
@@ -67,10 +68,8 @@
   "progression.badgeUpdateFailed": "Could not update badge.",
   "progression.badgeUpdated": "Badge updated.",
   "progression.locked": "Locked",
-  "progression.inProgress": "In progress",
   "progression.blockedBy": "Unmet predecessors: {names}",
-  "progression.graphChanged": "The progression rules changed. Refresh the map and try again.",
-  "progression.startFailed": "Could not start this challenge. Refresh and try again.",
+  "progression.startFailed": "This challenge is currently unavailable. Refresh and try again.",
   "progression.prerequisiteProgress": "{satisfied}/{total} prerequisites met",
   "progression.playerDescription": "See your team’s current badges and the competition’s visible route.",
   "progression.myTeamBadges": "Team badges",
