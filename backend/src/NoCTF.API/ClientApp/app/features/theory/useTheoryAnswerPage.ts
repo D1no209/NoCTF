@@ -22,6 +22,7 @@ export function useTheoryAnswerPage() {
   let epoch = 0, mutation = 0, disposed = false, interval: ReturnType<typeof setInterval> | undefined, saveTimer: ReturnType<typeof setTimeout> | undefined
   let readPending = false, draining: Promise<void> | null = null, issueRequest = '', tickCount = 0
   let unwatch: (() => void) | undefined
+  let lastAssetSignature = ''
   const queue = new Set<string>()
   const questions = computed(() => view.value?.paper?.questions ?? [])
   const selected = computed(() => questions.value[current.value] ?? null)
@@ -61,8 +62,12 @@ export function useTheoryAnswerPage() {
     }
     current.value = Math.min(Math.max(0, changedPaper ? Number(route.query.q ?? 1) - 1 : current.value), Math.max(0, questions.value.length - 1))
     if (data.paper?.state !== 0) { submitOpen.value = false; confirmation.value = null }
-    if (data.paper?.state === 0 && data.paper.id && activityId.value)
-      void files.load((data.paper.questions ?? []).flatMap(question => [question.body ?? '', ...(question.options ?? []).map(option => option.content ?? '')]), { activityId: activityId.value, paperId: data.paper.id })
+    const sources = (data.paper?.questions ?? []).flatMap(question => [question.body ?? '', ...(question.options ?? []).map(option => option.content ?? '')])
+    const signature = sources.join('\u0000')
+    if (data.paper?.state === 0 && data.paper.id && activityId.value && signature !== lastAssetSignature) {
+      lastAssetSignature = signature
+      void files.load(sources, { activityId: activityId.value, paperId: data.paper.id })
+    }
   }
   async function load(initial = false) {
     if (readPending || disposed) return
@@ -193,7 +198,7 @@ export function useTheoryAnswerPage() {
   onBeforeRouteLeave(confirmLeave); onBeforeRouteUpdate((to, from) => to.path === from.path ? true : confirmLeave())
   onMounted(() => {
     void load(true); window.addEventListener('beforeunload', beforeUnload)
-    unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining) void load() }, onReconnected: () => void load() })
+    unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining && !unsaved.value && queue.size === 0) void load() }, onReconnected: () => void load() })
     interval = setInterval(() => { clock.value = Date.now(); tickCount++; if ((tickCount % 15 === 0 || remaining.value === 0 && view.value?.paper?.state === 0) && !busy.value && !draining && !submitOpen.value) void load() }, 1000)
   })
   onBeforeUnmount(() => { disposed = true; epoch++; unwatch?.(); clearInterval(interval); clearTimeout(saveTimer); window.removeEventListener('beforeunload', beforeUnload); leaveResolver?.(false) })
