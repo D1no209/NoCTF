@@ -5,6 +5,7 @@ import { EditorView, keymap, placeholder as placeholderExtension } from '@codemi
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { Code, Heading2, Link, List } from '@lucide/vue'
+import { minimalTextChange, shouldApplyExternalModel } from '~/lib/editor-model-sync'
 import { livePreview } from './live-preview'
 
 const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string }>()
@@ -14,8 +15,38 @@ const host = ref<HTMLElement | null>(null)
 const editable = new Compartment()
 let view: EditorView | null = null
 let external = false
+/** 最后一次由编辑器自身发给父级的文本:用来识别父级回传的旧值/回声。 */
+let lastEmitted = model.value
+/** 输入法组合期间收到的外部模型值,组合结束后再写入。 */
+let pendingExternal: string | null = null
 
 function syncEditable() { view?.dispatch({ effects: editable.reconfigure(EditorView.editable.of(!props.disabled)) }) }
+
+function emitModel(): void {
+  if (!view) return
+  const text = view.state.doc.toString()
+  lastEmitted = text
+  if (model.value !== text) model.value = text
+}
+
+/** 只派发最小变更:整篇替换会让光标跳到末尾,并吞掉同一帧内继续输入的字符。 */
+function applyExternal(value: string): void {
+  if (!view) return
+  const change = minimalTextChange(view.state.doc.toString(), value)
+  if (!change) return
+  external = true
+  try { view.dispatch({ changes: change }) }
+  catch { /* 编辑器正在销毁或处于非可编辑状态,忽略此次外部写入 */ }
+  finally { external = false }
+}
+
+function settleAfterComposition(): void {
+  const pending = pendingExternal
+  pendingExternal = null
+  if (pending !== null) { applyExternal(pending); return }
+  emitModel()
+}
+
 function insert(text: string) {
   if (!view || props.disabled) return
   view.dispatch(view.state.replaceSelection(text))
@@ -24,7 +55,7 @@ function insert(text: string) {
 const actions = [
   { key: 'heading', icon: Heading2, text: '\n## ' },
   { key: 'list', icon: List, text: '\n- ' },
-  { key: 'code', icon: Code, text: '\n\`\`\`\n' },
+  { key: 'code', icon: Code, text: '\n```\n' },
   { key: 'link', icon: Link, text: '[](https://)' },
 ] as const
 
@@ -42,25 +73,33 @@ onMounted(() => {
         editable.of(EditorView.editable.of(!props.disabled)),
         placeholderExtension(props.placeholder ?? ''),
         keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => { if (!props.disabled) emit('save'); return true } }, indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        // 组合期间不把中间文本推给父级,避免父级重渲染打断候选词与光标。
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged || external) return
-          model.value = update.state.doc.toString()
+          if (!update.docChanged || external || update.view.composing) return
+          emitModel()
+        }),
+        EditorView.domEventHandlers({
+          compositionend: () => {
+            // CodeMirror 在组合结束这一轮事件之后才提交最终文本,延后一拍再对齐模型。
+            setTimeout(settleAfterComposition, 0)
+          },
+          // 失焦时补一次同步,避免组合结束后立刻切换字段导致父级模型缺最后一段文本。
+          blur: () => { setTimeout(settleAfterComposition, 0) },
         }),
       ],
     }),
   })
 })
-// 外部模型变化(表单重置/加载)才写回编辑器;必须等组件更新后再 dispatch,
-// 否则 CodeMirror 会在 DOM 补丁期间测量布局并抛错。
+// 只有真正的外部变化(表单重置/草稿载入/格式切换)才写回编辑器。
 watch(model, (value) => {
-  if (!view || value === view.state.doc.toString()) return
-  external = true
-  try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } }) }
-  catch { /* 编辑器正在销毁或处于非可编辑状态,忽略此次外部写入 */ }
-  finally { external = false }
+  if (!view || typeof value !== 'string') return
+  if (!shouldApplyExternalModel(view.state.doc.toString(), value, lastEmitted)) return
+  if (view.composing) { pendingExternal = value; return }
+  pendingExternal = null
+  applyExternal(value)
 }, { flush: 'post' })
 watch(() => props.disabled, syncEditable, { flush: 'post' })
-onBeforeUnmount(() => { view?.destroy(); view = null })
+onBeforeUnmount(() => { pendingExternal = null; view?.destroy(); view = null })
 </script>
 
 <template>

@@ -21,10 +21,16 @@ class BulletWidget extends WidgetType {
 /** 表格渲染缓存:同一份源码只走一次 worker,并限制条目数避免长会话无界增长。 */
 const renderedBlocks = new Map<string, string>()
 const renderedBlocksLimit = 32
+/** 异步块渲染完成后请求一次重新测量,避免高度变化后光标坐标残留旧布局。 */
+let requestMeasure: (() => void) | null = null
 
 class BlockWidget extends WidgetType {
   constructor(private readonly html: string, private readonly source?: string) { super() }
-  override eq(other: BlockWidget) { return other.html === this.html && other.source === this.source }
+  override eq(other: BlockWidget) {
+    // 表格按源码复用同一个 widget:worker 返回后不再触发一次替换/重排。
+    if (this.source !== undefined || other.source !== undefined) return other.source === this.source
+    return other.html === this.html
+  }
   override toDOM() {
     const wrapper = document.createElement('div')
     wrapper.className = 'cm-md-block markdown-content'
@@ -36,7 +42,9 @@ class BlockWidget extends WidgetType {
       renderedBlocks.set(source, html)
       if (renderedBlocks.size > renderedBlocksLimit)
         renderedBlocks.delete(renderedBlocks.keys().next().value!)
+      if (!wrapper.isConnected) return
       wrapper.innerHTML = html
+      requestMeasure?.()
     })
     return wrapper
   }
@@ -106,8 +114,11 @@ function scan(view: EditorView): DecorationSet {
       number = end
     }
   }
+  // 输入法组合期间保持源码可见:替换型装饰会打断候选词并让光标跳位。
+  const composing = view.composing
   const rendered = new Map<number, Block & { html: string }>()
   for (const block of blocks) {
+    if (composing) break
     let active = false
     for (let line = block.fromLine; line <= block.toLine; line += 1) if (cursorLines.has(line)) active = true
     if (!active) rendered.set(block.fromLine, block)
@@ -126,7 +137,7 @@ function scan(view: EditorView): DecorationSet {
     const trimmed = body.trimStart()
     if (!trimmed) continue
     const at = line.from
-    const editable = cursorLines.has(number)
+    const editable = composing || cursorLines.has(number)
     const heading = /^(#{1,6})\s+/.exec(body)
     if (heading) {
       ranges.push({ from: at, to: at, deco: headings[heading[1]!.length - 1]! })
@@ -184,8 +195,12 @@ function scan(view: EditorView): DecorationSet {
 
 export const livePreview = ViewPlugin.fromClass(class {
   decorations: DecorationSet
-  constructor(view: EditorView) { this.decorations = scan(view) }
+  constructor(readonly view: EditorView) {
+    requestMeasure = () => view.requestMeasure()
+    this.decorations = scan(view)
+  }
   update(update: ViewUpdate) {
     if (update.docChanged || update.selectionSet || update.viewportChanged) this.decorations = scan(update.view)
   }
+  destroy() { requestMeasure = null }
 }, { decorations: value => value.decorations })
