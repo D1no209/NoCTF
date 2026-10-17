@@ -8,7 +8,10 @@ import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfiguratio
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
 import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
 
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
+import { shouldHydrateMetaField } from '../../../../../lib/pristine-meta'
+import { normalizeConfigValue } from '~/features/admin/useConfigDraft'
 import SingleWriteUpSettingsComponent from '~/features/writeups/SingleWriteUpSettings.vue'
 import CompetitionModeConfigEditorComponent from '../../../../admin/CompetitionModeConfigEditor.vue'
 
@@ -65,28 +68,93 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   const metaError = ref<UiMessage | null>(null)
 
+  /** 最近一次与服务器对齐过的元数据,用来区分“用户没动过的字段”和“正在编辑的字段”。 */
+  const hydratedMeta = ref<ReturnType<typeof currentMeta> | null>(null)
+
+  function currentMeta() {
+    return {
+      title: title.value,
+      description: description.value,
+      startTime: startTime.value,
+      endTime: endTime.value,
+      teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
+      allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
+      maxTeamMembers: maxTeamMembers.value,
+      maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+      runtimeAccessMode: runtimeAccessMode.value,
+      trafficCaptureEnabled: trafficCaptureEnabled.value,
+      trafficCaptureLimitMiB: trafficCaptureLimitMiB.value,
+      maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
+      maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
+      allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
+      practiceModeEnabled: practiceModeEnabled.value,
+      writeUpSubmissionRequired: writeUpSubmissionRequired.value,
+      writeUpSubmissionDeadlineHours: writeUpSubmissionDeadlineHours.value,
+      staffOnly: staffOnly.value,
+    }
+  }
+
+  /**
+   * 实时刷新与保存回执都会重建 competition 对象。只回填用户没改动的字段,
+   * 否则正在输入的描述会被服务器旧值覆盖(表现为字符丢失与光标跳动)。
+   */
+  function applyCompetitionMeta(c: NoCtfapiEndpointsCompetitionsCompetitionResponse, force = false): void {
+    const next = {
+      title: c.title ?? '',
+      description: c.description ?? '',
+      startTime: isoToLocalInput(c.startTime),
+      endTime: isoToLocalInput(c.endTime),
+      teamRegistrationAutoApprove: c.teamRegistrationAutoApprove ?? false,
+      allowTeamRegistrationWhileRunning: c.allowTeamRegistrationWhileRunning ?? false,
+      maxTeamMembers: c.maxTeamMembers ?? 1,
+      maxConcurrentRuntimeInstancesPerTeam: c.maxConcurrentRuntimeInstancesPerTeam ?? 1,
+      runtimeAccessMode: c.runtimeAccessMode ?? 'Direct',
+      trafficCaptureEnabled: c.trafficCaptureEnabled ?? false,
+      trafficCaptureLimitMiB: c.trafficCaptureLimitBytes == null
+        ? null
+        : c.trafficCaptureLimitBytes / 1_048_576,
+      maxActiveQuestionsPerTeam: c.maxActiveQuestionsPerTeam ?? 5,
+      maxParticipantMessagesBeforeHandlerReply: c.maxParticipantMessagesBeforeHandlerReply ?? 3,
+      allowChallengeOwnersToHandleQuestions: c.allowChallengeOwnersToHandleQuestions ?? true,
+      practiceModeEnabled: c.practiceModeEnabled ?? false,
+      writeUpSubmissionRequired: c.writeUpSubmissionRequired ?? false,
+      writeUpSubmissionDeadlineHours: c.writeUpSubmissionDeadlineHours ?? 0,
+      staffOnly: c.accessMode === 'StaffOnly',
+    }
+    const previous = hydratedMeta.value
+    const current = currentMeta()
+    const write = (key: keyof typeof next) => shouldHydrateMetaField(previous, current, key, force)
+    if (write('title')) title.value = next.title
+    if (write('description')) description.value = next.description
+    if (write('startTime')) startTime.value = next.startTime
+    if (write('endTime')) endTime.value = next.endTime
+    if (write('teamRegistrationAutoApprove')) teamRegistrationAutoApprove.value = next.teamRegistrationAutoApprove
+    if (write('allowTeamRegistrationWhileRunning')) allowTeamRegistrationWhileRunning.value = next.allowTeamRegistrationWhileRunning
+    if (write('maxTeamMembers')) maxTeamMembers.value = next.maxTeamMembers
+    if (write('maxConcurrentRuntimeInstancesPerTeam')) maxConcurrentRuntimeInstancesPerTeam.value = next.maxConcurrentRuntimeInstancesPerTeam
+    if (write('runtimeAccessMode')) runtimeAccessMode.value = next.runtimeAccessMode
+    if (write('trafficCaptureEnabled')) trafficCaptureEnabled.value = next.trafficCaptureEnabled
+    if (write('trafficCaptureLimitMiB')) trafficCaptureLimitMiB.value = next.trafficCaptureLimitMiB
+    if (write('maxActiveQuestionsPerTeam')) maxActiveQuestionsPerTeam.value = next.maxActiveQuestionsPerTeam
+    if (write('maxParticipantMessagesBeforeHandlerReply')) maxParticipantMessagesBeforeHandlerReply.value = next.maxParticipantMessagesBeforeHandlerReply
+    if (write('allowChallengeOwnersToHandleQuestions')) allowChallengeOwnersToHandleQuestions.value = next.allowChallengeOwnersToHandleQuestions
+    if (write('practiceModeEnabled')) practiceModeEnabled.value = next.practiceModeEnabled
+    if (write('writeUpSubmissionRequired')) writeUpSubmissionRequired.value = next.writeUpSubmissionRequired
+    if (write('writeUpSubmissionDeadlineHours')) writeUpSubmissionDeadlineHours.value = next.writeUpSubmissionDeadlineHours
+    if (write('staffOnly')) staffOnly.value = next.staffOnly
+    hydratedMeta.value = next
+  }
+
+  /** 当前表单基线所属的竞赛;切换竞赛时必须重新建立基线。 */
+  const hydratedCompetitionId = ref('')
+
   watch(competition, (c) => {
     if (!c) return
-    title.value = c.title ?? ''
-    description.value = c.description ?? ''
-    startTime.value = isoToLocalInput(c.startTime)
-    endTime.value = isoToLocalInput(c.endTime)
-    teamRegistrationAutoApprove.value = c.teamRegistrationAutoApprove ?? false
-    allowTeamRegistrationWhileRunning.value = c.allowTeamRegistrationWhileRunning ?? false
-    maxTeamMembers.value = c.maxTeamMembers ?? 1
-    maxConcurrentRuntimeInstancesPerTeam.value = c.maxConcurrentRuntimeInstancesPerTeam ?? 1
-    runtimeAccessMode.value = c.runtimeAccessMode ?? 'Direct'
-    trafficCaptureEnabled.value = c.trafficCaptureEnabled ?? false
-    trafficCaptureLimitMiB.value = c.trafficCaptureLimitBytes == null
-      ? null
-      : c.trafficCaptureLimitBytes / 1_048_576
-    maxActiveQuestionsPerTeam.value = c.maxActiveQuestionsPerTeam ?? 5
-    maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
-    allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
-    practiceModeEnabled.value = c.practiceModeEnabled ?? false
-    writeUpSubmissionRequired.value = c.writeUpSubmissionRequired ?? false
-    writeUpSubmissionDeadlineHours.value = c.writeUpSubmissionDeadlineHours ?? 0
-    staffOnly.value = c.accessMode === 'StaffOnly'
+    if (c.id !== hydratedCompetitionId.value) {
+      hydratedCompetitionId.value = c.id ?? ''
+      hydratedMeta.value = null
+    }
+    applyCompetitionMeta(c)
   }, { immediate: true })
 
   async function saveMeta() {
@@ -118,6 +186,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       return
     }
     savingMeta.value = true
+    const submitted = currentMeta()
     try {
       const { data, error } = await adminPatchCompetition({
         path: { competitionId },
@@ -150,6 +219,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       toast.success(describeMessage("administration.competitionsBy.label.basicInformationSaved"))
       if (data) accept(data)
       else await refresh()
+      // 已提交的值成为新基线:未改动的字段继续跟随服务器,保存期间继续输入的字段保持不变。
+      hydratedMeta.value = submitted
     }
     catch (e) {
       toastWriteError(e)
@@ -167,9 +238,13 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   async function loadConfig() {
     configLoading.value = true
-    const { data, error } = await readAdminCompetition({ path: { competitionId } })
-    if (!error && data) config.value = data.modeConfiguration ?? null
-    configLoading.value = false
+    try {
+      const { data } = await readAdminCompetition({ path: { competitionId } })
+      const next = data?.modeConfiguration ?? null
+      // 只在内容变化时替换对象,避免刷新重置模式配置编辑器的未保存草稿。
+      if (normalizeConfigValue(next) !== normalizeConfigValue(config.value)) config.value = next
+    }
+    finally { configLoading.value = false }
   }
 
   async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, reason?: string) {
@@ -182,7 +257,6 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       })
       if (error) throw error
       if (data) accept(data)
-      config.value = data?.modeConfiguration ?? config.value
       toast.success(describeMessage("administration.label.modeConfigurationSaved"))
     }
     catch (e) {
@@ -193,7 +267,12 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
   }
 
-  watch(() => useData.value?.modeConfiguration, value => { config.value = value ?? null }, { immediate: true })
+  watch(() => useData.value?.modeConfiguration, value => {
+    const next = value ?? null
+    // 内容没变就不要替换对象:否则实时刷新会重置模式配置编辑器的未保存草稿。
+    if (normalizeConfigValue(next) === normalizeConfigValue(config.value)) return
+    config.value = next
+  }, { immediate: true })
   onMounted(loadConfig)
 
   const CompetitionModeConfigEditor = markRaw(CompetitionModeConfigEditorComponent)
