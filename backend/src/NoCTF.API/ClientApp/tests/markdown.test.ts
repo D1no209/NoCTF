@@ -1,7 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { renderMarkdown, renderMarkdownAsync, renderPublishedMarkdown } from '../app/lib/markdown'
+import { escapeMarkdownFenceText, renderMarkdownFence } from '../app/lib/markdown-fence'
+import { hasMarkdownCodeFence } from '../app/lib/markdown-language'
 import { highlightMarkdownCode, normalizeMarkdownCodeLanguage } from '../app/lib/markdown-highlighter'
+import { renderMarkdownPreview } from '../app/lib/markdown-preview-worker.client'
 import { readableHintContent } from '../app/lib/challenge-hints'
 
 describe('safe challenge Markdown', () => {
@@ -70,7 +73,7 @@ describe('safe challenge Markdown', () => {
 
   test('highlights registered fence languages and safely falls back for unknown or malformed info strings', async () => {
     expect(normalizeMarkdownCodeLanguage(' TypeScript extra')).toBe('typescript')
-    expect(normalizeMarkdownCodeLanguage('\"><img/src=x>')).toBe('')
+    expect(normalizeMarkdownCodeLanguage('"><img/src=x>')).toBe('')
     expect(highlightMarkdownCode('const answer: number = 42', 'typescript')).toContain('hljs-keyword')
     expect(highlightMarkdownCode('<script>alert(1)</script>', 'unknown')).toBeNull()
 
@@ -90,6 +93,53 @@ describe('safe challenge Markdown', () => {
     const highlightedHtml = await renderMarkdownAsync('```html\n<br>\n<script>alert(1)</script>\n```')
     expect(highlightedHtml).toContain('class="hljs-tag"')
     expect(highlightedHtml).not.toContain('<script>')
+  })
+
+  test('fence rendering normalizes the info string instead of interpolating it raw', () => {
+    expect(escapeMarkdownFenceText('<b>&"')).toBe('&lt;b&gt;&amp;&quot;')
+    expect(renderMarkdownFence('1 < 2', 'python')).toContain('data-language="python"')
+    expect(renderMarkdownFence('1 < 2', 'python')).toContain('1 &lt; 2')
+
+    const shared = renderMarkdownFence('body', 'x"><img src=x onerror=alert(1)>')
+    expect(shared).not.toContain('<img')
+    expect(shared).toContain('data-language="text"')
+
+    const html = renderMarkdown('```x"><img src=x onerror=alert(1)>\nbody\n```')
+    expect(html).not.toContain('<img')
+    expect(html).toContain('data-language="text"')
+  })
+
+  test('highlighting and detection also cover fences nested in blockquotes and lists', async () => {
+    expect(hasMarkdownCodeFence('> ```js')).toBeTrue()
+    expect(hasMarkdownCodeFence('- item\n\n  ```js')).toBeTrue()
+    expect(hasMarkdownCodeFence('plain text')).toBeFalse()
+
+    const quoted = await renderMarkdownAsync('> ```js\n> const a = 1\n> ```')
+    expect(quoted).toContain('data-language="js"')
+    expect(quoted).toContain('hljs-keyword')
+    const listed = await renderMarkdownAsync('- item\n\n  ```js\n  const a = 1\n  ```')
+    expect(listed).toContain('hljs-keyword')
+  })
+
+  test('author pre data-language is normalized before the CSS label is applied', () => {
+    expect(renderMarkdown('<pre data-language="hello world">x</pre>')).toContain('data-language="hello"')
+    const hostile = renderMarkdown('<pre data-language="x&quot;&gt;&lt;img src=x&gt;">x</pre>')
+    expect(hostile).not.toContain('<img')
+    expect(hostile).toContain('data-language="text"')
+  })
+
+  test('preview falls back to the main-thread renderer when no worker exists', async () => {
+    const originalWorker = (globalThis as { Worker?: unknown }).Worker
+    Reflect.deleteProperty(globalThis, 'Worker')
+    try {
+      const html = await renderMarkdownPreview('# Title\n\n```js\nconst a = 1\n```')
+      expect(html).toContain('<h1>Title</h1>')
+      expect(html).toContain('hljs-keyword')
+      expect(html).toContain('<pre tabindex="0" data-language="js">')
+    }
+    finally {
+      if (originalWorker !== undefined) Reflect.set(globalThis, 'Worker', originalWorker)
+    }
   })
 
   for (const url of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'jav&#x61;script:alert(1)', 'vbscript:msgbox(1)', 'file:///etc/passwd', 'data:text/html;base64,PHNjcmlwdD4=']) {
@@ -133,7 +183,7 @@ describe('safe challenge Markdown', () => {
     expect(competition).toContain('<MarkdownEditor v-model="description"')
     expect(preview).toContain('renderMarkdownPreview(source)')
     expect(preview).toContain('renderedBlocks')
-    expect(preview).toContain('escapeHtml')
+    expect(preview).toContain('renderMarkdownFence')
     const worker = await Bun.file(new URL('../app/workers/markdown.worker.ts', import.meta.url)).text()
     expect(worker).toContain('renderMarkdownAsync(source)')
     expect(worker).toContain('self.postMessage({ id, html }')

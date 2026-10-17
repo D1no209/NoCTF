@@ -1,6 +1,7 @@
 import { RangeSetBuilder } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import { renderMarkdownPreview } from '~/lib/markdown-preview-worker.client'
+import { renderMarkdownFence } from '~/lib/markdown-fence'
 import { highlightMarkdownCode } from '~/lib/markdown-highlighter'
 
 /**
@@ -17,8 +18,9 @@ class BulletWidget extends WidgetType {
   }
 }
 
-/** 表格渲染缓存:同一份源码只走一次 worker。 */
+/** 表格渲染缓存:同一份源码只走一次 worker,并限制条目数避免长会话无界增长。 */
 const renderedBlocks = new Map<string, string>()
+const renderedBlocksLimit = 32
 
 class BlockWidget extends WidgetType {
   constructor(private readonly html: string, private readonly source?: string) { super() }
@@ -32,6 +34,8 @@ class BlockWidget extends WidgetType {
     if (cached !== undefined) { wrapper.innerHTML = cached; return wrapper }
     void renderMarkdownPreview(source).then((html) => {
       renderedBlocks.set(source, html)
+      if (renderedBlocks.size > renderedBlocksLimit)
+        renderedBlocks.delete(renderedBlocks.keys().next().value!)
       wrapper.innerHTML = html
     })
     return wrapper
@@ -41,18 +45,15 @@ class BlockWidget extends WidgetType {
 
 type Block = { fromLine: number, toLine: number, source: string[], tableSource?: string }
 
-function escapeHtml(text: string): string {
-  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
-}
-
+/**
+ * 围栏 HTML 与发布渲染共用同一实现:语言 token 会被规范化,作者输入的围栏
+ * info 无法闭合属性或注入元素。
+ */
 function codeBlockHtml(source: string[]): string {
   const open = source[0] ?? ''
-  const language = open.replace(/^```|^~~~/, '').trim().split(/\s+/)[0] ?? ''
+  const info = open.replace(/^```|^~~~/, '').trim()
   const body = source.slice(1, source.length - 1).join('\n')
-  const highlighted = language ? highlightMarkdownCode(body, language) : null
-  const inner = highlighted ?? escapeHtml(body)
-  const languageClass = language ? ` language-${language}` : ''
-  return `<pre tabindex="0" data-language="${language || 'text'}"><code class="hljs${languageClass}">${inner}</code></pre>`
+  return renderMarkdownFence(body, info, highlightMarkdownCode)
 }
 
 const bullet = Decoration.replace({ widget: new BulletWidget() })

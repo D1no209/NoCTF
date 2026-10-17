@@ -472,3 +472,31 @@ unused-primitive  components/ui/** 无外部引用的 .vue                    ->
 6. 补行为测试：fence 渲染/转义、围栏检测边界、worker 回退、缓存失败；`MarkdownDocument` 建议先抽出纯函数（tag/attr 白名单映射）再测。
 7. 同步 AGENTS.md 的样式归属与按需注册表述。
 
+### 11.6 本轮修复结果（已执行）
+
+验证：§bun run audit:architecture§ 0 violation、§bun run typecheck§ 通过、§bun test§ 全量通过。改动处保留既有路由懒加载边界（§tests/route-loading-performance.test.ts§ 要求 markdown 样式不进入 §main.css§）。
+
+| 审计项 | 处理 |
+|---|---|
+| P1-1 编辑器围栏注入 | 新增 §lib/markdown-fence.ts§：§renderMarkdownFence(code, info, highlighter)§ 复用 §normalizeMarkdownCodeLanguage§ 并在无高亮时转义正文；§lib/markdown.ts§ 与 §live-preview.ts§ 共用。编辑器不再自己拼接 §data-language§/§language-*§ |
+| P1-3 围栏渲染 + §escapeHtml§ 双实现 | 同上；§live-preview.ts§ 删除自写 §escapeHtml§ 与 §codeBlockHtml§ 逻辑，改为一行调用共享渲染器 |
+| P1-2 编辑器样式归属 | 保留单一懒加载 §markdown.css§（路由性能测试要求），由 §MarkdownContent§ 与 §MarkdownEditor§ 各自 §<style src>§ 引入并加注释说明共享关系；编辑器页面不再依赖“恰好先挂载阅读组件” |
+| P1-4 引用块内围栏不高亮 | §markdown-language.ts§ 的 §hasMarkdownCodeFence§ 允许 §>§/缩进前缀；实测引用块与列表内围栏现在都会加载高亮 |
+| P1-5 失败缓存永久化 | §renderMarkdownAsync§ 在高亮 chunk 加载失败时回退为无高亮渲染；§renderPublishedMarkdown§ 在渲染失败时删除缓存项；§MarkdownContent§ 捕获异常并保留上一版内容 |
+| §assets§ 死 prop | §MarkdownEditor§ 删除该 prop，理论题编辑器同步移除传参 |
+| §prefetchMarkdownHighlighter§ 死代码 | 删除 |
+| §renderedBlocks§ 无界增长 | 上限 32 条，超出淘汰最早条目 |
+| worker 无超时 / 任务残留 | 每任务 15s 超时，超时或 §postMessage§ 抛错都会清理 §pendingTasks§，并回退主线程渲染 |
+| 作者 §data-language§ 视觉伪造 | 清洗器 §pre§ transform 现在对作者自带值也执行 §normalizeMarkdownCodeLanguage§，非法值归一为 §text§ |
+| 嵌套滚动面 | §.markdown-content§ 根节点改 §overflow-x: clip§（表格/围栏仍各自横向滚动） |
+| §MarkdownDiff§ 逐行号比较 | 新增 §lib/line-diff.ts§（公共前后缀 + 变更块 LCS，超大块回退按索引配对）；§MarkdownDiff§ 改为渲染对齐行 |
+| 通用编辑器借用 writeup key | 新增 §markdown.editor.*§（en/zh），删除 §challengeWriteUp.heading/list/code/link§ |
+
+新增/更新的行为测试：
+
+- §tests/markdown.test.ts§：围栏 info 注入归一、§escapeMarkdownFenceText§、引用块/列表围栏检测与高亮、作者 §pre data-language§ 归一、无 Worker 环境下的主线程回退；
+- §tests/line-diff.test.ts§：插入/删除/替换/空文档/超大块回退；
+- §tests/route-loading-performance.test.ts§ 保持通过（全局样式仍不含 markdown 规则）。
+
+仍未处理（记录在案）：§MarkdownDocument§ 的纯函数化与 DOM 测试环境、§live-preview.scan()§ 全文档重算的增量优化。
+

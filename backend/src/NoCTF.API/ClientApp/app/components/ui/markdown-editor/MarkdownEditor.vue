@@ -7,7 +7,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { Code, Heading2, Link, List } from '@lucide/vue'
 import { livePreview } from './live-preview'
 
-const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string; assets?: Readonly<Record<string, string>> }>()
+const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string }>()
 const model = defineModel<string>({ default: '' })
 const emit = defineEmits<{ save: [] }>()
 const host = ref<HTMLElement | null>(null)
@@ -67,9 +67,12 @@ onBeforeUnmount(() => { view?.destroy(); view = null })
   <section data-slot="markdown-editor" class="min-w-0 space-y-3" :aria-label="label">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex gap-1">
-        <Button v-for="action in actions" :key="action.key" type="button" variant="ghost" size="icon-sm" :disabled="disabled" :aria-label="$t(`challengeWriteUp.${action.key}`)" @click="insert(action.text)"><component :is="action.icon" /></Button>
+        <Button v-for="action in actions" :key="action.key" type="button" variant="ghost" size="icon-sm" :disabled="disabled" :aria-label="$t(`markdown.editor.${action.key}`)" @click="insert(action.text)"><component :is="action.icon" /></Button>
       </div>
     </div>
     <div ref="host" data-slot="markdown-editor-surface" class="min-h-64 rounded-[10px] bg-[var(--field-surface)] p-2" />
   </section>
 </template>
+
+<!-- 编辑器需要阅读态规则来排版实时预览中的表格/围栏块,与 MarkdownContent 共用同一份懒加载样式。 -->
+<style src="../markdown/markdown.css"></style>

@@ -1334,5 +1334,9 @@
   "liveSolo.notice.roomUnavailable": "The screen room became unavailable.",
   "liveSolo.notice.authorizationChanged": "The room was retired because its current authorization no longer qualified.",
   "liveSolo.notice.noAutomaticDecision": "This alert does not automatically pause the match, record a forfeit or change results. A judge must review it.",
-  "liveSolo.notice.viewMatch": "View match"
+  "liveSolo.notice.viewMatch": "View match",
+  "markdown.editor.heading": "Insert heading",
+  "markdown.editor.list": "Insert list",
+  "markdown.editor.code": "Insert code block",
+  "markdown.editor.link": "Insert link"
 }

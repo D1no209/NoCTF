@@ -1,8 +1,9 @@
+/* 阅读态与编辑态共用:MarkdownContent 与 MarkdownEditor 都按路由懒加载本文件。 */
 .markdown-content {
   --markdown-surface: color-mix(in oklch, var(--card) 74%, transparent);
   --markdown-surface-strong: color-mix(in oklch, var(--muted) 86%, var(--card));
   --markdown-rule: color-mix(in oklch, var(--primary) 24%, var(--border));
-  max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; color: var(--foreground);
+  max-width: 100%; overflow-x: clip; overflow-wrap: anywhere; color: var(--foreground);
 }
 .markdown-content :where(p, ul, ol, blockquote, pre, table, details, section) { margin-block: 0.9em; }
 .markdown-content :where(h1, h2, h3, h4, h5, h6) {

@@ -1,4 +1,9 @@
 const languageName = /^[a-z\d][a-z\d_+.#-]{0,31}$/i
+/**
+ * Fences may be nested in blockquotes and lists, so detection has to skip the
+ * container markers instead of only matching a line-start fence.
+ */
+const fenceLine = /(?:^|\n)[ \t]*(?:>[ \t]*)*(?:`{3,}|~{3,})/
 
 export function normalizeMarkdownCodeLanguage(info: string): string {
   const candidate = info.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? ''
@@ -6,5 +11,5 @@ export function normalizeMarkdownCodeLanguage(info: string): string {
 }
 
 export function hasMarkdownCodeFence(source: string): boolean {
-  return /(?:^|\n)[ \t]{0,3}(?:`{3,}|~{3,})/.test(source)
+  return fenceLine.test(source)
 }

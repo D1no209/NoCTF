@@ -20,7 +20,7 @@ const { state } = toRefs(props)
           <Field v-if="state.id"><FieldLabel>{{ $t('theory.state') }}</FieldLabel><Select :model-value="String(state.detail?.question?.state ?? 0)" :disabled="state.busy" @update:model-value="state.setState"><SelectTrigger :aria-label="$t('theory.state')"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="0">{{ $t('theory.draft') }}</SelectItem><SelectItem value="1">{{ $t('theory.available') }}</SelectItem><SelectItem value="2">{{ $t('theory.retired') }}</SelectItem></SelectGroup></SelectContent></Select></Field>
         </FieldGroup>
         <Separator />
-        <Field><FieldLabel>{{ $t('theory.body') }}</FieldLabel><MarkdownEditor v-model="state.form.body" :assets="state.assets" :label="$t('theory.body')" :disabled="state.busy" @save="state.save" /></Field>
+        <Field><FieldLabel>{{ $t('theory.body') }}</FieldLabel><MarkdownEditor v-model="state.form.body" :label="$t('theory.body')" :disabled="state.busy" @save="state.save" /></Field>
         <FieldSet><FieldLegend>{{ $t('theory.options') }}</FieldLegend><FieldGroup>
           <div v-for="(option, index) in state.form.options" :key="index" class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
             <span class="pt-2 font-semibold">{{ state.optionLabel(index) }}</span>

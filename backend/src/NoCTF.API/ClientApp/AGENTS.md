@@ -92,7 +92,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 参赛题目详情中的 FlagSubmit 通过可选 dockTarget 挂载到详情卡片底部独立区域，不进入详情 ScrollSurface；CTF、AWD、AWDP 面板只转发布局目标，提交状态和业务命令仍由 FlagSubmit 功能层拥有。
 - 参赛题目环境通过 RuntimeCard 的可选 dockTarget 挂载到描述后的资源行左侧，附件位于右侧；All 策略附件使用单一文件名按钮下载，不再拆分文件信息和通用下载按钮。Runtime 业务状态仍由各赛制功能层拥有。
 - 剩余 Flag 次数使用 RemainingAttempts 原语；低于 5 时仅数字使用 `--critical-attempt` 纯红色。题目提示使用 MarkdownQuote 以 blockquote / `>` 语义渲染，继续经过共享 Markdown 安全清洗。
-- Markdown 统一通过 `lib/markdown.ts` 解析与清洗，Fence 代码使用 `lib/markdown-highlighter.ts` 的 Highlight.js core 按需语言注册；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰集中在 main.css 的 `.markdown-content` 规则中，不在业务页面重复定义。
+- Markdown 统一通过 `lib/markdown.ts` 解析与清洗，围栏 HTML 统一由 `lib/markdown-fence.ts` 生成（语言 token 规范化 + 正文转义），发布渲染与编辑器实时预览必须共用该实现，禁止各自拼接围栏标记。Highlight.js 使用 core 构建 + 精选语言包，语言包模块在检测到围栏后才动态加载；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。阅读态与编辑态样式集中在 `components/ui/markdown/markdown.css`（MarkdownContent 与 MarkdownEditor 各自按路由懒加载，避免进入全局样式表）；标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰只在该文件定义，不在业务页面重复定义。WriteUp 审核的原文对比使用 `lib/line-diff.ts`（公共前后缀 + 变更块 LCS），不使用按行号直接比较。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。
 

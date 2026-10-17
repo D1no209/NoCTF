@@ -1334,5 +1334,9 @@
   "liveSolo.notice.roomUnavailable": "屏幕房间已不可用。",
   "liveSolo.notice.authorizationChanged": "当前授权不再满足要求，屏幕房间已退役。",
   "liveSolo.notice.noAutomaticDecision": "此提醒不会自动暂停、判负或修改结果，请裁判核查后处理。",
-  "liveSolo.notice.viewMatch": "查看对局"
+  "liveSolo.notice.viewMatch": "查看对局",
+  "markdown.editor.heading": "插入标题",
+  "markdown.editor.list": "插入列表",
+  "markdown.editor.code": "插入代码块",
+  "markdown.editor.link": "插入链接"
 }
