@@ -19,7 +19,14 @@ const maximumWriteUpDeadlineHours = 24 * 365
 
 /** Owns state, effects and commands for AdminCompetitionsByIdConfigurationPage. */
 export function useAdminCompetitionsByIdConfigurationPage() {
-  const { competitionId, competition, canWrite, refresh, accept, data: useData, read: readAdminCompetition } = useCompetitionAdmin()
+  const { competitionId, competition, role, canWrite, refresh, accept, data: useData, read: readAdminCompetition } = useCompetitionAdmin()
+
+  /**
+   * 编辑权限不应随后台刷新抖动:resource.fresh 在每次 refresh 期间都会短暂变 false
+   * (canWrite 随之变 false),若直接绑定到输入控件,刷新窗口内输入的字符会被丢弃。
+   * 提交仍由 canWrite 把关,服务端继续做最终授权。
+   */
+  const canEditMeta = computed(() => competition.value !== null && (role.value === 'Owner' || role.value === 'Manager'))
 
   const title = ref('')
 
@@ -281,6 +288,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       competitionId, SingleWriteUpSettings: markRaw(SingleWriteUpSettingsComponent), refreshCompetition: refresh,
       competition,
       canWrite,
+      canEditMeta,
       title,
       description,
       startTime,

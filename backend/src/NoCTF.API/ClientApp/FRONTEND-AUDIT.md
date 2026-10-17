@@ -498,5 +498,68 @@ unused-primitive  components/ui/** 无外部引用的 .vue                    ->
 - §tests/line-diff.test.ts§：插入/删除/替换/空文档/超大块回退；
 - §tests/route-loading-performance.test.ts§ 保持通过（全局样式仍不含 markdown 规则）。
 
-仍未处理（记录在案）：§MarkdownDocument§ 的纯函数化与 DOM 测试环境、§live-preview.scan()§ 全文档重算的增量优化。
+仍未处理（记录在案）：`MarkdownDocument` 的纯函数化与 DOM 测试环境、`live-preview.scan()` 全文档重算的增量优化。
+
+## 12. Markdown 与编辑器专项审计（第二轮）
+
+### 12.1 结论
+
+上一轮修复只覆盖了渲染管线与数据回写，"编辑器问题仍然存在"和"代码段/表格无法实时渲染"另有**两个 P0 根因**：实时预览把 CodeMirror 禁止的块装饰放进 ViewPlugin（编辑器构造直接抛异常），以及表格块把渲染器会丢弃的行吞进替换区间（用户输入的字符在模型中存在但不可见）。两者都已修复，并用真实浏览器（无头 Edge + CDP）取证。
+
+### 12.2 P0-1 块装饰来自 ViewPlugin，编辑器构建失败
+
+证据（最小 Vite harness 直接挂载 `MarkdownEditor`）：
+
+- 控制台：`Uncaught RangeError: Block decorations may not be specified via plugins`，栈指向 `RangeSet.spans` → `new EditorView` → `MarkdownEditor.vue`；
+- 修复前 DOM：`cm=false / lines=0 / blocks=0`，编辑器根本没有创建，页面在真实 Nuxt 应用中表现为 500 错误页；
+- 修复后：`cm=true / lines=8 / blocks=2`（`pre=1`、`table=1`），无异常。
+
+机制：`@codemirror/view` 对 plugin 提供的 `PointDecoration` 有硬性约束——`block` 装饰与跨行替换都会抛 `RangeError`（`node_modules/@codemirror/view/dist/index.js:2775-2779`）。整块替换（表格/围栏）只能由 **StateField** 提供。
+
+修复：
+
+- 分支上的 `2f03c41e` 已把块/行装饰整体移入 `StateField`（含组合输入的 StateEffect），本次审计与其实现一致，并在此基础上继续收敛；
+- 抽出纯逻辑 `live-preview-blocks.ts`（块检测、光标行、可渲染块、跳过区间），不依赖 DOM，可直接单测；`live-preview.ts` 只保留 widget、HTML 与装饰组装；
+- 行内替换全部限制在单行内，不触发"不得替换换行"的约束。
+
+### 12.3 P0-2 表格块吞掉渲染器会丢弃的行
+
+真实页面复现（CDP 输入 + 读取 `.cm-line`）：
+
+1. 输入 `| a | b |` → 回车 → `| --- | --- |` → 回车 → 输入 `|||`；
+2. 再回车并输入 `tail`。修复前 `.cm-line` 只剩 `["tail"]`，模型仍是 `...|||\ntail`——`|||` 行被渲染成空白行而不可见；
+3. 修复后 `["|||","tail"]`，表格区域正常渲染且原文不再消失。
+
+机制：旧检测只要求下一行"像分隔行"、行继续条件只要包含 `|`，于是只有管道的行（以及单元格数超过表头的行）被算进 `tableSource`。Markdown 渲染器对这类行要么输出空行、要么丢弃多余单元格，原文因此不可见。这与用户报告的"`|||` 丢失第一个 `|`"一致。
+
+修复：
+
+- 分隔行必须与表头**列数一致**且每列匹配 `:?-{2,}:?`；
+- 只有单元格数不超过表头、且不是纯管道空行的行才纳入表格块；
+- 渲染结果不含 `<table>` 时回退显示原文，绝不把内容渲染成空白块。
+
+新增 `tests/editor-preview-blocks.test.ts`（6 条行为测试）：正常表格、纯管道行、超出列数行、伪表格拒绝、围栏、光标所在块不渲染。
+
+### 12.4 P1 编辑权限随刷新抖动会丢弃按键
+
+`resource.fresh` 在每次 `refresh()` 期间会同步变 `false`，管理端 `canWrite` 随之变 `false`，配置页输入控件因此被设为 disabled；该窗口内的按键会被浏览器直接丢弃（harness 证据：disabled 期间输入 `DROPPED` 未进入模型）。这与"字符丢失"的另一个表象一致。
+
+修复：配置页区分"可编辑"与"可提交"——新增 `canEditMeta`（角色为 Owner/Manager 且已有数据，不依赖 `fresh`）绑定到输入控件；`saveMeta` 仍以 `canWrite` 把关，服务端继续做最终授权。共享 shell 的 `fresh` 语义保持不变。
+
+建议（未实施）：其它管理页把 `fresh` 直接用作可编辑态的地方，同样拆成 `canEdit` / `canSubmit` 两种语义，避免后台刷新导致控件闪烁与输入丢失。
+
+### 12.5 其它审计结论
+
+- 行内语法隐藏只在"光标不在该行"时生效，且组合输入期间全部跳过；外部模型写入使用最小 diff 并忽略回声（上一轮已修）。
+- 性能：状态字段在每个事务（文档/选区变化）上重扫 O(n) 并重建块装饰对象；长文档可再做行扫描缓存或仅在行结构变化时重算，暂不阻塞正确性。
+- 异步表格渲染：缓存上限 32 条；渲染为空/非表格时回退原文；完成后 `requestMeasure()` 修正布局。
+- 测试边界：块检测已可无 DOM 单测；装饰组合仍依赖真实浏览器验证（本次用 harness + CDP），未纳入常规 CI。
+
+### 12.6 验证
+
+- `bun run audit:architecture`：0 violation
+- `bun run typecheck`：通过
+- `bun test`：1117 通过 / 0 失败
+- 真实浏览器（无头 Edge + CDP）：编辑器可初始化（`blocks=2`）、表格/围栏实时渲染、`|||` 行保持可见、快速连续输入与外部回写不丢字
+
 

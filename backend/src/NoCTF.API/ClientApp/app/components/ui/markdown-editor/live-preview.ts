@@ -3,6 +3,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } fr
 import { renderMarkdownPreview } from '../../../lib/markdown-preview-worker.client'
 import { renderMarkdownFence } from '../../../lib/markdown-fence'
 import { highlightMarkdownCode } from '../../../lib/markdown-highlighter'
+import { renderedBlockList, selectedLines, type PreviewBlock } from './live-preview-blocks'
 
 /**
  * Obsidian 式实时预览:编辑器内容仍是 Markdown 源码,非光标行隐藏语法标记并套用排版样式,
@@ -35,21 +36,25 @@ class BlockWidget extends WidgetType {
     if (this.html) { wrapper.innerHTML = this.html; return wrapper }
     const source = this.source ?? ''
     const cached = renderedBlocks.get(source)
-    if (cached !== undefined) { wrapper.innerHTML = cached; return wrapper }
+    if (cached !== undefined) {
+      if (cached.includes('<table')) wrapper.innerHTML = cached
+      else wrapper.textContent = source
+      return wrapper
+    }
     void renderMarkdownPreview(source).then((html) => {
       renderedBlocks.set(source, html)
       if (renderedBlocks.size > renderedBlocksLimit)
         renderedBlocks.delete(renderedBlocks.keys().next().value!)
       if (!wrapper.isConnected) return
-      wrapper.innerHTML = html
+      // 渲染器没有产出表格时保留原文,绝不把用户内容变成空白块。
+      if (html.includes('<table')) wrapper.innerHTML = html
+      else wrapper.textContent = source
       view.requestMeasure()
     })
     return wrapper
   }
   override ignoreEvent() { return false }
 }
-
-type Block = { fromLine: number, toLine: number, source: string[], tableSource?: string }
 
 /**
  * 围栏 HTML 与发布渲染共用同一实现:语言 token 会被规范化,作者输入的围栏
@@ -75,60 +80,26 @@ const headings = [1, 2, 3, 4, 5, 6].map(level => Decoration.line({ class: `cm-md
 type Range = { from: number, to: number, deco: Decoration }
 
 function scan(state: EditorState, composing: boolean): DecorationSet {
-  const cursorLines = new Set<number>()
-  for (const range of state.selection.ranges) {
-    cursorLines.add(state.doc.lineAt(range.head).number)
-    cursorLines.add(state.doc.lineAt(range.from).number)
-    cursorLines.add(state.doc.lineAt(range.to).number)
-  }
-  const text = (number: number) => state.doc.line(number).text
-  const blocks: Array<Block & { html: string }> = []
-  for (let number = 1; number <= state.doc.lines; number += 1) {
-    const line = text(number).trimStart()
-    const fence = /^(```|~~~)/.exec(line)
-    if (fence) {
-      const marker = fence[1]!
-      let end = number
-      while (end < state.doc.lines) {
-        end += 1
-        if (text(end).trimStart().startsWith(marker) && end > number) break
-      }
-      if (end > number) {
-        const source: string[] = []
-        for (let index = number; index <= end; index += 1) source.push(text(index))
-        blocks.push({ fromLine: number, toLine: end, source, html: codeBlockHtml(source) })
-        number = end
-      }
-      continue
-    }
-    if (text(number).includes('|') && number + 1 <= state.doc.lines && /^\s*\|?\s*:?-{2,}/.test(text(number + 1))) {
-      let end = number + 1
-      while (end < state.doc.lines && text(end + 1).includes('|') && text(end + 1).trim()) end += 1
-      const source: string[] = []
-      for (let index = number; index <= end; index += 1) source.push(text(index))
-      const tableSource = source.join('\n')
-      blocks.push({ fromLine: number, toLine: end, source, html: renderedBlocks.get(tableSource) ?? '', tableSource })
-      number = end
-    }
-  }
+  const cursorLines = selectedLines(state)
   // 输入法组合期间保持源码可见:替换型装饰会打断候选词并让光标跳位。
-  const rendered = new Map<number, Block & { html: string }>()
-  for (const block of blocks) {
-    if (composing) break
-    let active = false
-    for (let line = block.fromLine; line <= block.toLine; line += 1) if (cursorLines.has(line)) active = true
-    if (!active) rendered.set(block.fromLine, block)
-  }
+  const rendered = new Map<number, PreviewBlock>()
+  if (!composing) for (const block of renderedBlockList(state)) rendered.set(block.fromLine, block)
   const ranges: Range[] = []
   for (let number = 1; number <= state.doc.lines; number += 1) {
     const line = state.doc.line(number)
     const body = line.text
     const block = rendered.get(number)
     if (block) {
-      const end = state.doc.line(block.toLine)
-      ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(block.html, block.tableSource) }) })
-      number = block.toLine
-      continue
+      const cached = block.tableSource === undefined ? undefined : renderedBlocks.get(block.tableSource)
+      // 已知渲染结果不是表格(原文被丢弃)时保留源码,不显示空块。
+      const skip = block.tableSource !== undefined && cached !== undefined && !cached.includes('<table')
+      if (!skip) {
+        const html = block.tableSource === undefined ? codeBlockHtml(block.source) : cached ?? ''
+        const end = state.doc.line(block.toLine)
+        ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(html, block.tableSource) }) })
+        number = block.toLine
+        continue
+      }
     }
     const trimmed = body.trimStart()
     if (!trimmed) continue
