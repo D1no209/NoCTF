@@ -1,8 +1,8 @@
-import { RangeSetBuilder } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
-import { renderMarkdownPreview } from '~/lib/markdown-preview-worker.client'
-import { renderMarkdownFence } from '~/lib/markdown-fence'
-import { highlightMarkdownCode } from '~/lib/markdown-highlighter'
+import { RangeSetBuilder, StateEffect, StateField, type EditorState } from '@codemirror/state'
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view'
+import { renderMarkdownPreview } from '../../../lib/markdown-preview-worker.client'
+import { renderMarkdownFence } from '../../../lib/markdown-fence'
+import { highlightMarkdownCode } from '../../../lib/markdown-highlighter'
 
 /**
  * Obsidian 式实时预览:编辑器内容仍是 Markdown 源码,非光标行隐藏语法标记并套用排版样式,
@@ -21,8 +21,6 @@ class BulletWidget extends WidgetType {
 /** 表格渲染缓存:同一份源码只走一次 worker,并限制条目数避免长会话无界增长。 */
 const renderedBlocks = new Map<string, string>()
 const renderedBlocksLimit = 32
-/** 异步块渲染完成后请求一次重新测量,避免高度变化后光标坐标残留旧布局。 */
-let requestMeasure: (() => void) | null = null
 
 class BlockWidget extends WidgetType {
   constructor(private readonly html: string, private readonly source?: string) { super() }
@@ -31,7 +29,7 @@ class BlockWidget extends WidgetType {
     if (this.source !== undefined || other.source !== undefined) return other.source === this.source
     return other.html === this.html
   }
-  override toDOM() {
+  override toDOM(view: EditorView) {
     const wrapper = document.createElement('div')
     wrapper.className = 'cm-md-block markdown-content'
     if (this.html) { wrapper.innerHTML = this.html; return wrapper }
@@ -44,7 +42,7 @@ class BlockWidget extends WidgetType {
         renderedBlocks.delete(renderedBlocks.keys().next().value!)
       if (!wrapper.isConnected) return
       wrapper.innerHTML = html
-      requestMeasure?.()
+      view.requestMeasure()
     })
     return wrapper
   }
@@ -76,8 +74,7 @@ const headings = [1, 2, 3, 4, 5, 6].map(level => Decoration.line({ class: `cm-md
 
 type Range = { from: number, to: number, deco: Decoration }
 
-function scan(view: EditorView): DecorationSet {
-  const { state } = view
+function scan(state: EditorState, composing: boolean): DecorationSet {
   const cursorLines = new Set<number>()
   for (const range of state.selection.ranges) {
     cursorLines.add(state.doc.lineAt(range.head).number)
@@ -115,7 +112,6 @@ function scan(view: EditorView): DecorationSet {
     }
   }
   // 输入法组合期间保持源码可见:替换型装饰会打断候选词并让光标跳位。
-  const composing = view.composing
   const rendered = new Map<number, Block & { html: string }>()
   for (const block of blocks) {
     if (composing) break
@@ -193,14 +189,41 @@ function scan(view: EditorView): DecorationSet {
   return builder.finish()
 }
 
-export const livePreview = ViewPlugin.fromClass(class {
-  decorations: DecorationSet
-  constructor(readonly view: EditorView) {
-    requestMeasure = () => view.requestMeasure()
-    this.decorations = scan(view)
+const compositionChanged = StateEffect.define<boolean>()
+const previewDecorations = StateField.define<{ composing: boolean; decorations: DecorationSet }>({
+  create: state => ({ composing: false, decorations: scan(state, false) }),
+  update(value, transaction) {
+    let composing = value.composing
+    for (const effect of transaction.effects)
+      if (effect.is(compositionChanged)) composing = effect.value
+    if (!transaction.docChanged && !transaction.selection && composing === value.composing) return value
+    return { composing, decorations: scan(transaction.state, composing) }
+  },
+  // 多行替换会改变布局,必须在计算视口之前直接提供,不能从 ViewPlugin 返回。
+  provide: field => EditorView.decorations.from(field, value => value.decorations),
+})
+
+const compositionEvents = ViewPlugin.fromClass(class {
+  private timer: ReturnType<typeof setTimeout> | undefined
+  constructor(readonly view: EditorView) {}
+  start() {
+    clearTimeout(this.timer)
+    this.view.dispatch({ effects: compositionChanged.of(true) })
   }
-  update(update: ViewUpdate) {
-    if (update.docChanged || update.selectionSet || update.viewportChanged) this.decorations = scan(update.view)
+  finish() {
+    clearTimeout(this.timer)
+    // 等待 CodeMirror 提交组合输入的最后一轮文本后再恢复预览。
+    this.timer = setTimeout(() => {
+      this.view.dispatch({ effects: compositionChanged.of(false) })
+    }, 0)
   }
-  destroy() { requestMeasure = null }
-}, { decorations: value => value.decorations })
+  destroy() { clearTimeout(this.timer) }
+}, {
+  eventHandlers: {
+    compositionstart() { this.start() },
+    compositionend() { this.finish() },
+    blur() { this.finish() },
+  },
+})
+
+export const livePreview = [previewDecorations, compositionEvents]
