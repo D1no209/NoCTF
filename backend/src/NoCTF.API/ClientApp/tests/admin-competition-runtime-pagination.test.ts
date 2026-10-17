@@ -5,13 +5,14 @@ import { id } from '../mock/schema'
 describe('competition runtime administration pagination', () => {
   test('uses numbered offset pages and resets to the first page when filters are applied', async () => {
     const controller = await Bun.file(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage.ts', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
+    const list = await Bun.file(new URL('../app/features/admin/useAdminCompetitionList.ts', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
     const view = await Bun.file(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdRuntimesPageView.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
-    expect(controller).toContain('useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>')
-    expect(controller).toContain('offset,\n        limit,\n        desc,')
+    expect(controller).toContain('useAdminCompetitionFilteredList<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse')
     expect(controller).toContain('return { items: data.items ?? [], total: data.total ?? 0 }')
-    expect(controller).toContain('initialPageSize: 10')
-    expect(controller).toContain('pagination.reset()\n    await pagination.loadPage(1)')
+    expect(list).toContain('useOffsetPagination<T>')
+    expect(list).toContain('initialPageSize: 10')
+    expect(list).toContain('pagination.reset()\n    await pagination.loadPage(1)')
     expect(view).toContain('<OffsetPagination v-if="initialized"')
     expect(view).not.toContain('loadMore')
   })

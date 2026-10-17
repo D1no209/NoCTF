@@ -316,7 +316,48 @@ unused-primitive  components/ui/** 无外部引用的 .vue                    ->
 
 ### 9.3 剩余
 
-- 三组仍待处理的重复实现（runtime 面板、竞赛列表控制器、平台日志/审计视图）
-- P2 组合入口样板与颜色技术常量进一步 token 化
+- 三组重复实现与组合入口样板 → 已在 §10 收口
 - 大屏相关（按要求）
+
+---
+
+## 10. 第三轮：四项重复实现收口
+
+验证：`bun run audit:architecture` 0 violation、`bun run typecheck` 通过、`bun test` **1091 项全部通过**。大屏未动。
+
+### 10.1 runtime 面板 / runtime 卡片
+
+新增 `features/challenges/useRuntimeStatus.ts`（74 行）：1 秒时钟、TTL 文案、状态 Badge 色、续期窗口（分钟输入、校验、too-early、请求体）。
+
+| 文件 | 行数变化 | 说明 |
+|---|---|---|
+| `useRuntimeCard.ts` | 275 → 242 | 时钟 / ttl / stateVariant / 续期校验调用共享 hook；保留人机验证与 commandAttempt 差异 |
+| `useChallengeTestRuntimePanel.ts` | 294 → 277 | 同上；保留 202 + pendingMutation 轮询差异 |
+
+### 10.2 竞赛管理 Runtimes / Submissions 列表
+
+新增 `features/admin/useAdminCompetitionList.ts`（87 行）：`useAdminCompetitionReferences`（challenge/team 选项、`loadRefs`、名称回退）与 `useAdminCompetitionFilteredList`（筛选快照、首次页重置、`initialPageSize: 10`、标准 view bindings）。
+
+| 文件 | 行数变化 | 说明 |
+|---|---|---|
+| `useAdminCompetitionsByIdRuntimesPage.ts` | 448 → 425 | `loadRefs`、分页配置、bindings、首屏重置各只出现一次 |
+| `useAdminCompetitionsByIdSubmissionsPage.ts` | 507 → 479 | 同上；预览重算通过 `onApplied` 钩子保留 |
+
+### 10.3 平台日志 / 平台审计视图
+
+新增 `components/ui/table/RecordListSection.vue`（65 行）：失败 Alert、Skeleton、Empty、表格外壳与 load-more 脚注；列头与数据行通过 `#header` / `#rows` 槽留在各自视图，空态标题/描述以 `MessageKey` 传入。
+
+| 文件 | 行数变化 |
+|---|---|
+| `AdminPlatformLogsPageView.vue` | 132 → 118 |
+| `AdminPlatformAuditPageView.vue` | 120 → 108 |
+
+### 10.4 组合入口样板
+
+新增 `features/shared/define-feature-view.ts`（24 行）：绑定控制器 → View → 转发全部 slot。12 个入口（4 个 mode panel + 8 个 definition section）改为 `defineFeatureView(View, () => useX(props, emit))`，每个文件只剩类型化 props/emits 契约与 View 渲染；保留 `import View from …` 与 `./useX` 形态以维持 `sourceFile` 展开契约。带 `defineExpose` 的 `RuntimeCard` / `ChallengeWriteUpEditor` 未改。
+
+### 10.5 仍保留的“逐字相同”
+
+- 共享 hook 的调用点、Select/Field 骨架、查询/导出按钮属于各页面数据与交互本身，不再抽象；
+- 大屏（`live` / `awdp-control` / spectator）按要求未动。
 

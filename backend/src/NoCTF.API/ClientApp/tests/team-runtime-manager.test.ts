@@ -17,7 +17,7 @@ describe('team runtime management', () => {
     expect(view).toContain('@changed="refresh"')
     expect(view).toContain('<OffsetPagination')
     expect(card).toContain("emit('changed')")
-    expect(card).toContain('createRuntimeExtensionRequest(')
+    expect(card).toContain('useRuntimeExtension(')
     expect(card).toContain("requestHumanVerification('runtime')")
   })
 })

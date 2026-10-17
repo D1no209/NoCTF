@@ -9,7 +9,7 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAc
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
 import RuntimeFlagsPanelComponent from './RuntimeFlagsPanel.vue'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
-import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
+import { useRuntimeClock, useRuntimeExtension, useRuntimeStateVariant, useRuntimeTtl } from '../challenges/useRuntimeStatus'
 
 type TestRuntime = NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
 
@@ -30,13 +30,9 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const copied = ref(false)
 
-  const now = ref(Date.now())
-
-  const extendMinutes = ref<number | string>(30)
+  const now = useRuntimeClock()
 
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
-
-  let clockTimer: ReturnType<typeof setInterval> | undefined
 
   async function load(): Promise<ChallengeTestRuntimeLoadOutcome> {
     try {
@@ -86,12 +82,10 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     loading.value = false
     if (shouldContinuePolling(outcome))
       startPolling()
-    clockTimer = setInterval(() => { now.value = Date.now() }, 1000)
   })
 
   onUnmounted(() => {
     if (copiedTimer) clearTimeout(copiedTimer)
-    if (clockTimer) clearInterval(clockTimer)
   })
 
   async function retryLoad(): Promise<void> {
@@ -166,8 +160,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const extend = () => {
     const current = runtime.value
-    const extension = createRuntimeExtensionRequest(
-      current?.expiresAt, Date.now(), extendMinutes.value, 1440)
+    const extension = extensionRequest.value
     if (current?.state !== 'Running' || !current.id || extension === null) return
     return act(
       'extend',
@@ -212,31 +205,21 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const busy = computed(() => acting.value || waitingForAcceptedRuntime.value)
 
-  const ttl = computed(() => {
-    if (!runtime.value?.expiresAt) return null
-    const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 ? formatDuration(remaining) : translate("runtime.label.expired")
-  })
+  const ttl = useRuntimeTtl(runtime, now)
+  const stateVariant = useRuntimeStateVariant(runtime)
+  const {
+    extendMinutes,
+    extendMinutesInvalid,
+    renewalTooEarly,
+    extensionRequest,
+    validExtension: renewalAllowed,
+  } = useRuntimeExtension(runtime, now, { maximumMinutes: 1440, busy })
 
   const canExtend = computed(() => {
     if (runtime.value?.state !== 'Running' || !runtime.value.expiresAt) return false
-    const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0
+    return new Date(runtime.value.expiresAt).getTime() - now.value > 0
   })
-  const renewalTooEarly = computed(() => runtime.value?.state === 'Running'
-    && isRuntimeExtensionTooEarly(runtime.value.expiresAt, now.value))
-  const extendMinutesInvalid = computed(() =>
-    parseRuntimeExtensionMinutes(extendMinutes.value, 1440) === null)
-  const validExtension = computed(() => canExtend.value && !busy.value
-    && createRuntimeExtensionRequest(
-      runtime.value?.expiresAt, now.value, extendMinutes.value, 1440) !== null)
-
-  const stateVariant = computed(() => {
-    if (runtime.value?.state === 'Running') return 'default' as const
-    if (runtime.value?.state === 'Failed') return 'destructive' as const
-    if (runtime.value?.state === 'Stopped') return 'secondary' as const
-    return 'outline' as const
-  })
+  const validExtension = computed(() => canExtend.value && renewalAllowed.value)
 
   const flagVariant = computed(() => runtime.value?.flagState === 'Failed'
     ? 'destructive' as const

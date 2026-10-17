@@ -52,68 +52,56 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
         </Button>
       </div>
 
-      <Alert v-if="listError" variant="destructive">
-        <AlertDescription>{{ $message(listError.message) }}</AlertDescription>
-      </Alert>
-
-      <Card v-if="loading && items.length === 0">
-        <CardContent class="flex flex-col gap-3 pt-6">
-          <Skeleton v-for="i in 6" :key="i" class="h-10 w-full" />
-        </CardContent>
-      </Card>
-
-      <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
-        <EmptyHeader>
-          <EmptyTitle>{{ $t('administration.label.matchingAuditRecord') }}</EmptyTitle>
-          <EmptyDescription>{{ $t('administration.platformAudit.description.adjustTypeTimeRange') }}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-
-      <Card v-else-if="items.length > 0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead class="w-44">{{ $t('administration.label.time') }}</TableHead>
-              <TableHead class="w-32">{{ $t('common.label.type') }}</TableHead>
-              <TableHead>{{ $t('administration.label.subject') }}</TableHead>
-              <TableHead>{{ $t('common.label.actions') }}</TableHead>
-              <TableHead class="w-32">{{ $t('administration.label.operator') }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="log in items" :key="log.id">
-              <TableCell class="text-sm">
-                <component :is="AdminDateTime" :value="log.occurredAt" />
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ? translate(KIND_LABELS[String(log.kind)]!) : log.kind }}</Badge>
-                <Badge v-if="log.automatic" variant="outline" class="ml-1">{{ $t('administration.label.automatic') }}</Badge>
-              </TableCell>
-              <TableCell class="max-w-56">
-                <Hint :content="log.subjectId" ><NuxtLink v-if="adminAuditSubjectPath(log)" :to="adminAuditSubjectPath(log)" class="block truncate hover:underline">{{ log.subjectDisplayName ?? log.subjectId }}</NuxtLink><div v-else tabindex="0" class="truncate">{{ log.subjectDisplayName ?? log.subjectId }}</div></Hint>
-              </TableCell>
-              <TableCell class="max-w-md">
-                <Hint :content="platformAuditActionText(log)" ><div tabindex="0" class="font-medium" >{{ platformAuditActionText(log) }}</div></Hint>
-                <div v-if="log.fileId" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
-                  <span>{{ $t('administration.label.fileId') }}: {{ log.fileId }}</span>
-                  <span>{{ $t('common.label.submissionId') }}: {{ log.gameplayFactId }}</span>
-                  <span>{{ $t('common.label.teamId') }}: <NuxtLink v-if="adminTeamPath(log.competitionId, log.teamId)" :to="adminTeamPath(log.competitionId, log.teamId)" class="hover:underline">{{ log.teamId }}</NuxtLink><span v-else>{{ log.teamId }}</span></span>
-                </div>
-                <div v-if="log.jwtId || log.tokenExpiresAt || log.tokenVersion !== null && log.tokenVersion !== undefined" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
-                  <span v-if="log.jwtId">{{ $t('administration.label.jwtId') }}: {{ log.jwtId }}</span>
-                  <span v-if="log.tokenExpiresAt">{{ $t('administration.label.expires') }} <component :is="AdminDateTime" :value="log.tokenExpiresAt" /></span>
-                  <span v-if="log.tokenVersion !== null && log.tokenVersion !== undefined">{{ $t('administration.label.tokenVersion') }}: {{ log.tokenVersion }}</span>
-                </div>
-              </TableCell>
-              <Hint :content="log.actorId ?? ''" ><TableCell tabindex="0" class="max-w-32 truncate font-mono text-xs text-muted-foreground" >
-                <NuxtLink v-if="log.actorId" :to="adminUserPath(log.actorId)" class="hover:underline">{{ log.actorId }}</NuxtLink><span v-else>{{ $t('common.label.system') }}</span>
-              </TableCell></Hint>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </Card>
-
-      <AdminLoadMore :loading="loading" :has-more="hasMore" @load="loadMore" />
+      <RecordListSection
+        :loading="loading"
+        :error-message="listError?.message ?? null"
+        :initialized="initialized"
+        :item-count="items.length"
+        :has-more="hasMore"
+        empty-title-key="administration.label.matchingAuditRecord"
+        empty-description-key="administration.platformAudit.description.adjustTypeTimeRange"
+        :skeleton-count="6"
+        skeleton-class="h-10 w-full"
+        @load-more="loadMore"
+      >
+        <template #header>
+          <TableHead class="w-44">{{ $t('administration.label.time') }}</TableHead>
+          <TableHead class="w-32">{{ $t('common.label.type') }}</TableHead>
+          <TableHead>{{ $t('administration.label.subject') }}</TableHead>
+          <TableHead>{{ $t('common.label.actions') }}</TableHead>
+          <TableHead class="w-32">{{ $t('administration.label.operator') }}</TableHead>
+        </template>
+        <template #rows>
+          <TableRow v-for="log in items" :key="log.id">
+            <TableCell class="text-sm">
+              <component :is="AdminDateTime" :value="log.occurredAt" />
+            </TableCell>
+            <TableCell>
+              <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ? translate(KIND_LABELS[String(log.kind)]!) : log.kind }}</Badge>
+              <Badge v-if="log.automatic" variant="outline" class="ml-1">{{ $t('administration.label.automatic') }}</Badge>
+            </TableCell>
+            <TableCell class="max-w-56">
+              <Hint :content="log.subjectId" ><NuxtLink v-if="adminAuditSubjectPath(log)" :to="adminAuditSubjectPath(log)" class="block truncate hover:underline">{{ log.subjectDisplayName ?? log.subjectId }}</NuxtLink><div v-else tabindex="0" class="truncate">{{ log.subjectDisplayName ?? log.subjectId }}</div></Hint>
+            </TableCell>
+            <TableCell class="max-w-md">
+              <Hint :content="platformAuditActionText(log)" ><div tabindex="0" class="font-medium" >{{ platformAuditActionText(log) }}</div></Hint>
+              <div v-if="log.fileId" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
+                <span>{{ $t('administration.label.fileId') }}: {{ log.fileId }}</span>
+                <span>{{ $t('common.label.submissionId') }}: {{ log.gameplayFactId }}</span>
+                <span>{{ $t('common.label.teamId') }}: <NuxtLink v-if="adminTeamPath(log.competitionId, log.teamId)" :to="adminTeamPath(log.competitionId, log.teamId)" class="hover:underline">{{ log.teamId }}</NuxtLink><span v-else>{{ log.teamId }}</span></span>
+              </div>
+              <div v-if="log.jwtId || log.tokenExpiresAt || log.tokenVersion !== null && log.tokenVersion !== undefined" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
+                <span v-if="log.jwtId">{{ $t('administration.label.jwtId') }}: {{ log.jwtId }}</span>
+                <span v-if="log.tokenExpiresAt">{{ $t('administration.label.expires') }} <component :is="AdminDateTime" :value="log.tokenExpiresAt" /></span>
+                <span v-if="log.tokenVersion !== null && log.tokenVersion !== undefined">{{ $t('administration.label.tokenVersion') }}: {{ log.tokenVersion }}</span>
+              </div>
+            </TableCell>
+            <Hint :content="log.actorId ?? ''" ><TableCell tabindex="0" class="max-w-32 truncate font-mono text-xs text-muted-foreground" >
+              <NuxtLink v-if="log.actorId" :to="adminUserPath(log.actorId)" class="hover:underline">{{ log.actorId }}</NuxtLink><span v-else>{{ $t('common.label.system') }}</span>
+            </TableCell></Hint>
+          </TableRow>
+        </template>
+      </RecordListSection>
     </div>
 
   </div>

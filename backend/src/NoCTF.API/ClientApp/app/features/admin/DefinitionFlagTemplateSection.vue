@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { bindViewState } from '~/features/shared/view-state'
+import { defineFeatureView } from '~/features/shared/define-feature-view'
 import type { DefinitionModel, GameModeValue } from '~/utils/game-config'
 
 import { useDefinitionFlagTemplateSection } from './useDefinitionFlagTemplateSection'
@@ -12,12 +12,10 @@ const props = withDefaults(defineProps<{
 }>(), {
   disabled: false,
 })
-const state = bindViewState(useDefinitionFlagTemplateSection(props))
+const FeatureView = defineFeatureView(View, () => useDefinitionFlagTemplateSection(props))
 
 </script>
 
 <template>
-  <View :state="state">
-    <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps || {}" /></template>
-  </View>
+  <FeatureView />
 </template>

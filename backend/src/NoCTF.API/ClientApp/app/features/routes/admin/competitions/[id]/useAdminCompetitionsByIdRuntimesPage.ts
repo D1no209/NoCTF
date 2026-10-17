@@ -8,13 +8,13 @@ import { markRaw } from 'vue'
 import { toast } from '../../../../../utils/message-toast'
 import { adminCreateRuntimeForceTermination, adminCreateSharedRuntime, adminCreateTeamRuntime, adminExtendTeamRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminTerminateRuntime } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
-import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { createTrailingRefresh } from '../../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../../utils/admin-runtime'
 import { createRuntimeOperationCoordinator, type RuntimeOperationKind, type RuntimeOperationToken } from '../../../../../lib/runtime-operation-coordinator'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../../../../lib/runtime-stop-polling'
 import { isRuntimeExtensionTooEarly, isRuntimeExtensionWindowOpen } from '../../../../../lib/runtime-extension'
+import { useAdminCompetitionFilteredList, useAdminCompetitionReferences } from '~/features/admin/useAdminCompetitionList'
 import RuntimeAccessUrlComponent from '../../../../challenges/RuntimeAccessUrl.vue'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdRuntimesPage. */
@@ -23,9 +23,10 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const { isAdministrator } = useAuth()
 
-  const challengeOptions = ref<{ id: string; title: string }[]>([])
-
-  const teamOptions = ref<{ id: string; name: string }[]>([])
+  const { challengeOptions, teamOptions, challengeTitle, loadRefs } = useAdminCompetitionReferences(competitionId, {
+    listChallenges: adminListCompetitionChallenges,
+    listTeams: adminListTeams,
+  })
 
   const runtimeTeamLabel = (
     runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null | undefined,
@@ -41,17 +42,6 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   ) => runtime.purpose !== 'AwdpTarget'
 
-  const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
-
-  async function loadRefs() {
-    const [challenges, teams] = await Promise.all([
-      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
-    ])
-    challengeOptions.value = (challenges.data?.items ?? []).map(c => ({ id: c.id!, title: c.title ?? '' }))
-    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
-  }
-
   const filterChallenge = ref('')
 
   const filterTeam = ref('')
@@ -60,10 +50,12 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const filterKind = ref('')
 
-  const appliedFilters = ref({ challengeId: '', teamId: '', state: '', kind: '' })
-
-  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>(async ({ offset, limit, desc }) => {
-    const filters = appliedFilters.value
+  const list = useAdminCompetitionFilteredList<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, {
+    challengeId: string
+    teamId: string
+    state: string
+    kind: string
+  }>(async (filters, request) => {
     const { data, error } = await adminListRuntimes({
       path: { competitionId },
       query: {
@@ -71,28 +63,22 @@ export function useAdminCompetitionsByIdRuntimesPage() {
         teamId: filters.teamId || null,
         state: filters.state === '' ? null : filters.state as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
         runtimeKind: filters.kind === '' ? null : filters.kind as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
-        offset,
-        limit,
-        desc,
+        ...request,
       },
     })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], total: data.total ?? 0 }
-  }, { initialPageSize: 10, initialDesc: true })
-
-  const { items, loading, error: listError, initialized } = pagination
-  const refreshRuntimeList = createTrailingRefresh(() => pagination.loadPage())
-
-  async function applyFilters() {
-    appliedFilters.value = {
+  }, {
+    readFilters: () => ({
       challengeId: filterChallenge.value,
       teamId: filterTeam.value,
       state: filterState.value,
       kind: filterKind.value,
-    }
-    pagination.reset()
-    await pagination.loadPage(1)
-  }
+    }),
+  })
+
+  const { pagination, applyFilters, items } = list
+  const refreshRuntimeList = createTrailingRefresh(() => pagination.loadPage())
 
   function refreshList() {
     return refreshRuntimeList()
@@ -374,16 +360,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       filterTeam,
       filterState,
       filterKind,
-      items,
-      loading,
-      listError,
-      initialized,
-      page: pagination.page,
-      pageCount: pagination.pageCount,
-      total: pagination.total,
-      pageLimit: pagination.limit,
-      loadPage: pagination.loadPage,
-      setPageSize: pagination.setPageSize,
+      ...list.listBindings,
       applyFilters,
       detail,
       detailOpen,

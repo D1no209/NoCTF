@@ -74,59 +74,45 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
       </Button>
     </div>
 
-    <Alert v-if="listError" variant="destructive">
-      <AlertDescription>{{ $message(listError.message) }}</AlertDescription>
-    </Alert>
-
-    <Card v-if="loading && items.length === 0">
-      <CardContent class="flex flex-col gap-3 pt-6">
-        <Skeleton v-for="i in 8" :key="i" class="h-8 w-full" />
-      </CardContent>
-    </Card>
-
-    <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
-      <EmptyHeader>
-        <EmptyTitle>{{ $t('administration.label.matchingLogs') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('administration.platformLogs.description.adjustLevelTimeRange') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-
-    <Card v-else-if="items.length > 0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-44">{{ $t('administration.label.time') }}</TableHead>
-            <TableHead class="w-20">{{ $t('administration.label.level') }}</TableHead>
-            <TableHead class="w-20">{{ $t('administration.label.service') }}</TableHead>
-            <TableHead class="w-56">{{ $t('administration.label.category.logsPageView') }}</TableHead>
-            <TableHead>{{ $t('common.label.news') }}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-for="log in items" :key="log.cursor">
-            <TableCell class="text-sm">
-              <component :is="AdminDateTime" :value="log.timestamp" />
-            </TableCell>
-            <TableCell>
-              <Badge :variant="levelOrdinal(log.level) >= 4 ? 'destructive' : log.level === 'Warning' ? 'secondary' : 'outline'">
-                {{ levelLabel(log.level) }}
-              </Badge>
-            </TableCell>
-            <TableCell class="text-muted-foreground">{{ serviceLabel(log.service) }}</TableCell>
-            <Hint :content="log.category" ><TableCell tabindex="0" class="max-w-56 truncate font-mono text-xs text-muted-foreground" >
-              {{ log.category }}
-            </TableCell></Hint>
-            <TableCell class="max-w-xl">
-              <Hint :content="log.message" ><div tabindex="0" class="truncate" >{{ $message(log.message) }}</div></Hint>
-              <Hint :content="log.exceptionMessage ?? ''" v-if="log.exceptionType"><div tabindex="0"  class="truncate text-xs text-destructive" >
-                {{ log.exceptionType }}: {{ log.exceptionMessage }}
-              </div></Hint>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </Card>
-
-    <AdminLoadMore :loading="loading" :has-more="hasMore" @load="loadMore" />
+    <RecordListSection
+      :loading="loading"
+      :error-message="listError?.message ?? null"
+      :initialized="initialized"
+      :item-count="items.length"
+      :has-more="hasMore"
+      empty-title-key="administration.label.matchingLogs"
+      empty-description-key="administration.platformLogs.description.adjustLevelTimeRange"
+      @load-more="loadMore"
+    >
+      <template #header>
+        <TableHead class="w-44">{{ $t('administration.label.time') }}</TableHead>
+        <TableHead class="w-20">{{ $t('administration.label.level') }}</TableHead>
+        <TableHead class="w-20">{{ $t('administration.label.service') }}</TableHead>
+        <TableHead class="w-56">{{ $t('administration.label.category.logsPageView') }}</TableHead>
+        <TableHead>{{ $t('common.label.news') }}</TableHead>
+      </template>
+      <template #rows>
+        <TableRow v-for="log in items" :key="log.cursor">
+          <TableCell class="text-sm">
+            <component :is="AdminDateTime" :value="log.timestamp" />
+          </TableCell>
+          <TableCell>
+            <Badge :variant="levelOrdinal(log.level) >= 4 ? 'destructive' : log.level === 'Warning' ? 'secondary' : 'outline'">
+              {{ levelLabel(log.level) }}
+            </Badge>
+          </TableCell>
+          <TableCell class="text-muted-foreground">{{ serviceLabel(log.service) }}</TableCell>
+          <Hint :content="log.category" ><TableCell tabindex="0" class="max-w-56 truncate font-mono text-xs text-muted-foreground" >
+            {{ log.category }}
+          </TableCell></Hint>
+          <TableCell class="max-w-xl">
+            <Hint :content="log.message" ><div tabindex="0" class="truncate" >{{ $message(log.message) }}</div></Hint>
+            <Hint :content="log.exceptionMessage ?? ''" v-if="log.exceptionType"><div tabindex="0"  class="truncate text-xs text-destructive" >
+              {{ log.exceptionType }}: {{ log.exceptionMessage }}
+            </div></Hint>
+          </TableCell>
+        </TableRow>
+      </template>
+    </RecordListSection>
   </div>
 </template>
