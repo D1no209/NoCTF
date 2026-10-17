@@ -124,25 +124,3 @@ export const livePreview = ViewPlugin.fromClass(class {
     if (update.docChanged || update.selectionSet || update.viewportChanged) this.decorations = scan(update.view)
   }
 }, { decorations: value => value.decorations })
-
-export const livePreviewTheme = EditorView.theme({
-  '&': { color: 'var(--foreground)', backgroundColor: 'transparent', fontSize: '0.95rem' },
-  '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.85', padding: '0.75rem 0' },
-  '.cm-content': { padding: '0', caretColor: 'var(--primary)' },
-  '.cm-line': { padding: '0 0.75rem' },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-cursor': { borderLeftColor: 'var(--primary)' },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'color-mix(in oklab, var(--primary) 24%, transparent)' },
-  '.cm-md-h1': { fontSize: '1.6em', fontWeight: '700', lineHeight: '1.5' },
-  '.cm-md-h2': { fontSize: '1.35em', fontWeight: '700', lineHeight: '1.55' },
-  '.cm-md-h3': { fontSize: '1.18em', fontWeight: '700' },
-  '.cm-md-h4, .cm-md-h5, .cm-md-h6': { fontWeight: '700' },
-  '.cm-md-strong': { fontWeight: '700' },
-  '.cm-md-em': { fontStyle: 'italic' },
-  '.cm-md-link': { color: 'var(--primary)', textDecoration: 'underline' },
-  '.cm-md-bullet': { color: 'var(--primary)', paddingRight: '0.35rem' },
-  '.cm-md-code': { fontFamily: 'var(--font-mono, monospace)', backgroundColor: 'color-mix(in oklab, var(--muted) 70%, transparent)', padding: '0.1rem 0.3rem', borderRadius: '4px' },
-  '.cm-md-quote': { backgroundColor: 'color-mix(in oklab, var(--muted) 40%, transparent)', boxShadow: 'inset 3px 0 0 var(--primary)', borderRadius: '4px' },
-  '.cm-md-fence': { color: 'var(--muted-foreground)', fontSize: '0.85em' },
-  '.cm-md-codeline': { fontFamily: 'var(--font-mono, monospace)', backgroundColor: 'color-mix(in oklab, var(--muted) 55%, transparent)' },
-})

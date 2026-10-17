@@ -111,3 +111,26 @@
 .markdown-content hr { height: 1px; margin-block: 1.5rem; background: linear-gradient(90deg, transparent, var(--markdown-rule) 16% 84%, transparent); }
 .markdown-content > :first-child { margin-top: 0; }
 .markdown-content > :last-child { margin-bottom: 0; }
+
+/* Markdown 编辑态(Obsidian 式实时预览):排版与 .markdown-content 同源,统一在此维护。 */
+[data-slot='markdown-editor'] .cm-editor { color: var(--foreground); background: transparent; font-size: 0.95rem; outline: none; }
+[data-slot='markdown-editor'] .cm-scroller { font-family: inherit; line-height: 1.85; padding: 0.75rem 0; }
+[data-slot='markdown-editor'] .cm-content { padding: 0; caret-color: var(--primary); }
+[data-slot='markdown-editor'] .cm-line { padding: 0 0.75rem; }
+[data-slot='markdown-editor'] .cm-cursor { border-left-color: var(--primary); }
+[data-slot='markdown-editor'] .cm-selectionBackground,
+[data-slot='markdown-editor'] .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in oklab, var(--primary) 24%, transparent); }
+[data-slot='markdown-editor'] .cm-md-h1 { font-size: 1.6em; font-weight: 700; line-height: 1.5; }
+[data-slot='markdown-editor'] .cm-md-h2 { font-size: 1.35em; font-weight: 700; line-height: 1.55; }
+[data-slot='markdown-editor'] .cm-md-h3 { font-size: 1.18em; font-weight: 700; }
+[data-slot='markdown-editor'] .cm-md-h4,
+[data-slot='markdown-editor'] .cm-md-h5,
+[data-slot='markdown-editor'] .cm-md-h6 { font-weight: 700; }
+[data-slot='markdown-editor'] .cm-md-strong { font-weight: 700; }
+[data-slot='markdown-editor'] .cm-md-em { font-style: italic; }
+[data-slot='markdown-editor'] .cm-md-link { color: var(--primary); text-decoration: underline; }
+[data-slot='markdown-editor'] .cm-md-bullet { color: var(--primary); padding-right: 0.35rem; }
+[data-slot='markdown-editor'] .cm-md-code { font-family: var(--font-mono, monospace); background: color-mix(in oklab, var(--muted) 70%, transparent); padding: 0.1rem 0.3rem; border-radius: 4px; }
+[data-slot='markdown-editor'] .cm-md-quote { background: color-mix(in oklab, var(--muted) 40%, transparent); box-shadow: inset 3px 0 0 var(--primary); border-radius: 4px; }
+[data-slot='markdown-editor'] .cm-md-fence { color: var(--muted-foreground); font-size: 0.85em; }
+[data-slot='markdown-editor'] .cm-md-codeline { font-family: var(--font-mono, monospace); background: color-mix(in oklab, var(--muted) 55%, transparent); }

@@ -5,7 +5,7 @@ import { EditorView, keymap, placeholder as placeholderExtension } from '@codemi
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { Code, Heading2, Link, List } from '@lucide/vue'
-import { livePreview, livePreviewTheme } from './live-preview'
+import { livePreview } from './live-preview'
 
 const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string; assets?: Readonly<Record<string, string>> }>()
 const model = defineModel<string>({ default: '' })
@@ -39,7 +39,6 @@ onMounted(() => {
         markdown(),
         EditorView.lineWrapping,
         livePreview,
-        livePreviewTheme,
         editable.of(EditorView.editable.of(!props.disabled)),
         placeholderExtension(props.placeholder ?? ''),
         keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => { if (!props.disabled) emit('save'); return true } }, indentWithTab, ...defaultKeymap, ...historyKeymap]),
