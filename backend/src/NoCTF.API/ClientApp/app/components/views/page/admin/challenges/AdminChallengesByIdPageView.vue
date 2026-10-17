@@ -141,13 +141,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       />
                     </Field>
                     </div>
-                    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
-                      <Field>
-                        <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
-                        <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
-                      </Field>
-                      <MarkdownPreview :source="form.description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
-                    </div>
+                    <Field>
+                      <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
+                      <MarkdownEditor v-model="form.description" :disabled="isDeleted" :label="$t('administration.label.question')" />
+                    </Field>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span>{{ $t('common.action.create') }} <component :is="AdminDateTime" :value="template.createdAt" /></span>
                       <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>

@@ -24,13 +24,10 @@ const { competitionId, SingleWriteUpSettings, refreshCompetition, competition, c
               <FieldLabel for="c-title">{{ $t('common.label.title') }}</FieldLabel>
               <Input id="c-title" v-model="title" :readonly="!canWrite" required />
             </Field>
-            <div class="grid min-w-0 gap-4 xl:grid-cols-2">
-              <Field>
-                <FieldLabel for="c-desc">{{ $t('common.label.description') }}</FieldLabel>
-                <Textarea id="c-desc" v-model="description" rows="8" :readonly="!canWrite" />
-              </Field>
-              <MarkdownPreview :source="description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
-            </div>
+            <Field>
+              <FieldLabel for="c-desc">{{ $t('common.label.description') }}</FieldLabel>
+              <MarkdownEditor v-model="description" :disabled="!canWrite" :label="$t('common.label.description')" />
+            </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-start">{{ $t('common.label.startTime') }}</FieldLabel>

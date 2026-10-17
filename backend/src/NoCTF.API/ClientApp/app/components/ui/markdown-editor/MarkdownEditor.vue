@@ -67,7 +67,6 @@ onBeforeUnmount(() => { view?.destroy(); view = null })
       <div class="flex gap-1">
         <Button v-for="action in actions" :key="action.key" type="button" variant="ghost" size="icon-sm" :disabled="disabled" :aria-label="$t(`challengeWriteUp.${action.key}`)" @click="insert(action.text)"><component :is="action.icon" /></Button>
       </div>
-      <span class="text-xs text-muted-foreground">{{ $t('challengeWriteUp.preview') }}</span>
     </div>
     <div ref="host" data-slot="markdown-editor-surface" class="min-h-64 rounded-[10px] bg-[var(--field-surface)] p-2" />
   </section>
