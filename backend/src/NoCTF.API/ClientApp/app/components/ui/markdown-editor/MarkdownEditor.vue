@@ -50,13 +50,16 @@ onMounted(() => {
     }),
   })
 })
+// 外部模型变化(表单重置/加载)才写回编辑器;必须等组件更新后再 dispatch,
+// 否则 CodeMirror 会在 DOM 补丁期间测量布局并抛错。
 watch(model, (value) => {
   if (!view || value === view.state.doc.toString()) return
   external = true
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } })
-  external = false
-})
-watch(() => props.disabled, syncEditable)
+  try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } }) }
+  catch { /* 编辑器正在销毁或处于非可编辑状态,忽略此次外部写入 */ }
+  finally { external = false }
+}, { flush: 'post' })
+watch(() => props.disabled, syncEditable, { flush: 'post' })
 onBeforeUnmount(() => { view?.destroy(); view = null })
 </script>
 
