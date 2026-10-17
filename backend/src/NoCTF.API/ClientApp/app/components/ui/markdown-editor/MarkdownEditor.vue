@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
-import { useMediaQuery } from '@vueuse/core'
+import { nextTick, ref } from 'vue'
 import { Code, Heading2, Link, List } from '@lucide/vue'
 
 const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string; assets?: Readonly<Record<string, string>> }>()
 const model = defineModel<string>({ default: '' })
 const emit = defineEmits<{ save: [] }>()
 const root = ref<HTMLElement | null>(null)
-const layout = ref('split')
-const narrow = useMediaQuery('(max-width: 767px)')
-const effectiveLayout = computed(() => narrow.value && layout.value === 'split' ? 'edit' : layout.value)
 async function insert(kind: 'heading' | 'list' | 'code' | 'link') {
   const input = root.value?.querySelector('textarea')
   const start = input?.selectionStart ?? model.value.length
@@ -21,7 +17,6 @@ async function insert(kind: 'heading' | 'list' | 'code' | 'link') {
   input?.focus()
   input?.setSelectionRange(start + syntax.length, start + syntax.length)
 }
-function setLayout(value: unknown) { if (value === 'edit' || value === 'preview' || value === 'split') layout.value = value }
 function keydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && !props.disabled) {
     event.preventDefault(); emit('save')
@@ -38,13 +33,11 @@ function keydown(event: KeyboardEvent) {
         <Button type="button" variant="ghost" size="icon-sm" :disabled="disabled" :aria-label="$t('challengeWriteUp.code')" @click="insert('code')"><Code /></Button>
         <Button type="button" variant="ghost" size="icon-sm" :disabled="disabled" :aria-label="$t('challengeWriteUp.link')" @click="insert('link')"><Link /></Button>
       </div>
-      <ToggleGroup type="single" :model-value="layout" :aria-label="$t('challengeWriteUp.editorLayout')" @update:model-value="setLayout">
-        <ToggleGroupItem value="edit">{{ $t('challengeWriteUp.edit') }}</ToggleGroupItem><ToggleGroupItem value="preview">{{ $t('challengeWriteUp.preview') }}</ToggleGroupItem><ToggleGroupItem v-if="!narrow" value="split">{{ $t('challengeWriteUp.split') }}</ToggleGroupItem>
-      </ToggleGroup>
+      <span class="text-xs text-muted-foreground">{{ $t('challengeWriteUp.preview') }}</span>
     </div>
-    <div class="grid min-w-0 gap-4" :class="effectiveLayout === 'split' ? 'md:grid-cols-2' : ''">
-      <Textarea v-if="effectiveLayout !== 'preview'" v-model="model" :disabled="disabled" :aria-label="label" :placeholder="placeholder" class="min-h-64" />
-      <MarkdownPreview v-if="effectiveLayout !== 'edit'" :source="model" :assets="assets" :label="$t('challengeWriteUp.preview')" :empty-label="$t('challengeWriteUp.previewEmpty')" />
+    <div class="grid min-w-0 gap-4 md:grid-cols-2">
+      <Textarea v-model="model" :disabled="disabled" :aria-label="label" :placeholder="placeholder" class="min-h-64" />
+      <MarkdownPreview :source="model" :assets="assets" :label="$t('challengeWriteUp.preview')" :empty-label="$t('challengeWriteUp.previewEmpty')" class="min-h-64" />
     </div>
   </section>
 </template>
