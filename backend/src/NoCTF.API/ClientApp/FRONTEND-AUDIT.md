@@ -286,6 +286,37 @@ unused-primitive  components/ui/** 无外部引用的 .vue                    ->
 - runtime 面板 / runtime 卡片控制器重复（72 行）
 - 竞赛管理 Runtimes / Submissions 列表控制器重复（81 行）
 - 平台日志 / 平台审计视图重复（58/125 行）
-- P1-3 颜色字面量跨层复制、P1-5 i18n 英文兜底串、P2 组合入口样板收敛
+- P2 组合入口样板收敛（4 个 panel、8 个 definition section）
 - 大屏（`live` / `awdp-control` / spectator）全部未动
+
+---
+
+## 9. 第二轮整改结果
+
+验证：`bun run audit:architecture` 0 violation、`bun run typecheck` 通过、`bun test` **1091 项全部通过**。大屏未动。
+
+### 9.1 P1-5 i18n 硬编码英文
+
+| 位置 | 处理 |
+|---|---|
+| `useAdminChallengesIndexPage` / `useAdminCompetitionsByIdTeamsPage` / `useAdminPlatformUsersPage` 的 `new Error('Failed to load …')` | 改为 `new ApiError(describeMessage('…'))`，错误在显示时按当前语种渲染；新增 `administration.challenges.error.templatesLoadFailed`、`administration.competitionsBy.error.teamsLoadFailed`、`administration.platformUsers.error.usersLoadFailed`（en + zh-CN） |
+| `createError({ statusMessage: 'Page not found' })` ×2 | 不处理：`features/shell/ApplicationError` 只按状态码渲染本地化文案，`statusMessage` 不会上屏 |
+
+### 9.2 P1-3 颜色字面量
+
+| 位置 | 处理 |
+|---|---|
+| `ColorPicker.vue`、`useThemePalettePanel` 的 `'#39FF14'` 兜底 | 改为 `themeColor('--primary')`，从 main.css token 读取 |
+| 调色板 8 个 preset hex | 收进 `features/theme/palette-presets.ts`（单一设计数据模块） |
+| `useScoreboardTeamDetailDialog` 雷达图 `rgba(148,163,184,…)` | 新增 `utils/chart-theme.ts` 的 `chartGuideColor(alpha)`，经 `themeColorAlpha('--border')` 解析 token（canvas 无法解析 CSS 变量） |
+| `CompetitionWorkspaceNavigationView` 的 `shadow-[0_0_14px_color-mix(…)]` | 移到 `main.css` 的 `.nav-focus-glare:focus-visible` 共享类 |
+| `AvatarCropDialogView` 的 `shadow-[0_0_0_999px_oklch(…)]` | 移到 `main.css` 的 `.crop-overlay-mask` 共享类 |
+
+复扫结果：非大屏、非 `main.css`/token 模块的原始色值只剩 `lib/color.ts`（对比墨色常量）、`palette-presets.ts`（设计数据）、`motion/motion.css` 与 `auth-artwork.css` 的遮罩黑、`utils/theme-color.ts` 的无 DOM 兜底值——均为集中模块内的技术常量，不再出现在业务组件与视图中。
+
+### 9.3 剩余
+
+- 三组仍待处理的重复实现（runtime 面板、竞赛列表控制器、平台日志/审计视图）
+- P2 组合入口样板与颜色技术常量进一步 token 化
+- 大屏相关（按要求）
 

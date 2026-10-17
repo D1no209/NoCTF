@@ -13,6 +13,7 @@ import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
 import PrivateAccountPanelComponent from '../../../../account/PrivateAccountPanel.vue'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
+import { ApiError } from '../../../../../utils/api-error'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
 export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boolean } = {}) {
@@ -123,7 +124,7 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
       path: { competitionId },
       query: { keyword: search.value.trim() || null, offset, limit, desc },
     })
-    if (requestError || !data) throw requestError ?? new Error('Failed to load teams.')
+    if (requestError || !data) throw requestError ?? new ApiError(describeMessage('administration.competitionsBy.error.teamsLoadFailed'))
     teams.value = data.items ?? []
     return { items: teams.value, total: data.total ?? 0 }
   })

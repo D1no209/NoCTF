@@ -1242,6 +1242,10 @@ body:has([data-modal-scroll-lock]) {
 [data-slot='input-group']:focus-within {
   box-shadow: 0 0 14px color-mix(in oklch, var(--primary) 32%, transparent);
 }
+/* Sidebar nav rows keep a weaker glow than the global focus halo. */
+.nav-focus-glare:focus-visible { box-shadow: 0 0 14px color-mix(in oklch, var(--ring) 22%, transparent); }
+/* Crop dialogs dim everything outside the mask with one shared overlay shadow. */
+.crop-overlay-mask { box-shadow: 0 0 0 999px oklch(0 0 0 / 0.3); }
 /* Menu rows touch their clipped panel edges, so their focus glow stays inside. */
 :is([data-slot='select-item'], [data-slot='dropdown-menu-item']):is(:focus, :focus-visible, [data-highlighted]) {
   box-shadow: inset 0 0 12px color-mix(in oklch, var(--ring) 22%, transparent);

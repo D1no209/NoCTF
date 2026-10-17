@@ -12,6 +12,7 @@ import MfaUserManagementComponent from '../../../authentication/mfa/MfaUserManag
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
+import { ApiError } from '../../../../utils/api-error'
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
@@ -83,7 +84,7 @@ export function useAdminPlatformUsersPage() {
       desc,
     }
     const { data, error } = await adminPlatformListUsers({ query })
-    if (error || !data) throw error ?? new Error('Failed to load platform users.')
+    if (error || !data) throw error ?? new ApiError(describeMessage('administration.platformUsers.error.usersLoadFailed'))
     users.value = data.items ?? []
     return { items: users.value, total: data.total ?? 0 }
   }, { initialDesc: false })

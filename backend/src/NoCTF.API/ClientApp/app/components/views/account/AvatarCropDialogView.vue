@@ -44,7 +44,7 @@ const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, so
           />
           <div
             v-if="!profileCover"
-            class="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-background/90 shadow-[0_0_0_999px_oklch(0_0_0/0.3)]"
+            class="crop-overlay-mask pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-background/90"
           />
           <div
             v-if="loadError"
