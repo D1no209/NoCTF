@@ -24,6 +24,7 @@ const linkText = Decoration.mark({ class: 'cm-md-link' })
 const quoteLine = Decoration.line({ class: 'cm-md-quote' })
 const fenceLine = Decoration.line({ class: 'cm-md-fence' })
 const codeLine = Decoration.line({ class: 'cm-md-codeline' })
+const listLine = Decoration.line({ class: 'cm-md-list' })
 const headings = [1, 2, 3, 4, 5, 6].map(level => Decoration.line({ class: `cm-md-h${level}` }))
 
 type Range = { from: number, to: number, deco: Decoration }
@@ -63,19 +64,17 @@ function scan(view: EditorView): DecorationSet {
     if (heading) {
       ranges.push({ from: at, to: at, deco: headings[heading[1]!.length - 1]! })
       if (!editable) ranges.push({ from: at, to: at + heading[0].length, deco: hide })
-      continue
     }
     const quote = /^>\s?/.exec(text)
     if (quote) {
       ranges.push({ from: at, to: at, deco: quoteLine })
       if (!editable) ranges.push({ from: at, to: at + quote[0].length, deco: hide })
-      continue
     }
     const list = /^(\s+)?([-*+])\s/.exec(text)
     if (list) {
       const start = at + (list[1]?.length ?? 0)
+      ranges.push({ from: at, to: at, deco: listLine })
       if (!editable) ranges.push({ from: start, to: start + 1, deco: bullet })
-      continue
     }
     if (editable) continue
     const used: Array<{ from: number, to: number }> = []

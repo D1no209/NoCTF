@@ -112,25 +112,39 @@
 .markdown-content > :first-child { margin-top: 0; }
 .markdown-content > :last-child { margin-bottom: 0; }
 
-/* Markdown 编辑态(Obsidian 式实时预览):排版与 .markdown-content 同源,统一在此维护。 */
-[data-slot='markdown-editor'] .cm-editor { color: var(--foreground); background: transparent; font-size: 0.95rem; outline: none; }
+/* Markdown 编辑态(Obsidian 式实时预览):与 .markdown-content 保持同一套排版。 */
+[data-slot='markdown-editor'] .cm-editor { color: var(--foreground); background: transparent; font-size: 1rem; outline: none; }
 [data-slot='markdown-editor'] .cm-scroller { font-family: inherit; line-height: 1.85; padding: 0.75rem 0; }
 [data-slot='markdown-editor'] .cm-content { padding: 0; caret-color: var(--primary); }
 [data-slot='markdown-editor'] .cm-line { padding: 0 0.75rem; }
 [data-slot='markdown-editor'] .cm-cursor { border-left-color: var(--primary); }
 [data-slot='markdown-editor'] .cm-selectionBackground,
 [data-slot='markdown-editor'] .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in oklab, var(--primary) 24%, transparent); }
-[data-slot='markdown-editor'] .cm-md-h1 { font-size: 1.6em; font-weight: 700; line-height: 1.5; }
-[data-slot='markdown-editor'] .cm-md-h2 { font-size: 1.35em; font-weight: 700; line-height: 1.55; }
-[data-slot='markdown-editor'] .cm-md-h3 { font-size: 1.18em; font-weight: 700; }
+[data-slot='markdown-editor'] .cm-md-h1,
+[data-slot='markdown-editor'] .cm-md-h2,
+[data-slot='markdown-editor'] .cm-md-h3,
 [data-slot='markdown-editor'] .cm-md-h4,
 [data-slot='markdown-editor'] .cm-md-h5,
-[data-slot='markdown-editor'] .cm-md-h6 { font-weight: 700; }
+[data-slot='markdown-editor'] .cm-md-h6 { font-weight: 700; line-height: 1.35; }
+[data-slot='markdown-editor'] .cm-md-h1,
+[data-slot='markdown-editor'] .cm-md-h2 {
+  padding-block-end: 0.45rem; padding-inline-start: 1rem;
+  box-shadow: inset 3px 0 0 var(--primary);
+  background-image: linear-gradient(90deg, color-mix(in oklch, var(--primary) 24%, var(--border)), transparent 72%);
+  background-repeat: no-repeat; background-position: 0 100%; background-size: 100% 1px;
+}
+[data-slot='markdown-editor'] .cm-md-h1 { font-size: 1.6rem; }
+[data-slot='markdown-editor'] .cm-md-h2 { font-size: 1.3rem; }
+[data-slot='markdown-editor'] .cm-md-h3 { font-size: 1.125rem; padding-inline-start: 1.25rem; }
+[data-slot='markdown-editor'] .cm-md-h4,
+[data-slot='markdown-editor'] .cm-md-h5,
+[data-slot='markdown-editor'] .cm-md-h6 { font-size: 1rem; padding-inline-start: 1.25rem; }
+[data-slot='markdown-editor'] .cm-md-list { padding-inline-start: 1.65rem; }
 [data-slot='markdown-editor'] .cm-md-strong { font-weight: 700; }
 [data-slot='markdown-editor'] .cm-md-em { font-style: italic; }
-[data-slot='markdown-editor'] .cm-md-link { color: var(--primary); text-decoration: underline; }
-[data-slot='markdown-editor'] .cm-md-bullet { color: var(--primary); padding-right: 0.35rem; }
-[data-slot='markdown-editor'] .cm-md-code { font-family: var(--font-mono, monospace); background: color-mix(in oklab, var(--muted) 70%, transparent); padding: 0.1rem 0.3rem; border-radius: 4px; }
-[data-slot='markdown-editor'] .cm-md-quote { background: color-mix(in oklab, var(--muted) 40%, transparent); box-shadow: inset 3px 0 0 var(--primary); border-radius: 4px; }
+[data-slot='markdown-editor'] .cm-md-link { color: var(--primary); font-weight: 600; text-decoration-line: underline; text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
+[data-slot='markdown-editor'] .cm-md-bullet { color: var(--primary); font-weight: 700; padding-right: 0.55rem; }
+[data-slot='markdown-editor'] .cm-md-code { padding: 0.16em 0.42em; border-radius: 0.35rem; background: color-mix(in oklch, var(--primary) 10%, var(--muted)); color: var(--primary); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent); font-family: var(--font-mono); font-size: 0.9em; font-weight: 600; }
+[data-slot='markdown-editor'] .cm-md-quote { padding: 0.35rem 1rem 0.35rem 2.75rem; border-radius: 0 var(--control-radius) var(--control-radius) 0; background: color-mix(in oklch, var(--primary) 6%, var(--muted)); color: var(--muted-foreground); box-shadow: inset 3px 0 var(--primary); }
 [data-slot='markdown-editor'] .cm-md-fence { color: var(--muted-foreground); font-size: 0.85em; }
-[data-slot='markdown-editor'] .cm-md-codeline { font-family: var(--font-mono, monospace); background: color-mix(in oklab, var(--muted) 55%, transparent); }
+[data-slot='markdown-editor'] .cm-md-codeline { font-family: var(--font-mono); background: color-mix(in oklch, var(--muted) 86%, var(--card)); }
