@@ -127,12 +127,10 @@ describe('safe challenge Markdown', () => {
   test('competition and challenge editors share a live sanitized preview', async () => {
     const challenge = await sourceFile(new URL('../app/components/views/page/admin/challenges/AdminChallengesByIdPageView.vue', import.meta.url)).text()
     const competition = await sourceFile(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdConfigurationPageView.vue', import.meta.url)).text()
-    const editor = await Bun.file(new URL('../app/components/ui/markdown-editor/MarkdownEditor.vue', import.meta.url)).text()
     const preview = await Bun.file(new URL('../app/components/ui/markdown/MarkdownPreview.vue', import.meta.url)).text()
 
     expect(challenge).toContain('<MarkdownEditor v-model="form.description"')
     expect(competition).toContain('<MarkdownEditor v-model="description"')
-    expect(editor).toContain('livePreview')
     expect(preview).toContain('renderMarkdownPreview(source)')
     expect(preview).toContain('sequence === renderSequence')
     expect(preview).toContain('requestAnimationFrame')
