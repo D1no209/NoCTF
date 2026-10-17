@@ -12,6 +12,7 @@ import MfaUserManagementComponent from '../../../authentication/mfa/MfaUserManag
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
+import { ApiError } from '../../../../utils/api-error'
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
@@ -83,7 +84,7 @@ export function useAdminPlatformUsersPage() {
       desc,
     }
     const { data, error } = await adminPlatformListUsers({ query })
-    if (error || !data) throw error ?? new Error('Failed to load platform users.')
+    if (error || !data) throw error ?? new ApiError(describeMessage('administration.platformUsers.error.usersLoadFailed'))
     users.value = data.items ?? []
     return { items: users.value, total: data.total ?? 0 }
   }, { initialDesc: false })
@@ -98,10 +99,21 @@ export function useAdminPlatformUsersPage() {
     loadError.value = pagination.error.value?.message ?? null
   }
 
-  watch([search, roleFilter, ssoProviderFilter], () => {
+  let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+  function reloadFromFirstPage(): void {
     pagination.reset()
     void load()
+  }
+
+  // 下拉筛选项立即生效;搜索框逐键输入必须防抖,否则每次按键都会清空列表并触发一次全量查询。
+  watch([roleFilter, ssoProviderFilter], reloadFromFirstPage)
+  watch(search, () => {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => { searchTimer = null; reloadFromFirstPage() }, 250)
   })
+
+  onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 
   async function loadSsoProviders(): Promise<void> {
     const { data } = await adminPlatformSsoGetConfiguration()

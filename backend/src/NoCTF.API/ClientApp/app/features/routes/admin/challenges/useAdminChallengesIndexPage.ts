@@ -1,4 +1,6 @@
+import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
+import { ApiError } from '../../../../utils/api-error'
 import { markRaw } from 'vue'
 
 import { Filter, Plus } from '@lucide/vue'
@@ -90,7 +92,7 @@ export function useAdminChallengesIndexPage() {
       },
     })
     if (generation !== requestGeneration) return { items: [], total: 0 }
-    if (error || !data) throw error ?? new Error('Failed to load challenge templates.')
+    if (error || !data) throw error ?? new ApiError(describeMessage('administration.challenges.error.templatesLoadFailed'))
     templates.value = data.items ?? []
     const catalog = [...new Set([
       ...(directionCatalogs.get(catalogKey) ?? []),

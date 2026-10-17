@@ -6,7 +6,7 @@ import type { UiMessage } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
 import { bindViewState } from '../../shared/view-state'
 import { useMfaStepUp } from '../mfa/useMfaStepUp'
-import StepUpView from '../../../components/views/authentication/MfaStepUpView.vue'
+import StepUpView from '../mfa/MfaStepUp.vue'
 import { createPasskey, passkeyBrowserSupported, passkeyCancelled } from './webauthn'
 
 export function usePasskeyAccountSecurity() {

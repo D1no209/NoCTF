@@ -7,6 +7,13 @@ import { toast } from '../../utils/message-toast'
 import type { MessageKey } from '~/locales/zh-CN'
 import { createHumanVerificationCoordinator } from '~/lib/human-verification-coordinator'
 import type { HumanVerificationHeaders } from '~/lib/human-verification-coordinator'
+import hashwxWasmUrl from '~/assets/wasm/hashwx.wasm?url'
+
+/**
+ * 自托管 hashwx.wasm 对应的 @cap.js/wasm 版本。
+ * 升级 @cap.js/widget 时必须重新下载该副本(tests/cap-wasm-asset.test.ts 会校验两者一致)。
+ */
+export const capHashwxWasmVersion = '0.0.8'
 
 export type HumanVerificationAction = 'login' | 'registration' | 'runtime' | 'evaluation'
 export type HumanVerificationSurface = 'dialog' | 'login-inline'
@@ -94,10 +101,14 @@ async function solveCapChallenge(
   try {
     const { default: Cap } = await import('@cap.js/widget')
     if (challenge.value?.id !== id) return
+    // 主 WASM 由 Cap 服务端托管(后端 Cap 配置探针校验该路径)。
     window.CAP_CUSTOM_WASM_URL = new URL(
       '../assets/cap_wasm_bg.wasm',
       current.apiEndpoint,
     ).toString()
+    // 第二个 WASM 由本仓库自托管:@cap.js/widget 对 hashwx.wasm 的默认回退是 jsDelivr CDN,
+    // 且控件不做任何完整性校验,等于让第三方代码在本源内执行。固定为同源资源。
+    window.CAP_CUSTOM_HASHWX_URL = hashwxWasmUrl
     const workers = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, 4))
     const instance = new Cap({
       apiEndpoint: current.apiEndpoint,

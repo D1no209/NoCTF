@@ -78,14 +78,17 @@ describe('realtime initial connection retry', () => {
   })
 
   test('both hubs use the shared retry and cancel it during teardown', async () => {
+    const hubPlumbing = await sourceFile(new URL('../app/lib/signalr-hub.ts', import.meta.url)).text()
     const competitionHub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
     const platformHub = await sourceFile(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
 
     for (const source of [competitionHub, platformHub]) {
+      expect(source).toContain('accessTokenFactory: getRealtimeAccessToken')
+    }
+    for (const source of [hubPlumbing]) {
       expect(source).toContain('startRealtimeWithRetry(')
       expect(source).toContain('if (startPromise) return startPromise')
       expect(source).toContain('startAbortController?.abort()')
-      expect(source).toContain('accessTokenFactory: getRealtimeAccessToken')
     }
     expect(competitionHub).toContain('subscribers.has(key) ? join(competitionId) : undefined')
     expect(competitionHub).toContain('if (!getAccessToken() && !connection) return')

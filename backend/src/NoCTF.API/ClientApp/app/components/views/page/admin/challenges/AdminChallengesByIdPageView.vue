@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -141,13 +141,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       />
                     </Field>
                     </div>
-                    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
-                      <Field>
-                        <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
-                        <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
-                      </Field>
-                      <MarkdownPreview :source="form.description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
-                    </div>
+                    <Field>
+                      <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
+                      <MarkdownEditor v-model="form.description" :disabled="isDeleted" :label="$t('administration.label.question')" />
+                    </Field>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span>{{ $t('common.action.create') }} <component :is="AdminDateTime" :value="template.createdAt" /></span>
                       <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>
@@ -258,7 +255,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <Field v-if="showInteractionKind">
                     <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('administration.label.completionMethod') }}</FieldLabel>
                     <Select
-                      :model-value="definitionModel.interactionKind === CtfInteraction.PatchVerification ? 'PatchVerification' : 'FlagSubmission'"
+                      :model-value="definitionModel.interactionKind"
                       :disabled="isDeleted"
                       @update:model-value="setInteractionKind"
                     >
@@ -282,7 +279,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   </template>
                   <template v-else-if="form.mode === 'Ctf' || form.mode === 'LiveSolo'">
-                    <template v-if="form.mode === 'Ctf' && definitionModel.interactionKind === CtfInteraction.PatchVerification">
+                    <template v-if="form.mode === 'Ctf' && definitionModel.interactionKind === 'PatchVerification'">
                       <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
                       <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                     </template>

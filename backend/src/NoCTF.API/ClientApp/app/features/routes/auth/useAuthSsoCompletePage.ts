@@ -1,4 +1,5 @@
 import type { MessageKey } from '~/locales/en'
+import { safeInternalPath } from '~/lib/safe-redirect'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
@@ -70,7 +71,7 @@ export function useAuthSsoCompletePage() {
     pending.value = true
     error.value = null
     try {
-      const returnPath = await auth.completeSsoLogin(flowId.value)
+      const returnPath = safeInternalPath(await auth.completeSsoLogin(flowId.value))
       if (returnPath !== '/auth/mfa') toast.success(describeMessage('sso.loginSuccessful'))
       await navigateTo(returnPath)
     }

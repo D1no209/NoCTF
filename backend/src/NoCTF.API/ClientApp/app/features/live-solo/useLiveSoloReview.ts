@@ -3,7 +3,7 @@ import { getLiveSoloReviewQuestion, listLiveSoloReviewQuestions, prepareLiveSolo
 import type { NoCtfapiEndpointsLiveSoloLiveSoloReviewContentResponse as Content, NoCtfapiEndpointsLiveSoloLiveSoloReviewQuestionResponse as Question } from '~/api'
 import { parseLiveSoloError } from './live-solo-errors'
 import { message, type UiMessage } from '~/utils/i18n'
-import { startAttachmentBrowserDownload } from '~/utils/download'
+import { assertCredentialSafeUrl, startAttachmentBrowserDownload } from '~/utils/download'
 import { getRealtimeAccessToken } from '~/lib/session'
 
 export function useLiveSoloReview(props: Readonly<{ competitionId: string; matchId: string; staff: boolean; roundId?: string }>) {
@@ -68,6 +68,8 @@ export function useLiveSoloReview(props: Readonly<{ competitionId: string; match
       const access = await getRealtimeAccessToken()
       if (disposed || epoch !== generation || actor !== user.value?.userId) return
       if (response.error || !response.data?.downloadUrl || !access) throw parseLiveSoloError(response.error, message('liveSolo.review.failed'))
+      // 预览会把 Bearer 头交给 pdf.js,必须先确认 URL 指向本源,避免凭证外泄。
+      assertCredentialSafeUrl(response.data.downloadUrl)
       previewHeaders.value = { Authorization: `Bearer ${access}` }; previewId.value = attachmentId; previewSource.value = response.data.downloadUrl
     } catch (cause) { if (!disposed && epoch === generation) error.value = parseLiveSoloError(cause, message('liveSolo.review.failed')).displayMessage }
     finally { downloading.value = false }

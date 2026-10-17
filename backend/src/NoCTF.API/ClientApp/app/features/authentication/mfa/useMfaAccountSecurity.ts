@@ -3,7 +3,7 @@ import { beginMfaEnrollmentEndpoint, beginMfaRebindEndpoint, disableMfaEndpoint,
 import type { NoCtfapiEndpointsAuthenticationMfaMfaStatusResponse } from '../../../api'
 import type { UiMessage } from '../../../utils/i18n'
 import { bindViewState } from '../../shared/view-state'
-import StepUpView from '../../../components/views/authentication/MfaStepUpView.vue'
+import StepUpView from './MfaStepUp.vue'
 import { useMfaStepUp } from './useMfaStepUp'
 export function useMfaAccountSecurity() {
   const auth = useAuth()

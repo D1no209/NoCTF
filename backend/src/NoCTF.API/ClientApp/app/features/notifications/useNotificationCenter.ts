@@ -1,4 +1,4 @@
-import { message as describeMessage } from '../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 
 
@@ -8,6 +8,7 @@ import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../a
 import { createLatestRequestGuard } from '../../lib/latest-request'
 import { createLatestPageRefresh } from '../../lib/latest-page-refresh'
 import { watchNotifications } from '../../composables/useNotificationHub'
+import { questionStatusLabel } from '../../utils/labels'
 
 type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
 
@@ -95,9 +96,10 @@ export function useNotificationCenter() {
       ? notification.content as Record<string, unknown>
       : {}
     if (notification.kind === 'QuestionStatusChanged') {
-      const from = typeof payload.from === 'string' ? payload.from : translate("common.label.unknown")
-      const to = typeof payload.to === 'string' ? payload.to : translate("common.label.unknown")
-      return translate("notifications.label.questionStatus", { from, to })
+      return translate("notifications.label.questionStatus", {
+        from: questionStatusLabel(typeof payload.from === 'number' ? payload.from : null),
+        to: questionStatusLabel(typeof payload.to === 'number' ? payload.to : null),
+      })
     }
     return notificationText(notification)
   }
@@ -193,6 +195,7 @@ export function useNotificationCenter() {
   }
 
   onMounted(async () => {
+    void ensureLocaleDomains(['administration'])
     await loadMore()
     markAllRead(items.value[0]?.id)
     await openFromRoute()

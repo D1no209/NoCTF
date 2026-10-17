@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { PointsDecayCurveViewState } from '~/features/admin/usePointsDecayCurve'
 
 const viewProps = defineProps<{ state: PointsDecayCurveViewState }>()
-const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger, tooltipTransform, onPointerMove, onPointerLeave, onFocus, onKeydown, setSvgElementRef, curve } = toRefs(viewProps.state)
+const { width, height, inset, tooltipBox, preview, formatInteger, tooltipTransform, onPointerMove, onPointerLeave, onFocus, onKeydown, setSvgElementRef, curve } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -98,7 +98,7 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger
       {{ $t('administration.pointsDecay.description.hoverCurveInspectRounded') }}
     </p>
   </figure>
-  <div v-else-if="curve.decayMode === ScoreDecayMode.Custom" class="border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+  <div v-else-if="curve.decayMode === 'Custom'" class="border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
     {{ $t('administration.pointsDecay.description.serverValidatesEveryPoint') }}
   </div>
 </template>

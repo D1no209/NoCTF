@@ -1,5 +1,5 @@
 import CompetitionTeamBanScreenComponent from '../../competition/CompetitionTeamBanScreen.vue'
-import { message as describeMessage } from '../../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
@@ -291,6 +291,11 @@ export function useCompetitionsByIdPage() {
       void initialize()
     }
   }, { flush: 'sync' })
+
+  // LiveSolo 赛制的共享工作区导航会渲染 liveSolo 文案，而 /competitions/** 子路由不加载该域。
+  watch(() => competition.value?.mode, (mode) => {
+    if (mode === 'LiveSolo') void ensureLocaleDomains(['live-solo'])
+  }, { immediate: true })
 
   onUnmounted(() => {
     competitionRequestId++

@@ -17,7 +17,7 @@ const props = defineProps<{
     :data-pin-horizontal-scrollbar="pinHorizontalScrollbar ? 'nearest-y' : undefined"
     class="relative w-full overflow-x-auto"
   >
-    <table data-slot="table" :class="cn('w-full caption-bottom text-sm', props.class)">
+    <table data-slot="table" :class="cn('w-full caption-bottom text-sm min-w-[960px]', props.class)">
       <slot />
     </table>
   </div>

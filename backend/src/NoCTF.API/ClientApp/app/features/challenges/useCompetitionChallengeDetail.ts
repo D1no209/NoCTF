@@ -1,5 +1,5 @@
 import { adminFormatDateTime } from '~/utils/admin-format'
-import { message as describeMessage } from '../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
@@ -112,6 +112,9 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
     attachments.value = (data.items ?? []).filter(attachment => !attachment.deletedAt)
   }
+
+  // 选手侧路由不会经 /admin 加载 administration，而判定失败原因文案来自该域。
+  void ensureLocaleDomains(['administration'])
 
   watch(
     () => [props.competitionId, props.competitionChallengeId, ctx.competition.value?.mode,

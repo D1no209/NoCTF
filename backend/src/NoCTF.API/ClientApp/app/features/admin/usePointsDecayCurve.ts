@@ -1,7 +1,7 @@
 import { toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { PointsCurveValue } from '../../utils/game-config'
-import { ctfPointsAtSolveCount, SCORE_DECAY_MODES, ScoreDecayMode } from '../../utils/game-config'
+import { ctfPointsAtSolveCount, SCORE_DECAY_MODES } from '../../utils/game-config'
 
 /** Owns state, effects and commands for PointsDecayCurve. */
 export function usePointsDecayCurve(props: Readonly<{ curve: PointsCurveValue }>) {
@@ -23,7 +23,7 @@ export function usePointsDecayCurve(props: Readonly<{ curve: PointsCurveValue }>
 
   const preview = computed(() => {
     const { initialPoints, minimumPoints, decayTeamCount, decayMode } = props.curve
-    if (decayMode === ScoreDecayMode.Custom)
+    if (decayMode === 'Custom')
       return null
     if (initialPoints === null || minimumPoints === null || decayTeamCount === null
       || initialPoints < minimumPoints || minimumPoints < 0 || decayTeamCount <= 1)
@@ -166,7 +166,6 @@ export function usePointsDecayCurve(props: Readonly<{ curve: PointsCurveValue }>
 
   return {
       ...toRefs(props),
-      ScoreDecayMode,
       width,
       height,
       inset,

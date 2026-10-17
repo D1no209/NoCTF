@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { bindViewState } from '~/features/shared/view-state'
+import { defineFeatureView } from '~/features/shared/define-feature-view'
 import type { GameModeValue } from '~/utils/game-config'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '~/api'
 import { useDefinitionEditor } from './useDefinitionEditor'
@@ -13,12 +13,10 @@ const props = withDefaults(defineProps<{
   disabled: false,
 })
 const emit = defineEmits<{ 'update:modelValue': [definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract] }>()
-const state = bindViewState(useDefinitionEditor(props, emit))
+const FeatureView = defineFeatureView(View, () => useDefinitionEditor(props, emit))
 
 </script>
 
 <template>
-  <View :state="state">
-    <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps || {}" /></template>
-  </View>
+  <FeatureView />
 </template>

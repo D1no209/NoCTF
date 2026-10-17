@@ -4,8 +4,13 @@ import { toRaw } from 'vue'
 import { awdOptionFields } from './awd-config-fields'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
@@ -20,41 +25,17 @@ export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 // ---------- Editor enums ----------
 
-export const RuntimeAllocation = { Shared: 0, PerTeam: 1 } as const
-export const EgressPolicy = { Isolated: 0, InternetOnly: 1 } as const
-export const FlagSource = { Static: 0, PerTeam: 1, AwdRotation: 2 } as const
-export const UrlExposure = { OwnerOnly: 0, Participants: 1 } as const
-export const BloodRewardPolicy = {
-  FixedPoints: 0,
-  InitialPointsPercentage: 1,
-  SolveTimePointsPercentage: 2,
-  CurrentPointsPercentage: 3,
-} as const
-export const ScoreDecayMode = {
-  Fixed: 0,
-  Linear: 1,
-  Quadratic: 2,
-  Exponential: 3,
-  Logarithmic: 4,
-  Custom: 5,
-} as const
-export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
-export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as const
-
-const scoreDecayProtocols = [
+// Runtime 协议值直接使用生成契约的字符串联合,不再维护数字镜像枚举;
+// 读写两侧都由下面的 protocol 读取器校验,未知值显式失败而不是静默回退。
+export const scoreDecayProtocols = [
   'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
-const bloodRewardProtocols = [
+export const bloodRewardProtocols = [
   'FixedPoints', 'InitialPointsPercentage', 'SolveTimePointsPercentage', 'CurrentPointsPercentage',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
-const evaluationDispatchProtocols = [
+export const evaluationDispatchProtocols = [
   'Automatic', 'Manual',
 ] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
-
-function protocolIndex(value: unknown, names: readonly string[], fallback: number): number {
-  const index = names.indexOf(value as string)
-  return index < 0 ? fallback : index
-}
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: "common.label.fixedScoreAttack" },
@@ -67,25 +48,25 @@ export const CTF_SCORE_SETTLEMENT_MODES = [
 ] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: "common.label.fixedPoints" },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: "common.label.initialScorePercentage" },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: "common.description.problemSolvingTimeScore" },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: "common.label.scorePercentage" },
-] as const
+  { value: 'FixedPoints', label: "common.label.fixedPoints" },
+  { value: 'InitialPointsPercentage', label: "common.label.initialScorePercentage" },
+  { value: 'SolveTimePointsPercentage', label: "common.description.problemSolvingTimeScore" },
+  { value: 'CurrentPointsPercentage', label: "common.label.scorePercentage" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol, label: string }[]
 
 export const SCORE_DECAY_MODES = [
-  { value: ScoreDecayMode.Fixed, label: "common.label.fixedPoints" },
-  { value: ScoreDecayMode.Linear, label: "common.label.linearDecay" },
-  { value: ScoreDecayMode.Quadratic, label: "common.label.quadraticDecay" },
-  { value: ScoreDecayMode.Exponential, label: "common.label.exponentialDecay" },
-  { value: ScoreDecayMode.Logarithmic, label: "common.label.logarithmicDecay" },
-  { value: ScoreDecayMode.Custom, label: "common.label.customFormula" },
-] as const
+  { value: 'Fixed', label: "common.label.fixedPoints" },
+  { value: 'Linear', label: "common.label.linearDecay" },
+  { value: 'Quadratic', label: "common.label.quadraticDecay" },
+  { value: 'Exponential', label: "common.label.exponentialDecay" },
+  { value: 'Logarithmic', label: "common.label.logarithmicDecay" },
+  { value: 'Custom', label: "common.label.customFormula" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol, label: string }[]
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: "common.label.automaticAssessment" },
-  { value: EvaluationDispatch.ManualBatch, label: "common.label.manualBatchEvaluation" },
-] as const
+  { value: 'Automatic', label: "common.label.automaticAssessment" },
+  { value: 'Manual', label: "common.label.manualBatchEvaluation" },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol, label: string }[]
 
 // ---------- 题目模板 Definition 模型 ----------
 
@@ -97,7 +78,7 @@ export interface RuntimeLimitsModel {
 
 export interface UrlBindingModel {
   urlTemplate: string
-  exposure: number
+  exposure: NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol
   containerPort: number | null
   serviceName: string
 }
@@ -128,13 +109,14 @@ export interface OvaDefinitionModel {
 export type RuntimeDefinitionModel = ContainerDefinitionModel | OvaDefinitionModel
 
 export interface RuntimeTemplateModel {
-  allocation: number
+  allocation: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol
+  egressPolicy: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol
   definition: RuntimeDefinitionModel
   limits: RuntimeLimitsModel
   ttlSeconds: number | null
   operationTimeoutSeconds: number | null
   urlBindings: UrlBindingModel[]
-  flagSource: number
+  flagSource: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol
   controlCheckUrlBinding: UrlBindingModel | null
 }
 
@@ -158,7 +140,7 @@ export interface FlagInjectionModel {
 }
 
 export interface DefinitionModel {
-  interactionKind: number
+  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
   checker: { job: RunnerJobModel; targetServiceName: string } | null
@@ -202,26 +184,27 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
 }
 
 export function emptyUrlBinding(): UrlBindingModel {
-  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: UrlExposure.Participants, containerPort: null, serviceName: 'main' }
+  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: 'Participants', containerPort: null, serviceName: 'main' }
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
   const accessBinding = emptyUrlBinding()
   accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-    ? UrlExposure.OwnerOnly
-    : UrlExposure.Participants
+    ? 'OwnerOnly'
+    : 'Participants'
   return {
-    allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
+    allocation: mode === 'Koh' ? 'Shared' : 'PerTeam',
+    egressPolicy: 'Isolated',
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: [accessBinding],
     flagSource: mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-      ? FlagSource.PerTeam
+      ? 'PerTeam'
       : mode === 'Awd'
-        ? FlagSource.AwdRotation
-        : FlagSource.Static,
+        ? 'AwdRotation'
+        : 'Static',
     controlCheckUrlBinding: null,
   }
 }
@@ -236,7 +219,7 @@ export function emptyFlagTemplate(): FlagTemplateModel {
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
   return {
-    interactionKind: CtfInteraction.FlagSubmission,
+    interactionKind: 'FlagSubmission',
     runtime: null,
     checker: null,
     checkerJob: null,
@@ -293,9 +276,7 @@ function parseUrlBinding(raw: unknown): UrlBindingModel {
   const obj = asObject(raw) ?? {}
   return {
     urlTemplate: asString(obj.urlTemplate),
-    exposure: obj.exposure === 'OwnerOnly'
-      ? UrlExposure.OwnerOnly
-      : UrlExposure.Participants,
+    exposure: optionalProtocol(obj.exposure, runtimeExposureProtocols, 'Participants', 'URL exposure'),
     containerPort: asNumber(obj.containerPort),
     serviceName: asString(obj.serviceName),
   }
@@ -321,17 +302,34 @@ export function emptyOvaDefinition(): OvaDefinitionModel {
   return { kind: 'ova', sourceUrl: '', sha256: '' }
 }
 
-function protocolAllocation(value: unknown): number {
-  return value === 'Shared' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
+export const runtimeAllocationProtocols = ['Shared', 'PerTeam'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol[]
+export const runtimeEgressPolicyProtocols = ['Isolated', 'InternetOnly'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol[]
+export const runtimeFlagSourceProtocols = ['Static', 'PerTeam', 'AwdRotation'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol[]
+export const runtimeExposureProtocols = ['OwnerOnly', 'Participants'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol[]
+export const ctfInteractionProtocols = ['FlagSubmission', 'PatchVerification'] as const satisfies readonly NoCtfapiEndpointsChallengesCtfInteractionKindProtocol[]
+
+/**
+ * 读取生成契约中的协议值。未知值必须显式失败:静默回退成默认值会在下次保存时
+ * 把服务端配置改写成另一个值。
+ */
+function requiredProtocol<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
+  if (typeof value === 'string' && (allowed as readonly string[]).includes(value))
+    return value as T
+  throw new Error(`Unknown ${label} protocol value.`)
 }
 
-function protocolFlagSource(value: unknown): number {
-  return value === 'PerTeam'
-    ? FlagSource.PerTeam
-    : value === 'AwdRotation'
-      ? FlagSource.AwdRotation
-      : FlagSource.Static
+/** 编辑器赋值入口:下拉框给出的原始值同样按协议表校验,不接受未知值。 */
+export function protocolValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T, label: string): T {
+  if (value === null || value === undefined) return fallback
+  return requiredProtocol(value, allowed, label)
 }
+
+/** UI 输入(下拉框)读取:无法识别的值保持原状,不会写坏模型,也不抛给事件处理器。 */
+export function protocolInput<T extends string>(value: unknown, allowed: readonly T[], current: T): T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? value as T : current
+}
+
+const optionalProtocol = protocolValue
 
 function definitionContractRuntime(
   runtime: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
@@ -357,7 +355,8 @@ function definitionContractRuntime(
   const limits = asObject(value.limits) ?? {}
   const bindings = Array.isArray(value.urlBindings) ? value.urlBindings : []
   return {
-    allocation: protocolAllocation(value.allocation),
+    allocation: optionalProtocol(value.allocation, runtimeAllocationProtocols, 'PerTeam', 'runtime allocation'),
+    egressPolicy: optionalProtocol(value.egressPolicy, runtimeEgressPolicyProtocols, 'Isolated', 'runtime egress policy'),
     definition,
     limits: {
       memoryBytes: asNumber(limits.memoryBytes),
@@ -367,7 +366,7 @@ function definitionContractRuntime(
     ttlSeconds: asNumber(value.ttlSeconds),
     operationTimeoutSeconds: asNumber(value.operationTimeoutSeconds),
     urlBindings: bindings.filter(item => asObject(item)?.isControlCheck !== true).map(parseUrlBinding),
-    flagSource: protocolFlagSource(value.flagSource),
+    flagSource: optionalProtocol(value.flagSource, runtimeFlagSourceProtocols, 'Static', 'runtime flag source'),
     controlCheckUrlBinding: bindings.find(item => asObject(item)?.isControlCheck === true)
       ? parseUrlBinding(bindings.find(item => asObject(item)?.isControlCheck === true))
       : null,
@@ -384,9 +383,7 @@ export function definitionContractToModel(
     throw new Error('Invalid challenge definition branch.')
   const model = emptyDefinition(mode)
   model.flagTemplate = contract.flagTemplate ? parseFlagTemplate(contract.flagTemplate) : null
-  model.interactionKind = contract.ctf?.interactionKind === 'PatchVerification'
-    ? CtfInteraction.PatchVerification
-    : CtfInteraction.FlagSubmission
+  model.interactionKind = optionalProtocol(contract.ctf?.interactionKind, ctfInteractionProtocols, 'FlagSubmission', 'CTF interaction kind')
   model.runtime = contract.runtime ? definitionContractRuntime(contract.runtime) : null
   const checker = asObject(contract.checker)
   if (checker) {
@@ -426,14 +423,14 @@ export function definitionContractToModel(
 
 export function applyCtfInteraction(
   model: DefinitionModel,
-  interactionKind: number,
+  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
 ): void {
   model.interactionKind = interactionKind
-  if (interactionKind === CtfInteraction.PatchVerification) {
+  if (interactionKind === 'PatchVerification') {
     model.runtime ??= emptyRuntimeTemplate('Ctf')
     if (model.runtime.definition.kind !== 'container')
       model.runtime.definition = emptyContainerDefinition(false)
-    model.runtime.flagSource = FlagSource.Static
+    model.runtime.flagSource = 'Static'
     for (const service of model.runtime.definition.services) service.flagEnvironmentVariableName = ''
     model.checkerJob ??= emptyRunnerJob()
     model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
@@ -448,7 +445,7 @@ export function applyCtfInteraction(
   model.checkerJob = null
   model.checkerFixInput = false
   if (model.runtime) {
-    model.runtime.flagSource = FlagSource.PerTeam
+    model.runtime.flagSource = 'PerTeam'
     if (model.runtime.definition.kind === 'container')
       model.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
   }
@@ -468,7 +465,7 @@ export type ConfigFieldType =
   | 'flagTemplate'
 
 export interface ConfigFieldOption {
-  value: string | number
+  value: string
   label: string
 }
 
@@ -493,7 +490,7 @@ export interface PointsCurveValue {
   initialPoints: number | null
   minimumPoints: number | null
   decayTeamCount: number | null
-  decayMode: number
+  decayMode: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol
   customExpression: string | null
 }
 
@@ -507,23 +504,23 @@ export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: numbe
   const progress = Math.min(1, Math.max(0, (normalizedCount - 1) / (decayTeamCount - 1)))
   let score: number
   switch (decayMode) {
-    case ScoreDecayMode.Fixed:
+    case 'Fixed':
       score = initialPoints
       break
-    case ScoreDecayMode.Linear:
+    case 'Linear':
       score = initialPoints + (minimumPoints - initialPoints) * progress
       break
-    case ScoreDecayMode.Quadratic:
+    case 'Quadratic':
       score = initialPoints + (minimumPoints - initialPoints) * progress * progress
       break
-    case ScoreDecayMode.Exponential: {
+    case 'Exponential': {
       const steepness = 4
       const normalized = (Math.exp(-steepness * progress) - Math.exp(-steepness))
         / (1 - Math.exp(-steepness))
       score = minimumPoints + (initialPoints - minimumPoints) * normalized
       break
     }
-    case ScoreDecayMode.Logarithmic:
+    case 'Logarithmic':
       score = initialPoints + (minimumPoints - initialPoints) * Math.log10(1 + 9 * progress)
       break
     default:
@@ -533,7 +530,7 @@ export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: numbe
 }
 
 export interface BloodRewardValue {
-  policy: number
+  policy: NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol
   value: number | null
 }
 
@@ -543,7 +540,7 @@ const POINTS_CURVE_DEFAULT: PointsCurveValue = {
   initialPoints: 500,
   minimumPoints: 100,
   decayTeamCount: 10,
-  decayMode: ScoreDecayMode.Quadratic,
+  decayMode: 'Quadratic',
   customExpression: null,
 }
 
@@ -581,7 +578,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'flagWrongPenalty', label: translate("common.label.wrongFlagPenalty"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'exploitSucceededPenalty', label: translate("common.label.exploitSuccessPenalty"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'serviceAbnormalPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: 'Automatic' },
         { key: 'flagTemplate', label: translate("common.label.breakFlagTemplate"), type: 'flagTemplate', description: translate("common.description.optionalGenerateDynamicFlags") },
       ]
     case 'Koh':
@@ -643,7 +640,7 @@ function parsePointsCurve(raw: unknown): PointsCurveValue {
     initialPoints: asNumber(obj.initialPoints),
     minimumPoints: asNumber(obj.minimumPoints),
     decayTeamCount: asNumber(obj.decayTeamCount),
-    decayMode: protocolIndex(obj.decayMode, scoreDecayProtocols, ScoreDecayMode.Quadratic),
+    decayMode: optionalProtocol(obj.decayMode, scoreDecayProtocols, 'Quadratic', 'score decay mode'),
     customExpression: asString(obj.customExpression),
   }
 }
@@ -653,7 +650,7 @@ function parseBloodRewards(raw: unknown): BloodRewardValue[] {
   return raw.map((item) => {
     const obj = asObject(item) ?? {}
     return {
-      policy: protocolIndex(obj.policy, bloodRewardProtocols, BloodRewardPolicy.FixedPoints),
+      policy: optionalProtocol(obj.policy, bloodRewardProtocols, 'FixedPoints', 'blood reward policy'),
       value: asNumber(obj.value),
     }
   })
@@ -678,7 +675,7 @@ export function fieldDefaultValue(field: ConfigFieldDef): unknown {
         initialPoints: null,
         minimumPoints: null,
         decayTeamCount: null,
-        decayMode: ScoreDecayMode.Quadratic,
+        decayMode: 'Quadratic',
         customExpression: null,
       }
     case 'bloodRewards':
@@ -698,10 +695,12 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
       return asString(raw)
     case 'bool':
       return asBool(raw)
-    case 'select':
-      if (field.key === 'evaluationDispatchMode')
-        return protocolIndex(raw, evaluationDispatchProtocols, EvaluationDispatch.Automatic)
-      return typeof raw === 'string' || typeof raw === 'number' ? raw : (field.options?.[0]?.value ?? '')
+    case 'select': {
+      // 未列出的历史取值必须原样保留:交给 awdInvalidFields 等校验显式暴露,
+      // 静默改写成默认值会让用户在无提示的情况下丢掉配置。
+      if (typeof raw === 'string') return raw
+      return field.options?.[0]?.value ?? ''
+    }
     case 'pointsCurve':
       return parsePointsCurve(raw)
     case 'bloodRewards':
@@ -715,7 +714,7 @@ function runtimeModelToContract(
   runtime: RuntimeTemplateModel,
 ): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
-    allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
+    allocation: runtime.allocation,
     limits: runtime.definition.kind === 'ova' ? {
       memoryBytes: runtime.limits.memoryBytes ?? 0,
       cpuMillicores: runtime.limits.cpuMillicores ?? 0,
@@ -723,16 +722,12 @@ function runtimeModelToContract(
     } : null,
     ttlSeconds: runtime.ttlSeconds,
     operationTimeoutSeconds: runtime.operationTimeoutSeconds,
-    flagSource: runtime.flagSource === FlagSource.PerTeam
-      ? 'PerTeam' as const
-      : runtime.flagSource === FlagSource.AwdRotation
-        ? 'AwdRotation' as const
-        : 'Static' as const,
-    egressPolicy: 'Isolated' as const,
+    flagSource: runtime.flagSource,
+    egressPolicy: runtime.egressPolicy,
     urlBindings: [
       ...runtime.urlBindings.map(binding => ({
         urlTemplate: binding.urlTemplate,
-        exposure: binding.exposure === UrlExposure.OwnerOnly ? 'OwnerOnly' as const : 'Participants' as const,
+        exposure: binding.exposure,
         containerPort: binding.containerPort,
         serviceName: binding.serviceName || null,
         vmId: null,
@@ -742,9 +737,7 @@ function runtimeModelToContract(
       ...(runtime.controlCheckUrlBinding
         ? [{
             urlTemplate: runtime.controlCheckUrlBinding.urlTemplate,
-            exposure: runtime.controlCheckUrlBinding.exposure === UrlExposure.OwnerOnly
-              ? 'OwnerOnly' as const
-              : 'Participants' as const,
+            exposure: runtime.controlCheckUrlBinding.exposure,
             containerPort: runtime.controlCheckUrlBinding.containerPort,
             serviceName: runtime.controlCheckUrlBinding.serviceName || null,
             vmId: null,
@@ -814,7 +807,7 @@ export function definitionModelToContract(
       return {
         mode,
         ...common,
-        ctf: { interactionKind: model.interactionKind === CtfInteraction.PatchVerification
+        ctf: { interactionKind: model.interactionKind === 'PatchVerification'
           ? 'PatchVerification'
           : 'FlagSubmission' },
       }
@@ -894,11 +887,7 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       return
     }
     case 'select': {
-      if (field.key === 'evaluationDispatchMode') {
-        out[field.key] = evaluationDispatchProtocols[value as number] ?? evaluationDispatchProtocols[EvaluationDispatch.Automatic]
-        return
-      }
-      if (typeof value === 'string' || typeof value === 'number') out[field.key] = value
+      if (typeof value === 'string') out[field.key] = value
       return
     }
     case 'pointsCurve': {
@@ -907,9 +896,8 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       putNumber(obj, 'initialPoints', curve?.initialPoints ?? null)
       putNumber(obj, 'minimumPoints', curve?.minimumPoints ?? null)
       putNumber(obj, 'decayTeamCount', curve?.decayTeamCount ?? null)
-      obj.decayMode = scoreDecayProtocols[curve?.decayMode ?? ScoreDecayMode.Quadratic]
-        ?? scoreDecayProtocols[ScoreDecayMode.Quadratic]
-      if (curve?.decayMode === ScoreDecayMode.Custom && curve.customExpression?.trim())
+      obj.decayMode = curve?.decayMode ?? 'Quadratic'
+      if (curve?.decayMode === 'Custom' && curve.customExpression?.trim())
         obj.customExpression = curve.customExpression.trim()
       if (Object.keys(obj).length > 0) out[field.key] = obj
       return
@@ -917,7 +905,7 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
     case 'bloodRewards': {
       const rewards = (value as BloodRewardValue[]) ?? []
       out[field.key] = rewards.map(r => ({
-        policy: bloodRewardProtocols[r.policy] ?? bloodRewardProtocols[BloodRewardPolicy.FixedPoints],
+        policy: r.policy,
         ...(r.value !== null ? { value: r.value } : {}),
       }))
       return

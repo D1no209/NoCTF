@@ -5,6 +5,7 @@ import type { Ref } from 'vue'
 import { ChartSpline, Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
 import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../../api'
 import type { echarts } from '../../utils/echarts'
+import { chartGuideColor } from '../../utils/chart-theme'
 import { scoreboardDirectionGroups, scoreboardMemberContributionSlices, scoreboardRankingStateLabel, scoreboardTeamChallengeScore, scoreboardTeamChallengeSignals, scoreboardTeamAchievements, scoreboardTeamDirectionScore } from '../../utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '../../utils/scoreboard'
 import type { TrendSeries } from './types'
@@ -148,8 +149,8 @@ open: Ref<boolean>) {
         splitNumber: 3,
         axisName: { fontSize: 12 },
         splitArea: { areaStyle: { color: 'transparent' } },
-        splitLine: { lineStyle: { color: 'rgba(148,163,184,0.28)' } },
-        axisLine: { lineStyle: { color: 'rgba(148,163,184,0.34)' } },
+        splitLine: { lineStyle: { color: chartGuideColor(0.28) } },
+        axisLine: { lineStyle: { color: chartGuideColor(0.34) } },
       },
       series: [{ type: 'radar', data }],
     }

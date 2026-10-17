@@ -12,6 +12,7 @@ import type { CompetitionAdminRole } from '../../../../lib/admin-competition'
 import CompetitionStatusBadgeComponent from '../../../admin/CompetitionStatusBadge.vue'
 import GameModeBadgeComponent from '../../../admin/GameModeBadge.vue'
 import AppWorkspaceNavComponent from '../../../app/AppWorkspaceNav.vue'
+import { useAdminCompetitionResource } from '../../../admin/useAdminCompetitionResource'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdPage. */
 export function useAdminCompetitionsByIdPage() {

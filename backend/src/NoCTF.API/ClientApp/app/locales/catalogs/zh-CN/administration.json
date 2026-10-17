@@ -1415,5 +1415,8 @@
   "administration.awd.tieBreak.field.AttackCount": "有效捕获数",
   "administration.awd.tieBreak.field.LastAttackAt": "最后有效攻击时间",
   "administration.awd.tieBreak.field.RegistrationTime": "队伍报名时间",
-  "administration.label.publicAddressUsage": "用于邮件链接、SSO 回调和竞赛 Webhook。"
+  "administration.label.publicAddressUsage": "用于邮件链接、SSO 回调和竞赛 Webhook。",
+  "administration.challenges.error.templatesLoadFailed": "无法加载题目模板",
+  "administration.competitionsBy.error.teamsLoadFailed": "无法加载队伍列表",
+  "administration.platformUsers.error.usersLoadFailed": "无法加载平台用户"
 }

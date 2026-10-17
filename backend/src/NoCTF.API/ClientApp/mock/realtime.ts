@@ -18,6 +18,10 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
     for (const client of connections.values()) if (client.hub === 'notifications')
       send(client, { type: 1, target: 'notificationChanged', arguments: [] })
   })
+  api.theoryChanges.add(activityId => {
+    for (const client of connections.values()) if (client.hub === 'notifications')
+      send(client, { type: 1, target: 'theoryChanged', arguments: [activityId] })
+  })
   return async function handle(request: Request) {
     const url = new URL(request.url)
     if (!/^\/hubs\/v1\/(competitions|spectators|notifications|admin\/platform-logs)(\/negotiate)?$/.test(url.pathname)) return new Response(null, { status: 404 })

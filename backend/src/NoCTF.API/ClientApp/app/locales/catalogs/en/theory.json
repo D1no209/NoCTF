@@ -183,5 +183,7 @@
   "theory.unexposed": "Not exposed",
   "theory.notGraded": "Not graded",
   "theory.operatedAt": "Time",
-  "theory.operation": "Operation"
+  "theory.operation": "Operation",
+  "theory.sessionLoading": "Checking paper…",
+  "theory.openActivity": "Open activity"
 }

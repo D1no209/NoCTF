@@ -8,9 +8,14 @@ let renderSequence = 0
 
 watch(() => [props.source, props.assets] as const, async ([source, assets]) => {
   const sequence = ++renderSequence
-  const rendered = assets === undefined ? await renderPublishedMarkdown(source) : await renderMarkdownAsync(source, assets)
-  if (sequence === renderSequence)
-    html.value = rendered
+  try {
+    const rendered = assets === undefined ? await renderPublishedMarkdown(source) : await renderMarkdownAsync(source, assets)
+    if (sequence === renderSequence)
+      html.value = rendered
+  }
+  catch {
+    // 保留上一版渲染;失败的发布缓存会删除对应条目,下一次请求自动重试。
+  }
 }, { immediate: true })
 
 onBeforeUnmount(() => { renderSequence++ })

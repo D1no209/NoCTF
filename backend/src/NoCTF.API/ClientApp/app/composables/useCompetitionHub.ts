@@ -7,7 +7,7 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
 } from '../api'
 import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
-import { startRealtimeWithRetry } from '../lib/realtime-retry'
+import { buildHubConnection, createHubStarter, stopHubConnection } from '../lib/signalr-hub'
 
 /**
  * 竞赛实时 hub(/hubs/v1/competitions)。
@@ -72,8 +72,6 @@ const GROUP_EVENTS = [
 const HEARTBEAT_MS = 45_000
 
 let connection: signalR.HubConnection | null = null
-let startPromise: Promise<void> | null = null
-let startAbortController: AbortController | null = null
 const subscribers = new Map<symbol, Subscriber>()
 const heartbeats = new Map<string, ReturnType<typeof setInterval>>()
 /** 已成功 Join 的竞赛(用于断线重连后恢复)。 */
@@ -100,26 +98,26 @@ function dispatch<TEvent extends keyof CompetitionHubClientEvents>(
       | ((notification: CompetitionHubClientEvents[TEvent]) => void)
       | undefined
     if (!handler) continue
-    if (!direct && competitionId && normalizeGuid(subscriber.competitionId) !== competitionId) continue
+    // 缺少竞赛标识的分组事件不得广播给所有订阅者,否则会跨竞赛串扰。
+    if (!direct) {
+      if (!competitionId) continue
+      if (normalizeGuid(subscriber.competitionId) !== competitionId) continue
+    }
     handler(payload)
   }
 }
 
 function ensureConnection(): signalR.HubConnection {
   if (connection) return connection
-  const hub = new signalR.HubConnectionBuilder()
-    .withUrl('/hubs/v1/competitions', {
-      headers: { 'Accept-Language': currentLocale() },
-      accessTokenFactory: getRealtimeAccessToken,
-      // 开发环境经 Vite ws 代理转发 SignalR WebSocket 会被重置并拖垮 Nuxt 进程,
-      // dev 下跳过 WebSockets 走 SSE/长轮询;生产直连后端,不受影响。
-      ...(import.meta.dev
-        ? { transport: signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling }
-        : {}),
-    })
-    .withAutomaticReconnect()
-    .configureLogging(signalR.LogLevel.Warning)
-    .build()
+  const hub = buildHubConnection({
+    signalR,
+    url: '/hubs/v1/competitions',
+    locale: currentLocale(),
+    accessTokenFactory: getRealtimeAccessToken,
+    // 开发环境经 Vite ws 代理转发 SignalR WebSocket 会被重置并拖垮 Nuxt 进程,
+    // dev 下跳过 WebSockets 走 SSE/长轮询;生产直连后端,不受影响。
+    preferLongPolling: import.meta.dev,
+  })
 
   for (const event of GROUP_EVENTS) {
     hub.on(event, (payload: CompetitionHubClientEvents[typeof event]) => dispatch(event, payload))
@@ -184,49 +182,36 @@ async function rejoinAll(): Promise<void> {
   for (const subscriber of subscribers.values()) subscriber.handlers.onReconnected?.()
 }
 
+const starter = createHubStarter({
+  current: () => connection,
+  isConnected: hub => hub.state === signalR.HubConnectionState.Connected,
+  isDisconnected: hub => hub.state === signalR.HubConnectionState.Disconnected,
+  start: async hub => {
+    if (hub.state === signalR.HubConnectionState.Disconnected) await hub.start()
+  },
+}, {
+  isWanted: () => subscribers.size > 0,
+  onStarted: () => rejoinAll(),
+})
+
 async function ensureStarted(): Promise<void> {
   // 首次匿名访问不建立 hub；已认证连接丢失 token 时仍让
   // accessTokenFactory 使用 refresh cookie 恢复连接。
   if (!getAccessToken() && !connection) return
-  const hub = ensureConnection()
-  if (hub.state === signalR.HubConnectionState.Connected) {
-    // Adding a subscriber to a healthy connection is not a reconnection.
-    // watchCompetition joins its own group; existing consumers keep their snapshots.
-    return
-  }
-  if (startPromise) return startPromise
-  if (hub.state !== signalR.HubConnectionState.Disconnected) return
-
-  const abortController = new AbortController()
-  startAbortController = abortController
-  const task = (async () => {
-    const started = await startRealtimeWithRetry(
-      async () => {
-        if (hub.state === signalR.HubConnectionState.Disconnected) await hub.start()
-      },
-      abortController.signal,
-      () => connection === hub && subscribers.size > 0,
-    )
-    if (started && connection === hub) await rejoinAll()
-  })()
-  startPromise = task.finally(() => {
-    if (startAbortController !== abortController) return
-    startAbortController = null
-    startPromise = null
-  })
-  await startPromise
+  ensureConnection()
+  // Adding a subscriber to a healthy connection is not a reconnection.
+  // watchCompetition joins its own group; existing consumers keep their snapshots.
+  await starter.ensureStarted()
 }
 
 async function teardownIfIdle(): Promise<void> {
   if (subscribers.size > 0 || !connection) return
   const hub = connection
-  startAbortController?.abort()
-  startAbortController = null
+  starter.abortStart()
   connection = null
-  startPromise = null
   joined.clear()
   stopAllHeartbeats()
-  await hub.stop().catch(() => undefined)
+  await stopHubConnection(hub)
 }
 
 /**

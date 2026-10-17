@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
-import { emptyFlagTemplate, FlagSource } from '../../utils/game-config'
+import { emptyFlagTemplate } from '../../utils/game-config'
 import FlagTemplateEditorComponent from './FlagTemplateEditor.vue'
 
 /** Owns state, effects and commands for DefinitionFlagTemplateSection. */
@@ -22,8 +22,7 @@ export function useDefinitionFlagTemplateSection(props: Readonly<Omit<{
 
   return {
       ...toRefs(props),
-      FlagSource,
-      toggleFlagTemplate,
+        toggleFlagTemplate,
       FlagTemplateEditor
     }
 }

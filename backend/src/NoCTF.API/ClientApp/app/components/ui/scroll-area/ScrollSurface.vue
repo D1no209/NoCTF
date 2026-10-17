@@ -27,9 +27,8 @@ watch(() => props.resetKey, async (value, previous) => {
   if (value === previous) return
   await nextTick()
   if (!target.value) return
-  if (props.axis !== 'x') target.value.scrollTop = 0
-  if (props.axis !== 'y') target.value.scrollLeft = 0
-  scrollbars?.update(props.axis)
+  if (props.axis !== 'x' && target.value.scrollTop !== 0) target.value.scrollTop = 0
+  if (props.axis !== 'y' && target.value.scrollLeft !== 0) target.value.scrollLeft = 0
 })
 onBeforeUnmount(() => scrollbars?.dispose())
 </script>

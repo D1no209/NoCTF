@@ -6,15 +6,31 @@ interface WorkerResponse {
   error?: string
 }
 
+interface PendingTask {
+  resolve: (html: string) => void
+  reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+/** A worker that stops answering must not hang the live preview forever. */
+const previewTimeoutMs = 15_000
+
 let markdownWorker: Worker | undefined
 let workerUnavailable = false
 let nextTaskId = 0
-const pendingTasks = new Map<number, { resolve: (html: string) => void; reject: (error: Error) => void }>()
+const pendingTasks = new Map<number, PendingTask>()
+
+function takeTask(id: number): PendingTask | undefined {
+  const task = pendingTasks.get(id)
+  if (!task) return undefined
+  pendingTasks.delete(id)
+  clearTimeout(task.timer)
+  return task
+}
 
 function rejectPending(error: Error) {
-  for (const task of pendingTasks.values())
-    task.reject(error)
-  pendingTasks.clear()
+  for (const id of [...pendingTasks.keys()])
+    takeTask(id)?.reject(error)
 }
 
 function getMarkdownWorker(): Worker | undefined {
@@ -25,14 +41,10 @@ function getMarkdownWorker(): Worker | undefined {
   try {
     markdownWorker = new Worker(new URL('../workers/markdown.worker.ts', import.meta.url), { type: 'module' })
     markdownWorker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
-      const task = pendingTasks.get(event.data.id)
-      if (!task)
-        return
-      pendingTasks.delete(event.data.id)
-      if (event.data.error)
-        task.reject(new Error(event.data.error))
-      else
-        task.resolve(event.data.html ?? '')
+      const task = takeTask(event.data.id)
+      if (!task) return
+      if (event.data.error) task.reject(new Error(event.data.error))
+      else task.resolve(event.data.html ?? '')
     })
     markdownWorker.addEventListener('error', () => {
       workerUnavailable = true
@@ -57,19 +69,15 @@ export async function renderMarkdownPreview(source: string): Promise<string> {
   const id = ++nextTaskId
   try {
     return await new Promise<string>((resolve, reject) => {
-      pendingTasks.set(id, { resolve, reject })
+      const timer = setTimeout(() => {
+        takeTask(id)?.reject(new Error('Markdown Worker timed out'))
+      }, previewTimeoutMs)
+      pendingTasks.set(id, { resolve, reject, timer })
       worker.postMessage({ id, source })
     })
   }
   catch {
+    takeTask(id)
     return renderMarkdownAsync(source)
   }
-}
-
-export function prefetchMarkdownHighlighter(): void {
-  const load = () => { void import('./markdown-highlighter') }
-  if ('requestIdleCallback' in globalThis)
-    globalThis.requestIdleCallback(load, { timeout: 1200 })
-  else
-    setTimeout(load, 0)
 }

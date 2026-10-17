@@ -121,6 +121,8 @@ function harness(options: { slow?: boolean; failPage?: number } = {}) {
     },
   }
   const deps = { ...geometry, computed, nextTick, ref, shallowRef, watch, testLibrary: library, pdfWorkerUrl: '/worker',
+    // 真实实现在 tests/credential-url.test.ts 中单独断言;此处仅需本源判定为真。
+    isCredentialSafeUrl: () => true,
     onBeforeUnmount: (callback: () => void) => { unmount = callback },
     window: { devicePixelRatio: 2 }, HTMLCanvasElement: TestCanvas,
     ResizeObserver: class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} },

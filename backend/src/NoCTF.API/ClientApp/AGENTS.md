@@ -8,6 +8,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - `bun run typecheck`:全量类型检查,改动后必须通过。
 - `bun run audit:architecture`:检查 i18n、渲染层、路由壳与 UI 原语边界；改动后必须通过。`bun test` 包含同一架构检查及行为回归。
 - `bun run api:gen`:从 `../wwwroot/openapi/v1.json` 重新生成 API SDK 到 `app/api/`(@hey-api/openapi-ts,配置在 `openapi-ts.config.ts`)。后端接口变更后先重新导出 OpenAPI(`dotnet run -- --export-openapi`)再跑此命令;生成产物提交入库。
+- `bun run test:quality-baseline`:重新生成源码断言基线 `tests/support/source-assert-baseline.json`。只在断言确实迁移成行为测试(或测试文件改名/删除)后运行;基线只允许下降。
 - shadcn-vue 组件用 `bunx --bun shadcn-vue@latest add <name>` 添加(CLI 一律走 bunx)。
 
 ## 结构(app/ 下)
@@ -26,6 +27,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 
 ## 约定
 
+- 测试策略:新增覆盖必须写成行为测试(导入真实模块,驱动真实输入并断言可观察结果)。不得再新增"读取 `app/` 源码再断言代码文本或语法"的断言;这类断言由 `tests/test-quality-ratchet.test.ts` 按基线钉死,只允许减少。需要长期覆盖页面逻辑时,先把逻辑从页面提取到 `features/` 控制器,再对控制器写行为测试。当前债务基线:1809 条源码文本断言(85 个文件)、112 条纯语法断言。
 - 全站控件遵循根 `DESIGN.md` 与已批准的 `UI-REDESIGN-PROPOSAL.md`：20px 圆角卡片，45% 不透明背景、12px 背景高斯模糊与右下阴影，悬停上移 4px / 180ms；控件 10px 圆角、常规 40px 高，浅色品牌蓝/冷蓝灰、深色 #39FF14 强调色。
 - 页面和业务视图禁止直接使用原生 form、日期/数值/文件等选择类型、DOM title 提示、window.alert/confirm/prompt。分别使用 `UiForm`、`DateTimePicker`、`NumberInput`、`FileUpload`、`Hint` 和共享对话框。原语内部可保留必要 HTML 语义与隐藏系统文件 input。
 - 已有完整业务校验的表单使用 `UiForm validation="feature"`；其他表单由 UiForm 显示自定义约束反馈。业务规则仍在功能层，不将校验、请求或导航处理放进 View。
@@ -57,11 +59,11 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 首页 View 直接组合信号装饰层以连接品牌区与终端；四条线路与节点来自 `assets/svg/decorations/home-signal-paths.svg`，主题着色和遮罩集中在 main.css，移动高光放在 motion.css，装饰不接收指针事件并支持减少动态效果。不要为这一处静态标签组合创建单独共享原语。
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
-- 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。
+- 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。Cap 的两个 WASM 都必须是同源可用资源、不得回退到第三方 CDN：`cap_wasm_bg.wasm` 取自 Cap 服务端（后端探针校验），`hashwx.wasm` 由 `app/assets/wasm/` 自托管；升级 `@cap.js/widget` 时必须同步该副本（`tests/cap-wasm-asset.test.ts` 会校验版本与摘要）。
 - 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置和消息中心；右侧依次容纳中英切换、主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；桌面端正方形主 Card 以头像为水平中线显示，窄屏保留末端对齐。账户摘要区直接进入个人页；设置详情以同宽但不定高的子 Card 在主 Card 下方向下展开并通过 ScrollSurface 滚动，不显示上传规格、字符计数或解释性注释。
 - 中间顶栏导航项的悬停和键盘焦点仅使用胶囊内侧柔光；不要叠加 `ghost` 底色或会被横向滚动面裁成矩形的外阴影。保留活动项的主题色下划线。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
-- 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。
+- 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.webp` 和 `dark-pages-wallpaper.webp` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。位图素材统一使用 WebP（转换后需比对新旧观感，透明素材需保留 alpha 通道）。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。
 - Nuxt 保持 `ssr: false`；搜索与分享平台所需的全局平台名称、描述、Logo、Open Graph 与 JSON-LD 由 API 的 SPA HTML fallback 从平台配置动态注入，不能只依赖客户端 `useHead`。元数据必须安全转义并生成绝对 URL，API/Hub/健康检查/静态资源不得被 fallback 接管。
 - Flag 输入统一使用 TerminalCommand 伪终端原语，空输入提示为主题色微软雅黑斜体 `Type Your Flag ~~`；回车提交、IME 组合确认不提交，批量模式 Shift+Enter 换行。普通 CTF Flag 正确后由 `Challenge is Solved ！` 直接替换原占位文字；仅本次正确判定弹出一次成功通知，题目详情恢复已解状态或重新进入时不弹。题目详情接口通过 `SolvedByMyTeam` 恢复本队已解状态，但已解状态不得禁用输入，后续 Flag 仍须正常判定为 Correct 或 Wrong。提交记录在 Dialog 中按需挂载，不在详情页内常驻表格；业务提交和历史读取仍由功能层管理。
 - 题目列表的一血、二血、三血标记保持横向图标排列，悬停提示显示排行榜快照中的队伍名；队伍名缺失时才回退到带标签的 Team ID，常驻界面不显示队名或 UUID。
@@ -90,7 +92,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 参赛题目详情中的 FlagSubmit 通过可选 dockTarget 挂载到详情卡片底部独立区域，不进入详情 ScrollSurface；CTF、AWD、AWDP 面板只转发布局目标，提交状态和业务命令仍由 FlagSubmit 功能层拥有。
 - 参赛题目环境通过 RuntimeCard 的可选 dockTarget 挂载到描述后的资源行左侧，附件位于右侧；All 策略附件使用单一文件名按钮下载，不再拆分文件信息和通用下载按钮。Runtime 业务状态仍由各赛制功能层拥有。
 - 剩余 Flag 次数使用 RemainingAttempts 原语；低于 5 时仅数字使用 `--critical-attempt` 纯红色。题目提示使用 MarkdownQuote 以 blockquote / `>` 语义渲染，继续经过共享 Markdown 安全清洗。
-- Markdown 统一通过 `lib/markdown.ts` 解析与清洗，Fence 代码使用 `lib/markdown-highlighter.ts` 的 Highlight.js core 按需语言注册；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰集中在 main.css 的 `.markdown-content` 规则中，不在业务页面重复定义。
+- Markdown 统一通过 `lib/markdown.ts` 解析与清洗，围栏 HTML 统一由 `lib/markdown-fence.ts` 生成（语言 token 规范化 + 正文转义），发布渲染与编辑器实时预览必须共用该实现，禁止各自拼接围栏标记。Highlight.js 使用 core 构建 + 精选语言包，语言包模块在检测到围栏后才动态加载；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。阅读态与编辑态样式集中在 `components/ui/markdown/markdown.css`（MarkdownContent 与 MarkdownEditor 各自按路由懒加载，避免进入全局样式表）；标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰只在该文件定义，不在业务页面重复定义。WriteUp 审核的原文对比使用 `lib/line-diff.ts`（公共前后缀 + 变更块 LCS），不使用按行号直接比较。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。
 

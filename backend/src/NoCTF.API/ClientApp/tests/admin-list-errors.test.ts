@@ -5,35 +5,42 @@ async function pageSource(path: string): Promise<string> {
   return sourceFile(new URL(`../app/pages/${path}`, import.meta.url)).text()
 }
 
+async function appSource(path: string): Promise<string> {
+  return Bun.file(new URL(`../app/${path}`, import.meta.url)).text()
+}
+
 describe('admin list error presentation', () => {
   test.each([
     'admin/platform/audit.vue',
     'admin/platform/logs.vue',
   ])('%s exposes cursor failures without replacing them with an empty state', async (path) => {
     const source = await pageSource(path)
+    const section = await appSource('components/ui/table/RecordListSection.vue')
 
-    expect(source).toContain('error: listError')
-    expect(source).toContain('<Alert v-if="listError" variant="destructive">')
-    expect(source).toContain('!listError && initialized && items.length === 0')
-    expect(source).toMatch(/(?:Card|template) v-else-if="items\.length > 0"/)
+    expect(source).toContain('error-message="listError?.message ?? null"')
     expect(source).toContain('reset({ preserveItems: true })')
+    expect(section).toContain('<Alert v-if="errorMessage" variant="destructive">')
+    expect(section).toContain('!errorMessage && initialized && itemCount === 0')
+    expect(section).toMatch(/(?:Card|template) v-else-if="itemCount > 0"/)
   })
 
   test('competition submissions expose offset page failures without replacing loaded rows with an empty state', async () => {
     const source = await pageSource('admin/competitions/[id]/submissions.vue')
+    const list = await appSource('features/admin/useAdminCompetitionList.ts')
 
-    expect(source).toContain('error: listError')
+    expect(list).toContain('error: listError')
     expect(source).toContain('<Alert v-if="listError" variant="destructive">')
     expect(source).toContain('!listError && initialized && items.length === 0')
     expect(source).toContain('v-else-if="items.length > 0"')
-    expect(source).toContain('useOffsetPagination<')
+    expect(list).toContain('useOffsetPagination<')
     expect(source).toContain('<OffsetPagination')
   })
 
   test('competition runtimes keep the current offset page visible after a refresh failure', async () => {
     const source = await pageSource('admin/competitions/[id]/runtimes.vue')
+    const list = await appSource('features/admin/useAdminCompetitionList.ts')
 
-    expect(source).toContain('error: listError')
+    expect(list).toContain('error: listError')
     expect(source).toContain('<Alert v-if="listError" variant="destructive">')
     expect(source).toContain('!listError && initialized && items.length === 0')
     expect(source).toContain('v-else-if="items.length > 0"')

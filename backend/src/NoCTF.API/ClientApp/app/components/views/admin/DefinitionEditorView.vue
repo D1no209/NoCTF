@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionEditorViewState } from '~/features/admin/useDefinitionEditor'
 
 const viewProps = defineProps<{ state: DefinitionEditorViewState }>()
-const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionPatchSection, DefinitionRuntimeSection, CtfInteraction, showInteractionKind, setInteractionKind, mode, disabled } = toRefs(viewProps.state)
+const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionPatchSection, DefinitionRuntimeSection, showInteractionKind, setInteractionKind, mode, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -15,7 +15,7 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
     <Field v-if="showInteractionKind">
       <FieldLabel for="ctf-interaction-kind">{{ $t('administration.label.completionMethod') }}</FieldLabel>
       <Select
-        :model-value="model.interactionKind === CtfInteraction.PatchVerification ? 'PatchVerification' : 'FlagSubmission'"
+        :model-value="model.interactionKind"
         :disabled="disabled"
         @update:model-value="setInteractionKind"
       >
@@ -40,7 +40,7 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
       <component :is="DefinitionCheckerSection" :model="model" :mode="mode" :disabled="disabled" />
     </template>
 
-    <template v-if="mode === 'Awdp' || (mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification)">
+    <template v-if="mode === 'Awdp' || (mode === 'Ctf' && model.interactionKind === 'PatchVerification')">
       <component :is="DefinitionPatchSection" :model="model" :disabled="disabled" />
       <component :is="DefinitionCheckerSection" :model="model" :mode="mode" :disabled="disabled" />
     </template>

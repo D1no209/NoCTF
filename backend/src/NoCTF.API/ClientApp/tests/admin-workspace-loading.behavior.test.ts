@@ -40,6 +40,9 @@ test('direct configuration entry shares the guard response with the shell and ed
     useCompetitionAdmin: () => context,
     onMounted: (callback: () => unknown) => mounted.push(callback), onUnmounted: () => {},
     watchCompetition: () => () => {}, isoToLocalInput: (value: unknown) => value ?? '',
+    normalizeConfigValue: (value: unknown) => JSON.stringify(value ?? null),
+    shouldHydrateMetaField: (previous: Record<string, unknown> | null, current: Record<string, unknown>, key: string, force = false) =>
+      force || previous === null || current[key] === previous[key],
   }
   const guard = await compile('middleware/competition-admin.ts', '', { ...deps }, true)
   await guard(route, { path: '/competitions' })

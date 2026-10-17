@@ -2,14 +2,13 @@
 import { bindViewState } from '~/features/shared/view-state'
 
 import type { UrlBindingModel } from '~/utils/game-config'
-import { UrlExposure } from '~/utils/game-config'
 import { useUrlBindingList } from './useUrlBindingList'
 import View from '~/components/views/admin/UrlBindingListView.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
-  exposureOptions?: { value: number; label: string }[]
+  exposureOptions?: { value: UrlBindingModel['exposure']; label: string }[]
   /** 容器运行时的服务选择。 */
   showServiceName?: boolean
   serviceNames?: string[]
@@ -19,8 +18,8 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   exposureOptions: () => [
-    { value: UrlExposure.OwnerOnly, label: "runtime.urlBinding.description.visibleTeamItself" },
-    { value: UrlExposure.Participants, label: "runtime.label.visibleContestants" },
+    { value: 'OwnerOnly', label: "runtime.urlBinding.description.visibleTeamItself" },
+    { value: 'Participants', label: "runtime.label.visibleContestants" },
   ],
   showServiceName: false,
   serviceNames: () => [],

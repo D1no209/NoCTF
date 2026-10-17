@@ -1,9 +1,6 @@
 {
   "common.label.theoryBank": "Theory question bank",
   "common.label.theoryActivities": "Theory activities",
-  "pagination.cursor.navigation": "Pagination",
-  "pagination.cursor.showing": "Showing {count} records",
-  "pagination.cursor.page": "Page {page}",
   "staffWebhook.workbench": "Staff workspace",
   "capacity.title": "Runner capacity",
   "capacity.units": "Resource amounts: CPU cores / MiB / PIDs. Usage: host CPU % / MiB / PIDs.",
@@ -1337,5 +1334,9 @@
   "liveSolo.notice.roomUnavailable": "The screen room became unavailable.",
   "liveSolo.notice.authorizationChanged": "The room was retired because its current authorization no longer qualified.",
   "liveSolo.notice.noAutomaticDecision": "This alert does not automatically pause the match, record a forfeit or change results. A judge must review it.",
-  "liveSolo.notice.viewMatch": "View match"
+  "liveSolo.notice.viewMatch": "View match",
+  "markdown.editor.heading": "Insert heading",
+  "markdown.editor.list": "Insert list",
+  "markdown.editor.code": "Insert code block",
+  "markdown.editor.link": "Insert link"
 }

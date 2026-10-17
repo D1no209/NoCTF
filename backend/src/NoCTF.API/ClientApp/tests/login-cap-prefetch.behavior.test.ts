@@ -7,6 +7,7 @@ const compile = async (path: string) => new Bun.Transpiler({ loader: 'ts' })
   .transformSync(await Bun.file(new URL(path, import.meta.url)).text())
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '')
   .replace(/export function /g, 'function ')
+  .replace(/export /g, '')
   .replace(/await import\(["']@cap\.js\/widget["']\)/g, 'await loadCap()')
 const verificationSource = await compile('../app/features/security/useHumanVerification.ts')
 const loginSource = await compile('../app/features/routes/auth/useAuthLoginPage.ts')
@@ -67,6 +68,8 @@ function harness(provider = 'Cap', delayConfiguration = false) {
     } }),
     useAuthThemeArtwork: () => ({ authArtwork: ref(null) }),
     loadCap: async () => ({ default: FakeCap }),
+    // 真实自托管资源由 tests/cap-wasm-asset.test.ts 校验;此处仅提供 URL 标识。
+    hashwxWasmUrl: '/cap/hashwx.wasm',
     window: {}, navigator: { hardwareConcurrency: 8 },
     describeMessage: (key: string) => ({ key }),
     translate: (key: string) => key,
@@ -75,6 +78,8 @@ function harness(provider = 'Cap', delayConfiguration = false) {
     authenticationSsoListProviders: async () => ({ data: { items: [] } }),
     authenticationSsoBeginLogin: async () => ({}),
     navigateTo: async (path: string) => { navigations.push(path); scopes[0]!.stop() },
+    safeInternalPath: (value: unknown, fallback = '/') =>
+      typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') ? value : fallback,
   }
   const factory = new Function('dependencies', `const { ${Object.keys(dependencies).join(', ')} } = dependencies;
     ${verificationSource}; ${loginSource}; return { useAuthLoginPage, useHumanVerification };`)(dependencies)

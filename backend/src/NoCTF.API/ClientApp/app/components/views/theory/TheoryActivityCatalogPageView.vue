@@ -10,9 +10,28 @@ const { state } = toRefs(props)
     <Input v-model="state.search" :placeholder="$t('theory.search')" :aria-label="$t('theory.search')" class="max-w-xl" />
     <Alert v-if="state.error" variant="destructive"><AlertDescription>{{ $message(state.error) }}</AlertDescription></Alert>
     <Skeleton v-if="state.loading && !state.rows.length" class="h-64" />
-    <Card v-else><CardContent class="pt-6"><Table><TableHeader><TableRow><TableHead>{{ $t('theory.title') }}</TableHead><TableHead>{{ $t('theory.kind') }}</TableHead><TableHead>{{ $t('theory.state') }}</TableHead><TableHead>{{ $t('theory.scoring') }}</TableHead><TableHead /></TableRow></TableHeader><TableBody><TableRow v-for="row in state.rows" :key="row.id"><TableCell>{{ row.name }}</TableCell><TableCell>{{ row.kind === 0 ? $t('theory.practice') : $t('theory.examination') }}</TableCell><TableCell>{{ state.activityStateLabel(row.state) }}</TableCell><TableCell>{{ state.scoringLabel(row.scoringMode) }}</TableCell><TableCell><Button variant="ghost" @click="state.open(row)">{{ state.staff ? $t('theory.settings') : $t('theory.continue') }}</Button></TableCell></TableRow></TableBody></Table>
+    <div v-else class="flex min-w-0 flex-col gap-4"><Table><TableHeader><TableRow><TableHead>{{ $t('theory.title') }}</TableHead><TableHead>{{ $t('theory.kind') }}</TableHead><TableHead>{{ $t('theory.state') }}</TableHead><TableHead>{{ $t('theory.scoring') }}</TableHead><TableHead /></TableRow></TableHeader><TableBody><TableRow v-for="row in state.rows" :key="row.id"><TableCell>{{ row.name }}</TableCell><TableCell>{{ row.kind === 0 ? $t('theory.practice') : $t('theory.examination') }}</TableCell><TableCell>{{ state.activityStateLabel(row.state) }}</TableCell><TableCell>{{ state.scoringLabel(row.scoringMode) }}</TableCell><TableCell><Button v-if="state.staff" variant="ghost" @click="state.open(row)">{{ $t('theory.settings') }}</Button><div v-else-if="state.sessionErrors[row.id!]" class="flex flex-col items-start gap-2">
+        <p role="alert" class="text-sm text-destructive">{{ $message(state.sessionErrors[row.id!]) }}</p>
+        <div class="flex gap-2">
+          <Button variant="outline" @click="state.retrySession(row.id)">{{ $t('theory.retry') }}</Button>
+          <Button variant="ghost" @click="state.open(row)">{{ $t('theory.openActivity') }}</Button>
+        </div>
+      </div><Button v-else-if="!state.sessions[row.id!]" variant="ghost" disabled><Spinner data-icon="inline-start" />{{ $t('theory.sessionLoading') }}</Button><Button v-else-if="state.sessions[row.id!]?.canAnswer" variant="ghost" @click="state.open(row)">{{ $t('theory.continue') }}</Button><Button v-else-if="state.sessions[row.id!]?.canIssue" @click="state.open(row, true)">{{ $t('theory.start') }}</Button><Button v-else variant="ghost" @click="state.openSummary(row)">{{ $t('theory.submitted') }}</Button></TableCell></TableRow></TableBody></Table>
       <Empty v-if="!state.rows.length"><EmptyHeader><EmptyTitle>{{ $t('theory.empty') }}</EmptyTitle></EmptyHeader></Empty>
       <OffsetPagination :page="state.page" :page-count="state.pageCount" :total="state.total" :limit="state.limit" :loading="state.loading" @update:page="state.setPage" @update:limit="state.setLimit" />
-    </CardContent></Card>
+    </div>
+    <Dialog :open="state.summaryOpen" @update:open="state.closeSummary"><DialogContent class="max-w-2xl"><DialogHeader><DialogTitle>{{ state.summaryActivity?.name }}</DialogTitle></DialogHeader>
+      <div class="flex flex-col gap-3 text-sm">
+        <p>{{ $t('theory.paperSummary', { count: state.summary.questionCount, points: state.summary.maximumPaperPoints, minutes: state.summary.minutes }) }}</p>
+        <p v-if="state.summaryActivity?.competitionId" class="text-muted-foreground">{{ $t('theory.shared') }}</p>
+        <p class="text-muted-foreground">{{ state.activityStateLabel(state.summaryActivity?.state) }}</p>
+        <div v-if="state.summaryActivity?.id && state.sessions[state.summaryActivity.id]?.paper" class="flex flex-wrap gap-8">
+          <div><p class="text-muted-foreground">{{ $t('theory.score') }}</p><p class="text-3xl font-semibold tabular-nums">{{ state.summary.score }}</p></div>
+
+        </div>
+        <p class="text-muted-foreground">{{ $t('theory.attemptSummary', { used: state.summary.attemptUsed, limit: state.summary.attemptLimit }) }}</p>
+      </div>
+      <DialogFooter><Button variant="outline" @click="state.closeSummary">{{ $t('common.action.close') }}</Button></DialogFooter>
+    </DialogContent></Dialog>
   </section>
 </template>

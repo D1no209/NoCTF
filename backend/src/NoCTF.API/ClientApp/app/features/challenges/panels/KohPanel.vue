@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { bindViewState } from '~/features/shared/view-state'
+import { defineFeatureView } from '~/features/shared/define-feature-view'
 
 import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
 import { useKohPanel } from './useKohPanel'
@@ -9,12 +9,10 @@ const props = defineProps<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
-const state = bindViewState(useKohPanel(props))
+const FeatureView = defineFeatureView(View, () => useKohPanel(props))
 
 </script>
 
 <template>
-  <View :state="state">
-    <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps || {}" /></template>
-  </View>
+  <FeatureView />
 </template>

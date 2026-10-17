@@ -25,6 +25,9 @@ export function acknowledgeAnswer(draft: AnswerDraft, request: AnswerRequest, sa
   draft.conflict = draft.dirty && !sameAnswer(request.selected, saved.selected)
 }
 export function reconcileAnswer(draft: AnswerDraft, saved: SavedAnswer) {
+  // 同一个 revision 的重复回声不携带新信息:此时重置选择或判冲突会与正在
+  // 飞行的保存相互打脸,表现为选项跳闪 + 重试按钮闪现。
+  if (saved.revision === draft.remote.revision) return
   draft.remote = saved
   if (draft.saving) return
   if (draft.pending && sameAnswer(draft.pending.selected, saved.selected)) {

@@ -2,7 +2,7 @@ import { h, markRaw, shallowReactive } from 'vue'
 import { toast } from '../../utils/message-toast'
 
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
-import NotificationNoticeContentComponent from '../../components/views/layout/NotificationNoticeContent.vue'
+import NotificationNoticeContentComponent from './NotificationNotice.vue'
 import NoticeToastComponent from '../../components/ui/sonner/NoticeToast.vue'
 import type { NoticePayload } from '../../components/ui/sonner/notice-state'
 

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { UrlBindingListViewState } from '~/features/admin/useUrlBindingList'
 
 const viewProps = defineProps<{ state: UrlBindingListViewState }>()
-const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposureOptions, showServiceName, serviceNames, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
+const { Plus, X, displayTemplateOptions, update, updateExposure, remove, add, modelValue, exposureOptions, showServiceName, serviceNames, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -53,9 +53,9 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
           <Field>
             <FieldLabel>{{ $t('administration.label.exposureRange') }}</FieldLabel>
             <Select
-              :model-value="String(binding.exposure)"
+              :model-value="binding.exposure"
               :disabled="disabled || exposureOptions.length <= 1"
-              @update:model-value="update(index, { exposure: Number($event) })"
+              @update:model-value="updateExposure(index, $event)"
             >
               <SelectTrigger class="w-full">
                 <SelectValue />

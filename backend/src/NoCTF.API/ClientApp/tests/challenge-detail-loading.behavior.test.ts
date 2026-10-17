@@ -32,6 +32,7 @@ async function mountDetail(read: (request: Request) => Promise<Reply>, progressi
     startProgressionChallenge: async () => { calls.push({ method: 'POST', target: 'start' }); return {} },
     useState: () => ref(null),
     navigateTo: () => { calls.push({ method: 'NAVIGATE', target: 'progression' }) },
+    ensureLocaleDomains: async () => {},
   }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) dependencies[match[1]!] = {}
   for (const icon of ['Dice5', 'FileDown', 'History', 'BookOpen']) dependencies[icon] = {}

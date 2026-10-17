@@ -2,7 +2,7 @@ import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue } from '../../utils/game-config'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api'
-import { applyCtfInteraction, CtfInteraction } from '../../utils/game-config'
+import { applyCtfInteraction, protocolInput, ctfInteractionProtocols } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
 import DefinitionFlagTemplateSectionComponent from './DefinitionFlagTemplateSection.vue'
@@ -43,15 +43,13 @@ emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdmi
 
   const showInteractionKind = computed(() => props.mode === 'Ctf'
     && (patchVerificationEnabled.value
-      || model.value?.interactionKind === CtfInteraction.PatchVerification),
+      || model.value?.interactionKind === 'PatchVerification'),
   )
 
   function setInteractionKind(value: unknown): void {
-    if (!model.value || props.disabled || typeof value !== 'string') return
-    const interactionKind = value === 'PatchVerification'
-      ? CtfInteraction.PatchVerification
-      : CtfInteraction.FlagSubmission
-    if (interactionKind === CtfInteraction.PatchVerification
+    if (!model.value || props.disabled) return
+    const interactionKind = protocolInput(value, ctfInteractionProtocols, model.value.interactionKind)
+    if (interactionKind === 'PatchVerification'
       && !patchVerificationEnabled.value) return
     applyCtfInteraction(model.value, interactionKind)
   }
@@ -65,7 +63,6 @@ emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdmi
       DefinitionFlagTemplateSection,
       DefinitionPatchSection,
       DefinitionRuntimeSection,
-      CtfInteraction,
       patchVerificationEnabled,
       showInteractionKind,
       setInteractionKind

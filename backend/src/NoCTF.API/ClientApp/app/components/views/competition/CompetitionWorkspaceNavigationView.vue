@@ -24,10 +24,10 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
             v-for="item in group.items"
             :key="item.to"
             :to="item.to"
-            class="flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none"
+            class="nav-focus-glare flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none"
             :class="isActive(item)
               ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-background/60 text-muted-foreground hover:bg-muted/70 hover:text-foreground focus-visible:shadow-[0_0_14px_color-mix(in_oklch,var(--ring)_22%,transparent)]'"
+              : 'bg-background/60 text-muted-foreground hover:bg-muted/70 hover:text-foreground'"
           >
             <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
             <span class="truncate">{{ item.label }}</span>
