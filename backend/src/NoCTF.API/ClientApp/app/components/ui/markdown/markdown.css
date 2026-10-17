@@ -148,3 +148,7 @@
 [data-slot='markdown-editor'] .cm-md-quote { padding: 0.35rem 1rem 0.35rem 2.75rem; border-radius: 0 var(--control-radius) var(--control-radius) 0; background: color-mix(in oklch, var(--primary) 6%, var(--muted)); color: var(--muted-foreground); box-shadow: inset 3px 0 var(--primary); }
 [data-slot='markdown-editor'] .cm-md-fence { color: var(--muted-foreground); font-size: 0.85em; }
 [data-slot='markdown-editor'] .cm-md-codeline { font-family: var(--font-mono); background: color-mix(in oklch, var(--muted) 86%, var(--card)); }
+[data-slot='markdown-editor'] .cm-md-block { margin: 0.35rem 0.75rem; }
+[data-slot='markdown-editor'] .cm-md-block > :where(p, ul, ol, blockquote, pre, table) { margin-block: 0.6em; }
+[data-slot='markdown-editor'] .cm-md-block > :where(p, ul, ol, pre, table):first-child { margin-block-start: 0; }
+[data-slot='markdown-editor'] .cm-md-block > :where(p, ul, ol, pre, table):last-child { margin-block-end: 0; }
