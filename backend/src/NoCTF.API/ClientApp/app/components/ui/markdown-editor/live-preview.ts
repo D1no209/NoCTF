@@ -1,6 +1,6 @@
 import { RangeSetBuilder } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
-import { renderMarkdown } from '~/lib/markdown'
+import { renderMarkdownPreview } from '~/lib/markdown-preview-worker.client'
 import { highlightMarkdownCode } from '~/lib/markdown-highlighter'
 
 /**
@@ -17,19 +17,29 @@ class BulletWidget extends WidgetType {
   }
 }
 
+/** 表格渲染缓存:同一份源码只走一次 worker。 */
+const renderedBlocks = new Map<string, string>()
+
 class BlockWidget extends WidgetType {
-  constructor(private readonly html: string) { super() }
-  override eq(other: BlockWidget) { return other.html === this.html }
+  constructor(private readonly html: string, private readonly source?: string) { super() }
+  override eq(other: BlockWidget) { return other.html === this.html && other.source === this.source }
   override toDOM() {
     const wrapper = document.createElement('div')
     wrapper.className = 'cm-md-block markdown-content'
-    wrapper.innerHTML = this.html
+    if (this.html) { wrapper.innerHTML = this.html; return wrapper }
+    const source = this.source ?? ''
+    const cached = renderedBlocks.get(source)
+    if (cached !== undefined) { wrapper.innerHTML = cached; return wrapper }
+    void renderMarkdownPreview(source).then((html) => {
+      renderedBlocks.set(source, html)
+      wrapper.innerHTML = html
+    })
     return wrapper
   }
   override ignoreEvent() { return false }
 }
 
-type Block = { fromLine: number, toLine: number, source: string[] }
+type Block = { fromLine: number, toLine: number, source: string[], tableSource?: string }
 
 function escapeHtml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
@@ -90,7 +100,8 @@ function scan(view: EditorView): DecorationSet {
       while (end < state.doc.lines && text(end + 1).includes('|') && text(end + 1).trim()) end += 1
       const source: string[] = []
       for (let index = number; index <= end; index += 1) source.push(text(index))
-      blocks.push({ fromLine: number, toLine: end, source, html: renderMarkdown(source.join('\n')) })
+      const tableSource = source.join('\n')
+      blocks.push({ fromLine: number, toLine: end, source, html: renderedBlocks.get(tableSource) ?? '', tableSource })
       number = end
     }
   }
@@ -107,7 +118,7 @@ function scan(view: EditorView): DecorationSet {
     const block = rendered.get(number)
     if (block) {
       const end = state.doc.line(block.toLine)
-      ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(block.html) }) })
+      ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(block.html, block.tableSource) }) })
       number = block.toLine
       continue
     }
