@@ -16,14 +16,14 @@ const { state } = toRefs(props)
     </div>
     <Dialog :open="state.summaryOpen" @update:open="state.closeSummary"><DialogContent class="max-w-2xl"><DialogHeader><DialogTitle>{{ state.summaryActivity?.name }}</DialogTitle></DialogHeader>
       <div class="flex flex-col gap-3 text-sm">
-        <p>{{ $t('theory.paperSummary', { count: state.summaryActivity?.questionCount ?? 0, points: state.summaryActivity?.maximumPaperPoints ?? 0, minutes: Math.round((state.summaryActivity?.durationSeconds ?? 0) / 60) }) }}</p>
+        <p>{{ $t('theory.paperSummary', { count: state.summary.questionCount, points: state.summary.maximumPaperPoints, minutes: state.summary.minutes }) }}</p>
         <p v-if="state.summaryActivity?.competitionId" class="text-muted-foreground">{{ $t('theory.shared') }}</p>
         <p class="text-muted-foreground">{{ state.activityStateLabel(state.summaryActivity?.state) }}</p>
         <div v-if="state.summaryActivity?.id && state.sessions[state.summaryActivity.id]?.paper" class="flex flex-wrap gap-8">
-          <div><p class="text-muted-foreground">{{ $t('theory.score') }}</p><p class="text-3xl font-semibold tabular-nums">{{ state.sessions[state.summaryActivity.id]?.paper?.score ?? 0 }}</p></div>
+          <div><p class="text-muted-foreground">{{ $t('theory.score') }}</p><p class="text-3xl font-semibold tabular-nums">{{ state.summary.score }}</p></div>
 
         </div>
-        <p class="text-muted-foreground">{{ $t('theory.attemptSummary', { used: state.summaryActivity?.id ? state.sessions[state.summaryActivity.id]?.issuedCount ?? 0 : 0, limit: state.summaryActivity?.attemptLimit ?? 1 }) }}</p>
+        <p class="text-muted-foreground">{{ $t('theory.attemptSummary', { used: state.summary.attemptUsed, limit: state.summary.attemptLimit }) }}</p>
       </div>
       <DialogFooter><Button variant="outline" @click="state.closeSummary">{{ $t('common.action.close') }}</Button></DialogFooter>
     </DialogContent></Dialog>

@@ -1,9 +1,9 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Palette } from '@lucide/vue'
 import { useThemePalette } from '../../composables/useThemePalette'
-import { normalizeHex } from '../../components/ui/color-picker/color'
+import { normalizeHex } from '../../lib/color'
 import { themeColor } from '../../utils/theme-color'
-import { defaultWallpaperBlur, maximumWallpaperBlur } from './palette'
+import { defaultWallpaperBlur, maximumWallpaperBlur } from '../../lib/theme-palette'
 
 export function useThemePalettePanel() {
   const { isDark, toggle } = useTheme()

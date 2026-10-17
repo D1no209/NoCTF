@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { adminCompetitionResource as resource } from '../features/admin/admin-competition-resource'
+import { adminCompetitionResource as resource } from './admin-competition-resource'
 
 export function useAdminCompetitionResource(competitionId: string) {
   const { user } = useAuth()

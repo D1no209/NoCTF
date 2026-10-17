@@ -1,6 +1,7 @@
 import { competitionPath } from '../utils/app-routes'
 import { competitionChallengeManagementPath, isCompetitionChallengeManagementRoute } from '../features/admin/admin-navigation'
 import { isLiveSoloManagementPath } from '../features/live-solo/navigation'
+import { useAdminCompetitionResource } from '../features/admin/useAdminCompetitionResource'
 
 /** Competition staff access is scoped to the resource, independently of platform administration. */
 export default defineNuxtRouteMiddleware(async (to, from) => {

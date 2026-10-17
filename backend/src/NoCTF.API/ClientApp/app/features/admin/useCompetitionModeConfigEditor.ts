@@ -7,8 +7,9 @@ import { markRaw, toRefs } from 'vue'
 
 import { RotateCcw } from '@lucide/vue'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
-import type { ConfigValues, GameModeValue } from '../../utils/game-config'
-import { buildConfigValues, competitionConfigFields, fieldDefaultValue, readConfigValues } from '../../utils/game-config'
+import type { GameModeValue } from '../../utils/game-config'
+import { competitionConfigFields, fieldDefaultValue } from '../../utils/game-config'
+import { useConfigDraft } from './useConfigDraft'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
 /** Owns state, effects and commands for CompetitionModeConfigEditor. */
@@ -23,29 +24,12 @@ export function useCompetitionModeConfigEditor(props: Readonly<{
 emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, reason?: string]): void }) {
   const fields = computed(() => competitionConfigFields(props.mode))
 
-  const values = ref<ConfigValues>({})
-
-  const parseFailed = ref(false)
-
-  watch(
-    [() => props.configuration, () => props.mode],
-    () => {
-      const parsed = readConfigValues(
-        props.configuration as Record<string, unknown> | null,
-        fields.value,
-        { rules: false },
-      )
-      if (parsed) {
-        values.value = parsed.values
-        parseFailed.value = false
-      }
-      else {
-        values.value = {}
-        parseFailed.value = true
-      }
-    },
-    { immediate: true },
-  )
+  const { values, parseFailed, serialized, dirty } = useConfigDraft<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract>({
+    mode: () => props.mode,
+    rules: false,
+    fields,
+    source: () => props.configuration,
+  })
 
   function updateField(key: string, value: unknown) {
     if (awdEditor.updateAwdField(key, value)) return
@@ -64,36 +48,6 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
   const awdEditor = useAwdRuleEditor(props, fields, effectiveValues, patch => {
     const baseline = patch.preset === 'Custom' ? awdPresetConstraints(effectiveValues.value) : {}
     values.value = { ...values.value, ...baseline, ...patch }
-  })
-
-  function canonicalize(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(canonicalize)
-    if (value !== null && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .filter(([, entry]) => entry !== null && entry !== undefined)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, v]) => [k, canonicalize(v)]),
-      )
-    }
-    return value
-  }
-
-  function normalize(value: unknown): string {
-    return JSON.stringify(canonicalize(value))
-  }
-
-  const serialized = computed(() => buildConfigValues(
-    props.mode,
-    fields.value,
-    values.value,
-    { rules: false },
-  ) as NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract)
-
-  const dirty = computed(() => {
-    if (parseFailed.value) return false
-    const original = normalize(props.configuration)
-    return normalize(serialized.value) !== original
   })
 
   const tieBreakers = computed(() => (values.value.awdTieBreakers ?? defaultAwdTieBreaks()) as AwdTieBreak[])

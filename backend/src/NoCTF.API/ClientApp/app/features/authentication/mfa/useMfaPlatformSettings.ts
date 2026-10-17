@@ -5,7 +5,7 @@ import type { UiMessage } from '../../../utils/i18n'
 import { message } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
 import { bindViewState } from '../../shared/view-state'
-import StepUpView from '../../../components/views/authentication/MfaStepUpView.vue'
+import StepUpView from './MfaStepUp.vue'
 import { useMfaStepUp } from './useMfaStepUp'
 export function useMfaPlatformSettings() {
   const auth = useAuth()

@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { buildHubConnection, createHubStarter, stopHubConnection } from '../app/lib/signalr-hub'
 
 const source = await Bun.file(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
@@ -30,6 +31,7 @@ function harness() {
     getAccessToken: () => 'test-token', getRealtimeAccessToken: async () => 'test-token',
     currentLocale: () => 'zh-CN',
     startRealtimeWithRetry: async (start: () => Promise<void>) => { await start(); return true },
+    buildHubConnection, createHubStarter, stopHubConnection,
     setInterval: () => 1, clearInterval: () => {},
   }
   const body = 'const { ' + Object.keys(deps).join(', ') + ' } = deps; ' + compiled + '; return watchCompetition;'

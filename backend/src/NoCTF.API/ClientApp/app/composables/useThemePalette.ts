@@ -1,4 +1,4 @@
-import { defaultWallpaperBlur, type ThemePalette } from '../features/theme/palette'
+import { defaultWallpaperBlur, type ThemePalette } from '../lib/theme-palette'
 export function useThemePalette() {
   return useState<ThemePalette>('theme-palette', () => ({
     light: null,

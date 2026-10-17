@@ -15,6 +15,20 @@ export function useTheoryActivityCatalogPage() {
   const sessions = ref<Record<string, PaperView>>({})
   const summaryOpen = ref(false)
   const summaryActivity = ref<Activity | null>(null)
+  /** 摘要弹窗的展示值(分钟换算、缺省值与作答次数)属于功能层转换。 */
+  const summary = computed(() => {
+    const activity = summaryActivity.value
+    const id = activity?.id
+    const session = id ? sessions.value[id] : undefined
+    return {
+      questionCount: activity?.questionCount ?? 0,
+      maximumPaperPoints: activity?.maximumPaperPoints ?? 0,
+      minutes: Math.round((activity?.durationSeconds ?? 0) / 60),
+      score: session?.paper?.score ?? 0,
+      attemptUsed: id ? session?.issuedCount ?? 0 : 0,
+      attemptLimit: activity?.attemptLimit ?? 1,
+    }
+  })
   function openSummary(activity: Activity) { summaryActivity.value = activity; summaryOpen.value = true }
   function closeSummary() { summaryOpen.value = false }
   async function probeStarted(): Promise<void> {
@@ -54,7 +68,7 @@ export function useTheoryActivityCatalogPage() {
   }
   watch(search, () => { clearTimeout(timer); timer = setTimeout(() => setPage(1), 250) })
   onMounted(load); onBeforeUnmount(() => { epoch++; clearTimeout(timer) })
-  return { staff, rows, started, sessions, summaryOpen, summaryActivity, openSummary, closeSummary, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
+  return { staff, rows, started, sessions, summaryOpen, summaryActivity, summary, openSummary, closeSummary, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
     pageCount: computed(() => Math.max(1, Math.ceil(total.value / limit.value))),
     create: () => router.push('/admin/theory/activities/new'), manage: () => router.push('/admin/theory/activities'),
     participate: () => router.push('/theory') }

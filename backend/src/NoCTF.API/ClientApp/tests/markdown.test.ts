@@ -127,14 +127,13 @@ describe('safe challenge Markdown', () => {
   test('competition and challenge editors share a live sanitized preview', async () => {
     const challenge = await sourceFile(new URL('../app/components/views/page/admin/challenges/AdminChallengesByIdPageView.vue', import.meta.url)).text()
     const competition = await sourceFile(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdConfigurationPageView.vue', import.meta.url)).text()
-    const preview = await Bun.file(new URL('../app/components/ui/markdown/MarkdownPreview.vue', import.meta.url)).text()
+    const preview = await Bun.file(new URL('../app/components/ui/markdown-editor/live-preview.ts', import.meta.url)).text()
 
     expect(challenge).toContain('<MarkdownEditor v-model="form.description"')
     expect(competition).toContain('<MarkdownEditor v-model="description"')
     expect(preview).toContain('renderMarkdownPreview(source)')
-    expect(preview).toContain('sequence === renderSequence')
-    expect(preview).toContain('requestAnimationFrame')
-    expect(preview).toContain('<ScrollSurface axis="both"')
+    expect(preview).toContain('renderedBlocks')
+    expect(preview).toContain('escapeHtml')
     const worker = await Bun.file(new URL('../app/workers/markdown.worker.ts', import.meta.url)).text()
     expect(worker).toContain('renderMarkdownAsync(source)')
     expect(worker).toContain('self.postMessage({ id, html }')

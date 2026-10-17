@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformLogsPageViewState } from '~/features/routes/admin/platform/useAdminPlatformLogsPage'
 
 const viewProps = defineProps<{ state: AdminPlatformLogsPageViewState }>()
-const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, page, pageLimit, hasPrevious, hasNext, initialized, loadPage, setPageSize, newLogs, viewLatest, applyFilters, live, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
+const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, hasMore, initialized, loadMore, newLogs, viewLatest, applyFilters, live, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -127,7 +127,6 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
       </Table>
     </Card>
 
-    <CursorPagination :page="page" :count="items.length" :limit="pageLimit" :loading="loading"
-      :has-previous="hasPrevious" :has-next="hasNext" @update:page="loadPage" @update:limit="setPageSize" />
+    <AdminLoadMore :loading="loading" :has-more="hasMore" @load="loadMore" />
   </div>
 </template>

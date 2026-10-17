@@ -1,4 +1,5 @@
-import { normalizeHex } from '../../components/ui/color-picker/color'
+import { normalizeHex } from './color'
+
 export const defaultWallpaperBlur = 0
 export const maximumWallpaperBlur = 24
 

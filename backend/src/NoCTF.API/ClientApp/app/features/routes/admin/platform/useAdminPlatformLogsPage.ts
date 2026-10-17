@@ -5,7 +5,7 @@ import { Download, Radio } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 import { adminPlatformExportLogs, adminPlatformListLogs } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
-import { useCursorPagePagination } from '../../../../composables/useCursorPagePagination'
+import { useCursorPagination } from '../../../../composables/useCursorPagination'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
@@ -77,14 +77,14 @@ export function useAdminPlatformLogsPage() {
   let liveTo = toIso(to.value)
   const newLogs = ref(0)
   const seenLiveCursors = new Set<string>()
-  const pagination = useCursorPagePagination<PlatformLog>(async (cursor, limit) => {
+  const pagination = useCursorPagination<PlatformLog>(async (cursor) => {
     const { data, error } = await adminPlatformListLogs({
-      query: { ...appliedFilters, cursor, limit },
+      query: { ...appliedFilters, cursor, limit: 50 },
     })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
-  const { items, page, limit: pageLimit, loading, error: listError, hasPrevious, hasNext, initialized, loadPage, reset } = pagination
+  const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = pagination
 
   function applyFilters(): void {
     appliedFilters = captureFilters()
@@ -93,13 +93,7 @@ export function useAdminPlatformLogsPage() {
     newLogs.value = 0
     seenLiveCursors.clear()
     reset({ preserveItems: true })
-    void loadPage(1)
-  }
-
-  function setPageSize(value: number): void {
-    if (![20, 50, 100, 200].includes(value) || value === pageLimit.value) return
-    pageLimit.value = value
-    applyFilters()
+    void loadMore()
   }
 
   function viewLatest(): void {
@@ -108,7 +102,7 @@ export function useAdminPlatformLogsPage() {
     if (!liveTo) appliedFilters = { ...appliedFilters, to: new Date().toISOString() }
     if (!liveFrom) appliedFilters = { ...appliedFilters, from: new Date(Date.parse(appliedFilters.to) - 14 * 24 * 60 * 60 * 1000).toISOString() }
     reset({ preserveItems: true })
-    void loadPage(1)
+    void loadMore()
   }
 
   const live = ref(true)
@@ -189,7 +183,7 @@ export function useAdminPlatformLogsPage() {
   }
 
   onMounted(() => {
-    void loadPage(1)
+    void loadMore()
     void start()
   })
   onUnmounted(() => reset())
@@ -211,13 +205,9 @@ export function useAdminPlatformLogsPage() {
       items,
       loading,
       listError,
-      page,
-      pageLimit,
-      hasPrevious,
-      hasNext,
+      hasMore,
       initialized,
-      loadPage,
-      setPageSize,
+      loadMore,
       newLogs,
       viewLatest,
       applyFilters,
