@@ -361,3 +361,114 @@ unused-primitive  components/ui/** 无外部引用的 .vue                    ->
 - 共享 hook 的调用点、Select/Field 骨架、查询/导出按钮属于各页面数据与交互本身，不再抽象；
 - 大屏（`live` / `awdp-control` / spectator）按要求未动。
 
+---
+
+## 11. Markdown 专项审计
+
+本轮只审计、未改代码。范围：ClientApp 中 12 个 markdown 相关文件（共 834 行）+ 其消费点 + 测试。
+
+| 文件 | 行数 | 职责 |
+|---|---|---|
+| `lib/markdown.ts` | 162 | markdown-it 渲染 + sanitize-html 白名单 + 发布缓存 |
+| `lib/markdown-language.ts` | 10 | 语言规范化、围栏探测 |
+| `lib/markdown-highlighter.ts` | 67 | highlight.js core + 21 种语言、别名 |
+| `lib/markdown-preview-worker.client.ts` | 75 | Worker 单例、主线程回退、预取 |
+| `workers/markdown.worker.ts` | 24 | 预览渲染 worker 入口 |
+| `components/ui/markdown/MarkdownContent.vue` | 23 | 已发布/带 assets 的渲染桥 |
+| `components/ui/markdown/MarkdownDocument.ts` | 28 | 清洗结果 → VNode 的结构化重建 |
+| `components/ui/markdown/MarkdownQuote.vue` | 11 | 提示引用块 |
+| `components/ui/markdown/markdown.css` | 154 | 阅读态 55 条规则 + 编辑器态 34 条规则 |
+| `components/ui/markdown-editor/MarkdownEditor.vue` | 75 | CodeMirror 编辑器壳 |
+| `components/ui/markdown-editor/live-preview.ts` | 190 | Obsidian 式实时预览（另一种围栏/表格渲染） |
+| `components/ui/markdown-diff/MarkdownDiff.vue` | 15 | WriteUp 审核的原文行对比 |
+
+### 11.1 结论
+
+安全基座扎实：`sanitize-html` 白名单 → `MarkdownDocument` 结构化重建的两层防护、`nonTextTags` 覆盖 svg/math/template、禁止 id/name/data-*、样式白名单、外链 `target/rel` 与媒体 `preload=none`。实测 `<svg>`/`<iframe>`/`<form>` 被清除、`position`/`background-image` 被剥离、`data:` 图片被拒绝。后端只存原文不渲染（仅 256 KB 上限），因此**前端是 HTML 清洗的唯一执行点**——这也让下面 P1-1 的“编辑器绕开统一渲染”从代码整洁问题升级为安全边界问题。
+
+问题分四类：1 处编辑器路径未走统一渲染（注入面）；1 处样式归属错位（功能缺陷）；3 组重复实现；若干健壮性/文档漂移。
+
+### 11.2 P1
+
+**P1-1 编辑器围栏 HTML 自行拼接、语言未规范化/转义（HTML 注入，自伤型）**
+
+`live-preview.ts:48-56` 自己构造围栏 HTML：取围栏 info 的第一个 token 作为 `language`，直接插入 `data-language="..."` 与 `class="language-..."`，随后 `wrapper.innerHTML = html`（`live-preview.ts:29/32/35`）。`language` 既未经过 `normalizeMarkdownCodeLanguage`，也未做属性转义。
+
+按同一逻辑复现：
+
+```text
+输入围栏 info: x"><img src=x onerror=alert(1)>
+输出 HTML:      <pre tabindex="0" data-language="x"><img"><code class="hljs language-x"><img">body</code></pre>
+```
+
+即围栏 info 可闭合 `data-language` 并注入元素。对照：统一渲染器用 `normalizeMarkdownCodeLanguage`（`markdown-language.ts:1-6`）只允许 `[a-z\d_+.#-]`，`tests/markdown.test.ts:73` 已断言 `normalizeMarkdownCodeLanguage('"><img/src=x>') === ''`。危害限于编辑器自己的 `innerHTML`（内容为作者本人输入），但它是全站唯一绕过 `lib/markdown.ts` 的 HTML 生成点。
+
+**P1-2 `markdown.css` 归属错位：编辑器样式挂在阅读组件上**
+
+`markdown.css` 第 116-157 行是 34 条 `[data-slot='markdown-editor'] .cm-*` 规则，但该文件只被 `MarkdownContent.vue:23` 以 `<style src>` 引入；`main.css` 与 `nuxt.config.ts` 均未引入它。于是**只渲染 MarkdownEditor、不渲染 MarkdownContent 的路由拿不到编辑器样式**：
+
+- `components/views/page/admin/challenges/AdminChallengesByIdPageView.vue:146`（题库编辑，MarkdownContent 出现 0 次）
+- `components/views/page/admin/competitions/[id]/AdminCompetitionsByIdConfigurationPageView.vue:29`（竞赛描述，MarkdownContent 出现 0 次）
+
+其余 3 个编辑器页面（理论题、WriteUp、LiveSolo 赛后）恰好同时渲染 MarkdownContent，才没有暴露。取决于路由 chunk 首次加载顺序，这两个页面首次进入时 CodeMirror 会退回默认外观。修复：把编辑器样式拆到 `components/ui/markdown-editor/markdown-editor.css` 并由 `MarkdownEditor.vue` 引入（或整体并入 `main.css`，与 AGENTS 的集中化规则一致）。
+
+**P1-3 围栏渲染与转义的双实现**
+
+| 统一渲染 | 编辑器预览 |
+|---|---|
+| `lib/markdown.ts:9-17` `renderer.rules.fence` | `live-preview.ts:48-56` `codeBlockHtml` |
+| `markdown.utils.escapeHtml` | `live-preview.ts:44-46` 自写 `escapeHtml` |
+
+两者输出格式（`pre tabindex/data-language/code.hljs.language-*`）必须与清洗白名单（`lib/markdown.ts:43` 的 `pre` 属性、`allowedClasses`）保持一致，但实现分叉，本次已出现行为差异（语言大小写、非法语言、属性转义）。应抽 `lib/markdown-fence.ts`：`normalizeMarkdownCodeLanguage` + `escapeMarkdownText` + `renderMarkdownFence(code, info, highlighter)`，由 `lib/markdown.ts` 与 `live-preview.ts` 共用。这同时消除 P1-1。
+
+**P1-4 引用块内的代码围栏不参与高亮**
+
+`hasMarkdownCodeFence`（`markdown-language.ts:8-10`）用行首锚定正则，只认行首（最多 3 空格）围栏。实测：
+
+| 输入 | hljs 高亮 | data-language |
+|---|---|---|
+| 引用块内围栏（`>` 前缀） | 否 | js |
+| 列表内（2 空格缩进） | 是 | js |
+| 顶层围栏 | 是 | js |
+
+`renderMarkdownAsync` 因检测不到围栏而走 plain 路径（`markdown.ts:123-128`），但 markdown-it 仍生成 fence token 且 `data-language="js"` 已出现——即“声明了语言却不给高亮”，与阅读端不一致。建议改为基于解析后的 token 判断，或把正则放宽到允许 `>` 前缀。
+
+**P1-5 失败缓存永久化 + 未处理的 Promise 拒绝**
+
+`renderPublishedMarkdown`（`markdown.ts:148-161`）把 `renderMarkdownAsync(source)` 的 Promise 直接放进缓存；一旦动态 `import('./markdown-highlighter')` 失败（弱网或部署后旧 chunk 404），该 Promise 变为 rejected 并**永久留在缓存**。`MarkdownContent.vue:9-14` 的 watch 没有 try/catch，于是同一份内容此后每次渲染都命中 rejected Promise：内容空白 + unhandled rejection，且无法自愈。修复：`renderPublishedMarkdown` 失败时删除缓存项并回退到无高亮渲染；`MarkdownContent` 捕获异常并保留上一版内容。
+
+### 11.3 P2
+
+| 位置 | 问题 |
+|---|---|
+| `MarkdownEditor.vue:10` | `assets` prop 声明后从未使用；`TheoryQuestionEditorPageView.vue:23` 仍在传，预期图片预览但实时预览不渲染内联图片 |
+| `markdown-preview-worker.client.ts:69-74` | `prefetchMarkdownHighlighter` 无任何调用方（MarkdownPreview 删除后的残留） |
+| `live-preview.ts:21,31-34` | `renderedBlocks` 只增不删，长会话内存增长 |
+| `live-preview.ts:70-182` | `scan()` 在每次 doc/selection/viewport 变化时全文档 O(n) 重算，长 WriteUp 输入有卡顿风险 |
+| `markdown-preview-worker.client.ts:12,59-66` | 任务无超时；`postMessage` 同步抛错时 `pendingTasks` 残留 |
+| `lib/markdown.ts:43` + `markdown.css` | 作者可自带 `<pre data-language="任意文案">`，`content: attr(data-language)` 会显示为“语言标签”，存在视觉伪造空间（建议 transform 覆写/限制取值） |
+| `markdown.css:5` | `.markdown-content` 自带 `overflow-x:auto`，与 WriteUp/理论页外层 `ScrollSurface`（`ChallengeWriteUpPageView.vue:31`）形成嵌套滚动面 |
+| `markdown-diff/MarkdownDiff.vue:4-8` | 按行号逐行比较而非 LCS：插入一行会把其后所有行标为变更，审核对比误导 |
+| `MarkdownEditor.vue:70` | 通用编辑器借用 `challengeWriteUp.heading/list/code/link` 文案 key（值本身是通用文案），应迁 `markdown.editor.*` |
+| AGENTS.md | “装饰集中在 main.css 的 .markdown-content”与实现（`components/ui/markdown/markdown.css`）不符；“Highlight.js core 按需语言注册”与实现（`markdown-highlighter.ts:49-62` 加载即注册 21 种）不符 |
+
+### 11.4 测试缺口
+
+`tests/markdown.test.ts` 对 `renderMarkdown`/`renderMarkdownAsync`/`renderPublishedMarkdown` 的清洗、协议、样式、媒体、缓存命中覆盖良好，但以下无行为测试：
+
+- `MarkdownDocument.ts`（标签/属性白名单重建、`title` → `Hint` 组合；项目当前无 DOM 测试环境）；
+- `live-preview.ts` 围栏渲染（P1-1 的注入面）；
+- `hasMarkdownCodeFence` 的引用块/列表/缩进边界；
+- worker 失败回退、缓存失败重试、任务超时；
+- `MarkdownDiff` 的行对比语义。
+
+### 11.5 建议整改顺序
+
+1. 抽 `lib/markdown-fence.ts` 并让 `lib/markdown.ts` 与 `live-preview.ts` 共用（同时修掉 P1-1/P1-3）。
+2. 编辑器样式归位到 `markdown-editor` 自己的 CSS 或 `main.css`（P1-2）。
+3. 围栏检测改为解析后判断（P1-4）。
+4. 缓存失败可重试 + `MarkdownContent` 捕获异常（P1-5）。
+5. 清理 `assets`/`prefetchMarkdownHighlighter`、`renderedBlocks` 上限、worker 超时、`MarkdownDiff` 用公共前后缀 + LCS、嵌套滚动、i18n key 迁移。
+6. 补行为测试：fence 渲染/转义、围栏检测边界、worker 回退、缓存失败；`MarkdownDocument` 建议先抽出纯函数（tag/attr 白名单映射）再测。
+7. 同步 AGENTS.md 的样式归属与按需注册表述。
+
