@@ -30,7 +30,6 @@ export type ImpersonationSession = {
 let endingImpersonation: Promise<void> | null = null
 
 export function useAuth() {
-  const route = useRoute()
   const user = useState<CurrentUser | null>('auth:user', () => null)
   /** Whether the initial session restore attempt has finished. */
   const ready = useState<boolean>('auth:ready', () => false)
@@ -90,7 +89,8 @@ export function useAuth() {
   async function acceptAuthentication(data: NoCtfapiEndpointsAuthenticationAuthenticationResponse): Promise<boolean> {
     if (data.state !== 'Authenticated') {
       invalidate()
-      await navigateTo({ path: '/auth/mfa', query: route.query.redirect ? { redirect: route.query.redirect } : {} })
+      const redirect = useRoute().query.redirect
+    await navigateTo({ path: '/auth/mfa', query: redirect ? { redirect } : {} })
       return false
     }
     setAccessToken(data.accessToken)
