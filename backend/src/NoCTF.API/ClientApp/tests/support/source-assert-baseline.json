@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2502,
+  "textAssertions": 2514,
   "sourceTextAssertions": {
-    "total": 1808,
+    "total": 1807,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -55,7 +55,7 @@
       "live-solo-state.test.ts": 2,
       "locale-domain-loading.test.ts": 4,
       "locale-layout-motion.test.ts": 13,
-      "markdown.test.ts": 14,
+      "markdown.test.ts": 13,
       "notice-layout.test.ts": 16,
       "notification-actions.test.ts": 20,
       "notification-realtime.test.ts": 15,

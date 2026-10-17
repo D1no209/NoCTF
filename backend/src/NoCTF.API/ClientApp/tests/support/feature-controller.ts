@@ -1,5 +1,5 @@
 /** Execute a Nuxt controller with explicit platform/API dependencies in behavior tests. */
-export async function featureController<T>(path: string, name: string, dependencies: Record<string, unknown>): Promise<() => T> {
+export async function featureController<T, TArgs extends unknown[] = []>(path: string, name: string, dependencies: Record<string, unknown>): Promise<(...args: TArgs) => T> {
   const source = await Bun.file(new URL(`../../app/${path}`, import.meta.url)).text()
   const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '')
