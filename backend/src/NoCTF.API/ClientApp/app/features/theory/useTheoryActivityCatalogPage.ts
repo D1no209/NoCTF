@@ -9,10 +9,10 @@ export function useTheoryActivityCatalogPage() {
   const staff = computed(() => route.path.startsWith('/admin/'))
   const rows = ref<Activity[]>([]), search = ref(''), page = ref(1), limit = ref(20), total = ref(0)
   const loading = ref(false), error = ref<UiMessage | null>(null)
-  /** 每人每活动的作答状态:列表载荷不含该信息,按当前页逐行探一次 session。 */
-  const started = ref<Record<string, boolean>>({})
   /** 探测到的每题会话,用于不可作答时的摘要弹窗。 */
   const sessions = ref<Record<string, PaperView>>({})
+  const sessionErrors = ref<Record<string, UiMessage>>({})
+  const sessionRequests = new Map<string, number>()
   const summaryOpen = ref(false)
   const summaryActivity = ref<Activity | null>(null)
   /** 摘要弹窗的展示值(分钟换算、缺省值与作答次数)属于功能层转换。 */
@@ -31,29 +31,33 @@ export function useTheoryActivityCatalogPage() {
   })
   function openSummary(activity: Activity) { summaryActivity.value = activity; summaryOpen.value = true }
   function closeSummary() { summaryOpen.value = false }
-  async function probeStarted(): Promise<void> {
-    if (staff.value) return
-    await Promise.all(rows.value.filter(row => row.id).map(async (row) => {
-      const id = row.id!
-      try {
-        const response = await getTheorySession({ path: { activityId: id } })
-        if (response.data) sessions.value[id] = response.data
-        started.value[id] = Boolean(response.data?.paper) || (response.data?.issuedCount ?? 0) > 0
-      }
-      catch { started.value[id] = true }
-    }))
-  }
   let epoch = 0, timer: ReturnType<typeof setTimeout> | undefined
+  async function loadSession(id: string | undefined, current = epoch): Promise<void> {
+    if (!id || staff.value || sessionRequests.get(id) === current) return
+    sessionRequests.set(id, current)
+    delete sessions.value[id]
+    delete sessionErrors.value[id]
+    try {
+      const response = await getTheorySession({ path: { activityId: id } })
+      if (response.error || !response.data) throw response.error
+      if (current === epoch) sessions.value[id] = response.data
+    }
+    catch (cause) {
+      if (current === epoch) sessionErrors.value[id] = parseApiError(cause, message('theory.loadFailed')).displayMessage
+    }
+    finally { if (sessionRequests.get(id) === current) sessionRequests.delete(id) }
+  }
   async function load() {
     const current = ++epoch; loading.value = true
+    sessionRequests.clear()
     try {
       const response = await listTheoryActivities({ query: { staff: staff.value, offset: (page.value - 1) * limit.value, limit: limit.value, desc: true, keyword: search.value } })
       if (response.error || !response.data) throw response.error
       if (current === epoch) {
         rows.value = response.data.items ?? []; total.value = response.data.total ?? 0; error.value = null
-        started.value = {}
         sessions.value = {}
-        void probeStarted()
+        sessionErrors.value = {}
+        if (!staff.value) void Promise.all(rows.value.map(row => loadSession(row.id, current)))
       }
     }
     catch (cause) { if (current === epoch) error.value = parseApiError(cause, message('theory.loadFailed')).displayMessage }
@@ -67,8 +71,8 @@ export function useTheoryActivityCatalogPage() {
     void router.push({ path: `/theory/${activity.id}`, query: newPaper ? { new: '1' } : {} })
   }
   watch(search, () => { clearTimeout(timer); timer = setTimeout(() => setPage(1), 250) })
-  onMounted(load); onBeforeUnmount(() => { epoch++; clearTimeout(timer) })
-  return { staff, rows, started, sessions, summaryOpen, summaryActivity, summary, openSummary, closeSummary, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
+  onMounted(load); onBeforeUnmount(() => { epoch++; sessionRequests.clear(); clearTimeout(timer) })
+  return { staff, rows, sessions, sessionErrors, retrySession: loadSession, summaryOpen, summaryActivity, summary, openSummary, closeSummary, search, page, limit, total, loading, error, canOrganize, open, load, setPage, setLimit, activityStateLabel, scoringLabel,
     pageCount: computed(() => Math.max(1, Math.ceil(total.value / limit.value))),
     create: () => router.push('/admin/theory/activities/new'), manage: () => router.push('/admin/theory/activities'),
     participate: () => router.push('/theory') }
