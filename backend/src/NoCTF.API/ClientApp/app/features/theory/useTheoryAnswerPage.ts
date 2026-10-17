@@ -22,7 +22,6 @@ export function useTheoryAnswerPage() {
   let epoch = 0, mutation = 0, disposed = false, interval: ReturnType<typeof setInterval> | undefined, saveTimer: ReturnType<typeof setTimeout> | undefined
   let readPending = false, draining: Promise<void> | null = null, issueRequest = '', tickCount = 0
   let unwatch: (() => void) | undefined
-  let lastAssetSignature = ''
   let retryTimer: ReturnType<typeof setTimeout> | undefined
   let saveFailures = 0
   const queue = new Set<string>()
@@ -65,9 +64,7 @@ export function useTheoryAnswerPage() {
     current.value = Math.min(Math.max(0, changedPaper ? Number(route.query.q ?? 1) - 1 : current.value), Math.max(0, questions.value.length - 1))
     if (data.paper?.state !== 0) { submitOpen.value = false; confirmation.value = null }
     const sources = (data.paper?.questions ?? []).flatMap(question => [question.body ?? '', ...(question.options ?? []).map(option => option.content ?? '')])
-    const signature = sources.join('\u0000')
-    if (data.paper?.state === 0 && data.paper.id && activityId.value && signature !== lastAssetSignature) {
-      lastAssetSignature = signature
+    if (data.paper?.state === 0 && data.paper.id && activityId.value) {
       void files.load(sources, { activityId: activityId.value, paperId: data.paper.id })
     }
   }
