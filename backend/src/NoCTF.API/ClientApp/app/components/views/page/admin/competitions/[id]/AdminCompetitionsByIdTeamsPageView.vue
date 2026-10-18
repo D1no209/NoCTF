@@ -26,7 +26,7 @@ const { appealsOnly, adminUserPath, teamDetailOpen, teamLoading, teamDetailError
             <TableHead>{{ $t('administration.label.teamName') }}</TableHead>
             <TableHead v-if="tracksEnabled" class="min-w-36">{{ $t('common.label.tracks') }}</TableHead>
             <TableHead class="w-24">{{ $t('administration.label.numberPeople') }}</TableHead>
-            <TableHead class="w-28">{{ $t('administration.label.registrationStatus') }}</TableHead>
+            <TableHead class="min-w-36">{{ $t('administration.label.registrationStatus') }}</TableHead>
             <TableHead class="w-28">{{ $t('administration.label.banStatus') }}</TableHead>
             <TableHead class="w-44">{{ $t('administration.label.registrationTime') }}</TableHead>
             <TableHead v-if="canWrite || canJudge" class="w-64 text-right">{{ $t('common.label.actions') }}</TableHead>
@@ -61,25 +61,25 @@ const { appealsOnly, adminUserPath, teamDetailOpen, teamLoading, teamDetailError
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
-              <DropdownMenu v-if="canWrite">
-                <DropdownMenuTrigger as-child>
-                  <ActionButton type="button" :disabled="pendingId === t.id" :aria-label="$t('administration.label.changeTeamRegistrationStatus', { team: displayTeamName(t) })">
-                    <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
-                      {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
-                    </Badge>
-                  </ActionButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem
+              <Select
+                v-if="canWrite"
+                :model-value="t.registrationStatus"
+                :disabled="pendingId === t.id"
+                @update:model-value="setRegistrationStatusValue(t, $event)"
+              >
+                <SelectTrigger class="min-w-32" :aria-label="$t('administration.label.changeTeamRegistrationStatus', { team: displayTeamName(t) })">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
                     v-for="option in registrationStatusOptions"
                     :key="option.value"
-                    :disabled="pendingId === t.id || option.value === t.registrationStatus"
-                    @select="setRegistrationStatusValue(t, option.value)"
+                    :value="option.value"
                   >
                     {{ $t(option.label) }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               <Badge v-else :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
                 {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
               </Badge>
