@@ -10,19 +10,25 @@ License: SIL Open Font License 1.1, preserved in the repository's
 | SarasaMonoSC-Regular / Bold | Code, terminal input and monospaced data | `aa2150e99eb38c5f9d3a00fe58e3f90a9d89495c795a8ac80934d1c3e6c377ee` |
 
 Download `SarasaUiSC-TTF-1.0.42.7z` and `SarasaMonoSC-TTF-1.0.42.7z`
-from the release above. Extract only the regular and bold faces. Convert each
-TTF with FontTools 4.60.1 and Brotli:
+from the release above. Extract only the regular and bold faces into a temporary
+source directory. From the repository root, build with FontTools 4.60.1 and Brotli:
 
 ```sh
-fonttools ttLib.woff2 compress SarasaUiSC-Regular.ttf
-fonttools ttLib.woff2 compress SarasaUiSC-Bold.ttf
-fonttools ttLib.woff2 compress SarasaMonoSC-Regular.ttf
-fonttools ttLib.woff2 compress SarasaMonoSC-Bold.ttf
+python backend/scripts/Build-Sarasa-Webfonts.py \
+  --source /path/to/extracted-ttfs \
+  --output backend/src/NoCTF.API/ClientApp/app/assets/fonts/split
 ```
 
-The conversion preserves the complete upstream character map and glyphs; it does
-not subset characters to the current UI translations. The CSS font roles and
-`font-display: swap` declarations live in `app/assets/css/main.css`. The regular
-and bold faces provide normal text; existing explicit italic styles retain the
-browser's synthetic oblique rendering. Fonts are served from the same origin,
-without a font CDN dependency.
+The script separates basic Latin/punctuation, GB2312 level-one Han characters,
+and bounded remaining ranges. `split/fonts.css` uses `unicode-range` so browsers
+download only the ranges used by displayed text. This is not a subset of current
+UI translations: the generated files collectively retain the complete upstream
+character map and variation sequences. The script verifies that coverage after
+conversion, retains layout features, and records source/output SHA-256 hashes in
+`split/manifest.json`.
+
+Font roles live in `app/assets/css/main.css`; generated declarations retain
+`font-display: swap`. The regular and bold faces provide normal text; existing
+explicit italic styles retain the browser's synthetic oblique rendering. Fonts
+are served from the same origin, without a font CDN dependency. Do not restore
+the monolithic 8–9 MB WOFF2 faces: they delay first-time loading on slow links.

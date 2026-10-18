@@ -17,9 +17,10 @@ The self-hosted Sarasa UI SC and Sarasa Mono SC faces are from
 [Sarasa Gothic v1.0.42](https://github.com/be5invis/Sarasa-Gothic/releases/tag/v1.0.42).
 Their SIL Open Font License 1.1 and copyright notices are preserved in
 [LICENSES/Sarasa-Gothic-OFL.txt](LICENSES/Sarasa-Gothic-OFL.txt).
-The regular and bold TTF faces are converted to WOFF2 without subsetting or
-changing their glyphs. Source URLs, checksums and conversion instructions are
-recorded beside the font assets.
+The regular and bold TTF faces are split into local WOFF2 unicode-range assets.
+Together the subsets preserve every upstream encoded character and variation
+sequence. Source URLs, checksums and conversion instructions are recorded beside
+the font assets.
 
 ## Package dependencies
 

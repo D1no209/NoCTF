@@ -36,7 +36,7 @@ test('platform font roles use local Sarasa UI and monospace faces without a remo
 
   for (const declaration of ["--font-sans: 'Sarasa UI SC'", '--font-heading: var(--font-sans)', "--font-mono: 'Sarasa Mono SC'"])
     expect(css).toContain(declaration)
-  expect(css).toContain("src: url('../fonts/SarasaUiSC-Regular.woff2') format('woff2')")
+  expect(css).toContain("@import '../fonts/split/fonts.css'")
   expect(css).toContain("html {\n    font-family: var(--font-sans);")
   expect(css).toContain('code, kbd, samp, pre {\n    font-family: var(--font-mono);')
   expect(css).toContain("[data-slot='pseudo-terminal']")

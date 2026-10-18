@@ -8,6 +8,7 @@
 @import '../../motion/motion.css';
 @import '../../motion/flag-celebration.css';
 @import '../../motion/cap-verification.css';
+@import '../fonts/split/fonts.css';
 
 /* Team bans use an independent warning surface, matching the approved red reference. */
 [data-team-banned-screen] {
@@ -48,36 +49,6 @@
   .team-ban-screen-logo { margin-bottom: 2rem; }
   .team-ban-screen-actions { gap: .25rem; }
 }
-/* Sarasa Gothic 1.0.42, self-hosted SC faces with full upstream character coverage. */
-@font-face {
-    font-family: 'Sarasa UI SC';
-    src: url('../fonts/SarasaUiSC-Regular.woff2') format('woff2');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'Sarasa UI SC';
-    src: url('../fonts/SarasaUiSC-Bold.woff2') format('woff2');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'Sarasa Mono SC';
-    src: url('../fonts/SarasaMonoSC-Regular.woff2') format('woff2');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'Sarasa Mono SC';
-    src: url('../fonts/SarasaMonoSC-Bold.woff2') format('woff2');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-}
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
