@@ -33,7 +33,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 已有完整业务校验的表单使用 `UiForm validation="feature"`；其他表单由 UiForm 显示自定义约束反馈。业务规则仍在功能层，不将校验、请求或导航处理放进 View。
 - 滚动需求通过 `ScrollSurface` 或共享组件的 `data-scroll-surface` 标记声明；禁止在业务视图私建滚动条。滑块默认隐藏，悬停/滚动/键盘操作时显示，800ms 后隐藏，颜色随主题。
 - 普通文本、密码、数值、多行与组合输入框使用 80% 背景不透明度，通过 field-surface token 在亮暗主题下与卡片区分，Flag 伪终端保持透明。选择与上传控件同主卡片使用 45% 背景不透明度；文字和图标不降低透明度。菜单和弹层保持不透明，按钮样式按 variant 全站统一，卡片不覆盖按钮颜色和透明度；主按钮使用主题色与柔光，禁用时关闭光晕。颜色、阴影、滚动条皮肤集中在 `main.css`；Canvas/WebGL 色值通过 `themeColor` 获取。禁止业务组件重新定义原始颜色或私有阴影。
-- 错误提醒、校验摘要和操作通知统一使用右下角小型弹窗，从右向左滑入，字体为 14px 微软雅黑、700 字重，并复用 SVG 状态装饰。`Alert` 是受所属组件生命周期控制的浮动通知；`toast.*` 使用同一 Sonner 队列。辅助说明用 FieldDescription，确认流程继续用 Dialog/AlertDialog。
+- 错误提醒、校验摘要和操作通知统一使用右下角小型弹窗，从右向左滑入，字体为 14px Sarasa UI SC、700 字重，并复用 SVG 状态装饰。`Alert` 是受所属组件生命周期控制的浮动通知；`toast.*` 使用同一 Sonner 队列。辅助说明用 FieldDescription，确认流程继续用 Dialog/AlertDialog。
 - 右下角通知必须在插槽内容变化时重新测量高度并更新 Sonner 堆叠偏移，达到视口上限后才使用内部 ScrollSurface。`parseApiError` 优先采用字段级 validation errors，带稳定 code 的 400 保留具体业务原因，空 400 使用调用处的操作级 fallback；不得用统一“参数有误”覆盖已有具体上下文。
 - Dialog、DialogScrollContent 与 AlertDialog 的可见表面必须由共享 Card 原语渲染，统一继承卡片透明度、模糊、圆角、阴影和装饰；业务弹窗不得再自行实现一层原生卡片，也不得在 Card 弹窗内嵌套另一张 Card。
 - WriteUp 审核页的队伍导航使用 ChoiceSidebar / WaveSelectionList，选择和路由同步留在 feature。PDF 在线预览统一使用 PdfPreview 内的 PDF.js Worker + Canvas，以及共享 Button、ScrollSurface、Skeleton、Spinner、Empty；禁止业务 View 或 PdfPreview 使用 iframe、object、embed 及浏览器原生 PDF 查看器。
@@ -55,7 +55,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 竞赛与题目列表共用 ChoiceSidebar 组合原语；题目页按视口限制高度，采用组件内部 ScrollSurface，不做页面级滚动。题目侧栏提供按名称搜索并与隐藏已解出组合过滤；方向抽屉默认收起，仅当前选中题目所在方向自动展开。默认题目条目固定为 40px，仅显示题名、必要状态与分数。未选中项持续悬停 50ms 后才开始 800ms 展开，离开立即开始 800ms 收缩；键盘聚焦不等待。当前选中题目始终保持 112px 展开。题目卡片不增加选中或已解外圈光晕；展开态默认显示方向水印，并允许 StatusIcon 与三枚 BloodMark 自身光晕越过裁切边界，其中选中分组单独保留底部光晕安全区。展开态保持透明，不增加白色覆盖层、背景模糊或阴影。默认布局不显示站点页脚。
 - 消息中心复用 ChoiceSidebar / WaveSelectionList 列表侧边栏与 Card 详情容器；分页操作放在 ChoiceSidebar footer，详情正文和后续记录使用 Card 内部 ScrollSurface。通知切换复用竞赛详情的 MotionSwap / film-up 动效，外层 Card 不参与动画。通知选择、URL 同步、线程读取与操作目标解析留在 features/notifications。
 - 赛事播报由 `CompetitionEventCommitted` 经事务 Outbox、Worker Redis 发布、API SignalR Relay 后触发客户端 REST 重取。播报查询窗口不得在赛事结束后冻结，也不得只以浏览器时钟作为上限；必须至少覆盖 `competitionEventChanged.occurredAt`，以容忍客户端与服务端时钟差。
-- 首页主视觉填满导航栏下方视口，不再展示近期竞赛列表；状态区使用透明 PseudoTerminal 原语，英文字体为本地 JetBrains Mono，中文回退微软雅黑，输入提示符为 `noctf $`，空输入持续显示共享 motion 闪烁光标。支持 `help`、`ls`、`status`、`whoami`，回车后输入清空且当前输出替换旧输出，不保存或导航终端历史；当前输出使用共享 useTypewriterMotion 逐字呈现并支持减少动态效果，业务数据请求与命令解析留在功能层。
+- 首页主视觉填满导航栏下方视口，不再展示近期竞赛列表；状态区使用透明 PseudoTerminal 原语，中英文字体统一使用本地 Sarasa Mono SC，输入提示符为 `noctf $`，空输入持续显示共享 motion 闪烁光标。支持 `help`、`ls`、`status`、`whoami`，回车后输入清空且当前输出替换旧输出，不保存或导航终端历史；当前输出使用共享 useTypewriterMotion 逐字呈现并支持减少动态效果，业务数据请求与命令解析留在功能层。
 - 首页 View 直接组合信号装饰层以连接品牌区与终端；四条线路与节点来自 `assets/svg/decorations/home-signal-paths.svg`，主题着色和遮罩集中在 main.css，移动高光放在 motion.css，装饰不接收指针事件并支持减少动态效果。不要为这一处静态标签组合创建单独共享原语。
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
@@ -65,7 +65,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
 - 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.webp` 和 `dark-pages-wallpaper.webp` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。位图素材统一使用 WebP（转换后需比对新旧观感，透明素材需保留 alpha 通道）。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。
 - Nuxt 保持 `ssr: false`；搜索与分享平台所需的全局平台名称、描述、Logo、Open Graph 与 JSON-LD 由 API 的 SPA HTML fallback 从平台配置动态注入，不能只依赖客户端 `useHead`。元数据必须安全转义并生成绝对 URL，API/Hub/健康检查/静态资源不得被 fallback 接管。
-- Flag 输入统一使用 TerminalCommand 伪终端原语，空输入提示为主题色微软雅黑斜体 `Type Your Flag ~~`；回车提交、IME 组合确认不提交，批量模式 Shift+Enter 换行。普通 CTF Flag 正确后由 `Challenge is Solved ！` 直接替换原占位文字；仅本次正确判定弹出一次成功通知，题目详情恢复已解状态或重新进入时不弹。题目详情接口通过 `SolvedByMyTeam` 恢复本队已解状态，但已解状态不得禁用输入，后续 Flag 仍须正常判定为 Correct 或 Wrong。提交记录在 Dialog 中按需挂载，不在详情页内常驻表格；业务提交和历史读取仍由功能层管理。
+- Flag 输入统一使用 TerminalCommand 伪终端原语，空输入提示为主题色 Sarasa Mono SC 斜体 `Type Your Flag ~~`；回车提交、IME 组合确认不提交，批量模式 Shift+Enter 换行。普通 CTF Flag 正确后由 `Challenge is Solved ！` 直接替换原占位文字；仅本次正确判定弹出一次成功通知，题目详情恢复已解状态或重新进入时不弹。题目详情接口通过 `SolvedByMyTeam` 恢复本队已解状态，但已解状态不得禁用输入，后续 Flag 仍须正常判定为 Correct 或 Wrong。提交记录在 Dialog 中按需挂载，不在详情页内常驻表格；业务提交和历史读取仍由功能层管理。
 - 题目列表的一血、二血、三血标记保持横向图标排列，悬停提示显示排行榜快照中的队伍名；队伍名缺失时才回退到带标签的 Team ID，常驻界面不显示队名或 UUID。
 - 全局组件与原语不显示边框、outline 或 ring 框线；使用背景、投影和光晕表达层次、焦点及错误。统一规则由 main.css 覆盖，保留 SVG 图标笔画。竞赛侧栏状态选择器、下拉面板与列表选中/悬停底色完全透明，文字和图标保持可见。
 
@@ -80,12 +80,12 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 管理端写操作不携带持久化修订并发字段；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。
 - shadcn 规则:表单 FieldGroup+Field;Dialog/Sheet 必带 Title;语义色类(禁原始色值);gap-* 不用 space-*;size-*;条件类 `cn()`;空态 Empty、提示 Alert、骨架 Skeleton、状态 Badge;按钮加载态 Spinner+data-icon+disabled;图标用 `@lucide/vue`。
 - 开发环境会话恢复依赖后端 `appsettings.Development.json` 的 `Authentication:RefreshAllowedOrigins` 包含前端源(已配 127.0.0.1/localhost:3000-3001);新增端口要同步加。
-- 组件 style preset 为 `reka-vega`(components.json),全站文字微软雅黑;新增/更新组件统一 `bunx --bun shadcn-vue@latest add <name>`,apply/init preset 会重写 `main.css` 配色变量,之后需回合下方品牌色定制。
+- 组件 style preset 为 `reka-vega`(components.json),界面文字使用本地 Sarasa UI SC，代码、终端与等宽数据使用 Sarasa Mono SC;新增/更新组件统一 `bunx --bun shadcn-vue@latest add <name>`,apply/init preset 会重写 `main.css` 配色变量,之后需回合下方品牌色定制。
 - 主题默认深色,切换走 `useTheme()`(vueuse `vueuse-color-scheme` 持久化,nuxt.config head 脚本防首帧闪烁);浅色品牌蓝、深色 #39FF14 token 与两套配色在 `assets/css/main.css`,背景刻意带蓝色调、不做纯白。
-- 排版约定:标题用 `text-display` 工具类(main.css 定义,字重+字距),全局 h1-h3 已带 `tracking-tight`;终端光标闪烁用 `animate-blink`(如品牌 wordmark `> name _`,见 layouts/default.vue);数据用 `font-mono`（字体同样映射为微软雅黑）+ `tabular-nums`。
+- 排版约定:标题用 `text-display` 工具类(main.css 定义,字重+字距),全局 h1-h3 已带 `tracking-tight`;终端光标闪烁用 `animate-blink`(如品牌 wordmark `> name _`,见 layouts/default.vue);数据用 `font-mono`（使用 Sarasa Mono SC）+ `tabular-nums`。
 - 页面、分区与列表标题只显示标题和必要业务状态；不在标题下重复解释页面用途、内容范围或键盘操作。会影响决策的权限、风险、表单约束、错误与空状态反馈继续保留。
 - 新 UI 文案在英文功能 JSON 添加完整资源，在中文资源添加对应翻译（缺失或空译文回退英文）；静态文案用稳定 key 调用 `$t` / `t`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈保存 `message(key, arguments)` / `ApiError.displayMessage`，用 `$message` 渲染；通知用 `utils/message-toast`。不得根据原文匹配错误或恢复中文原文作 key。具体错误、字段校验和操作级 fallback 保持原有优先级。
-- 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
+- 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(Sarasa Mono SC)+ `tabular-nums`。
 - 项目自绘的静态 SVG 资源统一放在 `app/assets/svg/` 下，方向图标放在 `directions/`、装饰图样放在 `decorations/`；Vue/TypeScript 只通过资源 URL 引用，不内联 path 数据。数据驱动的动态图表不作为静态资源处理。
 - 题目列表详细态使用共享 IconWatermark 显示方向 SVG 水印，收缩态隐藏水印，方向文字只作为辅助技术文本；分组标题继续显示小图标和方向名称。Mock 为每个支持方向提供一题和一个可下载附件，数据与下载内容仅放在 mock/。
 - 题目进度标记使用共享 StatusIcon 与 `app/assets/svg/status/`：CTF 已解出、AWDP 攻击成功、防御成功、攻防均成功必须使用四个不同 SVG，并提供非颜色依赖的可访问名称。状态判断留在功能层。

@@ -27,16 +27,16 @@ test('terminal exposes the themed flag placeholder without covering it with the 
   expect(terminal).toContain(':placeholder="placeholder"')
   expect(terminal).toContain('!blocked && !placeholder')
   expect(css).toContain("[data-slot='terminal-editor']::placeholder")
-  expect(css).toContain("font-family: 'Maple Mono CN'")
+  expect(css).toContain('font-family: var(--font-mono)')
   expect(css).toContain('font-style: italic;')
 })
 
-test('all platform font roles resolve to the local Maple Mono CN without a remote web font', async () => {
+test('platform font roles use local Sarasa UI and monospace faces without a remote web font', async () => {
   const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
-  for (const role of ['--font-sans', '--font-heading', '--font-mono'])
-    expect(css).toContain(`${role}: 'Maple Mono CN'`)
-  expect(css).toContain("src: url('../fonts/MapleMono-CN-Italic.ttf') format('truetype')")
+  for (const declaration of ["--font-sans: 'Sarasa UI SC'", '--font-heading: var(--font-sans)', "--font-mono: 'Sarasa Mono SC'"])
+    expect(css).toContain(declaration)
+  expect(css).toContain("src: url('../fonts/SarasaUiSC-Regular.woff2') format('woff2')")
   expect(css).toContain("html {\n    font-family: var(--font-sans);")
   expect(css).toContain('code, kbd, samp, pre {\n    font-family: var(--font-mono);')
   expect(css).toContain("[data-slot='pseudo-terminal']")

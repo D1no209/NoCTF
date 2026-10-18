@@ -90,6 +90,11 @@ export class SpectatorScene {
     element.addEventListener('pointerup', this.up)
     element.addEventListener('pointercancel', this.up)
     this.resize()
+    document.fonts?.ready.then(() => {
+      if (this.disposed || !this.state) return
+      for (const flag of this.flags.values()) flag.name = undefined
+      this.update(this.state)
+    })
   }
   private material(color: THREE.Color, metalness = 0) {
     const material = new THREE.MeshStandardMaterial({ color, roughness: .86, metalness })
@@ -244,7 +249,7 @@ export class SpectatorScene {
         const canvas = flag.texture.image as HTMLCanvasElement, context = canvas.getContext('2d')!
         context.fillStyle = (node.owner === undefined ? this.colors.unknown : this.colors[['flag-a', 'flag-b', 'flag-c', 'flag-d'][node.owner % 4]!]!)!.getStyle()
         context.fillRect(0, 0, 512, 192); context.fillStyle = this.colors.snow!.getStyle()
-        context.font = '700 52px Microsoft YaHei, sans-serif'; context.textBaseline = 'middle'; context.fillText(node.controllerName ?? '', 22, 96, 468)
+        context.font = `700 52px ${getComputedStyle(this.element).fontFamily}`; context.textBaseline = 'middle'; context.fillText(node.controllerName ?? '', 22, 96, 468)
         flag.texture.needsUpdate = true
       }
       const contour = this.controlLines.get(id)
