@@ -54,8 +54,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
     </Alert>
     <Skeleton v-if="loading" class="h-64 w-full" />
 
-    <ScrollSurface as="div" axis="x" v-else class="overflow-x-auto border">
-      <Table>
+    <Table v-else>
         <TableHeader>
           <TableRow>
             <TableHead class="min-w-40">{{ $t('administration.label.trackKey') }}</TableHead>
@@ -140,8 +139,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
             </TableCell>
           </TableRow>
         </TableBody>
-      </Table>
-    </ScrollSurface>
+    </Table>
     <p v-if="!loading" class="text-xs text-muted-foreground">
       {{ $t('administration.competitionsBy.description.bloodAwardsRequireScoring') }}
     </p>
