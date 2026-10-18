@@ -183,5 +183,7 @@
   "theory.unexposed": "未曝光",
   "theory.notGraded": "尚未判分",
   "theory.operatedAt": "操作时间",
-  "theory.operation": "操作"
+  "theory.operation": "操作",
+  "theory.sessionLoading": "正在查询试卷…",
+  "theory.openActivity": "查看活动"
 }

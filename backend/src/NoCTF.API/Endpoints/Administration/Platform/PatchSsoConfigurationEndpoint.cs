@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Sso;
@@ -9,16 +8,6 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 public sealed class PatchSsoConfigurationRequest
 {
     public required bool Enabled { get; set; }
-    public required string PublicBaseUrl { get; set; }
-}
-
-public sealed class PatchSsoConfigurationValidator : Validator<PatchSsoConfigurationRequest>
-{
-    public PatchSsoConfigurationValidator()
-    {
-        RuleFor(request => request.PublicBaseUrl).NotEmpty()
-            .MaximumLength(SsoRules.MaximumUrlLength);
-    }
 }
 
 public sealed class PatchSsoConfigurationEndpoint(
@@ -33,7 +22,7 @@ public sealed class PatchSsoConfigurationEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoPatchConfiguration"));
-        Summary(summary => summary.Summary = "Updates the global SSO switch and public base URL.");
+        Summary(summary => summary.Summary = "Updates the global SSO switch.");
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(
@@ -41,7 +30,7 @@ public sealed class PatchSsoConfigurationEndpoint(
         CancellationToken ct)
     {
         var result = await management.UpdateGlobalAsync(
-            request.Enabled, request.PublicBaseUrl, user.UserId, ct);
+            request.Enabled, user.UserId, ct);
         return result.State == SsoConfigurationMutationState.Updated
             ? TypedResults.Ok(SsoAdministrationMapping.ToResponse(result.Configuration!))
             : SsoAdministrationMapping.Problem(result.State);

@@ -1,4 +1,10 @@
-const OPEN_INTERACTION_LAYER_SELECTOR = '[data-dismissable-layer][data-state="open"]'
+/**
+ * "还有模态层打开"只依据本项目共享原语自己的标记
+ * (DialogContent / DialogScrollContent / AlertDialogContent / SheetContent 的
+ * `data-modal-scroll-lock`),不读 Reka 的 `data-dismissable-layer` / `data-state`
+ * 等内部属性,避免库升级时检测静默失效。悬停定位不依赖该标记。
+ */
+const OPEN_INTERACTION_LAYER_SELECTOR = '[data-modal-scroll-lock]'
 const MODAL_OVERLAY_SELECTOR = [
   '[data-slot="dialog-overlay"]',
   '[data-slot="sheet-overlay"]',
@@ -38,9 +44,13 @@ function restoreRecoveredOverlays(documentRoot: InteractionLockDocument): void {
 }
 
 /**
- * Releases a stale modal pointer lock after no visible open interaction layer remains.
- * An orphaned full-screen overlay is made inert as part of the same recovery so it
- * cannot continue intercepting clicks after the body lock has been released.
+ * 在所有可见的模态层都已关闭后释放残留的 body 指针锁。
+ *
+ * 根因是库内部的竞态:Reka 的 scroll-lock 在 `nextTick` 里写
+ * `document.body.style.pointerEvents = 'none'`,该回调可能在模态层已卸载后落地;
+ * 而它自己的 reset 路径又被内部计数门控,于是锁留在页面上。恢复因此只依据
+ * 本项目原语自己的标记判断"是否还有模态层",并重置同样的文档级样式。
+ * 同时把残留的全屏遮罩置为 inert,避免释放后它继续吞掉点击。
  */
 export function releaseStaleInteractionLock(documentRoot: InteractionLockDocument): boolean {
   const openLayers = [...documentRoot.querySelectorAll<InteractionLayer>(OPEN_INTERACTION_LAYER_SELECTOR)]
@@ -66,11 +76,9 @@ export function releaseStaleInteractionLock(documentRoot: InteractionLockDocumen
 }
 
 /**
- * Reka UI owns modal pointer locking. A Portal that is torn down during a route
- * transition can leave the body lock behind even though its layer is gone. Portal
- * contents can be removed below a persistent body child, so observe state and subtree
- * membership as well as the body style. Checks are coalesced instead of debounced: a
- * busy page must not be able to postpone recovery forever.
+ * 模态锁由共享原语持有的 `data-modal-scroll-lock` 标记驱动:Portal 在路由过渡中被拆除时
+ * 该标记随之消失,即使库状态残留也能判定"已无模态层"。检查做合并(coalesce)而非防抖,
+ * 繁忙页面不能无限推迟恢复。
  */
 export function installInteractionLockRecovery(
   documentRoot: Document = document,
@@ -92,9 +100,9 @@ export function installInteractionLockRecovery(
     portalObserverActive = shouldObserve
     if (!shouldObserve) return
 
+    // 只看节点增删:模态表面出现/消失即 `data-modal-scroll-lock` 节点增删,
+    // 不再监听库的 `data-state` 属性变化。
     portalObserver.observe(documentRoot.body, {
-      attributes: true,
-      attributeFilter: ['data-state'],
       childList: true,
       subtree: true,
     })

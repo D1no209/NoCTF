@@ -80,7 +80,6 @@ public sealed class NoCtfDbContext(
     public DbSet<ProgressionEdge> ProgressionEdges => Set<ProgressionEdge>();
     public DbSet<CompetitionBadge> CompetitionBadges => Set<CompetitionBadge>();
     public DbSet<TeamProgressionNodeState> TeamProgressionNodeStates => Set<TeamProgressionNodeState>();
-    public DbSet<TeamProgressionNodeVisit> TeamProgressionNodeVisits => Set<TeamProgressionNodeVisit>();
     public DbSet<TeamProgressionBadgeState> TeamProgressionBadgeStates => Set<TeamProgressionBadgeState>();
     public DbSet<UserBadgeGrant> UserBadgeGrants => Set<UserBadgeGrant>();
     public DbSet<UserBadgeTransition> UserBadgeTransitions => Set<UserBadgeTransition>();
@@ -575,6 +574,10 @@ public sealed class NoCtfDbContext(
 
             var instance = ownerEntry.Entity;
             if (instance.ActiveSlot is not null)
+                continue;
+            // A reset may already have handed this slot to a replacement in another
+            // context. Cleanup must never reclaim it for the stopping Runtime.
+            if (instance.State == RuntimeState.Stopping)
                 continue;
             var key = group.Key;
             var reusable = slotEntries.FirstOrDefault(slot => slot.Entity.Key == key);

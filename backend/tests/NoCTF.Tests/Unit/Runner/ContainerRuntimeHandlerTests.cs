@@ -92,13 +92,13 @@ public sealed class ContainerRuntimeHandlerTests
     }
 
     [Test]
-    public async Task Provider_rejection_marks_the_runner_temporarily_unavailable()
+    public async Task A_workload_rejection_does_not_disable_the_runner()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var lifecycle = new RecordingContainerLifecycle
         {
             ProvisionFailure = new InvalidOperationException(
-                "all predefined address pools have been fully subnetted")
+                "The challenge image was rejected")
         };
         var health = new RunnerProviderHealthState(
             Options.Create(new RunnerOptions
@@ -123,7 +123,7 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
         await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.ProviderRejected);
-        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsFalse();
+        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsTrue();
     }
 
     [Test]

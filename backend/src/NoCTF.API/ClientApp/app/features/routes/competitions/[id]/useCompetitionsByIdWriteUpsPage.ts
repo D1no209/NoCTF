@@ -2,7 +2,7 @@ import { inject, markRaw } from 'vue'
 import { CompetitionAdminKey } from '../../../../lib/admin-competition'
 import { competitionContextKey } from '../../../../utils/labels'
 import ChallengeWriteUpReviewComponent from '~/features/writeups/ChallengeWriteUpReview.vue'
-import { message as describeMessage } from '../../../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
@@ -26,6 +26,8 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const activeTab = ref(route.query.writeupMode === 'whole' ? 'whole' : 'single')
   const ChallengeWriteUpReview = markRaw(ChallengeWriteUpReviewComponent)
   watch(activeTab, value => { void router.replace({ query: { ...route.query, writeupMode: value } }) })
+  // 审核文案属于 administration 语言域；选手侧路由不会经 /admin 加载它。
+  if (!management) void ensureLocaleDomains(['administration'])
 
   const review = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
   const loading = ref(true)

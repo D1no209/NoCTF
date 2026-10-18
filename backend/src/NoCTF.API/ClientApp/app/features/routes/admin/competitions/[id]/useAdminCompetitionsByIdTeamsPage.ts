@@ -7,17 +7,18 @@ import { adminUserPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
-import { adminGetTeam, adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
+import { adminGetTeam, adminCreateManualAdjustment, adminCorrectTeamBan, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
 import PrivateAccountPanelComponent from '../../../../account/PrivateAccountPanel.vue'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
+import { ApiError } from '../../../../../utils/api-error'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
 export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boolean } = {}) {
   const appealsOnly = options.appealsOnly === true
-  const { competitionId, competition, canJudge, canWrite } = useCompetitionAdmin()
+  const { competitionId, competition, canJudge, canWrite, read: readAdminCompetition } = useCompetitionAdmin()
 
   const route = useRoute()
 
@@ -123,7 +124,7 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
       path: { competitionId },
       query: { keyword: search.value.trim() || null, offset, limit, desc },
     })
-    if (requestError || !data) throw requestError ?? new Error('Failed to load teams.')
+    if (requestError || !data) throw requestError ?? new ApiError(describeMessage('administration.competitionsBy.error.teamsLoadFailed'))
     teams.value = data.items ?? []
     return { items: teams.value, total: data.total ?? 0 }
   })
@@ -251,7 +252,7 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
     if (appealsOnly) return
     loading.value = true
     error.value = null
-    const trackResult = await adminGetCompetition({ path: { competitionId } })
+    const trackResult = await readAdminCompetition({ path: { competitionId } })
     await pagination.loadPage(pagination.page.value)
     if (pagination.error.value) error.value = pagination.error.value.message
     if (!trackResult.error && trackResult.data) {

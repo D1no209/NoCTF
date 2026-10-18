@@ -334,7 +334,6 @@ public sealed class AggregatePatchMapperTests
         PlatformSettingsPatchMapper.ApplyEmailAsAdministrator(new()
         {
             Enabled = true,
-            PublicBaseUrl = "https://example.test",
             TokenLifetimeMinutes = 60,
             ResendCooldownSeconds = 60,
             PasswordResetTokenLifetimeMinutes = 30,

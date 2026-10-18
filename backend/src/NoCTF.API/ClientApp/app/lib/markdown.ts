@@ -1,19 +1,13 @@
 import MarkdownIt from 'markdown-it'
 import sanitizeHtml from 'sanitize-html'
 import { hasMarkdownCodeFence, normalizeMarkdownCodeLanguage } from './markdown-language'
-
-type CodeHighlighter = (code: string, language: string) => string | null
+import { renderMarkdownFence, type CodeHighlighter } from './markdown-fence'
 
 function createMarkdown(highlighter?: CodeHighlighter) {
   const markdown = new MarkdownIt({ html: true, linkify: true })
   markdown.renderer.rules.fence = (tokens, index) => {
     const token = tokens[index]!
-    const language = normalizeMarkdownCodeLanguage(token.info)
-    const highlighted = highlighter?.(token.content, language)
-      ?? markdown.utils.escapeHtml(token.content)
-    const displayLanguage = language || 'text'
-    const languageClass = language ? ` language-${displayLanguage}` : ''
-    return `<pre tabindex="0" data-language="${displayLanguage}"><code class="hljs${languageClass}">${highlighted}</code></pre>\n`
+    return renderMarkdownFence(token.content, token.info, highlighter)
   }
   return markdown
 }
@@ -88,12 +82,21 @@ const htmlOptions: sanitizeHtml.IOptions = {
     img: (tagName, attribs) => ({ tagName, attribs: { ...attribs, loading: 'lazy', referrerpolicy: 'no-referrer' } }),
     audio: (tagName, attribs) => ({ tagName, attribs: { ...attribs, controls: '', preload: 'none' } }),
     video: (tagName, attribs) => ({ tagName, attribs: { ...attribs, controls: '', preload: 'none' } }),
-    pre: (tagName, attribs) => ({ tagName, attribs: { ...attribs, tabindex: '0' } }),
+    // Author HTML may carry its own pre/data-language; normalize it so the CSS label cannot be spoofed.
+    pre: (tagName, attribs) => {
+      const attributes: Record<string, string> = { ...attribs, tabindex: '0' }
+      if ('data-language' in attributes)
+        attributes['data-language'] = normalizeMarkdownCodeLanguage(attributes['data-language'] ?? '') || 'text'
+      return { tagName, attribs: attributes }
+    },
     table: (tagName, attribs) => ({ tagName, attribs: { ...attribs, tabindex: '0' } }),
   },
   exclusiveFilter: frame => frame.tag === 'img' && !frame.attribs.src,
   nonTextTags: ['script', 'style', 'textarea', 'option', 'iframe', 'object', 'svg', 'math', 'template'],
 }
+
+/** 渲染层只允许重建清洗白名单认可的标签(白名单变化时自动跟随)。 */
+export const sanitizedMarkdownTags: ReadonlySet<string> = new Set(htmlOptions.allowedTags as string[])
 
 /** Sanitize the complete result, including Markdown-generated links and author HTML. */
 export function renderMarkdown(source: string, highlighter?: CodeHighlighter, assets?: Readonly<Record<string, string>>): string {
@@ -120,8 +123,14 @@ export function renderMarkdown(source: string, highlighter?: CodeHighlighter, as
 export async function renderMarkdownAsync(source: string, assets?: Readonly<Record<string, string>>): Promise<string> {
   if (!hasMarkdownCodeFence(source))
     return renderMarkdown(source, undefined, assets)
-  const { highlightMarkdownCode } = await import('./markdown-highlighter')
-  return renderMarkdown(source, highlightMarkdownCode, assets)
+  try {
+    const { highlightMarkdownCode } = await import('./markdown-highlighter')
+    return renderMarkdown(source, highlightMarkdownCode, assets)
+  }
+  catch {
+    // A missing or stale highlighter chunk must degrade to plain code, never to a blank document.
+    return renderMarkdown(source, undefined, assets)
+  }
 }
 
 interface MarkdownCacheEntry {
@@ -151,7 +160,14 @@ export function renderPublishedMarkdown(source: string): Promise<string> {
     return cached.html
   }
 
-  const entry = { source, html: renderMarkdownAsync(source) }
+  const pending = renderMarkdownAsync(source)
+  const entry: MarkdownCacheEntry = { source, html: pending }
+  // A failed render must not stay cached as a permanent rejection for this source.
+  entry.html = pending.catch((error: unknown) => {
+    if (publishedMarkdownCache.get(key) === entry)
+      publishedMarkdownCache.delete(key)
+    throw error
+  })
   publishedMarkdownCache.set(key, entry)
   if (publishedMarkdownCache.size > publishedMarkdownCacheLimit)
     publishedMarkdownCache.delete(publishedMarkdownCache.keys().next().value!)

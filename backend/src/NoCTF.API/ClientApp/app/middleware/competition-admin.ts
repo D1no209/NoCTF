@@ -1,21 +1,27 @@
-import { adminGetCompetition } from '../api'
 import { competitionPath } from '../utils/app-routes'
 import { competitionChallengeManagementPath, isCompetitionChallengeManagementRoute } from '../features/admin/admin-navigation'
 import { isLiveSoloManagementPath } from '../features/live-solo/navigation'
+import { useAdminCompetitionResource } from '../features/admin/useAdminCompetitionResource'
 
 /** Competition staff access is scoped to the resource, independently of platform administration. */
-export default defineNuxtRouteMiddleware(async (to) => {
-  const { isLoggedIn, isAdministrator } = useAuth()
+export default defineNuxtRouteMiddleware(async (to, from) => {
+  const { isLoggedIn, isAdministrator, user } = useAuth()
   if (!isLoggedIn.value)
     return navigateTo({ path: '/auth/login', query: { redirect: to.fullPath } })
   const competitionId = typeof to.params.id === 'string' ? to.params.id : null
   if (!competitionId) return navigateTo('/competitions')
   const challengeManagement = isCompetitionChallengeManagementRoute(to.path, competitionId)
   const soloManagement = isLiveSoloManagementPath(to.path)
-  if (isAdministrator.value && !challengeManagement && !soloManagement) return
 
-  const { data, error, response } = await adminGetCompetition({ path: { competitionId } })
-  if (!error && data?.competition && (isAdministrator.value || data.competition.administrationRole)) {
+  const resource = useAdminCompetitionResource(competitionId)
+  const base = `/admin/competitions/${competitionId}`
+  if (from?.path !== base && !from?.path?.startsWith(`${base}/`)) resource.invalidate()
+  const actor = user.value?.userId
+  const result = await resource.read()
+  if (actor !== user.value?.userId) return navigateTo('/competitions')
+  const { error, response } = result
+  const data = resource.data.value
+  if (data?.competition && (isAdministrator.value || data.competition.administrationRole)) {
     if (soloManagement && data.competition.mode !== 'LiveSolo') return navigateTo(`/admin/competitions/${competitionId}`, { replace: true })
     if (challengeManagement && data.competition.mode === 'LiveSolo') {
       return navigateTo({

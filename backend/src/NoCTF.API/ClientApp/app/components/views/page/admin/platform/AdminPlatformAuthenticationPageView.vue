@@ -30,11 +30,6 @@ const { Plus, RotateCw, FlaskConical, MfaPlatformSettings, configuration, loadin
                   <FieldDescription>{{ $t('sso.enableSingleSignOnDescription') }}</FieldDescription>
                 </FieldContent>
               </Field>
-              <Field>
-                <FieldLabel for="sso-public-base-url">{{ $t('sso.publicBaseUrl') }}</FieldLabel>
-                <Input id="sso-public-base-url" v-model="globalForm.publicBaseUrl" type="url" required maxlength="2048" :placeholder="$t('sso.publicBaseUrlPlaceholder')" />
-                <FieldDescription>{{ $t('sso.publicBaseUrlDescription') }}</FieldDescription>
-              </Field>
             </FieldGroup>
             <Button type="submit" class="self-start" :disabled="globalSaving">
               <Spinner v-if="globalSaving" data-icon="inline-start" />{{ $t('administration.label.saveConfiguration') }}

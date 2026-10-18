@@ -3196,36 +3196,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("team_progression_node_states", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeVisit", b =>
-                {
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("node_id");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<long>("FirstOpenedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("first_opened_at");
-
-                    b.HasKey("TeamId", "NodeId")
-                        .HasName("pk_team_progression_node_visits");
-
-                    b.HasIndex("NodeId")
-                        .HasDatabaseName("ix_team_progression_node_visits_node_id");
-
-                    b.HasIndex("CompetitionId", "TeamId")
-                        .HasDatabaseName("ix_team_progression_node_visits_competition_id_team_id");
-
-                    b.ToTable("team_progression_node_visits", (string)null);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -6673,12 +6643,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("email_password_reset_token_lifetime_minutes");
 
-                    b.Property<string>("EmailPublicBaseUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("email_public_base_url");
-
                     b.Property<string>("EmailSmtpFromAddress")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -6826,15 +6790,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<bool>("SsoEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("sso_enabled");
-
-                    b.Property<string>("SsoPublicBaseUrl")
+                    b.Property<string>("PublicBaseUrl")
                         .IsRequired()
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
-                        .HasColumnName("sso_public_base_url");
+                        .HasColumnName("public_base_url");
+
+                    b.Property<bool>("SsoEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sso_enabled");
 
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("bigint")
@@ -6857,7 +6821,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             EmailPasswordResetCooldownSeconds = 60,
                             EmailPasswordResetMaxRequestsPerHour = 5,
                             EmailPasswordResetTokenLifetimeMinutes = 30,
-                            EmailPublicBaseUrl = "http://localhost:5000",
                             EmailSmtpFromAddress = "",
                             EmailSmtpFromName = "NoCTF",
                             EmailSmtpHost = "",
@@ -6881,8 +6844,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             MfaPolicy = (short)0,
                             MfaPolicyStamp = new Guid("00000000-0000-0000-0000-000000000002"),
                             Name = "NoCTF",
+                            PublicBaseUrl = "http://localhost:5000",
                             SsoEnabled = false,
-                            SsoPublicBaseUrl = "",
                             UpdatedAt = 621355968000000000L
                         });
                 });
@@ -12296,23 +12259,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_team_progression_node_states_teams_team_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeVisit", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Competitions.Progression.ProgressionNode", null)
-                        .WithMany()
-                        .HasForeignKey("NodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_team_progression_node_visits_competition_progression_nodes_");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_team_progression_node_visits_teams_team_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>

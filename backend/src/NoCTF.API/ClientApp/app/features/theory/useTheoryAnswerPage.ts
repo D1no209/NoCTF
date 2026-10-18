@@ -22,6 +22,8 @@ export function useTheoryAnswerPage() {
   let epoch = 0, mutation = 0, disposed = false, interval: ReturnType<typeof setInterval> | undefined, saveTimer: ReturnType<typeof setTimeout> | undefined
   let readPending = false, draining: Promise<void> | null = null, issueRequest = '', tickCount = 0
   let unwatch: (() => void) | undefined
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let saveFailures = 0
   const queue = new Set<string>()
   const questions = computed(() => view.value?.paper?.questions ?? [])
   const selected = computed(() => questions.value[current.value] ?? null)
@@ -29,8 +31,16 @@ export function useTheoryAnswerPage() {
   const canAnswer = computed(() => view.value?.canAnswer === true && !busy.value)
   const unsaved = computed(() => Object.values(drafts).some(draft => draft.dirty || draft.saving || draft.pending !== null))
   const answered = computed(() => questions.value.filter(question => question.id && (drafts[question.id]?.selected.length ?? 0) > 0).length)
-  const answerItems = computed(() => questions.value.map((question, index) => ({ value: String(index),
-    label: `${t('theory.questionNumber', { number: index + 1 })} · ${question.id && (drafts[question.id]?.selected.length ?? 0) > 0 ? t('theory.answered') : t('theory.unanswered')}${question.id && marks.has(question.id) ? ' ⚑' : ''}` })))
+  const answerItems = computed(() => questions.value.map((question, index) => {
+    const isAnswered = Boolean(question.id && (drafts[question.id]?.selected.length ?? 0) > 0)
+    return {
+      value: String(index),
+      number: index + 1,
+      answered: isAnswered,
+      active: index === current.value,
+      label: `${t('theory.questionNumber', { number: index + 1 })} · ${isAnswered ? t('theory.answered') : t('theory.unanswered')}${question.id && marks.has(question.id) ? ' ⚑' : ''}`,
+    }
+  }))
   const remaining = computed(() => {
     const at = new Date(view.value?.deadline?.at ?? '').getTime()
     const now = view.value?.deadline?.paused ? new Date(view.value?.serverTime ?? '').getTime() : clock.value + offset.value
@@ -53,8 +63,10 @@ export function useTheoryAnswerPage() {
     }
     current.value = Math.min(Math.max(0, changedPaper ? Number(route.query.q ?? 1) - 1 : current.value), Math.max(0, questions.value.length - 1))
     if (data.paper?.state !== 0) { submitOpen.value = false; confirmation.value = null }
-    if (data.paper?.state === 0 && data.paper.id && activityId.value)
-      void files.load((data.paper.questions ?? []).flatMap(question => [question.body ?? '', ...(question.options ?? []).map(option => option.content ?? '')]), { activityId: activityId.value, paperId: data.paper.id })
+    const sources = (data.paper?.questions ?? []).flatMap(question => [question.body ?? '', ...(question.options ?? []).map(option => option.content ?? '')])
+    if (data.paper?.state === 0 && data.paper.id && activityId.value) {
+      void files.load(sources, { activityId: activityId.value, paperId: data.paper.id })
+    }
   }
   async function load(initial = false) {
     if (readPending || disposed) return
@@ -105,6 +117,7 @@ export function useTheoryAnswerPage() {
           if (response.error || !response.data) throw response.error
           if (disposed || view.value?.paper?.id !== paperId) return
           const server = response.data.paper?.questions?.find(question => question.id === itemId)
+          saveFailures = 0
           if (server) acknowledgeAnswer(local, request, saved(server))
           receive(response.data); error.value = null
           if (local.dirty && !local.conflict && response.data.paper?.state === 0) queue.add(itemId)
@@ -114,7 +127,15 @@ export function useTheoryAnswerPage() {
           local.saving = false
           const failure = parseApiError(cause, message('theory.saveFailed')); error.value = failure.displayMessage
           if (failure.code === 'AnswerConflict') { local.conflict = true; local.pending = null; await load() }
-          queue.clear(); break
+          queue.clear()
+          // 保存失败自动重试(有界),不再暴露手动「重试」按钮。
+          if (failure.code !== 'AnswerConflict' && saveFailures < 3) {
+            saveFailures += 1
+            queue.add(itemId)
+            clearTimeout(retryTimer)
+            retryTimer = setTimeout(() => void drain(), 1500)
+          }
+          break
         }
         finally { mutation++ }
       }
@@ -183,12 +204,18 @@ export function useTheoryAnswerPage() {
   function setLeaveOpen(value: boolean) { if (!value) stay() }
   function beforeUnload(event: BeforeUnloadEvent) { if (unsaved.value) { event.preventDefault(); event.returnValue = '' } }
   onBeforeRouteLeave(confirmLeave); onBeforeRouteUpdate((to, from) => to.path === from.path ? true : confirmLeave())
+  // 列表页「开始新试卷」意图:进入作答页后若可发卷则直接发卷,随后清掉参数避免刷新重复发卷。
+  watch(() => [route.query.new, view.value?.canIssue, busy.value] as const, () => {
+    if (route.query.new !== '1' || !view.value?.canIssue || busy.value || issueRequest) return
+    void router.replace({ query: {} })
+    void start()
+  }, { immediate: true })
   onMounted(() => {
     void load(true); window.addEventListener('beforeunload', beforeUnload)
-    unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining) void load() }, onReconnected: () => void load() })
+    unwatch = watchNotifications({ theoryChanged: id => { if (id === activityId.value && !busy.value && !draining && !unsaved.value && queue.size === 0) void load() }, onReconnected: () => void load() })
     interval = setInterval(() => { clock.value = Date.now(); tickCount++; if ((tickCount % 15 === 0 || remaining.value === 0 && view.value?.paper?.state === 0) && !busy.value && !draining && !submitOpen.value) void load() }, 1000)
   })
-  onBeforeUnmount(() => { disposed = true; epoch++; unwatch?.(); clearInterval(interval); clearTimeout(saveTimer); window.removeEventListener('beforeunload', beforeUnload); leaveResolver?.(false) })
+  onBeforeUnmount(() => { disposed = true; epoch++; unwatch?.(); clearInterval(interval); clearTimeout(saveTimer); clearTimeout(retryTimer); window.removeEventListener('beforeunload', beforeUnload); leaveResolver?.(false) })
   return { view, loading, busy, error, questions, answerItems, current, selected, draft, drafts, marks, sheetOpen, canAnswer, unsaved, answered, remainingLabel, remaining,
     assets: files.assets, load, start, chooseSingle, chooseMultiple, clearAnswer: () => choose([]), go, selectNumber: (value: string) => go(Number(value)), mark, useRemote, keepLocal, retrySave,
     boardPage, boardLimit, boardLoading, setBoardPage, setBoardLimit, lostUnsynced, boardPageCount: computed(() => Math.max(1, Math.ceil((board.value?.total ?? 0) / boardLimit.value))),

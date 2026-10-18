@@ -87,14 +87,6 @@ public sealed class TeamProgressionNodeState : IConcurrencyTracked
     public DateTimeOffset EvaluatedAt { get; set; }
 }
 
-public sealed class TeamProgressionNodeVisit
-{
-    public Guid TeamId { get; set; }
-    public Guid NodeId { get; set; }
-    public Guid CompetitionId { get; set; }
-    public DateTimeOffset FirstOpenedAt { get; set; }
-}
-
 public sealed class TeamProgressionBadgeState : IConcurrencyTracked
 {
     public Guid TeamId { get; set; }

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformIndexPageViewState } from '~/features/routes/admin/platform/useAdminPlatformIndexPage'
 
 const viewProps = defineProps<{ state: AdminPlatformIndexPageViewState }>()
-const { Upload, information, loading, loadError, name, description, saving, logoInput, logoUploading, logoSrc, save, uploadLogo, setLogoInputRef } = toRefs(viewProps.state)
+const { Upload, information, loading, loadError, name, description, publicBaseUrl, saving, logoInput, logoUploading, logoSrc, save, uploadLogo, setLogoInputRef } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -54,6 +54,11 @@ const { Upload, information, loading, loadError, name, description, saving, logo
               <Field>
                 <FieldLabel for="platform-description">{{ $t('administration.label.platformDescription') }}</FieldLabel>
                 <Textarea id="platform-description" v-model="description" rows="3" maxlength="500" />
+              </Field>
+              <Field>
+                <FieldLabel for="platform-public-base-url">{{ $t('administration.label.publiclyAccessibleAddress') }}</FieldLabel>
+                <Input id="platform-public-base-url" v-model="publicBaseUrl" type="url" required maxlength="2048" :placeholder="$t('administration.label.httpsCtfExampleCom')" />
+                <FieldDescription>{{ $t('administration.label.publicAddressUsage') }}</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel>{{ $t('administration.label.logo') }}</FieldLabel>

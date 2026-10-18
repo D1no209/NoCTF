@@ -7,8 +7,8 @@ describe('authentication pages and dialog surfaces', () => {
     const registerRoute = await Bun.file(new URL('../app/pages/auth/register.vue', import.meta.url)).text()
     const login = await sourceFile(new URL('../app/pages/auth/login.vue', import.meta.url)).text()
     const register = await sourceFile(new URL('../app/pages/auth/register.vue', import.meta.url)).text()
-    const loginAsset = Bun.file(new URL('../app/assets/images/auth/login-character.png', import.meta.url))
-    const registerAsset = Bun.file(new URL('../app/assets/images/auth/register-character.png', import.meta.url))
+    const loginAsset = Bun.file(new URL('../app/assets/images/auth/login-character.webp', import.meta.url))
+    const registerAsset = Bun.file(new URL('../app/assets/images/auth/register-character.webp', import.meta.url))
 
     expect(loginRoute).toContain("middleware: 'guest'")
     expect(registerRoute).toContain("middleware: 'guest'")
@@ -28,8 +28,13 @@ describe('authentication pages and dialog surfaces', () => {
     expect(register).not.toContain('AuthCharacterOrnament')
     expect(await loginAsset.exists()).toBe(true)
     expect(await registerAsset.exists()).toBe(true)
-    expect(new Uint8Array(await loginAsset.arrayBuffer())[25]).toBe(6)
-    expect(new Uint8Array(await registerAsset.arrayBuffer())[25]).toBe(6)
+    // WebP 容器(RIFF/WEBP)且保留 alpha 通道(VP8X flags 的 0x10 位)
+    for (const asset of [loginAsset, registerAsset]) {
+      const bytes = new Uint8Array(await asset.arrayBuffer())
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('RIFF')
+      expect(String.fromCharCode(...bytes.slice(8, 12))).toBe('WEBP')
+      expect(bytes[20]! & 0x10).toBe(0x10)
+    }
     expect(login).not.toContain("$t('common.description.logAccountUsernameEmail')")
     expect(login).toContain('<CardTitle class="text-xl font-semibold">')
     expect(login).toContain('<CardHeader class="relative z-10 pt-3">')

@@ -43,6 +43,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
+            await db.PlatformSettings.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PublicBaseUrl, "https://noctf.example"), cancellationToken);
             var store = new EmailVerificationConfigurationStore(
                 db,
                 new PlatformSecretProtector(Options.Create(
@@ -72,7 +73,6 @@ public sealed class EmailVerificationConfigurationPersistenceTests
 
             var updated = await store.UpdateAsync(new(
                 Enabled: true,
-                PublicBaseUrl: "https://noctf.example",
                 TokenLifetimeMinutes: 120,
                 ResendCooldownSeconds: 45,
                 PasswordResetTokenLifetimeMinutes: 30,
@@ -98,7 +98,6 @@ public sealed class EmailVerificationConfigurationPersistenceTests
 
             var lastUpdate = await store.UpdateAsync(new(
                 Enabled: false,
-                PublicBaseUrl: "https://stale.example",
                 TokenLifetimeMinutes: 120,
                 ResendCooldownSeconds: 45,
                 PasswordResetTokenLifetimeMinutes: 30,
@@ -114,7 +113,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 Now: DateTimeOffset.UtcNow), cancellationToken);
             await Assert.That(lastUpdate).IsNotNull();
             await Assert.That(lastUpdate!.Enabled).IsFalse();
-            await Assert.That(lastUpdate.PublicBaseUrl).IsEqualTo("https://stale.example");
+            await Assert.That(lastUpdate.PublicBaseUrl).IsEqualTo("https://noctf.example");
             await Assert.That(lastUpdate.SmtpSecurityMode)
                 .IsEqualTo(SmtpSecurityMode.StartTls);
             await Assert.That(lastUpdate.SmtpPasswordConfigured).IsTrue();

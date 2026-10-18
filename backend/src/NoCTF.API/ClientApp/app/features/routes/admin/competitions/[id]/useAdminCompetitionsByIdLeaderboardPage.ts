@@ -4,13 +4,13 @@ import { ChartNoAxesCombined } from '@lucide/vue'
 
 
 import { toast } from '../../../../../utils/message-toast'
-import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
+import { adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdLeaderboardPage. */
 export function useAdminCompetitionsByIdLeaderboardPage() {
-  const { competitionId, canWrite } = useCompetitionAdmin()
+  const { competitionId, canWrite, accept, read: readAdminCompetition } = useCompetitionAdmin()
   const scoreboardPath = `/competitions/${competitionId}/leaderboard`
 
   const current = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null>(null)
@@ -30,7 +30,7 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
+    const { data, error: e } = await readAdminCompetition({ path: { competitionId } })
     if (e) error.value = parseApiError(e).displayMessage
     else {
       current.value = data?.leaderboardVisibility ?? null
@@ -55,6 +55,7 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
         },
       })
       if (error) throw error
+      if (data) accept(data)
       current.value = data?.leaderboardVisibility ?? current.value
       frozenStartAt.value = isoToLocalInput(current.value?.frozenStartAt)
       hiddenStartAt.value = isoToLocalInput(current.value?.hiddenStartAt)

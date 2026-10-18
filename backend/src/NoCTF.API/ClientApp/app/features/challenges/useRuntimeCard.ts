@@ -8,7 +8,7 @@ import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
-import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
+import { useRuntimeClock, useRuntimeExtension, useRuntimeStateVariant, useRuntimeTtl } from './useRuntimeStatus'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
@@ -39,9 +39,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   const commandAttempt = createCommandAttempt()
 
-  const extendMinutes = ref<number | string>(30)
-
-  const now = ref(Date.now())
+  const now = useRuntimeClock()
 
   const forceUntilStopped = ref(false)
 
@@ -132,11 +130,12 @@ export function useRuntimeCard(props: Readonly<Omit<{
     action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
     failMessage: string,
     onAccepted?: () => void,
+    requiresHumanVerification = true,
   ) {
     if (acting.value) return
     acting.value = true
     try {
-    const verificationHeaders = await requestHumanVerification('runtime')
+    const verificationHeaders = requiresHumanVerification ? await requestHumanVerification('runtime') : {}
     if (verificationHeaders === null) return
     const { error } = await action(verificationHeaders)
     if (error) {
@@ -171,7 +170,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     }), translate("runtime.error.stopEnvironmentFailed"), () => {
       if (runtime.value?.id === current.id)
         runtime.value = { ...runtime.value, state: 'Stopping' }
-    })
+    }, false)
   }
 
   const reset = () => runtime.value && act(verificationHeaders => createRuntime({
@@ -182,8 +181,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   const extend = () => {
     const current = runtime.value
-    const extension = createRuntimeExtensionRequest(
-      current?.expiresAt, Date.now(), extendMinutes.value, 720)
+    const extension = extensionRequest.value
     if (current?.state !== 'Running' || !current.id || extension === null) return
     return act(
       verificationHeaders => extendRuntimeEndpoint({
@@ -195,51 +193,21 @@ export function useRuntimeCard(props: Readonly<Omit<{
     )
   }
 
-  let timer: ReturnType<typeof setInterval> | undefined
-
-  onMounted(() => {
-    timer = setInterval(() => {
-      now.value = Date.now()
-    }, 1000)
-  })
-
-  onUnmounted(() => {
-    if (timer) clearInterval(timer)
-  })
-
-  const ttl = computed(() => {
-    if (!runtime.value?.expiresAt) return null
-    const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 ? formatDuration(remaining) : translate("runtime.label.expired")
-  })
+  const busy = computed(() => acting.value || polling.value)
+  const ttl = useRuntimeTtl(runtime, now)
+  const stateVariant = useRuntimeStateVariant(runtime)
+  const {
+    extendMinutes,
+    extendMinutesInvalid,
+    renewalTooEarly,
+    extensionRequest,
+    extensionWindowOpen,
+  } = useRuntimeExtension(runtime, now, { maximumMinutes: 720, busy })
 
   const isRunning = computed(() => runtime.value?.state === 'Running')
   const canStop = computed(() => runtime.value && ['Running', 'Queued', 'Provisioning'].includes(runtime.value.state ?? ''))
   const stopDisabled = computed(() => acting.value || runtime.value?.state === 'Stopping')
-
-  const busy = computed(() => acting.value || polling.value)
-  const extendMinutesInvalid = computed(() =>
-    parseRuntimeExtensionMinutes(extendMinutes.value, 720) === null)
-  const renewalTooEarly = computed(() => runtime.value?.state === 'Running'
-    && isRuntimeExtensionTooEarly(runtime.value.expiresAt, now.value))
-  const canExtend = computed(() => runtime.value?.state === 'Running'
-    && !!runtime.value.id
-    && !busy.value
-    && createRuntimeExtensionRequest(
-      runtime.value.expiresAt, now.value, extendMinutes.value, 720) !== null)
-
-  const stateVariant = computed(() => {
-    switch (runtime.value?.state) {
-      case 'Running':
-        return 'default' as const
-      case 'Failed':
-        return 'destructive' as const
-      case 'Stopped':
-        return 'secondary' as const
-      default:
-        return 'outline' as const
-    }
-  })
+  const canExtend = computed(() => extensionWindowOpen.value && !!runtime.value?.id && !busy.value)
 
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 

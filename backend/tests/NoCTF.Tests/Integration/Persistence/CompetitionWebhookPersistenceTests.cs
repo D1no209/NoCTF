@@ -132,11 +132,6 @@ public sealed class CompetitionWebhookPersistenceTests
                     new GetChallenge(Substitute.For<IChallengeManagementStore>()),
                     new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                     Substitute.For<ILeaderboardCache>(),
-                    new CompetitionWebhookOptions(
-                        new Uri("https://noctf.example.test/"),
-                        10,
-                        new HashSet<string>(),
-                        new HashSet<string>()),
                     TimeProvider.System,
                     Microsoft.Extensions.Logging.Abstractions.NullLogger<
                         CompetitionWebhookDeliveryStore>.Instance);
@@ -153,6 +148,15 @@ public sealed class CompetitionWebhookPersistenceTests
                 using var body = JsonDocument.Parse(delivery.Body!);
                 await Assert.That(body.RootElement.GetProperty("type").GetString())
                     .IsEqualTo("com.noctf.competition.lifecycle.changed.v1");
+                await deliveryDb.PlatformSettings.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(value => value.PublicBaseUrl, "https://current.example"), cancellationToken);
+                var testDelivery = await deliveryStore.PrepareTestDeliveryAsync(
+                    new(competitionId, targetId, Guid.NewGuid(), now), cancellationToken);
+                using var testBody = JsonDocument.Parse(testDelivery.Body!);
+                await Assert.That(testBody.RootElement.GetProperty("source").GetString())
+                    .IsEqualTo($"https://current.example/api/v1/competitions/{competitionId}");
+                await Assert.That(testBody.RootElement.GetProperty("dataschema").GetString())
+                    .IsEqualTo("https://current.example/schemas/webhooks/competition-events-v1.schema.json");
                 await Assert.That(body.RootElement.GetProperty("data")
                     .GetProperty("resources")
                     .GetProperty("competition")
@@ -205,11 +209,6 @@ public sealed class CompetitionWebhookPersistenceTests
                         new GetChallenge(Substitute.For<IChallengeManagementStore>()),
                         new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                         Substitute.For<ILeaderboardCache>(),
-                        new CompetitionWebhookOptions(
-                            new Uri("https://noctf.example.test/"),
-                            10,
-                            new HashSet<string>(),
-                            new HashSet<string>()),
                         TimeProvider.System,
                         raceLogger);
 
@@ -265,11 +264,6 @@ public sealed class CompetitionWebhookPersistenceTests
                     new GetChallenge(Substitute.For<IChallengeManagementStore>()),
                     new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                     Substitute.For<ILeaderboardCache>(),
-                    new CompetitionWebhookOptions(
-                        new Uri("https://noctf.example.test/"),
-                        10,
-                        new HashSet<string>(),
-                        new HashSet<string>()),
                     TimeProvider.System,
                     Microsoft.Extensions.Logging.Abstractions.NullLogger<
                         CompetitionWebhookDeliveryStore>.Instance);

@@ -3,7 +3,7 @@ import type { InjectionKey, Ref } from 'vue'
 import { localeTag, translate } from './i18n'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  NoCtfapiEndpointsTeamsMyTeamStandingResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
   NoCtfapiEndpointsNotificationsNotificationResponse,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
@@ -16,6 +16,7 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsNotificationsNotificationKindProtocol,
+  NoCtfDomainChallengesQuestionsCompetitionQuestionStatus,
 } from '../api'
 import {
   adminCompetitionCheatsPath,
@@ -28,11 +29,12 @@ import {
 
 /** 竞赛上下文:由 pages/competitions/[id].vue provide,子路由 inject。 */
 export interface CompetitionContext {
+  managementFresh?: Ref<boolean>
   competition: Ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
   loading: Ref<boolean>
   error: Ref<UiMessage | null>
   refresh: () => Promise<void>
-  standing: Ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>
+  standing: Ref<NoCtfapiEndpointsTeamsMyTeamStandingResponse | null>
   refreshStanding: () => Promise<void>
   canReadBroadcasts: Ref<boolean>
 }
@@ -79,6 +81,21 @@ export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsG
   if (result === null || result === undefined) return translate("common.label.underEvaluation")
   const labels = { RightButDue: translate("challenges.flagSubmit.correctWithoutScore"), Correct: translate("common.label.correct"), Wrong: translate("common.label.wrong"), Duplicate: translate("common.label.repeat"), AttemptsExhausted: translate("common.label.exhausted"), Rejected: translate("common.label.rejected"), Unlocked: translate("common.label.unlocked"), Applied: translate("common.label.applied"), ServiceUp: translate("common.label.serviceNormal"), ServiceDown: translate("common.label.serviceException"), Controlled: translate("common.label.controlled"), Uncontrolled: translate("common.label.uncontrolled") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
   return labels[result]
+}
+
+/** 咨询状态(数字协议)与稳定文案 key;渲染期翻译,不固定语言。 */
+const questionStatusMessageKeys = {
+  0: 'notifications.label.awaitingReply',
+  1: 'notifications.label.replied',
+  2: 'notifications.label.resolved',
+  3: 'notifications.label.closed',
+} as const satisfies Record<NoCtfDomainChallengesQuestionsCompetitionQuestionStatus, string>
+
+export function questionStatusLabel(status?: number | null): string {
+  const key = status === null || status === undefined
+    ? null
+    : questionStatusMessageKeys[status as NoCtfDomainChallengesQuestionsCompetitionQuestionStatus] ?? null
+  return translate(key ?? 'common.label.unknown')
 }
 
 export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null): string {

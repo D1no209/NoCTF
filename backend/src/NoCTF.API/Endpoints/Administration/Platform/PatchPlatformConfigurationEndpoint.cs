@@ -50,12 +50,12 @@ public sealed class PlatformBrandingPatchRequest
 {
     public required string Name { get; set; }
     public required string? Description { get; set; }
+    public string PublicBaseUrl { get; set; } = string.Empty;
 }
 
 public sealed class PlatformEmailVerificationPatchRequest
 {
     public required bool Enabled { get; set; }
-    public required string PublicBaseUrl { get; set; }
     public required int TokenLifetimeMinutes { get; set; }
     public required int ResendCooldownSeconds { get; set; }
     public required int PasswordResetTokenLifetimeMinutes { get; set; }
@@ -154,8 +154,8 @@ public sealed class PatchPlatformConfigurationValidator
         RuleForEach(request => request.HumanVerification!.TurnstileAllowedHostnames)
             .NotEmpty().MaximumLength(253)
             .When(request => request.HumanVerification is not null);
-        RuleFor(request => request.EmailVerification!.PublicBaseUrl).NotEmpty().MaximumLength(2048)
-            .When(request => request.EmailVerification is not null);
+        RuleFor(request => request.Branding!.PublicBaseUrl).NotEmpty().MaximumLength(2048)
+            .When(request => request.Branding is not null);
         RuleFor(request => request.EmailVerification!.SmtpPort).InclusiveBetween(1, 65_535)
             .When(request => request.EmailVerification is not null);
         RuleFor(request => request.EmailVerification!.SmtpSecurityMode).IsInEnum()
@@ -187,7 +187,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationResendCooldownSeconds))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailPasswordResetTokenLifetimeMinutes))]
@@ -210,14 +209,13 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicy))]
     [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicyStamp))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyBrandingAsAdministrator(
         PlatformBrandingPatchRequest request,
         [MappingTarget] PlatformSettings target);
 
+    [MapperIgnoreTarget(nameof(PlatformSettings.PublicBaseUrl))]
     [MapProperty(nameof(PlatformEmailVerificationPatchRequest.Enabled), nameof(PlatformSettings.EmailVerificationEnabled))]
-    [MapProperty(nameof(PlatformEmailVerificationPatchRequest.PublicBaseUrl), nameof(PlatformSettings.EmailPublicBaseUrl))]
     [MapProperty(nameof(PlatformEmailVerificationPatchRequest.TokenLifetimeMinutes), nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
     [MapProperty(nameof(PlatformEmailVerificationPatchRequest.ResendCooldownSeconds), nameof(PlatformSettings.EmailVerificationResendCooldownSeconds))]
     [MapProperty(nameof(PlatformEmailVerificationPatchRequest.PasswordResetTokenLifetimeMinutes), nameof(PlatformSettings.EmailPasswordResetTokenLifetimeMinutes))]
@@ -259,7 +257,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicy))]
     [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicyStamp))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyEmailAsAdministrator(
         PlatformEmailVerificationPatchRequest request,
@@ -302,7 +299,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
             Description = branding.Description,
             LogoFileId = branding.LogoFileId,
             EmailVerificationEnabled = email.Enabled,
-            EmailPublicBaseUrl = email.PublicBaseUrl,
+            PublicBaseUrl = email.PublicBaseUrl,
             EmailVerificationTokenLifetimeMinutes = email.TokenLifetimeMinutes,
             EmailVerificationResendCooldownSeconds = email.ResendCooldownSeconds,
             EmailPasswordResetTokenLifetimeMinutes = email.PasswordResetTokenLifetimeMinutes,
@@ -334,7 +331,8 @@ public sealed class PatchPlatformConfigurationEndpoint(
                     target.Name,
                     target.Description,
                     timeProvider.GetUtcNow(),
-                    transactionCt);
+                    transactionCt,
+                    target.PublicBaseUrl);
                 if (result.State != PlatformConfigurationUpdateState.Updated)
                 {
                     return AtomicAggregatePatchDecision<Results<
@@ -369,7 +367,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             {
                 var result = await emailVerification.UpdateAsync(new(
                     target.EmailVerificationEnabled,
-                    target.EmailPublicBaseUrl,
                     target.EmailVerificationTokenLifetimeMinutes,
                     target.EmailVerificationResendCooldownSeconds,
                     target.EmailPasswordResetTokenLifetimeMinutes,

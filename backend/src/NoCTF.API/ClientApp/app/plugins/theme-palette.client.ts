@@ -1,7 +1,7 @@
 import { watch } from 'vue'
 import { useThemePalette } from '../composables/useThemePalette'
-import { colorInk } from '../components/ui/color-picker/color'
-import { paletteStorageKey, parseThemePalette } from '../features/theme/palette'
+import { colorInk } from '../lib/color'
+import { paletteStorageKey, parseThemePalette } from '../lib/theme-palette'
 
 export default defineNuxtPlugin(nuxtApp => {
   const palette = useThemePalette()

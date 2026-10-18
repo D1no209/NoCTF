@@ -1,12 +1,12 @@
 import CompetitionTeamBanScreenComponent from '../../competition/CompetitionTeamBanScreen.vue'
-import { message as describeMessage } from '../../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, Monitor, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression, getCompetitionTheory } from '../../../api'
+import { getCompetitionEndpoint, getMyTeamStanding, getMyTeamEndpoint } from '../../../api'
 import { watchNotifications } from '~/composables/useNotificationHub'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsMyTeamStandingResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
@@ -45,7 +45,7 @@ export function useCompetitionsByIdPage() {
 
   const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
-  const myStanding = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const myStanding = ref<NoCtfapiEndpointsTeamsMyTeamStandingResponse | null>(null)
 
   const standingLoading = ref(false)
 
@@ -98,41 +98,23 @@ export function useCompetitionsByIdPage() {
     && (hasCompetitionStaffAccess.value
       || !teamLoading.value && !teamLoadError.value && hasParticipantChallengeAccess.value))
 
-  const progressionEnabled = ref(false)
-  const theoryVisible = ref(false)
-  let theoryEpoch = 0
-  async function refreshTheory() {
-    const epoch = ++theoryEpoch
-    theoryVisible.value = false
-    if (!user.value || !hasParticipantChallengeAccess.value || !['Ctf', 'Awd', 'Awdp'].includes(competition.value?.mode ?? '')) return
-    const response = await getCompetitionTheory({ path: { competitionId: competitionId.value }, query: { staff: false } })
-    if (epoch === theoryEpoch) theoryVisible.value = (response.data?.length ?? 0) > 0
-  }
-  watch(() => [competition.value, myTeam.value, user.value?.userId], () => void refreshTheory())
+  const progressionEnabled = computed(() => competition.value?.features?.progressionEnabled === true
+    && competition.value.features.progressionMapVisible === true)
+  const theoryVisible = computed(() => !!user.value && user.value.kind === 'Human'
+    && hasParticipantChallengeAccess.value && ['Ctf', 'Awd', 'Awdp'].includes(competition.value?.mode ?? '')
+    && competition.value?.features?.hasPublishedTheory === true)
   let unwatchTheory: (() => void) | undefined
-  onMounted(() => { unwatchTheory = watchNotifications({ theoryChanged: () => void refreshTheory(), onReconnected: () => void refreshTheory() }) })
-  onBeforeUnmount(() => { theoryEpoch++; unwatchTheory?.() })
+  onMounted(() => { unwatchTheory = watchNotifications({ theoryChanged: () => void refresh(), onReconnected: () => void refresh() }) })
+  onBeforeUnmount(() => unwatchTheory?.())
 
-  let progressionRequestId = 0
-
-  async function refreshProgressionEnabled() {
-    if (isPublicSpectator.value) return
-    const requestId = ++progressionRequestId
-    if (competition.value?.mode !== 'Ctf'
-      || (!hasCompetitionStaffAccess.value && !hasParticipantChallengeAccess.value)) {
-      progressionEnabled.value = false
-      return
-    }
-    const { data } = await getPlayerCompetitionProgression({
-      path: { competitionId: competitionId.value },
-    })
-    if (requestId === progressionRequestId)
-      progressionEnabled.value = data?.enabled === true
-  }
-
-  watch([competition, myTeam, () => user.value?.userId], () => {
-    void refreshProgressionEnabled()
-  }, { immediate: true })
+  let standingGeneration = 0
+  let standingPending: Promise<boolean> | null = null
+  const standingIdentity = computed(() => `${user.value?.userId ?? ''}:${competitionId.value}:${myTeam.value?.id ?? ''}:${myTeam.value?.registrationStatus ?? ''}:${myTeam.value?.isBanned ?? false}:${hasCompetitionStaffAccess.value ? 'Staff' : competition.value?.leaderboardVisibility ?? ''}`)
+  watch(standingIdentity, () => {
+    standingGeneration++; standingPending = null; standingPolling.stop()
+    myStanding.value = null; standingError.value = null; standingLoading.value = false
+    void refreshMyStanding()
+  }, { flush: 'sync' })
 
   async function refreshMyTeam() {
     if (isPublicSpectator.value) return
@@ -151,7 +133,7 @@ export function useCompetitionsByIdPage() {
     })
     if (requestId !== teamRequestId) return
     teamLoading.value = false
-    if (response?.status === 404) {
+    if ([401, 403, 404].includes(response?.status ?? 0)) {
       myTeam.value = null
       teamLoadError.value = null
       standingError.value = null
@@ -163,38 +145,49 @@ export function useCompetitionsByIdPage() {
     }
     teamLoadError.value = null
     myTeam.value = data
-    await refreshMyStanding()
+    void refreshMyStanding()
   }
 
-  async function refreshMyStanding(): Promise<void> {
-    if (isPublicSpectator.value) return
-    if (competition.value?.mode === 'LiveSolo') {
+  function loadStanding(): Promise<boolean> {
+    if (standingPending) return standingPending
+    if (isPublicSpectator.value || !user.value || competition.value?.mode === 'LiveSolo'
+      || myTeam.value?.registrationStatus !== 'Approved' || myTeam.value.isBanned || !myTeam.value.id) {
       myStanding.value = null; standingError.value = null; standingLoading.value = false
-      return
+      return Promise.resolve(true)
     }
-    if (myTeam.value?.registrationStatus !== 'Approved' || myTeam.value.isBanned || !myTeam.value.id) {
-      myStanding.value = null
-      standingLoading.value = false
-      standingError.value = null
-      return
-    }
+    const generation = standingGeneration, teamId = myTeam.value.id
+    let processing = false
     standingLoading.value = myStanding.value === null
-    const { data, error: requestError, response } = await getLeaderboardEndpoint({
-      path: { competitionId: competitionId.value },
-      query: { endingRound: null },
-    })
-    standingLoading.value = false
-    if (response?.status === 404) {
-      myStanding.value = null
-      standingError.value = null
-      return
-    }
-    if (requestError || !data || !('teams' in data)) {
-      standingError.value = parseApiError(requestError, describeMessage("competitions.competitionsBy.error.loadTeamRankingFailed")).displayMessage
-      return
-    }
-    standingError.value = null
-    myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null
+    const task = (async () => {
+      try {
+        const { data, error: requestError, response } = await getMyTeamStanding({ path: { competitionId: competitionId.value } })
+        if (generation !== standingGeneration) return true
+        if ([401, 403, 404].includes(response?.status ?? 0)) {
+          myStanding.value = null; standingError.value = null; return true
+        }
+        if (response?.status === 202) { processing = true; standingError.value = null; return false }
+        if (requestError || !data || !('teamId' in data)) throw requestError
+        if (data.teamId !== teamId) { myStanding.value = null; return true }
+        standingError.value = null
+        myStanding.value = data.dataScope === 'Hidden' ? null : data
+        return true
+      } catch (cause) {
+        if (generation === standingGeneration)
+          standingError.value = parseApiError(cause, describeMessage('competitions.competitionsBy.error.loadTeamRankingFailed')).displayMessage
+        return true
+      } finally {
+        if (generation === standingGeneration) standingLoading.value = processing && myStanding.value === null
+      }
+    })().finally(() => { if (standingPending === task) standingPending = null })
+    standingPending = task
+    return task
+  }
+  const standingPolling = usePolling(loadStanding, { interval: 2000, maxInterval: 8000, timeout: 120_000 })
+  watch(standingPolling.timedOut, value => {
+    if (value) { standingLoading.value = false; standingError.value = describeMessage('competitions.competitionsBy.error.loadTeamRankingFailed') }
+  })
+  async function refreshMyStanding(): Promise<void> {
+    if (!await loadStanding()) standingPolling.start()
   }
 
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
@@ -211,7 +204,9 @@ export function useCompetitionsByIdPage() {
     if (err || !data) {
       competitionActorId.value = null
       error.value = parseApiError(err, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
-      progressionEnabled.value = false
+      if ([401, 403, 404].includes(response?.status ?? 0)) {
+        competition.value = null; myTeam.value = null; myStanding.value = null
+      }
       return response?.status === 404 ? 'not-found' : 'failed'
     }
     error.value = null
@@ -261,11 +256,13 @@ export function useCompetitionsByIdPage() {
           || event.kind === 'TeamRegistered' || event.kind === 'TeamRegistrationChanged' || event.kind === 'TeamDeleted'
           || event.kind === 'TeamMemberJoined' || event.kind === 'TeamMemberRemoved')
           void refreshMyTeam()
-        if (event.kind === 'CompetitionAudienceChanged')
+        if (event.kind === 'CompetitionAudienceChanged' || event.kind === 'LeaderboardVisibilityChanged'
+          || event.kind === 'TrackConfigurationUpdated' || event.kind === 'TeamTrackChanged') {
+          standingGeneration++; standingPending = null; myStanding.value = null; standingPolling.stop()
           void handleAudienceChanged()
+        }
         if (event.kind === 'CompetitionUpdated') {
           void refresh()
-          void refreshProgressionEnabled()
         }
         if (event.kind === 'AnnouncementPublished')
           void refreshMissedAnnouncements()
@@ -275,9 +272,10 @@ export function useCompetitionsByIdPage() {
       },
       onReconnected: () => {
         if (isPublicSpectator.value) return
+        standingGeneration++; standingPending = null; myStanding.value = null; standingPolling.stop()
         if (!isWriteUpReview.value) void refreshMyTeam()
         if (!isWriteUpReview.value) void refreshStandingLatest()
-        void refreshProgressionEnabled()
+        void refresh()
         void refreshMissedAnnouncements()
       },
     })
@@ -286,7 +284,7 @@ export function useCompetitionsByIdPage() {
   watch(isPublicSpectator, enabled => {
     if (enabled) {
       unwatch?.(); unwatch = undefined
-      competitionRequestId++; teamRequestId++; progressionRequestId++
+      competitionRequestId++; teamRequestId++; standingGeneration++; standingPolling.stop()
       competition.value = null; competitionActorId.value = null; myTeam.value = null; myStanding.value = null
     } else {
       subscribeWorkspace()
@@ -294,9 +292,14 @@ export function useCompetitionsByIdPage() {
     }
   }, { flush: 'sync' })
 
+  // LiveSolo 赛制的共享工作区导航会渲染 liveSolo 文案，而 /competitions/** 子路由不加载该域。
+  watch(() => competition.value?.mode, (mode) => {
+    if (mode === 'LiveSolo') void ensureLocaleDomains(['live-solo'])
+  }, { immediate: true })
+
   onUnmounted(() => {
     competitionRequestId++
-    progressionRequestId++
+    standingGeneration++; standingPolling.stop()
     teamRequestId++
     unwatch?.()
   })

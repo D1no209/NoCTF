@@ -16,7 +16,7 @@ public sealed class CompetitionWebhookSenderTests
         try
         {
             var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            var options = new CompetitionWebhookOptions(new Uri("https://noctf.example.test/"), 5,
+            var options = new CompetitionWebhookOptions(5,
                 new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase));
             using var sender = new CompetitionWebhookSender(options, TimeProvider.System);
@@ -208,7 +208,6 @@ public sealed class CompetitionWebhookSenderTests
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         var request = ReceiveOnceAsync(listener, status, retryAfter);
         var options = new CompetitionWebhookOptions(
-            new Uri("https://noctf.example.test/"),
             15,
             new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase),
             new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase));

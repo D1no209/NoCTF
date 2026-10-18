@@ -56,7 +56,7 @@ public sealed class LiveSoloEventApplicabilityTests
             var protector = new PlatformSecretProtector(Options.Create(new EmailVerificationProtectionOptions { EncryptionKey = Convert.ToBase64String(new byte[32]) }));
             var deliveries = new CompetitionWebhookDeliveryStore(f.Db, protector,
                 new GetChallenge(Substitute.For<IChallengeManagementStore>()), new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
-                Substitute.For<ILeaderboardCache>(), new(new Uri("https://example.test/"), 10, new HashSet<string>(), new HashSet<string>()),
+                Substitute.For<ILeaderboardCache>(),
                 f.Clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<CompetitionWebhookDeliveryStore>.Instance);
             await Assert.That((await deliveries.PrepareBatchAsync(new(f.Competition.Id, legacy), 10, ct)).Deliveries.Count).IsEqualTo(0);
             f.Db.ChangeTracker.Clear();

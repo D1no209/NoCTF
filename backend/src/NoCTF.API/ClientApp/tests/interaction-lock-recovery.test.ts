@@ -62,7 +62,7 @@ function interactionDocument(
     querySelectorAll: (selector: string) => {
       if (selector === '[data-interaction-lock-recovered]')
         return overlays.filter(layer => layer.hasAttribute('data-interaction-lock-recovered'))
-      if (selector.includes('data-dismissable-layer')) return openLayers
+      if (selector.includes('data-modal-scroll-lock')) return openLayers
       return overlays
     },
   } as unknown as Document
@@ -123,4 +123,41 @@ test('does not change an unlocked page without a modal overlay', () => {
 
   expect(releaseStaleInteractionLock(documentRoot)).toBe(false)
   expect(bodyStyle.pointerEvents).toBe('')
+})
+
+test('an invisible stale modal content does not preserve the body lock', () => {
+  // 模态内容已随 Portal 拆除(不可见),残留的只有库状态,必须释放。
+  const { documentRoot, bodyStyle } = interactionDocument('none', {
+    openLayers: [fakeLayer({ visible: false })],
+  })
+
+  expect(releaseStaleInteractionLock(documentRoot)).toBe(true)
+  expect(bodyStyle.pointerEvents).toBe('')
+})
+
+test('detection relies on this project own modal marker instead of library internals', async () => {
+  const recovery = await Bun.file(new URL('../app/features/shell/interaction-lock-recovery.ts', import.meta.url)).text()
+
+  // 注释中会说明"不再读取"的库属性,因此只对代码行做断言。
+  const code = recovery.split('\n')
+    .filter(line => {
+      const trimmed = line.trimStart()
+      return !trimmed.startsWith('*') && !trimmed.startsWith('/*') && !trimmed.startsWith('//')
+    })
+    .join('\n')
+
+  expect(code).toContain("const OPEN_INTERACTION_LAYER_SELECTOR = '[data-modal-scroll-lock]'")
+  expect(code).not.toContain('data-dismissable-layer')
+  expect(code).not.toContain('data-state')
+
+  // 所有模态表面都必须携带该标记,否则检测会漏掉它而误释放锁。
+  for (const path of [
+    '../app/components/ui/dialog/DialogContent.vue',
+    '../app/components/ui/dialog/DialogScrollContent.vue',
+    '../app/components/ui/alert-dialog/AlertDialogContent.vue',
+    '../app/components/ui/sheet/SheetContent.vue',
+  ]) {
+    const source = await Bun.file(new URL(path, import.meta.url)).text()
+    expect(source).toContain('data-modal-scroll-lock')
+  }
 })

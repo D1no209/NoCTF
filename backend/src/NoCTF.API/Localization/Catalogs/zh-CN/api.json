@@ -450,7 +450,6 @@
   "api.endpoints.profileCoverUpload.sizeInvalid": "文件大小不合法。",
   "api.endpoints.profileCoverUpload.sourceMetadataMismatch": "源文件元数据不匹配。",
   "api.endpoints.profileCoverUpload.unsupportedFormat": "不支持此格式。",
-  "api.endpoints.progressionStart.graphChanged": "闯关规则已变更，请重新加载后再启动。",
   "api.endpoints.register.emailConflict": "该邮箱地址已被注册。",
   "api.endpoints.register.userNameConflict": "指定的账号标识已被使用。",
   "api.endpoints.runnerAdmissionFailure.nodePressureHigh": "节点资源压力过高。",

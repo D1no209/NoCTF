@@ -12,7 +12,8 @@ public sealed record PlatformBrandingResponse(
     string Name,
     string? Description,
     string? LogoUrl,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string PublicBaseUrl);
 
 internal static class PlatformConfigurationMapping
 {
@@ -24,7 +25,8 @@ internal static class PlatformConfigurationMapping
             configuration.Name,
             configuration.Description,
             PublicPlatformConfigurationMapping.LogoUrl(configuration, links, httpContext),
-            configuration.UpdatedAt);
+            configuration.UpdatedAt,
+            configuration.PublicBaseUrl);
 }
 
 public sealed record AdminHumanVerificationConfigurationResponse(

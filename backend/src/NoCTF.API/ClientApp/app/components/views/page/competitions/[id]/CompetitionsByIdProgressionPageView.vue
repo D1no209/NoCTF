@@ -78,7 +78,7 @@ const {
               <div v-else-if="selectedNode.data" class="flex flex-col gap-3">
                 <Badge :variant="selectedNode.data.complete ? 'default' : 'secondary'" class="w-fit">
                   {{ selectedNode.data.complete ? $t('progression.completed') : selectedNode.data.active
-                    ? selectedNode.data.visited ? $t('progression.inProgress') : $t('progression.available')
+                    ? $t('progression.available')
                     : $t('progression.locked') }}
                 </Badge>
                 <p v-if="selectedNode.data.complete && !selectedNode.data.active" class="text-sm text-warning">

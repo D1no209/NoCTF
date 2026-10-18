@@ -213,7 +213,7 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store, NoCTF.Applicat
         CancellationToken ct = default)
     {
         var normalizedReason = reason.Trim();
-        return normalizedReason.Length is >= 8 and <= 512
+        return normalizedReason.Length is >= 1 and <= 512
             ? store.ForceTerminateAsync(
                 competitionId,
                 runtimeInstanceId,
@@ -241,7 +241,7 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store, NoCTF.Applicat
         CancellationToken ct = default)
     {
         var normalizedReason = reason.Trim();
-        return normalizedReason.Length is >= 8 and <= 512
+        return normalizedReason.Length is >= 1 and <= 512
             ? store.ForceTerminatePlatformAsync(
                 runtimeInstanceId,
                 actorUserId,
@@ -256,12 +256,10 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store, NoCTF.Applicat
 
 public static class RuntimeForceTerminationPolicy
 {
-    public static readonly TimeSpan StuckThreshold = TimeSpan.FromMinutes(5);
-
     public static DateTimeOffset? AvailableAt(RuntimeInstanceView runtime) =>
-        runtime.State is RuntimeState.Provisioning or RuntimeState.Stopping
+        runtime.State is RuntimeState.Provisioning or RuntimeState.Stopping or RuntimeState.Failed
         && !string.IsNullOrWhiteSpace(runtime.RunnerId)
-            ? (runtime.StateChangedAt ?? runtime.CreatedAt).Add(StuckThreshold)
+            ? runtime.StateChangedAt ?? runtime.CreatedAt
             : null;
 
     public static bool CanForceTerminate(RuntimeInstanceView runtime, DateTimeOffset now) =>

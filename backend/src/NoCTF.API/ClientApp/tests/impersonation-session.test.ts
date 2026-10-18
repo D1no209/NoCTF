@@ -142,7 +142,7 @@ describe('administrator impersonation session', () => {
     expect(auth).toContain('restoreImpersonationAccessToken()')
     expect(auth).toContain('else if (await refreshSession())')
     expect(auth).toContain('user.value?.userId === active.administratorUserId')
-    expect(auth).toContain('await navigateTo(active.returnPath)')
+    expect(auth).toContain('await navigateTo(safeInternalPath(active.returnPath))')
   })
 
   test('user management exposes stateless one-time issuance and frontend identity switching', async () => {

@@ -114,13 +114,6 @@ describe('isolated Mock API', () => {
     expect(afterStop.total).toBe(13)
   })
 
-  test('starting a visible CTF challenge is an idempotent no-content operation', async () => {
-    const { send } = await setup()
-    const path = `${competition}/challenges/${id(4)}/start`
-    expect((await send(path, 'POST', {})).status).toBe(204)
-    expect((await send(path, 'POST', {})).status).toBe(204)
-  })
-
   test('the local CTF progression map exposes a readable route fixture', async () => {
     const { send } = await setup()
     const response = await send(`${competition}/progression`)
@@ -130,6 +123,7 @@ describe('isolated Mock API', () => {
     expect(graph.nodes).toHaveLength(8)
     expect(graph.edges).toHaveLength(8)
     expect(graph.nodes[0].positionX).toBeUndefined()
+    expect(graph.nodes.every((node: Data) => !('visited' in node) && !('firstOpenedAt' in node))).toBe(true)
   })
 
   test('the public profile includes a visible earned badge and zero-score historical directions', async () => {

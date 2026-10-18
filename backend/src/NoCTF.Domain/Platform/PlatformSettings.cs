@@ -73,7 +73,7 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
     public Guid MfaPolicyStamp { get; set; } = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     [MaxLength(2048)]
-    public string EmailPublicBaseUrl { get; set; } = string.Empty;
+    public string PublicBaseUrl { get; set; } = string.Empty;
 
     public int EmailVerificationTokenLifetimeMinutes { get; set; }
     public int EmailVerificationResendCooldownSeconds { get; set; }
@@ -103,9 +103,6 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
 
     public bool SsoEnabled { get; set; }
 
-    [MaxLength(2048)]
-    public string SsoPublicBaseUrl { get; set; } = string.Empty;
-
     public List<SsoProviderConfiguration> SsoProviders { get; set; } = [];
 
     [NotMapped]
@@ -114,13 +111,12 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
         get => new()
         {
             Enabled = SsoEnabled,
-            PublicBaseUrl = SsoPublicBaseUrl,
+            PublicBaseUrl = PublicBaseUrl,
             Providers = SsoProviders
         };
         set
         {
             SsoEnabled = value?.Enabled ?? false;
-            SsoPublicBaseUrl = value?.PublicBaseUrl ?? string.Empty;
             SsoProviders = value?.Providers ?? [];
         }
     }

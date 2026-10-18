@@ -16,7 +16,6 @@ const { Copy, entries, copy } = toRefs(viewProps.state)
         v-if="entry.clickable"
         :href="entry.address"
         target="_blank"
-        rel="noopener"
         class="min-w-0 flex-1 break-all font-mono text-sm text-primary underline"
       >
         {{ entry.address }}

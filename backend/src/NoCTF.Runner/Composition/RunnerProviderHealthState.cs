@@ -7,7 +7,8 @@ public enum RunnerProviderFailureKind
 {
     ProvisionRejected,
     ProvisionTimedOut,
-    CleanupFailed
+    CleanupFailed,
+    AvailabilityProbeFailed
 }
 
 public sealed class RunnerProviderHealthState(
@@ -23,6 +24,13 @@ public sealed class RunnerProviderHealthState(
         RunnerProviderFailureKind failureKind,
         Guid runtimeInstanceId)
     {
+        logger.LogWarning(
+            "Runtime resource operation failed. Provider {Provider} FailureCode {FailureCode} RuntimeInstanceId {RuntimeInstanceId}",
+            provider, failureKind, runtimeInstanceId);
+    }
+
+    public void ReportUnavailable(RuntimeProvider provider)
+    {
         var now = timeProvider.GetUtcNow();
         ProviderFailure failure;
         lock (sync)
@@ -31,18 +39,15 @@ public sealed class RunnerProviderHealthState(
                 ? checked(previous.ConsecutiveFailures + 1)
                 : 1;
             failure = new(
-                failureKind,
-                runtimeInstanceId,
+                RunnerProviderFailureKind.AvailabilityProbeFailed,
                 count,
                 now.AddSeconds(options.Value.ProviderFailureHoldSeconds));
             failures[provider] = failure;
         }
 
         logger.LogWarning(
-            "Runtime provider unavailable after a resource operation failure. Provider {Provider} FailureCode {FailureCode} RuntimeInstanceId {RuntimeInstanceId} ConsecutiveFailures {ConsecutiveFailures} UnavailableUntil {UnavailableUntil}",
+            "Runtime provider availability probe failed. Provider {Provider} ConsecutiveFailures {ConsecutiveFailures} UnavailableUntil {UnavailableUntil}",
             provider,
-            failureKind,
-            runtimeInstanceId,
             failure.ConsecutiveFailures,
             failure.UnavailableUntil);
     }
@@ -51,15 +56,6 @@ public sealed class RunnerProviderHealthState(
     {
         lock (sync)
             failures.Remove(provider);
-    }
-
-    public void EnsureReady(RuntimeProvider provider)
-    {
-        if (TryGetActiveFailure(provider, out var failure))
-        {
-            throw new InvalidOperationException(
-                $"Runtime provider '{provider}' is cooling down after '{failure!.FailureKind}'.");
-        }
     }
 
     public bool IsReady(RuntimeProvider provider) =>
@@ -85,7 +81,6 @@ public sealed class RunnerProviderHealthState(
 
     private sealed record ProviderFailure(
         RunnerProviderFailureKind FailureKind,
-        Guid RuntimeInstanceId,
         int ConsecutiveFailures,
         DateTimeOffset UnavailableUntil);
 }

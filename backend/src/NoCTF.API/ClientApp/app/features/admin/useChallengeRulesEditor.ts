@@ -5,8 +5,9 @@ import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../
 import { markRaw, toRefs } from 'vue'
 import type { NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
 
-import type { ConfigFieldDef, ConfigValues, GameModeValue } from '../../utils/game-config'
-import { buildConfigValues, challengeRuleFields, readConfigValues } from '../../utils/game-config'
+import type { ConfigFieldDef, GameModeValue } from '../../utils/game-config'
+import { challengeRuleFields, readConfigValues } from '../../utils/game-config'
+import { useConfigDraft } from './useConfigDraft'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
 /** Owns state, effects and commands for ChallengeRulesEditor. */
@@ -25,11 +26,7 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
   const fields = computed(() => challengeRuleFields(props.mode)
     .filter(field => !props.hiddenKeys.includes(field.key)))
 
-  const values = ref<ConfigValues>({})
-
   const overridden = ref<Record<string, boolean>>({})
-
-  const parseFailed = ref(false)
 
   const inheritedValues = computed(() =>
     readConfigValues(
@@ -39,27 +36,15 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
     )?.values ?? {},
   )
 
-  watch(
-    [() => props.rules, () => props.mode],
-    () => {
-      const parsed = readConfigValues(
-        props.rules as Record<string, unknown> | null,
-        fields.value,
-        { rules: true },
-      )
-      if (parsed) {
-        values.value = parsed.values
-        overridden.value = parsed.overridden
-        parseFailed.value = false
-      }
-      else {
-        values.value = {}
-        overridden.value = {}
-        parseFailed.value = true
-      }
-    },
-    { immediate: true },
-  )
+  const { values, parseFailed, serialized, dirty } = useConfigDraft<NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract>({
+    mode: () => props.mode,
+    rules: true,
+    fields,
+    source: () => props.rules,
+    buildExtras: () => ({ overridden: overridden.value }),
+    onParsed: parsed => { overridden.value = parsed.overridden },
+    onParseFailure: () => { overridden.value = {} },
+  })
 
   function updateField(key: string, value: unknown) {
     if (awdEditor.updateAwdField(key, value)) return
@@ -123,36 +108,6 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
     values.value = { ...values.value, awdStoreRules: remaining }
   }
   function presetControlled(field: ConfigFieldDef): boolean { return field.key in awdPresetConstraints(effectiveValues.value) }
-
-  function canonicalize(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(canonicalize)
-    if (value !== null && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .filter(([, entry]) => entry !== null && entry !== undefined)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, v]) => [k, canonicalize(v)]),
-      )
-    }
-    return value
-  }
-
-  function normalize(value: unknown): string {
-    return JSON.stringify(canonicalize(value))
-  }
-
-  const serialized = computed(() =>
-    buildConfigValues(props.mode, fields.value, values.value, {
-      rules: true,
-      overridden: overridden.value,
-    }) as NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract,
-  )
-
-  const dirty = computed(() => {
-    if (parseFailed.value) return false
-    const original = normalize(props.rules)
-    return normalize(serialized.value) !== original
-  })
 
   function save() {
     if (!awdEditor.canSaveRules.value || !storeRulesValid.value) return

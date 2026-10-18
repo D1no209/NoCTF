@@ -12,7 +12,7 @@ import { markRaw, nextTick } from 'vue'
 
 type ReadData = {
   title: string, description?: string | null, kind: 0 | 1, resourceId: string
-  active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: string | null
+  active: boolean, complete: boolean
   requiresPrerequisites: boolean
   imageUrl?: string | null
 }
@@ -64,8 +64,7 @@ export function useCompetitionsByIdProgressionPage() {
   const completedChallenges = computed(() => challengeNodes.value.filter(node => node.data?.complete).length)
   const currentProgressNodeId = computed(() => chooseProgressionFocus(nodes.value.map(node => ({
     id: node.id, kind: node.data!.kind, active: node.data!.active,
-    complete: node.data!.complete, visited: node.data!.visited,
-    firstOpenedAt: node.data!.firstOpenedAt,
+    complete: node.data!.complete,
     x: node.position.x, y: node.position.y,
   }))))
 
@@ -96,7 +95,6 @@ export function useCompetitionsByIdProgressionPage() {
         title: node.title ?? '', description: node.description,
         kind: node.kind === 1 ? 1 : 0, resourceId: node.resourceId!,
         active: node.active ?? false, complete: node.complete ?? false,
-        visited: node.visited ?? false, firstOpenedAt: node.firstOpenedAt,
         requiresPrerequisites: node.requiresPrerequisites!,
         imageUrl: node.imageUrl,
       },
@@ -146,15 +144,6 @@ export function useCompetitionsByIdProgressionPage() {
       blockedMessage.value = null
       highlightedNodeIds.value = new Set()
       highlightedEdgeIds.value = new Set()
-    }
-    const blockedResource = route.query.blocked
-    if (typeof blockedResource === 'string') {
-      const blocked = nodes.value.find(node => node.data?.kind === 0
-        && node.data.resourceId === blockedResource && !node.data.active)
-      if (blocked) {
-        selectedNodeId.value = blocked.id
-        showBlockers(blocked.id)
-      }
     }
   }
 
@@ -206,10 +195,6 @@ export function useCompetitionsByIdProgressionPage() {
   async function enterSelectedChallenge() {
     const node = selectedNode.value
     if (!node?.data || node.data.kind !== 0 || !node.data.active) return
-    useState<{ competitionId: string, challengeId: string, revision: number } | null>(
-      'progression-entry', () => null).value = {
-      competitionId, challengeId: node.data.resourceId, revision: data.value?.revision ?? 0,
-    }
     await navigateTo(`/competitions/${competitionId}/challenges/${node.data.resourceId}`)
   }
 

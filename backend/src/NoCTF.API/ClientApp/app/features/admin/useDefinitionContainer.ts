@@ -1,13 +1,13 @@
 import { computed, ref, toRefs, useId, watch } from 'vue'
-import type { ContainerDefinitionModel, DefinitionModel, GameModeValue, RuntimeServiceModel } from '../../utils/game-config'
-import { emptyRuntimeService, FlagSource, runtimeServiceIsReferenced, renameRuntimeService } from '../../utils/game-config'
+import type { ContainerDefinitionModel, DefinitionModel, GameModeValue, RuntimeServiceModel, RuntimeTemplateModel } from '../../utils/game-config'
+import { emptyRuntimeService, runtimeServiceIsReferenced, renameRuntimeService } from '../../utils/game-config'
 import { runtimeTopology } from './runtime-topology'
 
 export function useDefinitionContainer(props: Readonly<{
   definition: ContainerDefinitionModel; model: DefinitionModel; mode: GameModeValue;
-  flagSource: number; disabled: boolean; singleServiceOnly: boolean
+  flagSource: RuntimeTemplateModel['flagSource']; disabled: boolean; singleServiceOnly: boolean
 }>) {
-  const showFlagEnvironmentVariable = computed(() => props.flagSource === FlagSource.PerTeam)
+  const showFlagEnvironmentVariable = computed(() => props.flagSource === 'PerTeam')
   const selectedServiceIndex = ref(0)
   const fieldId = useId()
   const serviceNameInputId = `${fieldId}-service-name`

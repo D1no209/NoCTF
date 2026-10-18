@@ -240,11 +240,6 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
         <CardContent>
           <UiForm @submit.prevent="save">
             <FieldGroup>
-              <Field>
-                <FieldLabel for="public-base-url">{{ $t('administration.label.publiclyAccessibleAddress') }}</FieldLabel>
-                <Input id="public-base-url" v-model="form.publicBaseUrl" required :placeholder="$t('administration.label.httpsCtfExampleCom')" />
-                <FieldDescription>{{ $t('administration.platformEmail.description.generateVerificationResetLinks') }}</FieldDescription>
-              </Field>
               <div class="grid gap-4 sm:grid-cols-3">
                 <Field>
                   <FieldLabel for="token-lifetime">{{ $t('administration.platformEmail.label.verificationTokenValidityPeriod') }}</FieldLabel>

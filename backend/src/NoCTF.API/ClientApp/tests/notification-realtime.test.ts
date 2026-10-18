@@ -5,10 +5,10 @@ describe('notification realtime invalidation', () => {
     const hub = await Bun.file(new URL('../app/composables/useNotificationHub.ts', import.meta.url)).text()
     const shell = await Bun.file(new URL('../app/features/shell/useDefaultLayout.ts', import.meta.url)).text()
 
-    expect(hub).toContain(".withUrl('/hubs/v1/notifications'")
+    expect(hub).toContain("url: '/hubs/v1/notifications'")
     expect(hub).toContain('accessTokenFactory: getRealtimeAccessToken')
     expect(hub).toContain("hub.on('notificationChanged', notifyChanged)")
-    expect(hub).toContain('.withAutomaticReconnect()')
+    expect(hub).toContain('buildHubConnection({')
     expect(shell).toContain('watchNotifications({')
     expect(shell).toContain('notificationChanged: () => void refreshOnSignal()')
     expect(shell).toContain('onReconnected: () => void refreshOnSignal()')

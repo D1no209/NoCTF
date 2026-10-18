@@ -100,7 +100,6 @@ public interface ISsoConfigurationStore
 
     Task<SsoConfigurationMutationResult> UpdateGlobalAsync(
         bool enabled,
-        string publicBaseUrl,
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
@@ -151,12 +150,10 @@ public sealed class ManageSsoProviders(
 
     public Task<SsoConfigurationMutationResult> UpdateGlobalAsync(
         bool enabled,
-        string publicBaseUrl,
         Guid actorUserId,
         CancellationToken ct = default) =>
         store.UpdateGlobalAsync(
             enabled,
-            publicBaseUrl.TrimEnd('/'),
             actorUserId,
             clock.GetUtcNow(),
             ct);

@@ -50,14 +50,6 @@ public sealed class ProgressionPlayerReader(
                     && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
                 .Select(fact => fact.CompetitionChallengeId!.Value)
                 .Distinct().ToArrayAsync(ct)).ToHashSet();
-        var visited = teamId is not Guid visitTeam
-            ? new Dictionary<Guid, DateTimeOffset>()
-            : (await db.TeamProgressionNodeVisits.AsNoTracking()
-                .Where(visit => visit.TeamId == visitTeam
-                    && visit.CompetitionId == competitionId)
-                .Select(visit => new { visit.NodeId, visit.FirstOpenedAt })
-                .ToArrayAsync(ct)).ToDictionary(visit => visit.NodeId,
-                    visit => visit.FirstOpenedAt);
         var evaluation = ProgressionGraphRules.Evaluate(
             graph.ToDomainNodes(), graph.ToDomainEdges(), completed);
         var challengeDetails = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
@@ -88,16 +80,13 @@ public sealed class ProgressionPlayerReader(
                     challengeDetails.GetValueOrDefault(node.ResourceId)?.Title
                         ?? string.Empty,
                     null, challengeDetails.GetValueOrDefault(node.ResourceId)?.Direction,
-                    state.Active, state.Complete, visited.ContainsKey(node.Id),
-                    node.RequiresPrerequisites,
-                    visited.GetValueOrDefault(node.Id), null),
+                    state.Active, state.Complete, node.RequiresPrerequisites, null),
                 ProgressionNodeKind.Badge => new PlayerProgressionNode(
                     node.Id, node.Kind, node.ResourceId,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.Name
                         ?? string.Empty,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.Description,
-                    null, state.Active, state.Complete, false,
-                    node.RequiresPrerequisites, null,
+                    null, state.Active, state.Complete, node.RequiresPrerequisites,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.ImageFileId),
                 _ => throw new InvalidOperationException("Unsupported progression node type.")
             };

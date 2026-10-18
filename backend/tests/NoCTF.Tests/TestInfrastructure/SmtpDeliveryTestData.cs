@@ -30,7 +30,7 @@ internal static class SmtpDeliveryTestData
             Id = 1,
             Name = "NoCTF",
             EmailVerificationEnabled = configuration.Enabled,
-            EmailPublicBaseUrl = configuration.PublicBaseUrl,
+            PublicBaseUrl = configuration.PublicBaseUrl,
             EmailVerificationTokenLifetimeMinutes = 30,
             EmailVerificationResendCooldownSeconds = 60,
             EmailPasswordResetTokenLifetimeMinutes = 30,

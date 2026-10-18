@@ -23,6 +23,8 @@ export function useAdminPlatformIndexPage() {
 
   const description = ref('')
 
+  const publicBaseUrl = ref('')
+
   const saving = ref(false)
 
   const logoInput = ref<HTMLInputElement | null>(null)
@@ -47,6 +49,7 @@ export function useAdminPlatformIndexPage() {
     configuration.value = configResult.data?.branding ?? null
     name.value = configResult.data?.branding?.name ?? ''
     description.value = configResult.data?.branding?.description ?? ''
+    publicBaseUrl.value = configResult.data?.branding?.publicBaseUrl ?? ''
   }
 
   async function save(): Promise<void> {
@@ -57,6 +60,7 @@ export function useAdminPlatformIndexPage() {
         branding: {
           name: name.value.trim(),
           description: description.value.trim() || null,
+          publicBaseUrl: publicBaseUrl.value.trim(),
         },
       },
     })
@@ -113,6 +117,7 @@ export function useAdminPlatformIndexPage() {
       loadError,
       name,
       description,
+      publicBaseUrl,
       saving,
       logoInput,
       logoUploading,

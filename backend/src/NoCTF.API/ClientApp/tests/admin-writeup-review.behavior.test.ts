@@ -1,3 +1,4 @@
+import { testAdminResource } from './support/admin-competition-resource'
 import * as soloNavigation from '../app/features/live-solo/navigation'
 import { competitionChallengeManagementPath } from '../app/features/admin/admin-navigation'
 import { describe, expect, test } from 'bun:test'
@@ -21,9 +22,13 @@ test('management review remains discoverable for finished competitions and uses 
   const icons = Object.fromEntries('Activity ChartNoAxesCombined ClipboardCheck Container Download FileCheck GitBranch KeyRound LayoutDashboard Mail Network Orbit Puzzle Settings ShieldAlert Trophy Users Webhook'.split(' ').map(name => [name, {}]))
   const deps = { ...soloNavigation, ...icons, competitionChallengeManagementPath, computed, ref, proxyRefs, markRaw, useRoute: () => route,
     useAuth: () => ({ user: ref(null), isAdministrator: ref(true) }),
+    useAdminCompetitionResource: () => testAdminResource(async () => ({ data: {} })), watch: () => {}, onUnmounted: () => {},
     translate: (key: string) => key, provide: () => {}, onMounted: () => {},
     adminWorkspacePath: (path: string) => path, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(),
     CompetitionStatusBadgeComponent: {}, GameModeBadgeComponent: {}, AppWorkspaceNavComponent: {} }
+  const resource = deps.useAdminCompetitionResource()
+  resource.fresh.value = true
+  deps.useAdminCompetitionResource = () => resource
   const state = shellFactory(deps)()
   state.role.value = 'Owner'
   for (const status of ['Draft', 'Running', 'Finished']) {

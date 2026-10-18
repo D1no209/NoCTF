@@ -87,7 +87,7 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                 await setup.Database.EnsureCreatedAsync(cancellationToken);
                 var settings = await setup.PlatformSettings.SingleAsync(cancellationToken);
                 settings.EmailVerificationEnabled = true;
-                settings.EmailPublicBaseUrl = configuration.Delivery.PublicBaseUrl;
+                settings.PublicBaseUrl = configuration.Delivery.PublicBaseUrl;
                 settings.EmailVerificationTokenLifetimeMinutes = 1440;
                 settings.EmailVerificationResendCooldownSeconds = 60;
                 settings.EmailPasswordResetTokenLifetimeMinutes = 30;

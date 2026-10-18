@@ -14,7 +14,9 @@ public sealed record PlatformConfigurationView(
     string? Description,
     Guid? LogoFileId,
     DateTimeOffset UpdatedAt,
-    bool CtfPatchVerificationEnabled = false,NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo=null);
+    bool CtfPatchVerificationEnabled = false,
+    NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo = null,
+    string PublicBaseUrl = "http://localhost:5000");
 
 public sealed record PlatformLogoReplacement(
     PlatformConfigurationView Configuration,
@@ -28,7 +30,8 @@ public interface IPlatformConfigurationStore
         string name,
         string? description,
         DateTimeOffset now,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? publicBaseUrl = null);
 
     Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
         bool ctfPatchVerificationEnabled,
@@ -79,21 +82,26 @@ public sealed class ManagePlatformConfiguration(
         string name,
         string? description,
         DateTimeOffset now,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? publicBaseUrl = null)
     {
         var normalizedName = name.Trim();
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
             ? null
             : description.Trim();
+        var normalizedPublicBaseUrl = publicBaseUrl?.Trim().TrimEnd('/');
         if (normalizedName.Length is < 1 or > PlatformConfigurationRules.MaximumNameLength
-            || normalizedDescription?.Length > PlatformConfigurationRules.MaximumDescriptionLength)
+            || normalizedDescription?.Length > PlatformConfigurationRules.MaximumDescriptionLength
+            || normalizedPublicBaseUrl is { } origin && (origin.Length > 2048
+                || !NoCTF.Application.Authentication.Sso.SsoProviderValidation.IsValidPublicBaseUrl(origin, true)))
             return new(PlatformConfigurationUpdateState.InvalidInput);
 
         var updated = await settings.UpdateAsync(
             normalizedName,
             normalizedDescription,
             now,
-            ct);
+            ct,
+            normalizedPublicBaseUrl);
         return new(PlatformConfigurationUpdateState.Updated, updated);
     }
 

@@ -2,7 +2,7 @@ import { toRefs } from 'vue'
 
 import { Plus, X } from '@lucide/vue'
 import type { UrlBindingModel } from '../../utils/game-config'
-import { UrlExposure } from '../../utils/game-config'
+import { protocolInput, runtimeExposureProtocols } from '../../utils/game-config'
 
 const HTTP_DISPLAY_TEMPLATE = 'http://{HOST}:{PORT}'
 const NETCAT_DISPLAY_TEMPLATE = 'nc {HOST} {PORT}'
@@ -11,7 +11,7 @@ const NETCAT_DISPLAY_TEMPLATE = 'nc {HOST} {PORT}'
 export function useUrlBindingList(props: Readonly<Omit<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
-  exposureOptions?: { value: number; label: string }[]
+  exposureOptions?: { value: UrlBindingModel['exposure']; label: string }[]
   /** 容器运行时的服务选择。 */
   showServiceName?: boolean
   serviceNames?: string[]
@@ -22,7 +22,7 @@ export function useUrlBindingList(props: Readonly<Omit<{
 }, "exposureOptions" | "showServiceName" | "serviceNames" | "addLabel" | "allowCustomDisplay" | "disabled"> & Required<Pick<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
-  exposureOptions?: { value: number; label: string }[]
+  exposureOptions?: { value: UrlBindingModel['exposure']; label: string }[]
   /** 容器运行时的服务选择。 */
   showServiceName?: boolean
   serviceNames?: string[]
@@ -37,6 +37,11 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
     emit('update:modelValue', next)
   }
 
+  /** 下拉框给出的原始值同样按协议表校验,不把未知值写进模型。 */
+  function updateExposure(index: number, value: unknown): void {
+    update(index, { exposure: protocolInput(value, runtimeExposureProtocols, props.modelValue[index]?.exposure ?? 'Participants') })
+  }
+
   function remove(index: number): void {
     emit('update:modelValue', props.modelValue.filter((_, i) => i !== index))
   }
@@ -46,7 +51,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
       ...props.modelValue,
       {
         urlTemplate: HTTP_DISPLAY_TEMPLATE,
-        exposure: props.exposureOptions[0]?.value ?? UrlExposure.Participants,
+        exposure: props.exposureOptions[0]?.value ?? 'Participants',
         containerPort: null,
         serviceName: props.serviceNames[0] ?? '',
       },
@@ -58,6 +63,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
       Plus,
       X,
       displayTemplateOptions: [HTTP_DISPLAY_TEMPLATE, NETCAT_DISPLAY_TEMPLATE],
+      updateExposure,
       update,
       remove,
       add

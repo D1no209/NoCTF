@@ -3,11 +3,12 @@ import { computed, reactive, ref, watch } from 'vue'
 import { SliderRoot, SliderTrack, SliderRange, SliderThumb } from 'reka-ui'
 import { Input } from '../input'
 import { Label } from '../label'
+import { themeColor } from '../../../utils/theme-color'
 import { hexToHsv, hsvToHex, normalizeHex } from './color'
 
 const props = defineProps<{ modelValue: string; id: string }>()
 const emit = defineEmits<{ 'update:modelValue': [color: string] }>()
-const hsv = reactive(hexToHsv(normalizeHex(props.modelValue) ?? '#39FF14'))
+const hsv = reactive(hexToHsv(normalizeHex(props.modelValue) ?? themeColor('--primary')))
 const draft = ref(props.modelValue)
 const invalid = ref(false)
 watch(() => props.modelValue, value => {

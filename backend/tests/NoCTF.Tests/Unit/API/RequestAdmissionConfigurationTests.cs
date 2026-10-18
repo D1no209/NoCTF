@@ -69,6 +69,19 @@ public sealed class RequestAdmissionConfigurationTests
             new PostCommitDispatchStatus());
     }
 
+    [Test]
+    public async Task Resource_release_uses_separate_user_and_IP_buckets_with_bounded_limits()
+    {
+        var admission = new RecordingAdmission();
+        await InvokeAsync(admission, Options.Create(new RequestAdmissionOptions
+        {
+            SensitiveIpPerMinute = 7, RuntimeCommandPerUserPerMinute = 3
+        }), new ProtectedEntryMetadata(ProtectedEntry.RuntimeRelease));
+        await Assert.That(admission.Rates.Select(rate => rate.Limit)).IsEquivalentTo([7, 3]);
+        await Assert.That(admission.Rates[0].Key).IsEqualTo("release-ip:192.0.2.10");
+        await Assert.That(admission.Rates[1].Key.StartsWith("entry-user:RuntimeRelease:", StringComparison.Ordinal)).IsTrue();
+    }
+
     private sealed class RecordingAdmission : IRequestAdmission
     {
         public IReadOnlyList<RateQuota> Rates { get; private set; } = [];

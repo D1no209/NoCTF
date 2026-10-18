@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { colorInk, hexToHsv, hsvToHex, normalizeHex } from '../app/components/ui/color-picker/color'
-import { parseThemePalette } from '../app/features/theme/palette'
+import { parseThemePalette } from '../app/lib/theme-palette'
 
 test('palette accepts only complete HEX colors and isolates corrupt saved values', () => {
   expect(normalizeHex(' #3f1 ')).toBe('#33FF11')

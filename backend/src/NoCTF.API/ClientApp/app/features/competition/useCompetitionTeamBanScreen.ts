@@ -1,7 +1,7 @@
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getMyTeamBanCase, submitTeamBanAppeal } from '../../api'
 import type { NoCtfapiEndpointsTeamsMyTeamBanCaseResponse } from '../../api'
-import logoUrl from '../../assets/images/brand/noctf-team-ban-logo.png'
+import logoUrl from '../../assets/images/brand/noctf-team-ban-logo.webp'
 import { validateAppealStatement } from '../../lib/participant-form-validation'
 import { message } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'

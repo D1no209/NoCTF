@@ -11,7 +11,8 @@ describe('frontend architecture', () => {
   })
   test('all existing surfaces obey the rendering, primitive and locale boundaries', () => {
     expect(auditArchitecture(fileURLToPath(new URL('../app', import.meta.url)))).toEqual([])
-  })
+    // 全树扫描在并发执行的 bun test 下可能超过默认 5s,显式放宽以免 CI 抖动(实测 3.5s-6.1s)。
+  }, 60_000)
 
   test('shared cards and focus states use shadows instead of visible rings or outlines', async () => {
     const card = await Bun.file(new URL('../app/components/ui/card/Card.vue', import.meta.url)).text()

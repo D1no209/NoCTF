@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, ref, watch } from 'vue'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { useCursorPagination } from '../app/composables/useCursorPagination'
+import { useAdminCompetitionFilteredList, useAdminCompetitionReferences } from '../app/features/admin/useAdminCompetitionList'
 import { parseApiError } from '../app/utils/api-error'
 import * as adjudication from '../app/features/admin/adjudication-preview'
 
@@ -32,7 +33,7 @@ async function harness(mode = 'Ctf') {
   let unmount!: () => void
   const scope = effectScope()
   const state = scope.run(() => factory({
-    ...adjudication, ref, computed, watch, proxyRefs, markRaw, AwdCheckReviewComponent: {}, useOffsetPagination, useCursorPagination, parseApiError, Download: {},
+    ...adjudication, ref, computed, watch, proxyRefs, markRaw, AwdCheckReviewComponent: {}, useOffsetPagination, useCursorPagination, useAdminCompetitionFilteredList, useAdminCompetitionReferences, parseApiError, Download: {},
     useRouter: () => ({ push: async (path: string) => { navigations.push(path) } }),
     useCompetitionAdmin: () => ({ competitionId: 'competition', competition: ref({ mode }), role: ref('Owner'), canWrite: ref(true), canJudge: ref(true) }),
     useAuth: () => ({ isAdministrator: ref(true) }),

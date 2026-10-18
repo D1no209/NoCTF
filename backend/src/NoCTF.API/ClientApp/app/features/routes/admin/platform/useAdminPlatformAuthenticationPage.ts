@@ -28,7 +28,7 @@ export function useAdminPlatformAuthenticationPage() {
   const loading = ref(true)
   const loadError = ref<UiMessage | null>(null)
   const globalSaving = ref(false)
-  const globalForm = reactive({ enabled: false, publicBaseUrl: '' })
+  const globalForm = reactive({ enabled: false })
   const providerOpen = ref(false)
   const providerSaving = ref(false)
   const providerError = ref<UiMessage | null>(null)
@@ -62,7 +62,6 @@ export function useAdminPlatformAuthenticationPage() {
   function sync(value: Configuration) {
     configuration.value = value
     globalForm.enabled = value.enabled ?? false
-    globalForm.publicBaseUrl = value.publicBaseUrl ?? ''
   }
 
   async function load() {
@@ -83,7 +82,6 @@ export function useAdminPlatformAuthenticationPage() {
     const { data, error } = await adminPlatformSsoPatchConfiguration({
       body: {
         enabled: globalForm.enabled,
-        publicBaseUrl: globalForm.publicBaseUrl.trim(),
       },
     })
     globalSaving.value = false

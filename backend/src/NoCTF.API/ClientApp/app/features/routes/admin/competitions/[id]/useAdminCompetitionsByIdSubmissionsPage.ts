@@ -11,7 +11,7 @@ import { downloadSdkFile } from '../../../../../utils/download'
 import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
 import type { NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
+import { useAdminCompetitionFilteredList, useAdminCompetitionReferences } from '~/features/admin/useAdminCompetitionList'
 import { adminGetGameplayFactAdjudicationEvents } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api'
 import { adjudicationCounts, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant } from '../../../../admin/adjudication-preview'
@@ -78,23 +78,10 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     { value: 'Rejected', label: "common.label.rejected" },
   ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol>[]
 
-  const challengeOptions = ref<{ id: string; title: string }[]>([])
-
-  const teamOptions = ref<{ id: string; name: string }[]>([])
-
-  const teamName = (id?: string | null) => teamOptions.value.find(t => t.id === id)?.name ?? id ?? '-'
-
-  const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
-
-  async function loadRefs() {
-    const [challenges, teams] = await Promise.all([
-      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
-    ])
-    challengeOptions.value = (challenges.data?.items ?? [])
-      .map(c => ({ id: c.id!, title: c.title ?? '' }))
-    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
-  }
+  const { challengeOptions, teamOptions, challengeTitle, teamName, loadRefs } = useAdminCompetitionReferences(competitionId, {
+    listChallenges: adminListCompetitionChallenges,
+    listTeams: adminListTeams,
+  })
 
   const filterChallenge = ref('')
 
@@ -226,52 +213,46 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     }
   }
 
-  const appliedFilters = ref({
-    challengeId: filterChallenge.value,
-    teamId: filterTeam.value,
-    kind: filterKind.value,
-    state: filterState.value,
-    result: filterResult.value,
-    value: filterFlag.value,
-  })
-
-  const pagination = useOffsetPagination<
-    NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
-  >(async ({ offset, limit, desc }) => {
-    const filters = appliedFilters.value
-    const { data, error } = await adminListGameplayFacts({
-      path: { competitionId },
-      query: {
-        competitionChallengeId: filters.challengeId || null,
-        teamId: filters.teamId || null,
-        gameplayFactKind: filters.kind || null,
-        state: filters.state || null,
-        gameplayFactResult: filters.result || null,
-        value: filters.value || null,
-        offset,
-        limit,
-        desc,
-      },
-    })
-    if (error || !data) throw parseApiError(error)
-    return { items: data.items ?? [], total: data.total ?? 0 }
-  }, { initialPageSize: 10, initialDesc: true })
-
-  const { items, loading, error: listError, initialized } = pagination
-
-  async function applyFilters() {
-    appliedFilters.value = {
-      challengeId: filterChallenge.value,
-      teamId: filterTeam.value,
-      kind: filterKind.value,
-      state: filterState.value,
-      result: filterResult.value,
-      value: filterFlag.value,
-    }
-    pagination.reset()
-    await pagination.loadPage(1)
-    if (previewInitialized.value) void loadPreview(true)
+  type SubmissionListFilters = {
+    challengeId: string
+    teamId: string
+    kind: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | ''
+    state: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | ''
+    result: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | ''
+    value: string
   }
+
+  const list = useAdminCompetitionFilteredList<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, SubmissionListFilters>(
+    async (filters, request) => {
+      const { data, error } = await adminListGameplayFacts({
+        path: { competitionId },
+        query: {
+          competitionChallengeId: filters.challengeId || null,
+          teamId: filters.teamId || null,
+          gameplayFactKind: filters.kind || null,
+          state: filters.state || null,
+          gameplayFactResult: filters.result || null,
+          value: filters.value || null,
+          ...request,
+        },
+      })
+      if (error || !data) throw parseApiError(error)
+      return { items: data.items ?? [], total: data.total ?? 0 }
+    },
+    {
+      readFilters: () => ({
+        challengeId: filterChallenge.value,
+        teamId: filterTeam.value,
+        kind: filterKind.value,
+        state: filterState.value,
+        result: filterResult.value,
+        value: filterFlag.value,
+      }),
+      onApplied: () => { if (previewInitialized.value) void loadPreview(true) },
+    },
+  )
+
+  const { pagination, applyFilters } = list
 
   const detail = ref<NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
 
@@ -462,16 +443,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       differenceLabels,
       bloodRankLabel,
       loadPreview,
-      items,
-      loading,
-      listError,
-      page: pagination.page,
-      pageCount: pagination.pageCount,
-      total: pagination.total,
-      pageLimit: pagination.limit,
-      loadPage: pagination.loadPage,
-      setPageSize: pagination.setPageSize,
-      initialized,
+      ...list.listBindings,
       applyFilters,
       detail,
       detailOpen,

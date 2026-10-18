@@ -35,6 +35,7 @@ async function harness(options: Options = {}) {
   const scope = effectScope()
   const state = scope.run(() => factory({
     ref, computed, watch, useOffsetPagination, competitionEventHistoryRange, createTrailingRefresh, competitionChallengesPath, adminCompetitionPath, parseApiError,
+    ensureLocaleDomains: async () => {},
     ArrowLeft: {}, competitionContextKey: {}, inject: () => ({ competition }),
     useRoute: () => ({ params: { id: 'competition' }, query: { kind: options.initialKind } }),
     useAuth: () => ({ isAdministrator: ref(options.administrator ?? true), canOrganize: ref(options.organizer ?? false) }),

@@ -1,3 +1,4 @@
+import { testAdminResource } from './support/admin-competition-resource'
 import * as soloNavigation from '../app/features/live-solo/navigation'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, unref, watch } from 'vue'
@@ -8,12 +9,17 @@ import { competitionChallengeManagementPath, isCompetitionChallengeManagementRou
 
 const source = async (path: string) => Bun.file(new URL(`../app/${path}`, import.meta.url)).text()
 async function controller(path: string, name: string, dependencies: Record<string, unknown>, props?: object) {
+  if (dependencies.useCompetitionAdmin && dependencies.adminGetCompetition) {
+    const getContext = dependencies.useCompetitionAdmin as () => object
+    dependencies.useCompetitionAdmin = () => ({ ...getContext(), read: dependencies.adminGetCompetition })
+  }
   const input = await source(path)
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(input)
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
   const deps: Record<string, unknown> = { ...soloNavigation, computed, ref, watch, markRaw, reactive, proxyRefs, competitionChallengeManagementPath,
     translate: (key: string) => key, describeMessage: (key: string) => key,
-    onMounted: () => {}, onUnmounted: () => {}, ...dependencies }
+    onMounted: () => {}, onUnmounted: () => {}, watchCompetition: () => () => {}, navigateTo: () => {}, ...dependencies }
+  deps.useAdminCompetitionResource = (id: string) => testAdminResource(dependencies.adminGetCompetition as any, id)
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
   for (const icon of ['Plus', 'ArrowRight', 'Box', 'CalendarRange', 'Clock', 'EyeOff', 'FileText', 'KeyRound', 'LogIn', 'Settings', 'ShieldCheck', 'Trophy', 'UserPlus', 'Users',
     'Activity', 'ChartNoAxesCombined', 'ClipboardCheck', 'Container', 'Download', 'FileCheck', 'GitBranch', 'LayoutDashboard', 'Mail', 'Network', 'Orbit', 'Puzzle', 'ShieldAlert', 'Webhook']) deps[icon] = {}
@@ -31,7 +37,7 @@ async function middleware(session: ReturnType<typeof auth>, response: any) {
   const deps = { ...soloNavigation, useAuth: () => session, defineNuxtRouteMiddleware: (fn: unknown) => fn,
     navigateTo: (target: unknown) => target, competitionPath, competitionChallengeManagementPath, isCompetitionChallengeManagementRoute, translate: (key: string) => key,
     createError: (error: object) => Object.assign(new Error('request failed'), error),
-    adminGetCompetition: async ({ path }: any) => { calls.push(path.competitionId); return response } }
+    useAdminCompetitionResource: (id: string) => testAdminResource(async () => { calls.push(id); return response }, id) }
   const guard = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${code}`)(deps)
   return { guard: (id = 'contest', section = 'submissions', ccId?: string) => {
     const path = `/admin/competitions/${id}/${section}${ccId ? '/' + ccId : ''}`
@@ -133,9 +139,9 @@ describe('competition staff access', () => {
     const guest = await middleware(auth(false, false), {})
     expect(await guest.guard()).toEqual({ path: '/auth/login', query: { redirect: '/admin/competitions/contest/submissions?page=2' } })
     expect(guest.calls).toEqual([])
-    const platform = await middleware(auth(true), {})
+    const platform = await middleware(auth(true), { data: { competition: { id: 'contest', mode: 'Ctf' } } })
     expect(await platform.guard()).toBeUndefined()
-    expect(platform.calls).toEqual([])
+    expect(platform.calls).toEqual(['contest'])
   })
 
   test('the guard checks each target and does not turn a dependency failure into permission', async () => {
@@ -178,9 +184,9 @@ describe('competition staff access', () => {
       expect(context.canJudge.value).toBe(role !== 'Observer')
       expect(context.canManagePermissions.value).toBe(role === 'Owner')
       const links = app.state.navGroups.value.flatMap((group: any) => group.items).map((item: any) => item.to)
-      for (const suffix of ['configuration', 'tracks', 'directions', 'announcements', 'exports', 'webhooks', 'progression', 'leaderboard'])
+      for (const suffix of ['configuration', 'tracks', 'directions', 'exports', 'webhooks', 'progression', 'leaderboard'])
         expect(links.includes(`/admin/competitions/contest/${suffix}`)).toBe(role === 'Owner' || role === 'Manager')
-      for (const suffix of ['cheats', 'traffic-captures'])
+      for (const suffix of ['announcements', 'cheats', 'traffic-captures'])
         expect(links.includes(`/admin/competitions/contest/${suffix}`)).toBe(role !== 'Observer')
       for (const suffix of ['challenges', 'teams', 'submissions', 'runtimes', 'writeups'])
         expect(links).toContain(`/admin/competitions/contest/${suffix}`)
@@ -189,7 +195,7 @@ describe('competition staff access', () => {
       const permissionsLink = app.state.navGroups.value.flatMap((group: any) => group.items).some((item: any) => item.to.endsWith('/permissions'))
       expect(permissionsLink).toBe(role === 'Owner')
       response = { error: {}, response: { status: 404 } }
-      await mounted[0]!()
+      await app.state.refresh()
       expect(app.state.competition.value).toBeNull()
       expect(app.state.role.value).toBe('Observer')
       expect(context.canWrite.value).toBe(false)

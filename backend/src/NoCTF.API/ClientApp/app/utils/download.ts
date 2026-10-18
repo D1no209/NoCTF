@@ -1,6 +1,7 @@
 import { message as describeMessage } from './i18n'
 import { ApiError, parseApiError } from './api-error'
 import { translate } from './i18n'
+import { isCredentialSafeUrl } from '../lib/credential-url'
 
 export interface ProtectedDownloadResponse {
   data?: unknown
@@ -86,18 +87,10 @@ export async function downloadSdkFile(
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000)
 }
 
-/** @deprecated Prefer downloadSdkFile with the generated SDK promise directly. */
-export async function downloadProtectedFile(
-  request: ProtectedDownloadRequest,
-  fallbackName = 'download',
-): Promise<void> {
-  const { blob, fileName } = await readProtectedDownload(request, fallbackName)
-  const anchor = document.createElement('a')
-  const objectUrl = URL.createObjectURL(blob)
-  anchor.href = objectUrl
-  anchor.download = fileName
-  anchor.click()
-  URL.revokeObjectURL(objectUrl)
+/** 凭证型 URL 的同源判定由 app/lib/credential-url.ts 提供,此处只做拒绝语义。 */
+export function assertCredentialSafeUrl(value: string): void {
+  if (!isCredentialSafeUrl(value))
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
 }
 
 /** Hand the authenticated attachment stream to the browser without materializing file bytes in JavaScript. */

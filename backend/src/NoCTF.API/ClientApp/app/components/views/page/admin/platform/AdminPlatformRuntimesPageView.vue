@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError, formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError, formatCapacityAmount, runnerFailureLabel, ExternalLinkIcon, RuntimeAccessUrl, RefreshCw, filters, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -195,10 +195,10 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           <Separator />
           <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
-            <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('runtime.label.competitionRuntimes') }}</NuxtLink>
+            <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLinkIcon data-icon="inline-start" />{{ $t('runtime.label.competitionRuntimes') }}</NuxtLink>
           </Button>
           <Button v-else-if="detail.runtime?.challengeId" variant="outline" as-child>
-            <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLink data-icon="inline-start" />{{ $t('runtime.label.challengeTemplate') }}</NuxtLink>
+            <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLinkIcon data-icon="inline-start" />{{ $t('runtime.label.challengeTemplate') }}</NuxtLink>
           </Button>
         </div>
       </SheetContent>
@@ -268,7 +268,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           <Button
             type="button"
             variant="destructive"
-            :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 8"
+            :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 1"
             @click="submitForceTermination"
           >
             <Spinner v-if="forceTerminatePending" data-icon="inline-start" /> {{ $t('runtime.label.confirmForcedTermination') }}

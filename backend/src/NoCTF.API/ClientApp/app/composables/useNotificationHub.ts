@@ -1,7 +1,7 @@
 import { currentLocale } from '../utils/i18n'
 import * as signalR from '@microsoft/signalr'
 import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
-import { startRealtimeWithRetry } from '../lib/realtime-retry'
+import { buildHubConnection, createHubStarter, stopHubConnection } from '../lib/signalr-hub'
 
 export interface NotificationHubHandlers {
   theoryChanged?: (activityId: string) => void
@@ -10,8 +10,6 @@ export interface NotificationHubHandlers {
 }
 
 let connection: signalR.HubConnection | null = null
-let startPromise: Promise<void> | null = null
-let startAbortController: AbortController | null = null
 const subscribers = new Map<symbol, NotificationHubHandlers>()
 
 function notifyChanged(): void {
@@ -22,22 +20,21 @@ function notifyReconnected(): void {
   for (const handlers of subscribers.values()) handlers.onReconnected?.()
 }
 
+function notifyTheoryChanged(activityId: string): void {
+  for (const handlers of subscribers.values()) handlers.theoryChanged?.(activityId)
+}
+
 function ensureConnection(): signalR.HubConnection {
   if (connection) return connection
-  const hub = new signalR.HubConnectionBuilder()
-    .withUrl('/hubs/v1/notifications', {
-      headers: { 'Accept-Language': currentLocale() },
-      accessTokenFactory: getRealtimeAccessToken,
-      ...(import.meta.dev
-        ? { transport: signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling }
-        : {}),
-    })
-    .withAutomaticReconnect()
-    .configureLogging(signalR.LogLevel.Warning)
-    .build()
-
+  const hub = buildHubConnection({
+    signalR,
+    url: '/hubs/v1/notifications',
+    locale: currentLocale(),
+    accessTokenFactory: getRealtimeAccessToken,
+    preferLongPolling: import.meta.dev,
+  })
   hub.on('notificationChanged', notifyChanged)
-  hub.on('theoryChanged', (activityId: string) => { for (const handlers of subscribers.values()) handlers.theoryChanged?.(activityId) })
+  hub.on('theoryChanged', notifyTheoryChanged)
   hub.onreconnected(() => {
     if (connection === hub) notifyReconnected()
   })
@@ -48,40 +45,32 @@ function ensureConnection(): signalR.HubConnection {
   return hub
 }
 
-async function ensureStarted(): Promise<void> {
-  if (!getAccessToken() && !connection) return
-  const hub = ensureConnection()
-  if (hub.state === signalR.HubConnectionState.Connected || startPromise) return startPromise ?? undefined
-  if (hub.state !== signalR.HubConnectionState.Disconnected) return
+const starter = createHubStarter({
+  current: () => connection,
+  isConnected: hub => hub.state === signalR.HubConnectionState.Connected,
+  isDisconnected: hub => hub.state === signalR.HubConnectionState.Disconnected,
+  start: async hub => {
+    if (hub.state === signalR.HubConnectionState.Disconnected) await hub.start()
+  },
+}, {
+  isWanted: () => subscribers.size > 0,
+  onStarted: () => notifyReconnected(),
+})
 
-  const abortController = new AbortController()
-  startAbortController = abortController
-  const task = (async () => {
-    const started = await startRealtimeWithRetry(
-      async () => {
-        if (hub.state === signalR.HubConnectionState.Disconnected) await hub.start()
-      },
-      abortController.signal,
-      () => connection === hub && subscribers.size > 0,
-    )
-    if (started && connection === hub) notifyReconnected()
-  })()
-  startPromise = task.finally(() => {
-    if (startAbortController !== abortController) return
-    startAbortController = null
-    startPromise = null
-  })
-  await startPromise
+async function ensureStarted(): Promise<void> {
+  // 首次匿名访问不建立 hub；已认证连接丢失 token 时仍让
+  // accessTokenFactory 使用 refresh cookie 恢复连接。
+  if (!getAccessToken() && !connection) return
+  ensureConnection()
+  await starter.ensureStarted()
 }
 
 async function teardownIfIdle(): Promise<void> {
   if (subscribers.size > 0 || !connection) return
   const hub = connection
-  startAbortController?.abort()
-  startAbortController = null
+  starter.abortStart()
   connection = null
-  startPromise = null
-  await hub.stop().catch(() => undefined)
+  await stopHubConnection(hub)
 }
 
 /** A single authenticated connection is shared by shell and notification page. */

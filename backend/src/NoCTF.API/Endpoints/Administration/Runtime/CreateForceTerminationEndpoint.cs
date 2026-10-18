@@ -17,7 +17,7 @@ public sealed class CreateForceTerminationValidator
     : Validator<CreateForceTerminationRequest>
 {
     public CreateForceTerminationValidator() =>
-        RuleFor(request => request.Reason).NotEmpty().MinimumLength(8).MaximumLength(512);
+        RuleFor(request => request.Reason).NotEmpty().MaximumLength(512);
 }
 
 public sealed class CreateForceTerminationEndpoint(

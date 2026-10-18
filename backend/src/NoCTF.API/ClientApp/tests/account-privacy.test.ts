@@ -58,14 +58,14 @@ test('light and dark non-home pages use local wallpapers with a configurable sha
 
   expect(layout).toContain('data-slot="page-wallpaper"')
   expect(layout).toContain('v-if="!isHome"')
-  expect(css).toContain("url('../images/backgrounds/light-pages-wallpaper.jpg')")
-  expect(css).toContain("url('../images/backgrounds/dark-pages-wallpaper.jpg')")
+  expect(css).toContain("url('../images/backgrounds/light-pages-wallpaper.webp')")
+  expect(css).toContain("url('../images/backgrounds/dark-pages-wallpaper.webp')")
   expect(layout).toContain(':data-personal-wallpaper="wallpaperActive || undefined"')
   expect(css).toContain("[data-page-wallpaper='true'][data-personal-wallpaper='true']")
   expect(css).toContain("[data-page-wallpaper='true']::before")
   expect(css).toContain("[data-page-wallpaper='true']::after")
   expect(css).toContain('filter: blur(var(--page-wallpaper-blur));')
-  expect(await Bun.file(new URL('../app/assets/images/backgrounds/dark-pages-wallpaper.jpg', import.meta.url)).exists()).toBe(true)
+  expect(await Bun.file(new URL('../app/assets/images/backgrounds/dark-pages-wallpaper.webp', import.meta.url)).exists()).toBe(true)
 })
 
 test('private views are confined to staff pages and clear stale member responses', () => {

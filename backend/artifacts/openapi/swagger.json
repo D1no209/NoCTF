@@ -2663,6 +2663,83 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/teams/me/standing": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get My Team Standing",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/me/standing.",
+        "operationId": "GetMyTeamStanding",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsMyTeamStandingResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token": {
       "get": {
         "tags": [
@@ -3705,15 +3782,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "X-NoCTF-Human-Verification",
-            "in": "header",
-            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
-            "schema": {
-              "type": "string",
-              "maxLength": 4096
-            }
           }
         ],
         "responses": {
@@ -3754,24 +3822,7 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Human verification is required or was rejected.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "messageKey": {
-                      "type": "string",
-                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
-                    },
-                    "messageArguments": {
-                      "type": "object",
-                      "description": "Named interpolation arguments."
-                    }
-                  },
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
-                }
-              }
-            }
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -13097,88 +13148,6 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start": {
-      "post": {
-        "tags": [
-          "Competitions"
-        ],
-        "summary": "Start Progression Challenge",
-        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start.",
-        "operationId": "StartProgressionChallenge",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "StartProgressionChallengeRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesStartProgressionChallengeRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesProgressionStartConflict"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/unlock": {
       "post": {
         "tags": [
@@ -20645,7 +20614,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Updates the global SSO switch and public base URL.",
+        "summary": "Updates the global SSO switch.",
         "description": "Executes PATCH /api/v1/admin/platform/sso.",
         "operationId": "AdminPlatformSsoPatchConfiguration",
         "requestBody": {
@@ -20677,16 +20646,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -30095,6 +30054,140 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsTeamsMyTeamStandingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "challengeBenefits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardScoreboardChallengeBenefit"
+            }
+          },
+          "version": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
+          },
+          "dataScope": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardScoreboardChallengeBenefit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "grossPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "writeUpDeductionPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "writeUpDeductionPercent": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "writeUpUnlockedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Normal",
+          "Frozen",
+          "Blackout"
+        ],
+        "enum": [
+          "Normal",
+          "Frozen",
+          "Blackout"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Live",
+          "Frozen",
+          "Hidden"
+        ],
+        "enum": [
+          "Live",
+          "Frozen",
+          "Hidden"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Processing"
+        ],
+        "enum": [
+          "Processing"
+        ]
+      },
+      "NoCTFAPIEndpointsTeamsGetMyTeamStandingRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsTeamsGetTeamRequest": {
         "type": "object",
         "additionalProperties": false
@@ -38943,20 +39036,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Live",
-          "Frozen",
-          "Hidden"
-        ],
-        "enum": [
-          "Live",
-          "Frozen",
-          "Hidden"
-        ]
-      },
       "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
         "type": "string",
         "description": "",
@@ -39432,22 +39511,16 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "features": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationCompetitionsManagementCompetitionFeatures"
+              }
+            ]
           }
         }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Normal",
-          "Frozen",
-          "Blackout"
-        ],
-        "enum": [
-          "Normal",
-          "Frozen",
-          "Blackout"
-        ]
       },
       "NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol": {
         "type": "string",
@@ -39490,6 +39563,21 @@
           "DirectAndWsrx",
           "WsrxOnly"
         ]
+      },
+      "NoCTFApplicationCompetitionsManagementCompetitionFeatures": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "progressionEnabled": {
+            "type": "boolean"
+          },
+          "progressionMapVisible": {
+            "type": "boolean"
+          },
+          "hasPublishedTheory": {
+            "type": "boolean"
+          }
+        }
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
         "type": "object",
@@ -40103,38 +40191,6 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardScoreboardChallengeBenefit": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "grossPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "writeUpDeductionPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "writeUpDeductionPercent": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "writeUpUnlockedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "netPoints": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -40180,32 +40236,6 @@
             "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol"
-          },
-          "statusUrl": {
-            "type": "string"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Processing"
-        ],
-        "enum": [
-          "Processing"
-        ]
       },
       "NoCTFAPIEndpointsCompetitionsGetLeaderboardRequest": {
         "type": "object",
@@ -40344,16 +40374,8 @@
           "complete": {
             "type": "boolean"
           },
-          "visited": {
-            "type": "boolean"
-          },
           "requiresPrerequisites": {
             "type": "boolean"
-          },
-          "firstOpenedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           },
           "imageUrl": {
             "type": "string",
@@ -42860,47 +42882,6 @@
       "NoCTFAPIEndpointsChallengesPrepareRandomChallengeAttachmentDownloadRequest": {
         "type": "object",
         "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsChallengesProgressionStartConflict": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesProgressionStartFailureCode"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "messageKey": {
-            "type": "string"
-          },
-          "messageArguments": {
-            "type": "object",
-            "additionalProperties": {}
-          }
-        }
-      },
-      "NoCTFAPIEndpointsChallengesProgressionStartFailureCode": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "GraphChanged"
-        ],
-        "enum": [
-          "GraphChanged"
-        ]
-      },
-      "NoCTFAPIEndpointsChallengesStartProgressionChallengeRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "nullable": true
-          }
-        }
       },
       "NoCTFAPIEndpointsGameplayFactsAcceptedGameplayFactResponse": {
         "type": "object",
@@ -45639,7 +45620,7 @@
           "reason": {
             "type": "string",
             "maxLength": 512,
-            "minLength": 8,
+            "minLength": 0,
             "nullable": false
           }
         }
@@ -46904,6 +46885,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "publicBaseUrl": {
+            "type": "string"
           }
         }
       },
@@ -47838,6 +47822,11 @@
             "maxLength": 500,
             "minLength": 0,
             "nullable": true
+          },
+          "publicBaseUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0
           }
         }
       },
@@ -47897,7 +47886,6 @@
         "additionalProperties": false,
         "required": [
           "enabled",
-          "publicBaseUrl",
           "tokenLifetimeMinutes",
           "resendCooldownSeconds",
           "passwordResetTokenLifetimeMinutes",
@@ -47914,11 +47902,6 @@
         "properties": {
           "enabled": {
             "type": "boolean"
-          },
-          "publicBaseUrl": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 0
           },
           "tokenLifetimeMinutes": {
             "type": "integer",
@@ -48051,18 +48034,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "enabled",
-          "publicBaseUrl"
+          "enabled"
         ],
         "properties": {
           "enabled": {
             "type": "boolean"
-          },
-          "publicBaseUrl": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 0,
-            "nullable": false
           }
         }
       },

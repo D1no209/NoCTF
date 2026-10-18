@@ -1,15 +1,16 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Palette } from '@lucide/vue'
 import { useThemePalette } from '../../composables/useThemePalette'
-import { normalizeHex } from '../../components/ui/color-picker/color'
+import { normalizeHex } from '../../lib/color'
 import { themeColor } from '../../utils/theme-color'
-import { defaultWallpaperBlur, maximumWallpaperBlur } from './palette'
+import { defaultWallpaperBlur, maximumWallpaperBlur } from '../../lib/theme-palette'
+import { themePalettePresets } from './palette-presets'
 
 export function useThemePalettePanel() {
   const { isDark, toggle } = useTheme()
   const palette = useThemePalette()
   const mode = computed(() => isDark.value ? 'dark' : 'light')
-  const defaultColor = ref('#39FF14')
+  const defaultColor = ref(themeColor('--primary'))
   watch([isDark, palette], async () => { await nextTick(); defaultColor.value = themeColor('--primary') }, { immediate: true, deep: true })
   const color = computed(() => palette.value[mode.value] ?? defaultColor.value)
   const wallpaperBlurKey = computed(() => mode.value === 'dark' ? 'darkWallpaperBlur' : 'lightWallpaperBlur')
@@ -33,12 +34,7 @@ export function useThemePalettePanel() {
       [wallpaperBlurKey.value]: defaultWallpaperBlur,
     }
   }
-  const presets = [
-    { color: '#0066FF', label: 'palette.blue' }, { color: '#00B8D9', label: 'palette.cyan' },
-    { color: '#8B5CF6', label: 'palette.violet' }, { color: '#EC4899', label: 'palette.pink' },
-    { color: '#F97316', label: 'palette.orange' }, { color: '#39FF14', label: 'palette.green' },
-    { color: '#EF4444', label: 'palette.red' }, { color: '#64748B', label: 'palette.slate' },
-  ]
+  const presets = themePalettePresets
   return { Palette, mode, color, wallpaperBlur, maximumWallpaperBlur, presets, setColor, setWallpaperBlur, setMode, reset }
 }
 export type ThemePalettePanelViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useThemePalettePanel>>

@@ -35,6 +35,8 @@ export function useOffsetPagination<T>(
   const initialized = ref(false)
   let generation = 0
   let loadingGeneration: number | null = null
+  /** 同一代内并发请求时记住最后一次翻页目标,当前请求结束后补发。 */
+  let pendingPage: number | null = null
 
   const offset = computed(() => (page.value - 1) * limit.value)
   const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
@@ -44,7 +46,10 @@ export function useOffsetPagination<T>(
   async function loadPage(targetPage = page.value): Promise<void> {
     const target = Math.max(1, targetPage)
     const requestGeneration = generation
-    if (loadingGeneration === requestGeneration) return
+    if (loadingGeneration === requestGeneration) {
+      pendingPage = target
+      return
+    }
 
     page.value = target
     loadingGeneration = requestGeneration
@@ -74,12 +79,17 @@ export function useOffsetPagination<T>(
         loadingGeneration = null
         if (requestGeneration === generation) loading.value = false
       }
+      const trailing = pendingPage
+      pendingPage = null
+      if (trailing !== null && trailing !== page.value && requestGeneration === generation)
+        await loadPage(trailing)
     }
   }
 
   function reset(): void {
     generation += 1
     loadingGeneration = null
+    pendingPage = null
     page.value = 1
     total.value = 0
     items.value = []

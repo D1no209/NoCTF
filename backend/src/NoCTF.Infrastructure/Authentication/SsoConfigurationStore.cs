@@ -29,24 +29,19 @@ public sealed class SsoConfigurationStore(
 
     public Task<SsoConfigurationMutationResult> UpdateGlobalAsync(
         bool enabled,
-        string publicBaseUrl,
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        if (!SsoProviderValidation.IsValidPublicBaseUrl(
-                publicBaseUrl,
-                networkOptions.AllowInsecurePublicBaseUrl))
-            return Task.FromResult(new SsoConfigurationMutationResult(
-                SsoConfigurationMutationState.InvalidConfiguration));
-
         return MutateAsync(actorUserId, now, ct, configuration =>
         {
+            if (enabled && !SsoProviderValidation.IsValidPublicBaseUrl(
+                    configuration.PublicBaseUrl, networkOptions.AllowInsecurePublicBaseUrl))
+                return Mutation.Invalid(SsoConfigurationMutationState.InvalidConfiguration);
             if (enabled && configuration.Providers.All(provider =>
                     !provider.Enabled || !provider.AllowLogin && !provider.AllowBinding))
                 return Mutation.Invalid(SsoConfigurationMutationState.InvalidConfiguration);
             configuration.Enabled = enabled;
-            configuration.PublicBaseUrl = publicBaseUrl;
             return Mutation.Success(
                 new SsoProviderAuditFact(
                     1,

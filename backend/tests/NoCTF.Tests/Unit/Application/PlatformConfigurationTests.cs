@@ -8,6 +8,21 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class PlatformConfigurationTests
 {
     [Test]
+    [Arguments("https://example.test/path")]
+    [Arguments("https://example.test?token=private")]
+    [Arguments("https://user:secret@example.test")]
+    [Arguments("javascript:alert(1)")]
+    public async Task Public_address_rejects_non_origin_values_without_persistence(string origin)
+    {
+        var store = Substitute.For<IPlatformConfigurationStore>();
+        var objects = Substitute.For<IStore>();
+        var configuration = new ManagePlatformConfiguration(store, objects, Uploads(objects));
+        var result = await configuration.UpdateAsync("NoCTF", null, DateTimeOffset.UtcNow, publicBaseUrl: origin);
+        await Assert.That(result.State).IsEqualTo(PlatformConfigurationUpdateState.InvalidInput);
+        await store.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default, default);
+    }
+
+    [Test]
     public async Task Update_normalizes_public_branding_text()
     {
         var now = DateTimeOffset.UtcNow;

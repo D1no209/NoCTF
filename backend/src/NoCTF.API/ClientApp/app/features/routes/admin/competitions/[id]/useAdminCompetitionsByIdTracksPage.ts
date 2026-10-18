@@ -2,7 +2,7 @@ import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { Plus, Save, Trash2 } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-import { adminGetCompetition, adminListTeams, adminPatchCompetition } from '../../../../../api'
+import { adminListTeams, adminPatchCompetition } from '../../../../../api'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse,
@@ -34,7 +34,7 @@ interface PendingTrackRemoval {
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTracksPage. */
 export function useAdminCompetitionsByIdTracksPage() {
-  const { competitionId, canWrite } = useCompetitionAdmin()
+  const { competitionId, canWrite, accept, read: readAdminCompetition } = useCompetitionAdmin()
 
   const mode = ref<import('~/api').NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
   const enabled = ref(false)
@@ -63,7 +63,7 @@ export function useAdminCompetitionsByIdTracksPage() {
   async function load() {
     loading.value = true
     const [competitionResult, teamResult] = await Promise.all([
-      adminGetCompetition({ path: { competitionId } }),
+      readAdminCompetition({ path: { competitionId } }),
       adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
     ])
     loading.value = false
@@ -309,6 +309,7 @@ export function useAdminCompetitionsByIdTracksPage() {
       toast.error(error.value)
       return
     }
+    accept(data)
     toast.success(describeMessage('administration.label.trackConfigurationSaved'))
     await load()
   }

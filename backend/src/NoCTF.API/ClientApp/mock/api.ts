@@ -12,6 +12,7 @@ import { mockRuntimeEndpoint } from './runtime'
 import { createMockBroadcastHistory } from './broadcast-history'
 import { createMockPlatformLogHistory } from './platform-log-history'
 import { createMockLiveSolo } from './live-solo'
+import { createMockTheory } from './theory'
 import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
 import { validateAppealStatement } from '../app/lib/participant-form-validation'
 
@@ -120,6 +121,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
   const notificationChanges = new Set<() => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
+  const theory = createMockTheory({ state, json, shape, responseSchema })
   const defaultHumanVerification = () => ({
     enabled: false, runtimeEnabled: true, evaluationEnabled: true, provider: 'None', ready: false,
     capServerUrl: '', capSiteKey: '', capSecretConfigured: false,
@@ -298,6 +300,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (p.attachmentId && !attachment) return problem(404, '演示附件不存在 / Attachment not found')
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
+    if (competition) competition.features = { progressionEnabled: competition.mode === 'Ctf', progressionMapVisible: competition.mode === 'Ctf', hasPublishedTheory: theory.hasPublishedTheory(competition.id) }
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
     const awdScoringResponse = awdScoring.handle(request, route, p, body, user?.userId)
     if (awdScoringResponse) return awdScoringResponse
@@ -305,6 +308,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (awdCheckResponse) return awdCheckResponse
     const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
     if (liveSoloRead !== undefined) return json(shape(responseSchema(operation), liveSoloRead))
+    const theoryResponse = await theory.handle(request, route, p, body, user, operation)
+    if (theoryResponse) return theoryResponse
     if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
       return problem(403, 'Mock announcement management requires staff permissions')
     let value: any
@@ -386,9 +391,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       else if (route === '/auth/me/wallpaper') {
         if (!user?.wallpaperRevision) return problem(404, '尚未上传壁纸 / No wallpaper uploaded')
         const wallpaper = wallpapers.get(user.userId)
-          ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+          ?? Bun.file(new URL('./data/competition-poster.webp', import.meta.url))
         return new Response(wallpaper, {
-          headers: { 'Content-Type': wallpaper.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+          headers: { 'Content-Type': wallpaper.type || 'image/webp', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
       }
       else if (route === '/users/{userId}/profile-cover') {
@@ -401,7 +406,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       if (route === '/competitions/{competitionId}/poster') {
         const storedPoster = competitionPosters.get(p.competitionId!)
         if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
-        const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+        const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.webp', import.meta.url))
         const currentRevision = competition?.posterUrl
           ? new URL(competition.posterUrl, url).searchParams.get('revision')
           : null
@@ -565,9 +570,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
           nodes: competition?.mode === 'Ctf' ? challenges.map((item, index) => ({
             id: item.id, kind: 0, resourceId: item.id,
             title: item.customTitle || item.title, description: null, direction: item.direction,
-            active: index < 2, complete: index === 0, visited: index === 0,
+            active: index < 2, complete: index === 0,
             requiresPrerequisites: true,
-            firstOpenedAt: index === 0 ? now() : null, imageUrl: null,
+            imageUrl: null,
           })) : [],
           edges: competition?.mode === 'Ctf' ? links.filter(([from, to]) => challenges[from] && challenges[to])
             .map(([from, to], index) => ({
@@ -605,6 +610,15 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         if (!user) return problem(401, '请先登录演示账号 / Sign in to view the invitation token')
         if (!team || (team.captainId !== user.userId && !['Administrator', 'Organizer'].includes(user.role))) return problem(403, '仅队长或竞赛管理者可查看 / Captain or competition manager required')
         value = { invitationToken: invitationTokens.get(team.id) }
+      }
+      else if (route === '/competitions/{competitionId}/teams/me/standing') {
+        if (!myTeam || myTeam.isBanned || myTeam.registrationStatus !== 'Approved' || competition?.mode === 'LiveSolo') return problem(404, 'No eligible team')
+        const projection = leaderboardRead(state, '', p.competitionId!)
+        const row = projection?.teams?.find((item: Data) => item.teamId === myTeam.id)
+        value = { teamId: myTeam.id, rank: row?.rank ?? null, totalScore: row?.totalScore ?? null,
+          challengeBenefits: row?.challengeBenefits ?? [], version: projection?.version ?? '0',
+          generatedAt: projection?.generatedAt ?? now(), dataAsOf: projection?.dataAsOf ?? null,
+          visibility: projection?.visibility ?? 'Normal', dataScope: projection?.dataScope ?? 'Live' }
       }
       else if (cleanRoute.endsWith('/teams/me')) {
         if (!myTeam) return problem(404, '尚未加入演示队伍 / No team')
@@ -952,10 +966,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
         value = invitedTeam; value.memberIds.push(user!.userId); value.registrationStatus = 'Unregistered'
       }
-      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/start') {
-        if (!challenge || !challenge.isPublished) return problem(404, '演示题目不可访问 / Mock challenge unavailable')
-        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
-      }
+
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')
         const correct = (body.flag ?? body.flags?.[0]) === 'flag{mock_success}'
@@ -1091,5 +1102,5 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (status === 204) return new Response(null, { status, headers: { 'X-NoCTF-Mock': 'true' } })
     return json(shape(responseSchema(operation, String(status)), value), status)
   }
-  return { state, handle, changes, notificationChanges, userFor }
+  return { state, handle, changes, notificationChanges, theoryChanges: theory.changes, userFor }
 }

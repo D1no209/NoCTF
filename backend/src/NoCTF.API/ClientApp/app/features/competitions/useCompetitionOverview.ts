@@ -192,6 +192,10 @@ export function useCompetitionOverview(
   const countdown = computed(() => {
     const c = competition.value
     if (!c) return null
+    if (c.status === 'Finished') return { label: translate("common.label.finished"), ms: 0 }
+    const start = new Date(c.startTime ?? '').getTime()
+    if (!Number.isNaN(start) && now.value < start)
+      return { label: translate("competitions.label.start"), ms: start - now.value }
     const end = new Date(c.endTime ?? '').getTime()
     if (Number.isNaN(end)) return null
     if (now.value < end) return { label: translate("competitions.label.end"), ms: end - now.value }

@@ -97,7 +97,7 @@ describe('competition track pages', () => {
     const trackView = await sourceFile(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdTracksPageView.vue', import.meta.url)).text()
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
-    expect(admin).toContain('adminGetCompetition')
+    expect(admin).toContain('readAdminCompetition')
     expect(admin).toContain('adminListTeams')
     expect(admin).toContain('adminPatchCompetition')
     expect(admin).toContain('if (saving.value || !canUpdate.value || !canWrite.value) return')

@@ -89,8 +89,6 @@ public sealed class CompetitionWebhookBloodReadinessTests
                 new GetChallenge(Substitute.For<IChallengeManagementStore>()),
                 new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                 leaderboard,
-                new CompetitionWebhookOptions(new Uri("https://noctf.example.test/"),
-                    10, new HashSet<string>(), new HashSet<string>()),
                 clock,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<
                     CompetitionWebhookDeliveryStore>.Instance);

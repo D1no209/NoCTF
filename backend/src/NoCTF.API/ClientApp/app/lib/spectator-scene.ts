@@ -5,7 +5,7 @@ import { setFlagTransfer } from '../motion/spectator-flag'
 import { createTerrain, terrainHeight, terrainFragments } from './spectator-terrain'
 import { createSpectatorRock } from './spectator-rock'
 import { awdTeamLayout, awdOverviewRadius } from './spectator-awd-layout'
-import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
+import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.webp'
 import type { SpectatorServiceState } from '../features/spectator/spectator-service-state'
 
 export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: SpectatorServiceState[]; compromised?: boolean[] }

@@ -1,11 +1,11 @@
 import { adminFormatDateTime } from '~/utils/admin-format'
-import { message as describeMessage } from '../../utils/i18n'
+import { ensureLocaleDomains, message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
 import { Dice5, FileDown, History, BookOpen } from '@lucide/vue'
-import { prepareChallengeAttachmentDownloadEndpoint, prepareRandomChallengeAttachmentDownloadEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
+import { prepareChallengeAttachmentDownloadEndpoint, prepareRandomChallengeAttachmentDownloadEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
 import { startAttachmentBrowserDownload } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
@@ -69,34 +69,6 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     attachments.value = []
     attachmentDeliveryPolicy.value = 'All'
 
-    if (isLoggedIn.value && ctx.competition.value?.mode === 'Ctf') {
-      const entry = useState<{ competitionId: string, challengeId: string, revision: number } | null>(
-        'progression-entry', () => null)
-      const expectedRevision = entry.value?.competitionId === props.competitionId
-        && entry.value.challengeId === props.competitionChallengeId
-        ? entry.value.revision : undefined
-      entry.value = null
-      const started = await startProgressionChallenge({
-        signal: reads.signal,
-        path: {
-          competitionId: props.competitionId,
-          competitionChallengeId: props.competitionChallengeId,
-        },
-        body: { expectedRevision },
-      })
-      if (sequence !== loadSequence) return
-      if (started.error) {
-        loading.value = false
-        if (started.response?.status === 409 || started.response?.status === 404) {
-          await navigateTo({ path: `/competitions/${props.competitionId}/progression`,
-            query: { blocked: props.competitionChallengeId } })
-          return
-        }
-        error.value = parseApiError(started.error, describeMessage('progression.startFailed')).displayMessage
-        return
-      }
-    }
-
     const { data, error: requestError } = await getChallengeEndpoint({
       signal: reads.signal,
       path: {
@@ -140,6 +112,9 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
     attachments.value = (data.items ?? []).filter(attachment => !attachment.deletedAt)
   }
+
+  // 选手侧路由不会经 /admin 加载 administration，而判定失败原因文案来自该域。
+  void ensureLocaleDomains(['administration'])
 
   watch(
     () => [props.competitionId, props.competitionChallengeId, ctx.competition.value?.mode,

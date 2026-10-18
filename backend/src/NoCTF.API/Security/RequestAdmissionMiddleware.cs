@@ -15,7 +15,8 @@ public enum ProtectedEntry
     PatchUpload,
     RuntimeCommand,
     ManualAdjustment,
-    FlagSubmission
+    FlagSubmission,
+    RuntimeRelease
 }
 public sealed record ProtectedEntryMetadata(ProtectedEntry Entry);
 
@@ -38,7 +39,7 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.User.FindFirstValue("sub");
         if (Guid.TryParse(userId, out var canonicalUserId)) userId = canonicalUserId.ToString("N");
         var ip = source.Address ?? "unknown";
-        if (entry is ProtectedEntry.PatchUpload or ProtectedEntry.RuntimeCommand or ProtectedEntry.ManualAdjustment or ProtectedEntry.FlagSubmission
+        if (entry is ProtectedEntry.PatchUpload or ProtectedEntry.RuntimeCommand or ProtectedEntry.RuntimeRelease or ProtectedEntry.ManualAdjustment or ProtectedEntry.FlagSubmission
             && (!Guid.TryParse(context.Request.Headers["Idempotency-Key"], out var key) || key == Guid.Empty))
         {
             await ApiProblems.Problem(statusCode: 400, title: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareTitleRequestAdmissionMiddleware),
@@ -54,11 +55,11 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
         else
         {
             if (userId is null) { await next(context); return; } // Authentication supplies the 401 without consuming another user's quota.
-            rates.Add(new($"entry-ip:{ip}", options.Value.SensitiveIpPerMinute, 60));
+            rates.Add(new(entry == ProtectedEntry.RuntimeRelease ? $"release-ip:{ip}" : $"entry-ip:{ip}", options.Value.SensitiveIpPerMinute, 60));
             rates.Add(new($"entry-user:{policy ?? entry.ToString()}:{userId}",
                 policy == "submission"
                     ? options.Value.SubmissionPerUserPerMinute
-                    : entry == ProtectedEntry.RuntimeCommand
+                    : entry is ProtectedEntry.RuntimeCommand or ProtectedEntry.RuntimeRelease
                         ? options.Value.RuntimeCommandPerUserPerMinute
                         : 30,
                 60));

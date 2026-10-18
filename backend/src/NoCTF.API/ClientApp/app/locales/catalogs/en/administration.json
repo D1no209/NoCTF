@@ -1,4 +1,5 @@
 {
+  "administration.label.workspaceStale": "Competition settings could not be refreshed. Showing the last successful snapshot in read-only mode.",
   "administration.awd.activeIntervalPrecision": "At least 5 seconds. Issuance is checked every 5 seconds; validity starts at actual issuance. Missed periods are not backfilled.",
   "administration.label.adjustmentReason": "Adjustment reason",
   "administration.description.awdAdjustmentReason": "Required for AWD. This reason is retained in the staff audit log.",
@@ -1413,5 +1414,9 @@
   "administration.awd.tieBreak.field.HealthyRounds": "Complete healthy question-rounds",
   "administration.awd.tieBreak.field.AttackCount": "Accepted captures",
   "administration.awd.tieBreak.field.LastAttackAt": "Last accepted attack time",
-  "administration.awd.tieBreak.field.RegistrationTime": "Team registration time"
+  "administration.awd.tieBreak.field.RegistrationTime": "Team registration time",
+  "administration.label.publicAddressUsage": "Used for email links, SSO callbacks and competition Webhooks.",
+  "administration.challenges.error.templatesLoadFailed": "Unable to load challenge templates",
+  "administration.competitionsBy.error.teamsLoadFailed": "Unable to load teams",
+  "administration.platformUsers.error.usersLoadFailed": "Unable to load platform users"
 }

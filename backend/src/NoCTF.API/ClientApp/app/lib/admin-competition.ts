@@ -14,6 +14,9 @@ import type {
 export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol
 
 export interface CompetitionAdminContext {
+  data: ReturnType<typeof import('../features/admin/useAdminCompetitionResource').useAdminCompetitionResource>['data']
+  read: ReturnType<typeof import('../features/admin/useAdminCompetitionResource').useAdminCompetitionResource>['read']
+  accept: ReturnType<typeof import('../features/admin/useAdminCompetitionResource').useAdminCompetitionResource>['accept']
   competitionId: string
   competition: Ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
   role: Ref<CompetitionAdminRole>

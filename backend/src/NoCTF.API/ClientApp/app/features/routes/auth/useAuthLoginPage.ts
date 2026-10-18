@@ -6,6 +6,7 @@ import { bindViewState } from '../../shared/view-state'
 import { usePasskeyLogin } from '../../authentication/passkeys/usePasskeyLogin'
 import type { HumanVerificationHeaders } from '~/lib/human-verification-coordinator'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
+import { safeInternalPath } from '~/lib/safe-redirect'
 import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
 import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
 
@@ -90,10 +91,7 @@ export function useAuthLoginPage() {
     if (ssoPendingId.value) return
     error.value = null
     ssoPendingId.value = providerId
-    const candidate = route.query.redirect
-    const returnPath = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
-      ? candidate
-      : '/'
+    const returnPath = safeInternalPath(route.query.redirect)
     try {
       const { data, error: requestError } = await authenticationSsoBeginLogin({
         body: { providerId, returnPath },
@@ -149,11 +147,7 @@ export function useAuthLoginPage() {
       password.value = ''
       if (!authenticated) return
       toast.success(describeMessage('common.label.loginSuccessful'))
-      const candidate = route.query.redirect
-      const redirect = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
-        ? candidate
-        : '/'
-      await navigateTo(redirect)
+      await navigateTo(safeInternalPath(route.query.redirect))
     }
     catch (requestError) {
       error.value = parseApiError(requestError, describeMessage('auth.login.invalidCredentials')).displayMessage

@@ -6,6 +6,8 @@ using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Theory.Activities;
+using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Competitions.Progression;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -135,49 +137,43 @@ public sealed class CompetitionProgressionPersistenceTests
                     .CountAsync(ct)).IsEqualTo(1);
                 await Assert.That(await db.ProgressionNodes.OfType<BadgeProgressionNode>()
                     .CountAsync(ct)).IsEqualTo(1);
-                var starter = new ProgressionChallengeStarter(new TestContextFactory(options));
-                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
-                    result.Progression.Revision, now.AddMinutes(1), ct))
-                    .IsEqualTo(StartProgressionChallengeResult.Started);
-                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
-                    result.Progression.Revision, now.AddMinutes(2), ct))
-                    .IsEqualTo(StartProgressionChallengeResult.Started);
-                await Assert.That(await db.TeamProgressionNodeVisits.AsNoTracking()
-                    .Where(visit => visit.TeamId == teamId && visit.NodeId == nodeId)
-                    .Select(visit => visit.FirstOpenedAt).SingleAsync(ct))
-                    .IsEqualTo(now.AddMinutes(1));
-                var player = await new ProgressionPlayerReader(db).ReadAsync(
-                    competitionId, teamId, ct);
-                await Assert.That(player.Nodes.Single(node => node.Id == nodeId).Visited).IsTrue();
-                var other = await new ProgressionPlayerReader(db).ReadAsync(
-                    competitionId, otherTeamId, ct);
-                await Assert.That(other.Nodes.Single(node => node.Id == nodeId).Visited).IsFalse();
-                var concurrentStarts = await Task.WhenAll(Enumerable.Range(0, 8)
-                    .Select(_ => starter.StartAsync(competitionId, instanceId, otherUserId,
-                        result.Progression.Revision, now.AddMinutes(2), ct)));
-                await Assert.That(concurrentStarts.All(start =>
-                    start == StartProgressionChallengeResult.Started)).IsTrue();
-                await Assert.That(await db.TeamProgressionNodeVisits.AsNoTracking()
-                    .CountAsync(visit => visit.TeamId == otherTeamId && visit.NodeId == nodeId, ct))
-                    .IsEqualTo(1);
-                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
-                    result.Progression.Revision - 1, now.AddMinutes(3), ct))
-                    .IsEqualTo(StartProgressionChallengeResult.GraphChanged);
+                var player = await new ProgressionPlayerReader(db).ReadAsync(competitionId, teamId, ct);
+                await Assert.That(player.Nodes.Single(node => node.Id == nodeId).Active).IsTrue();
+                await Assert.That(await db.Database.SqlQueryRaw<int>(
+                    "SELECT COUNT(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'team_progression_node_visits'")
+                    .SingleAsync(ct)).IsEqualTo(0);
+                var features = new CompetitionFeatureReader(db);
+                var configured = await features.ReadAsync(competitionId, ct);
+                await Assert.That(configured.ProgressionEnabled).IsTrue();
+                await Assert.That(configured.ProgressionMapVisible).IsTrue();
+                await Assert.That(configured.HasPublishedTheory).IsFalse();
+                var activity = new TheoryActivity { Id = Guid.NewGuid(), OwnerId = ownerId,
+                    Name = "Navigation activity", Kind = TheoryActivityKind.Competition,
+                    State = TheoryActivityState.Draft, OpensAt = now, ClosesAt = now.AddHours(1), CreatedAt = now };
+                var link = new CompetitionTheoryActivity { CompetitionId = competitionId, ActivityId = activity.Id, Enabled = true };
+                db.TheoryActivities.Add(activity); db.CompetitionTheoryActivities.Add(link);
+                await db.SaveChangesAsync(ct);
+                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
+                activity.State = TheoryActivityState.Published;
+                await db.SaveChangesAsync(ct);
+                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsTrue();
+                link.Enabled = false;
+                await db.SaveChangesAsync(ct);
+                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
+                link.Enabled = true; activity.State = TheoryActivityState.Voided;
+                await db.SaveChangesAsync(ct);
+                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
+                var savedGraph = await db.CompetitionProgressions.SingleAsync(ct);
+                savedGraph.ShowPlayerMap = false;
+                await db.SaveChangesAsync(ct);
+                var hiddenMap = await features.ReadAsync(competitionId, ct);
+                await Assert.That(hiddenMap.ProgressionEnabled).IsTrue();
+                await Assert.That(hiddenMap.ProgressionMapVisible).IsFalse();
                 var stale = await store.SaveAsync(new(
                     competitionId, Guid.NewGuid(), false, false, [], [], now), ct);
                 await Assert.That(stale.Failure)
                     .IsEqualTo(CompetitionProgressionSaveFailure.ConcurrencyConflict);
             }
         });
-    }
-
-    private sealed class TestContextFactory(DbContextOptions<NoCtfDbContext> options)
-        : IDbContextFactory<NoCtfDbContext>
-    {
-        public NoCtfDbContext CreateDbContext() => new(options);
-
-        public Task<NoCtfDbContext> CreateDbContextAsync(
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(CreateDbContext());
     }
 }

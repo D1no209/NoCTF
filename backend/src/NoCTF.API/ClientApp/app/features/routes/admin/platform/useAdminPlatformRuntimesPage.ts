@@ -5,7 +5,8 @@ import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 
-import { ExternalLink, RefreshCw } from '@lucide/vue'
+// 别名避免与共享 ExternalLink 原语同名遮蔽。
+import { ExternalLink as ExternalLinkIcon, RefreshCw } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 import { adminGetRuntime, adminGetCompetition, adminGetCompetitionChallenge, adminChallengeBankGetTemplate, adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
@@ -152,7 +153,7 @@ export function useAdminPlatformRuntimesPage() {
     const runtime = runtimeOf(forceTerminateTarget.value)
     const reason = forceTerminateReason.value.trim()
     if (!runtime?.id
-      || reason.length < 8
+      || reason.length < 1
       || !forceTerminateConfirmed.value
       || forceTerminatePending.value)
       return
@@ -191,7 +192,7 @@ export function useAdminPlatformRuntimesPage() {
 
   const viewBindings = {
       RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError,
-      formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl,
+      formatCapacityAmount, runnerFailureLabel, ExternalLinkIcon, RuntimeAccessUrl,
       RefreshCw,
       filters,
       detailTarget,

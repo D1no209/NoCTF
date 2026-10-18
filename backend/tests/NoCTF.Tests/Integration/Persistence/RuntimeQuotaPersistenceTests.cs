@@ -172,10 +172,10 @@ public sealed class RuntimeQuotaPersistenceTests
         });
     }
 
-    [Test]
+    [Test, Arguments(false), Arguments(true)]
     [Timeout(300_000)]
     public async Task Admin_termination_targets_the_exact_instance_and_is_idempotent(
-        CancellationToken cancellationToken)
+        bool cleanupFailed, CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -244,6 +244,7 @@ public sealed class RuntimeQuotaPersistenceTests
                     runtime => runtime.Id == runtimeInstanceId,
                     cancellationToken);
                 assigned.RunnerId = "runner-a";
+                if (cleanupFailed) assigned.State = RuntimeState.Failed;
                 await assignmentDb.SaveChangesAsync(cancellationToken);
             }
 
@@ -257,7 +258,7 @@ public sealed class RuntimeQuotaPersistenceTests
                         runtimeInstanceId,
                         actorUserId,
                         "Runner cleanup exceeded the operation timeout.",
-                        fixture.Now.Add(RuntimeForceTerminationPolicy.StuckThreshold),
+                        fixture.Now.AddSeconds(2),
                         cancellationToken);
 
                 await Assert.That(forced.Failure).IsNull();
