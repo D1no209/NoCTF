@@ -16,6 +16,15 @@ function createMarkdown(highlighter?: CodeHighlighter) {
 const plainMarkdown = createMarkdown()
 let highlightedMarkdown: ReturnType<typeof createMarkdown> | undefined
 
+/** Top-level author HTML blocks, using the same parser as the published renderer. */
+export function markdownHtmlBlockRanges(source: string): Array<{ fromLine: number; toLine: number }> {
+  if (!source.includes('<')) return []
+  return plainMarkdown.parse(source, {}).flatMap(token =>
+    token.type === 'html_block' && token.level === 0 && token.map
+      ? [{ fromLine: token.map[0] + 1, toLine: token.map[1] }]
+      : [])
+}
+
 const color = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgb|hsl)a?\([\d\s.,%/+-]+\))$/i
 const length = /^(?:0|auto|\d{1,4}(?:\.\d+)?(?:px|em|rem|%))$/i
 const spacing = /^(?:0|auto|\d{1,3}(?:\.\d+)?(?:px|em|rem|%))(?:\s+(?:0|auto|\d{1,3}(?:\.\d+)?(?:px|em|rem|%))){0,3}$/i
@@ -27,7 +36,17 @@ const alignment: sanitizeHtml.Transformer = (tagName, attribs) => {
 }
 
 const htmlOptions: sanitizeHtml.IOptions = {
-  allowedTags: [...sanitizeHtml.defaults.allowedTags, 'img', 'details', 'summary', 'del', 'ins', 'audio', 'video', 'source', 'picture'],
+  // Keep this product policy explicit: dependency updates must not widen author HTML.
+  allowedTags: [
+    'address', 'article', 'aside', 'footer', 'header', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'hgroup', 'main', 'nav', 'section', 'blockquote', 'dd', 'div', 'dl', 'dt', 'figcaption',
+    'figure', 'hr', 'li', 'menu', 'ol', 'p', 'pre', 'ul', 'a', 'abbr', 'b', 'bdi', 'bdo',
+    'br', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rb', 'rp', 'rt',
+    'rtc', 'ruby', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var',
+    'wbr', 'caption', 'col', 'colgroup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr',
+    'img', 'details', 'summary', 'del', 'ins', 'audio', 'video', 'source', 'picture',
+  ],
+  disallowedTagsMode: 'discard',
   allowedAttributes: {
     '*': ['style', 'title', 'lang', { name: 'dir', values: ['ltr', 'rtl', 'auto'] }],
     a: ['href', 'rel', { name: 'target', values: ['_blank'] }],

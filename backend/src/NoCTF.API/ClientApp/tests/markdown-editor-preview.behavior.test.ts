@@ -65,6 +65,30 @@ test('table blocks finish rendering and keep working when the caret enters and l
   expect(view.dom.querySelectorAll('.cm-md-block td').length).toBe(2)
 })
 
+test('HTML author blocks share sanitized alignment and reveal editable source at the caret', async () => {
+  const source = 'Intro\n\n<div style="text-align: right" onclick="bad()">出题人：PaperPlane</div>\n\nEnd'
+  const view = editor(source)
+  await settle()
+  let author = view.dom.querySelector<HTMLDivElement>('.cm-md-block > div')
+  expect(author?.textContent).toBe('出题人：PaperPlane')
+  expect(author?.style.textAlign).toBe('right')
+  expect(author?.hasAttribute('onclick')).toBe(false)
+  view.dispatch({ selection: { anchor: view.state.doc.line(3).from } })
+  expect(view.dom.querySelector('.cm-md-block')).toBeNull()
+  expect(view.state.doc.toString()).toBe(source)
+  view.dispatch({ selection: { anchor: 0 } })
+  author = view.dom.querySelector<HTMLDivElement>('.cm-md-block > div')
+  expect(author?.style.textAlign).toBe('right')
+})
+
+test('HTML preview removes executable content and keeps fenced HTML literal', async () => {
+  const view = editor('Intro\n\n<div><script>bad()</script><iframe srcdoc="bad"></iframe><strong>safe</strong></div>\n\n```html\n<div onclick="bad()">literal</div>\n```')
+  await settle()
+  expect(view.dom.querySelector('.cm-md-block strong')?.textContent).toBe('safe')
+  expect(view.dom.querySelector('script, iframe, [onclick]')).toBeNull()
+  expect(view.dom.querySelector('.cm-md-block code')?.textContent).toContain('<div onclick="bad()">literal</div>')
+})
+
 test('composition reveals source until its final text has been committed', async () => {
   const view = editor('Intro\n\n```text\nbody\n```')
   view.contentDOM.dispatchEvent(new browser.CompositionEvent('compositionstart', { bubbles: true }))

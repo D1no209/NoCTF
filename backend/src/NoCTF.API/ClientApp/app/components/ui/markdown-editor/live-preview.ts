@@ -3,10 +3,11 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } fr
 import { renderMarkdownPreview } from '../../../lib/markdown-preview-worker.client'
 import { renderMarkdownFence } from '../../../lib/markdown-fence'
 import { highlightMarkdownCode } from '../../../lib/markdown-highlighter'
+import { markdownHtmlBlockRanges } from '../../../lib/markdown'
 
 /**
  * Obsidian 式实时预览:编辑器内容仍是 Markdown 源码,非光标行隐藏语法标记并套用排版样式,
- * 光标所在行恢复原始标记以便编辑。代码围栏与表格整块渲染为与只读展示相同的 HTML。
+ * 光标所在行恢复原始标记以便编辑。围栏、表格和 HTML 块复用阅读态的安全渲染。
  */
 
 class BulletWidget extends WidgetType {
@@ -18,14 +19,14 @@ class BulletWidget extends WidgetType {
   }
 }
 
-/** 表格渲染缓存:同一份源码只走一次 worker,并限制条目数避免长会话无界增长。 */
+/** 表格/HTML 渲染缓存:同一份源码只走一次 worker,并限制条目数。 */
 const renderedBlocks = new Map<string, string>()
 const renderedBlocksLimit = 32
 
 class BlockWidget extends WidgetType {
   constructor(private readonly html: string, private readonly source?: string) { super() }
   override eq(other: BlockWidget) {
-    // 表格按源码复用同一个 widget:worker 返回后不再触发一次替换/重排。
+    // 按源码复用 widget:worker 返回后不再触发一次替换/重排。
     if (this.source !== undefined || other.source !== undefined) return other.source === this.source
     return other.html === this.html
   }
@@ -49,7 +50,9 @@ class BlockWidget extends WidgetType {
   override ignoreEvent() { return false }
 }
 
-type Block = { fromLine: number, toLine: number, source: string[], tableSource?: string }
+type Block = { fromLine: number, toLine: number, source: string[], previewSource?: string }
+// Caret-only updates reuse parsed ranges; old documents are released with their editor states.
+const htmlRanges = new WeakMap<EditorState['doc'], ReturnType<typeof markdownHtmlBlockRanges>>()
 
 /**
  * 围栏 HTML 与发布渲染共用同一实现:语言 token 会被规范化,作者输入的围栏
@@ -83,7 +86,22 @@ function scan(state: EditorState, composing: boolean): DecorationSet {
   }
   const text = (number: number) => state.doc.line(number).text
   const blocks: Array<Block & { html: string }> = []
+  let htmlBlocks = htmlRanges.get(state.doc)
+  if (!htmlBlocks) {
+    htmlBlocks = markdownHtmlBlockRanges(state.doc.toString())
+    htmlRanges.set(state.doc, htmlBlocks)
+  }
+  const htmlEnds = new Map(htmlBlocks.map(block => [block.fromLine, block.toLine]))
   for (let number = 1; number <= state.doc.lines; number += 1) {
+    const htmlEnd = htmlEnds.get(number)
+    if (htmlEnd !== undefined) {
+      const source: string[] = []
+      for (let index = number; index <= htmlEnd; index += 1) source.push(text(index))
+      const previewSource = source.join('\n')
+      blocks.push({ fromLine: number, toLine: htmlEnd, source, html: renderedBlocks.get(previewSource) ?? '', previewSource })
+      number = htmlEnd
+      continue
+    }
     const line = text(number).trimStart()
     const fence = /^(```|~~~)/.exec(line)
     if (fence) {
@@ -106,8 +124,8 @@ function scan(state: EditorState, composing: boolean): DecorationSet {
       while (end < state.doc.lines && text(end + 1).includes('|') && text(end + 1).trim()) end += 1
       const source: string[] = []
       for (let index = number; index <= end; index += 1) source.push(text(index))
-      const tableSource = source.join('\n')
-      blocks.push({ fromLine: number, toLine: end, source, html: renderedBlocks.get(tableSource) ?? '', tableSource })
+      const previewSource = source.join('\n')
+      blocks.push({ fromLine: number, toLine: end, source, html: renderedBlocks.get(previewSource) ?? '', previewSource })
       number = end
     }
   }
@@ -126,7 +144,7 @@ function scan(state: EditorState, composing: boolean): DecorationSet {
     const block = rendered.get(number)
     if (block) {
       const end = state.doc.line(block.toLine)
-      ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(block.html, block.tableSource) }) })
+      ranges.push({ from: line.from, to: end.to, deco: Decoration.replace({ block: true, widget: new BlockWidget(block.html, block.previewSource) }) })
       number = block.toLine
       continue
     }
