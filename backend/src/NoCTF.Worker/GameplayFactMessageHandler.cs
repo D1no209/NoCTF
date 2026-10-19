@@ -26,9 +26,12 @@ public sealed class GameplayFactMessageHandler(
         CancellationToken cancellationToken)
     {
         var fact = await db.GameplayFacts.AsNoTracking()
-            .SingleOrDefaultAsync(
-                candidate => candidate.Id == message.GameplayFactId,
-                cancellationToken);
+            .Where(candidate => candidate.Id == message.GameplayFactId)
+            .Select(candidate => new { candidate.Id, candidate.ActorUserId, candidate.CompetitionId,
+                candidate.TeamId, candidate.CompetitionChallengeId, candidate.Kind, candidate.State,
+                candidate.Result, candidate.FailureCode, candidate.ConcurrencyStamp,
+                candidate.OccurredAt, candidate.UpdatedAt })
+            .SingleOrDefaultAsync(cancellationToken);
         if (fact?.ActorUserId is not Guid userId || fact.State != message.State || fact.CompetitionChallengeId is null
             || message.ConcurrencyStamp != Guid.Empty && fact.ConcurrencyStamp != message.ConcurrencyStamp)
             return;

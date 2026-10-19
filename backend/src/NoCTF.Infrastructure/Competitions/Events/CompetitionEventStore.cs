@@ -147,7 +147,11 @@ public sealed class CompetitionEventStore(
             draft.Level,
             draft.OccurredAt,
             draft.CompetitionAudienceChangeKind,
-            draft.CompetitionAccessMode));
+            draft.CompetitionAccessMode,
+            draft.Visibility,
+            // Mirrors the participant read filter: a Team event belongs to its subject or related team.
+            subject.Type == EntityReferenceKind.Team ? subject.Id
+                : related is { Type: EntityReferenceKind.Team } team ? team.Id : null));
         return id;
     }
 

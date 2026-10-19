@@ -26,6 +26,9 @@ public static class PostgreSqlPersistence
                 configuration.GetValue("Database:MaximumPoolSize", 80));
             settings.MaxAutoPrepare = configuration.GetValue("Database:MaximumAutoPreparedStatements", 64);
             settings.AutoPrepareMinUsages = configuration.GetValue("Database:AutoPrepareMinUsages", 2);
+            // The application never changes session state (no raw SQL, SET, LISTEN, temp tables or advisory locks).
+            // Skipping the reset avoids seven extra server statements on every pooled connection checkout.
+            settings.NoResetOnClose = true;
             var builder = new NpgsqlDataSourceBuilder(settings.ConnectionString) { Name = "NoCTF" };
             return builder.Build();
         });
@@ -38,6 +41,7 @@ public static class PostgreSqlPersistence
                 .AddInterceptors(new NoCTF.Infrastructure.Observability.DatabaseCommandPerformanceInterceptor(),
                     new NoCTF.Infrastructure.Observability.DatabaseConnectionPerformanceInterceptor());
         services.AddScoped<NoCtfDbContext>();
+        services.AddSingleton<IDatabaseConstraintClassifier, PostgreSqlConstraintClassifier>();
         services.AddDbContextFactory<NoCtfDbContext>(Configure);
         return services;
     }

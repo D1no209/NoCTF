@@ -18,6 +18,16 @@ public sealed class CompetitionHubAudienceAccess(IServiceScopeFactory scopes)
             .GetAccessModeAsync(competitionId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetTeamMemberIdsAsync(
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider
+            .GetRequiredService<ICompetitionAudienceReader>()
+            .GetTeamMemberIdsAsync(teamId, cancellationToken);
+    }
+
     public async Task<CompetitionHubAccessDecision?> ResolveAsync(
         Guid userId,
         Guid competitionId,

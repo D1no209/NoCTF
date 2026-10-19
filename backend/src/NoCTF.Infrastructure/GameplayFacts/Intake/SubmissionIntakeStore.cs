@@ -117,7 +117,9 @@ public sealed class GameplayFactIntakeStore(
     {
         if (received.Count == 0)
             return [];
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        // Reads run outside the write transaction: they are ReadCommitted either way, and the receipt's
+        // unique key resolves replay races. The transaction only spans the final write and commit, so a
+        // pooled connection is not pinned across admission reads.
         var previous = await FindFlagReplayAsync(received[0].CompetitionId, received[0].CompetitionChallengeId,
             received[0].UserId, received.Select(item => item.Value).ToArray(), cancellationToken);
         if (previous is not null) return previous;
@@ -261,8 +263,9 @@ public sealed class GameplayFactIntakeStore(
         }
         var response = entities.Select(entity => new GameplayFactAcceptanceResult(
             GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt)).ToArray();
-        replay?.Store(response);
         var commitStarted = Stopwatch.GetTimestamp();
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        replay?.Store(response);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         markCommitted();

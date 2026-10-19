@@ -13,7 +13,7 @@ internal static class AwdpDynamicLeaderboardProjection
 {
     private static readonly ScoreCurveEvaluator ScoreCurve = new();
 
-    public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
+    public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input, Guid? scoringTeamId = null)
     {
         var competition = ParseCompetition(input.CompetitionConfiguration);
         var activeTeams = input.Teams
@@ -149,6 +149,7 @@ internal static class AwdpDynamicLeaderboardProjection
         }
 
         var awardsByTeam = awards
+            .Where(item => scoringTeamId is null || item.Fact.TeamId == scoringTeamId)
             .GroupBy(item => item.Fact.TeamId!.Value)
             .ToDictionary(group => group.Key, group => group.ToList());
         var challengePenalties = input.GameplayFacts
@@ -174,7 +175,7 @@ internal static class AwdpDynamicLeaderboardProjection
             .ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
         var hintCosts = ProjectionPenalties.HintCosts(input, scoringTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, scoringTeams.Keys);
-        var rows = scoringTeams.Values.Select(team =>
+        var rows = scoringTeams.Values.Where(team => scoringTeamId is null || team.Id == scoringTeamId).Select(team =>
         {
             var own = awardsByTeam.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.OccurredAt)
@@ -217,7 +218,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 lastFixAt,
                 team.RegisteredAt);
         });
-        var entries = rows
+        var entries = scoringTeamId is not null ? rows.Select(row => row.Entry).ToList() : rows
             .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
             .SelectMany(track => track
                 .OrderByDescending(row => row.Entry.Score)
@@ -230,6 +231,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, awards
+            .Where(item => scoringTeamId is null || item.Fact.TeamId == scoringTeamId)
             .GroupBy(item => new
             {
                 TeamId = item.Fact.TeamId!.Value,

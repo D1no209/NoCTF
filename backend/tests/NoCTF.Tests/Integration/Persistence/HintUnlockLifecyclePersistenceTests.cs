@@ -180,7 +180,7 @@ public sealed class HintUnlockLifecyclePersistenceTests
                     processingDb,
                     Substitute.For<IGameplayFactEvaluatorCatalog>(),
                     Substitute.For<IPostCommitMessagePublisher>(),
-                    Substitute.For<ILeaderboardSnapshotFactory>());
+                    new TestDbContextFactory(processingDb), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
 
                 var expectedStamp = await processingDb.GameplayFacts.AsNoTracking().Where(item => item.Id == gameplayFactId)
                     .Select(item => item.ConcurrencyStamp).SingleAsync(cancellationToken);

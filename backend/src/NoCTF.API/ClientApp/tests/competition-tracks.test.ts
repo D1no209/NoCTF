@@ -218,6 +218,6 @@ describe('competition track pages', () => {
     expect(navigator).toContain("kind === 'TeamRegistrationChanged'")
     expect(navigator).toContain('if (response?.status === 404) items.value = []')
     expect(adminTeams).toContain('registrationStatusOptions')
-    expect(adminTeams).toContain('@select="setRegistrationStatusValue(t, option.value)"')
+    expect(adminTeams).toContain('@update:model-value="setRegistrationStatusValue(t, $event)"')
   })
 })

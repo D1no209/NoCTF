@@ -58,6 +58,8 @@ public static class WorkerRole
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
         services.AddTransient<PendingGameplayFactDispatchHandler>();
+        services.AddSingleton<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore>();
+        services.AddTransient<GameplayFactProgressionReconciler>();
         services.AddTransient<StopSolvedChallengeRuntimesHandler>();
         services.AddRuntimeDispatchWakeupGate(enableClusterScheduling);
         services.AddTransient<ReleaseRunnerCapacityHandler>();
@@ -140,7 +142,9 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
         var enabledQueues = WorkerQueues.GetEnabled(configuration);
         if (enabledQueues.Contains(WorkerQueue.Background))
+        {
             options.Discovery.IncludeType(typeof(CompetitionEventRealtimeMessageHandler));
+        }
         if (enabledQueues.Contains(WorkerQueue.Projection))
             options.Discovery.IncludeType(typeof(CompetitionEventLeaderboardMessageHandler));
         if (enabledQueues.Contains(WorkerQueue.Webhook))

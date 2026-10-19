@@ -24,10 +24,11 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue _leaderboardProjectionMergeQueue;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
+        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo _publishedLeaderboardMemo;
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public CompetitionEventLeaderboardMessageHandlerHandler914949183(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue leaderboardProjectionMergeQueue, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public CompetitionEventLeaderboardMessageHandlerHandler914949183(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue leaderboardProjectionMergeQueue, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo publishedLeaderboardMemo, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -38,6 +39,7 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardProjectionMergeQueue = leaderboardProjectionMergeQueue;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
+            _publishedLeaderboardMemo = publishedLeaderboardMemo;
             _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
@@ -50,7 +52,7 @@ namespace Internal.Generated.WolverineHandlers
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventApplicabilityReader = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventApplicabilityReader(noCtfDbContext);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher, _publishedLeaderboardMemo);
             // The actual message body
             var competitionEventCommitted = (NoCTF.Application.Competitions.Events.CompetitionEventCommitted)context.Envelope.Message;
 

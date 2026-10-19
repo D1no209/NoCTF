@@ -157,7 +157,7 @@ public sealed partial class AwdRoundCoordinationTests
             await Assert.That((await Submit()).FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.CompetitionFinished);
             await using var workerDb = new NoCtfDbContext(options);
             var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
-                new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
+                new RecordingOutbox(), new TestDbContextFactory(workerDb), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
             await processor.ProcessAsync(fact.Id, fact.ConcurrencyStamp, ct);
             await Assert.That((await workerDb.GameplayFacts.AsNoTracking().SingleAsync(x => x.Id == fact.Id, ct)).Result)
                 .IsEqualTo(GameplayFactResult.Correct);

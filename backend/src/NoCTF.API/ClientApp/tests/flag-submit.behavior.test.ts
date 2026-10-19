@@ -44,7 +44,8 @@ test('AWD accepts distinct flags after success and after remount without a solve
     remounted.state.input.value = 'flag{third}'; await remounted.state.submit()
     expect(app.submissions).toHaveLength(3)
     remounted.props.remainingAttempts = 0; await nextTick()
-    expect(remounted.state.inputDisabled.value).toBe(true)
+    // Remaining attempts are advisory; the Worker returns the authoritative asynchronous result.
+    expect(remounted.state.inputDisabled.value).toBe(false)
   } finally { remounted.stop() }
 })
 

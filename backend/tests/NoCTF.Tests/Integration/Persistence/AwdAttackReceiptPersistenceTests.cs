@@ -95,7 +95,7 @@ public sealed partial class AwdRoundCoordinationTests
             {
                 await using var workerDb = new NoCtfDbContext(options);
                 var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
-                    new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
+                    new RecordingOutbox(), new TestDbContextFactory(workerDb), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
                 var expectedStamp = await workerDb.GameplayFacts.AsNoTracking().Where(item => item.Id == id)
                     .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
                 await processor.ProcessAsync(id, expectedStamp, ct);

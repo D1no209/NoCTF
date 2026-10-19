@@ -313,12 +313,11 @@ internal static class NormalizedScoreboardProjection
     private static IReadOnlyList<ScoreboardSlotEntry> CompactEntries(
         IReadOnlyList<ScoreboardSlotEntry> entries)
     {
-        if (entries.Count <= CompactEntryLimit)
-            return entries;
-
-        // Totals and EntryCount remain authoritative. The main snapshot contains only
-        // a small, deterministic recent summary; complete raw history is cursor-paged.
+        // Totals and EntryCount remain authoritative. The main snapshot is downloaded by every
+        // viewer on every publication, so it only summarizes meaningful entries (scores, awards,
+        // successes). Failed and pending attempts stay in the cursor-paged slot detail.
         return entries
+            .Where(entry => IsScoreBearing(entry) || entry.Outcome == ScoreboardEntryOutcome.Succeeded)
             .OrderByDescending(entry => IsScoreBearing(entry))
             .ThenByDescending(entry => entry.OccurredAt)
             .ThenByDescending(entry => entry.Id)
@@ -843,6 +842,10 @@ internal static class NormalizedScoreboardProjection
                          && fact.Result == GameplayFactResult.Applied)
                     manual = checked(manual
                         + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
+                else if (fact.Kind == GameplayFactKind.HintUnlock)
+                    slot.AddFact(fact, ScoreboardEntryKind.Hint, ScoreboardBreakdownKind.Hint, actorIndexes, 0,
+                        fact.Result == GameplayFactResult.Unlocked ? checked(fact.HintCost.GetValueOrDefault() * fact.Multiplicity) : 0,
+                        deductedPointsPerOccurrence: fact.Result == GameplayFactResult.Unlocked ? fact.HintCost.GetValueOrDefault() : 0);
             }
             var control = checked((aggregateCells.GetValueOrDefault(group.Key)?.Score ?? 0L) - manual);
             slot.AddBreakdownScore(

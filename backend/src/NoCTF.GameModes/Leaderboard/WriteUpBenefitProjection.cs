@@ -120,8 +120,8 @@ internal static class WriteUpBenefitProjection
         return scoreboard with { Snapshot = scoreboard.Snapshot with { Teams = teams, Version = version }, EntryAllocations = allocations };
     }
 
-    private static Dictionary<(Guid TeamId, Guid ChallengeId), long> Gross(LeaderboardProjectionInput input,
-        GameModeLeaderboardProjection raw, ScoreboardProjection scoreboard)
+    internal static Dictionary<(Guid TeamId, Guid ChallengeId), long> Gross(LeaderboardProjectionInput input,
+        GameModeLeaderboardProjection raw, ScoreboardProjection? scoreboard = null)
     {
         if (input.Mode == GameMode.Awd && input.AwdAggregates is not null)
             return input.AwdAggregates.ToDictionary(x => (x.TeamId, x.CompetitionChallengeId), x => x.PositivePoints);
@@ -131,6 +131,7 @@ internal static class WriteUpBenefitProjection
                 x => x.Sum(f => checked(ProjectionPenalties.ParseDelta(f.Value) * f.Multiplicity)));
         if (input.Mode == GameMode.Awd)
         {
+            ArgumentNullException.ThrowIfNull(scoreboard);
             var columns = scoreboard.Schema.Columns.ToDictionary(x => x.Index);
             return scoreboard.Snapshot.Teams.SelectMany(team => team.Slots.Select(slot => new { team.TeamId,
                 ChallengeId = columns[slot.ColumnIndex].CompetitionChallengeId, Points = slot.EarnedPoints.GetValueOrDefault()

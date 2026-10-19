@@ -107,7 +107,7 @@ public sealed class MfaConnectionGuardTests
                 return (IReadOnlyDictionary<string, MfaFailure?>)new Dictionary<string, MfaFailure?> { [caller.ConnectionId] = null };
             });
 
-        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Notifications, [caller.ConnectionId], CancellationToken.None)).IsEmpty();
+        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Notifications, [caller.ConnectionId], revalidate: true, CancellationToken.None)).IsEmpty();
     }
 
     [Test]
@@ -123,7 +123,7 @@ public sealed class MfaConnectionGuardTests
                 return (IReadOnlyDictionary<string, MfaFailure?>)new Dictionary<string, MfaFailure?> { [caller.ConnectionId] = MfaFailure.AccountUnavailable };
             });
 
-        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Notifications, [caller.ConnectionId], CancellationToken.None)).IsEmpty();
+        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Notifications, [caller.ConnectionId], revalidate: true, CancellationToken.None)).IsEmpty();
         await Assert.That(guard.IsRegistered(replacement.ConnectionId)).IsTrue();
         replacement.DidNotReceive().Abort();
     }
@@ -135,7 +135,7 @@ public sealed class MfaConnectionGuardTests
         var guard = new MfaConnectionGuard(validator, TimeProvider.System);
         var caller = Context(); guard.Register(caller, MfaHubKind.Notifications);
 
-        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Competition, [caller.ConnectionId, "missing"], CancellationToken.None)).IsEmpty();
+        await Assert.That(await guard.EligibleConnectionsAsync(MfaHubKind.Competition, [caller.ConnectionId, "missing"], revalidate: true, CancellationToken.None)).IsEmpty();
         await guard.RevalidateAsync("missing", CancellationToken.None);
 
         await validator.DidNotReceive().ValidateAsync(Arg.Any<IReadOnlyList<MfaContextValidationRequest>>(), Arg.Any<CancellationToken>());

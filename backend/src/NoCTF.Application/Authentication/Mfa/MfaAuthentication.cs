@@ -14,6 +14,14 @@ public sealed record PrimaryAuthentication(AuthenticatedUser User, Authenticatio
     OidcMfaProof? OidcProof = null, string ReturnPath = "/", Guid? ProviderId = null, Guid? CredentialId = null);
 public sealed record MfaAuthenticationResult(AuthenticatedUser User, AuthenticationContext Context, string ReturnPath, IReadOnlyList<string>? RecoveryCodes = null);
 public sealed record MfaContextValidationRequest(string Key, Guid UserId, int TokenVersion, AuthenticationContext? Authentication);
+/// <summary>Per-request validation. EmailVerificationPending is null when the store did not evaluate it.</summary>
+public sealed record MfaRequestValidation(MfaFailure? Failure, bool? EmailVerificationPending);
+
+/// <summary>Optional store capability: validates a request and reads the email gate in one round trip.</summary>
+public interface IMfaRequestValidator
+{
+    Task<MfaRequestValidation> ValidateRequestAsync(Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct);
+}
 public sealed record AuthenticationCompletion(AuthenticationState State, MfaAuthenticationResult? Authentication = null,
     IssuedAccessToken? Access = null, IssuedRefreshToken? Refresh = null, MfaFlowView? Flow = null, MfaBrowserCredential? Browser = null);
 

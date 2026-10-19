@@ -11,6 +11,13 @@ using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
+using DotNet.Testcontainers.Builders;
+using NATS.Client.Core;
+using NATS.Client.JetStream.Models;
+using NATS.Net;
+using NoCTF.Hosting;
+using NoCTF.Infrastructure.GameplayFacts.Processing;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -28,6 +35,18 @@ public sealed class PendingGameplayFactDispatchTests
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .Build();
             await postgres.StartAsync(cancellationToken);
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true).WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222)).Build();
+            await nats.StartAsync(cancellationToken);
+            await using var connection = new NatsConnection(new NatsOpts {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}" });
+            var jetstream = connection.CreateJetStreamContext();
+            await jetstream.CreateStreamAsync(new StreamConfig(NatsSubjects.GameplayStream,
+                [NatsSubjects.Subject(WorkerQueue.Gameplay)]), cancellationToken);
+            await jetstream.CreateOrUpdateConsumerAsync(NatsSubjects.GameplayStream,
+                new ConsumerConfig(WorkerQueueNames.Gameplay) { AckPolicy = ConsumerConfigAckPolicy.Explicit }, cancellationToken);
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
@@ -105,7 +124,10 @@ public sealed class PendingGameplayFactDispatchTests
 
             await using var db = new NoCtfDbContext(options);
             var publisher = new RecordingPublisher();
-            await new PendingGameplayFactDispatchHandler(db, publisher, TimeProvider.System)
+            var cursors = new GameplayFactRecoveryCursorStore(connection);
+            var handler = new PendingGameplayFactDispatchHandler(db, publisher, TimeProvider.System,
+                connection, cursors, NullLogger<PendingGameplayFactDispatchHandler>.Instance);
+            await handler
                 .Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
             var dispatched = publisher.Messages.OfType<EvaluateGameplayFact>()
                 .Select(message => message.GameplayFactId).ToArray();
@@ -115,6 +137,38 @@ public sealed class PendingGameplayFactDispatchTests
                     && message.Purpose == GameplayFactDispatchPurpose.Recovery
                     && message.RecoveryWindow > 0)).IsTrue();
             await Assert.That(publisher.FlushCount).IsEqualTo(1);
+            var saved = await cursors.ReadAsync(cancellationToken);
+            await Assert.That(saved.Cursor).IsNotNull();
+            publisher.Messages.Clear();
+            await handler.Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
+            await Assert.That(publisher.Messages.OfType<EvaluateGameplayFact>().Select(item => item.GameplayFactId))
+                .IsEquivalentTo([queuedId, processingId]);
+            var laterIds = Enumerable.Range(0, 65).Select(_ => Guid.NewGuid()).ToArray();
+            db.GameplayFacts.AddRange(laterIds.Select(id => new FlagAttemptGameplayFact {
+                Id = id, CompetitionId = competitionId, CompetitionChallengeId = challengeId,
+                TeamId = teamId, ActorUserId = userId, Value = "flag{recovery}",
+                ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{recovery}")),
+                State = GameplayFactState.Queued, OccurredAt = now.AddMinutes(-1), UpdatedAt = now.AddMinutes(-1) }));
+            await db.SaveChangesAsync(cancellationToken);
+            var recovered = new HashSet<Guid>();
+            for (var pass = 0; pass < 3; pass++)
+            {
+                publisher.Messages.Clear();
+                await handler.Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
+                await Assert.That(publisher.Messages.Count <= PendingGameplayFactDispatchHandler.BatchSize).IsTrue();
+                recovered.UnionWith(publisher.Messages.OfType<EvaluateGameplayFact>().Select(item => item.GameplayFactId));
+            }
+            await Assert.That(laterIds.All(recovered.Contains)).IsTrue();
+            saved = await cursors.ReadAsync(cancellationToken);
+            for (var index = 0; index < 17; index++)
+                await jetstream.PublishAsync(NatsSubjects.Subject(WorkerQueue.Gameplay), index, cancellationToken: cancellationToken);
+            publisher.Messages.Clear();
+            await handler.Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
+            await Assert.That(publisher.Messages.Count).IsEqualTo(0);
+            await Assert.That((await cursors.ReadAsync(cancellationToken)).Cursor).IsEqualTo(saved.Cursor);
+            await jetstream.DeleteConsumerAsync(NatsSubjects.GameplayStream, WorkerQueueNames.Gameplay, cancellationToken);
+            await handler.Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
+            await Assert.That(publisher.Messages.Count).IsEqualTo(0);
         });
     }
 

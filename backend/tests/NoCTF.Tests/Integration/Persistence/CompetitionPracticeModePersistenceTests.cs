@@ -194,6 +194,54 @@ public sealed class CompetitionPracticeModePersistenceTests
     }
 
     [Test, Timeout(300_000)]
+    public async Task Idempotent_flag_intake_commits_the_receipt_with_the_fact_and_replays_it(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres("noctf_flag_replay");
+            await postgres.StartAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, earlyFinish: false, cancellationToken);
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                var competition = await setup.Competitions.AsSplitQuery().SingleAsync(
+                    item => item.Id == fixture.CompetitionId, cancellationToken);
+                competition.Status = CompetitionStatus.Running;
+                competition.EndAt = fixture.Now.AddHours(1);
+                await setup.SaveChangesAsync(cancellationToken);
+            }
+            var key = new ReplayKey(Guid.NewGuid(), fixture.UserId);
+
+            async Task<GameplayFactAcceptanceResult> SubmitAsync()
+            {
+                await using var db = new NoCtfDbContext(options);
+                var intake = new GameplayFactIntakeStore(db, new RecordingOutbox(),
+                    replay: new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(db, key));
+                var admission = await intake.LoadAdmissionAsync(fixture.CompetitionId,
+                    fixture.CompetitionChallengeId, fixture.UserId, cancellationToken);
+                return await intake.TryAcceptFlagAsync(new(
+                    Guid.CreateVersion7(fixture.Now), fixture.CompetitionId, fixture.TeamId,
+                    fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.FlagAttempt,
+                    "flag{replayed}", SHA256.HashData(Encoding.UTF8.GetBytes("flag{replayed}")), fixture.Now),
+                    admission!, maxAttempts: null, cancellationToken);
+            }
+
+            await using var verify = new NoCtfDbContext(options);
+            var factsBefore = await verify.GameplayFacts.CountAsync(cancellationToken);
+            var first = await SubmitAsync();
+            var replayed = await SubmitAsync();
+
+            await Assert.That(first.State).IsEqualTo(GameplayFactAcceptanceState.Created);
+            await Assert.That(replayed.GameplayFactId).IsEqualTo(first.GameplayFactId);
+            await Assert.That(await verify.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(factsBefore + 1);
+            await Assert.That(await verify.CommandReceipts.CountAsync(cancellationToken)).IsEqualTo(1);
+        });
+    }
+
+    private sealed record ReplayKey(Guid? Key, Guid? ActorId) : NoCTF.Application.Commands.Idempotency.IRequestCommandKey;
+
+    [Test, Timeout(300_000)]
     public async Task Standard_flag_intake_records_independent_unlimited_practice_without_changing_official_results(
         CancellationToken cancellationToken)
     {
@@ -456,8 +504,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             db,
             new GameModeGameplayFactEvaluatorCatalog(),
             outbox,
-            Substitute.For<ILeaderboardSnapshotFactory>(),
-            events);
+            new TestDbContextFactory(db), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
         var expectedStamp = await db.GameplayFacts.AsNoTracking().Where(item => item.Id == gameplayFactId)
             .Select(item => item.ConcurrencyStamp).SingleAsync(cancellationToken);
         await processor.ProcessAsync(gameplayFactId, expectedStamp, cancellationToken);

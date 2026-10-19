@@ -24,11 +24,16 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
         using var activity = NoCtfTelemetry.ActivitySource.StartActivity("Challenge.AttemptStateRead");
         try
         {
+            // Rules, challenge timing and the competition's official window in one round trip.
+            var finished = CompetitionOfficialWindowReader.FinishedAt(db, competitionId);
             var rules = await db.Set<CompetitionChallengeRules>().AsNoTracking()
                 .Where(item => item.CompetitionChallengeId == competitionChallengeId)
                 .Select(item => new { item.MaxFlagAttempts, item.MaxBreakSubmissions,
                     Timing = db.CompetitionChallenges.Where(challenge => challenge.Id == item.CompetitionChallengeId)
-                        .Select(challenge => new { challenge.AutoOpenAt, challenge.SubmissionDeadlineAt }).First() })
+                        .Select(challenge => new { challenge.AutoOpenAt, challenge.SubmissionDeadlineAt }).First(),
+                    Window = db.Competitions.Where(competition => competition.Id == competitionId)
+                        .Select(competition => new { competition.StartAt, competition.EndAt, competition.PracticeModeEnabled,
+                            FinishedAt = finished.FirstOrDefault() }).First() })
                 .SingleOrDefaultAsync(cancellationToken);
             if (rules is null)
                 throw new InvalidOperationException("Challenge rules are required for attempt state.");
@@ -57,14 +62,10 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
                 && (practice || timing.SubmissionDeadlineAt == null || item.OccurredAt < timing.SubmissionDeadlineAt));
             if (mode == GameMode.Ctf)
             {
-                var window = await db.Competitions.AsNoTracking()
-                    .Where(item => item.Id == competitionId)
-                    .Select(item => new { item.StartAt, item.EndAt, item.PracticeModeEnabled })
-                    .SingleAsync(cancellationToken);
+                var window = rules.Window;
                 if (practice && window.PracticeModeEnabled)
                     maximum = null;
-                var officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
-                    db, competitionId, window.StartAt, window.EndAt, cancellationToken);
+                var officialWindow = CompetitionOfficialWindow.Resolve(window.StartAt, window.EndAt, window.FinishedAt);
                 attempts = practice
                     ? attempts.Where(item => item.OccurredAt >= officialWindow.EndAt)
                     : attempts.Where(item => item.OccurredAt >= officialWindow.StartAt

@@ -18,7 +18,7 @@ namespace NoCTF.Infrastructure.Authentication.Mfa;
 
 public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCryptography crypto,
     PlatformSecretProtector protector, TimeProvider clock, IRequestSourceAddress? source = null,
-    NoCTF.Application.Messaging.IPostCommitMessagePublisher? publisher = null) : IMfaAuthenticationStore, IMfaManagementStore, IMfaSensitiveOperationProof
+    NoCTF.Application.Messaging.IPostCommitMessagePublisher? publisher = null) : IMfaAuthenticationStore, IMfaRequestValidator, IMfaManagementStore, IMfaSensitiveOperationProof
 {
     public async Task<MfaAccountSnapshot?> ReadAccountAsync(Guid userId, CancellationToken ct)
     {
@@ -33,9 +33,17 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             settings.MfaPolicyStamp, credential?.Id, count, user.EmailVerifiedAt is not null && MailConfigured(settings));
     }
 
-    public async Task<MfaFailure?> ValidateContextAsync(Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct)
+    public async Task<MfaFailure?> ValidateContextAsync(Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct) =>
+        (await ValidateRequestAsync(userId, tokenVersion, context, ct)).Failure;
+
+    public async Task<MfaRequestValidation> ValidateRequestAsync(Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct)
     {
         var user = await ContextUsers([userId]).SingleOrDefaultAsync(ct);
+        return new(await ValidateUserAsync(user, userId, tokenVersion, context, ct), user?.EmailVerificationPending);
+    }
+
+    private async Task<MfaFailure?> ValidateUserAsync(ContextUser? user, Guid userId, int tokenVersion, AuthenticationContext? context, CancellationToken ct)
+    {
         if (user is null || user.AccountStatus != UserAccountStatus.Active || user.TokenVersion != tokenVersion) return MfaFailure.AccountUnavailable;
         if (user.Kind == UserKind.Bot) return null;
         var now = clock.GetUtcNow();

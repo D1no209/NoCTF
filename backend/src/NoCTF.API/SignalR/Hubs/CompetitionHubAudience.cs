@@ -104,12 +104,23 @@ public interface ICompetitionHubAudienceRouter
     Task<ICompetitionHubClient?> CurrentAsync(
         Guid competitionId,
         CancellationToken cancellationToken);
+
+    /// <summary>Targets only the connections that may read an event of the given visibility.</summary>
+    Task<ICompetitionHubClient?> ForEventAsync(
+        Guid competitionId,
+        NoCTF.Domain.Competitions.Events.CompetitionEventVisibility visibility,
+        Guid? teamId,
+        CancellationToken cancellationToken);
 }
 
 public interface ICompetitionHubAudienceAccess
 {
     Task<CompetitionAccessMode?> GetAccessModeAsync(
         Guid competitionId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Guid>> GetTeamMemberIdsAsync(
+        Guid teamId,
         CancellationToken cancellationToken);
 
     Task<CompetitionHubAccessDecision?> ResolveAsync(
@@ -127,7 +138,8 @@ public sealed class CompetitionHubAudienceRouter(
 {
     public async Task<ICompetitionHubClient> AllKnownAsync(Guid competitionId, CancellationToken ct)
     {
-        var eligible = await EligibleAsync(competitionId, staffOnly: false, ct);
+        // Public broadcast: no private data, so the audience is not revalidated per push.
+        var eligible = await EligibleAsync(competitionId, _ => true, revalidate: false, ct);
         return new SpectatorInvalidatingClient(hub.Clients.Clients(eligible),
             spectators.Clients.Group(SpectatorHub.Group(competitionId)));
     }
@@ -143,19 +155,44 @@ public sealed class CompetitionHubAudienceRouter(
         {
             CompetitionAccessMode.Public => await AllKnownAsync(competitionId, cancellationToken),
             CompetitionAccessMode.StaffOnly =>
-                hub.Clients.Clients(await EligibleAsync(competitionId, staffOnly: true, cancellationToken)),
+                hub.Clients.Clients(await EligibleAsync(competitionId, subscription => subscription.IsStaff,
+                    revalidate: true, cancellationToken)),
             _ => null
         };
     }
 
-    private async Task<string[]> EligibleAsync(Guid competitionId, bool staffOnly, CancellationToken ct)
+    public async Task<ICompetitionHubClient?> ForEventAsync(
+        Guid competitionId,
+        NoCTF.Domain.Competitions.Events.CompetitionEventVisibility visibility,
+        Guid? teamId,
+        CancellationToken cancellationToken)
+    {
+        if (visibility == NoCTF.Domain.Competitions.Events.CompetitionEventVisibility.Public)
+            return await CurrentAsync(competitionId, cancellationToken);
+        var accessMode = await access.GetAccessModeAsync(competitionId, cancellationToken);
+        if (accessMode is null)
+            return null;
+        // Participants of a public competition read only their own team's Team events; staff read everything.
+        IReadOnlySet<Guid> members = visibility == NoCTF.Domain.Competitions.Events.CompetitionEventVisibility.Team
+            && teamId is Guid team && accessMode == CompetitionAccessMode.Public
+                ? (await access.GetTeamMemberIdsAsync(team, cancellationToken)).ToHashSet()
+                : new HashSet<Guid>();
+        var clients = hub.Clients.Clients(await EligibleAsync(competitionId,
+            subscription => subscription.IsStaff || members.Contains(subscription.UserId), revalidate: true, cancellationToken));
+        return accessMode == CompetitionAccessMode.Public
+            ? new SpectatorInvalidatingClient(clients, spectators.Clients.Group(SpectatorHub.Group(competitionId)))
+            : clients;
+    }
+
+    private async Task<string[]> EligibleAsync(Guid competitionId,
+        Func<CompetitionHubSubscription, bool> audience, bool revalidate, CancellationToken ct)
     {
         var candidates = subscriptions.Get(competitionId)
-            .Where(value => !staffOnly || value.IsStaff)
+            .Where(audience)
             .Select(value => value.ConnectionId).ToArray();
-        var eligible = await guard.EligibleConnectionsAsync(MfaHubKind.Competition, candidates, ct);
+        var eligible = await guard.EligibleConnectionsAsync(MfaHubKind.Competition, candidates, revalidate, ct);
         return eligible.Where(id => subscriptions.TryGet(id, competitionId, out var subscription)
-            && (!staffOnly || subscription.IsStaff)).ToArray();
+            && audience(subscription)).ToArray();
     }
 }
 

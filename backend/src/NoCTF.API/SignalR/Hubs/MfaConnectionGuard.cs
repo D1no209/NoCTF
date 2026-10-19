@@ -20,18 +20,35 @@ public sealed class MfaConnectionGuard(IMfaConnectionContextValidator validator,
     public void Register(HubCallerContext context, MfaHubKind kind) => connections[context.ConnectionId] = new(context, kind);
     public void Remove(string id) => connections.TryRemove(id, out _);
     public bool IsRegistered(string id) => connections.ContainsKey(id);
+    // Private pushes are revalidated against the database immediately before delivery.
     public async Task<string[]> EligibleAsync(MfaHubKind kind, IReadOnlySet<Guid>? users, CancellationToken ct)
     {
         var candidates = connections.Values.Where(value => value.Kind == kind && (users is null || Guid.TryParse(value.Context.UserIdentifier, out var id) && users.Contains(id))).ToArray();
         return await ValidateAsync(candidates, ct);
     }
-    public Task<string[]> EligibleConnectionsAsync(MfaHubKind kind, IReadOnlyCollection<string> connectionIds, CancellationToken ct)
+    // Public broadcasts carry no private data, so they skip the database round trip for the whole audience.
+    // Every connection is still validated when it connects, on every hub invocation and by the periodic
+    // revalidation agent; expired tokens are rejected here as well.
+    public Task<string[]> EligibleConnectionsAsync(MfaHubKind kind, IReadOnlyCollection<string> connectionIds,
+        bool revalidate, CancellationToken ct)
     {
         var candidates = new List<Connection>(connectionIds.Count);
         foreach (var id in connectionIds)
             if (connections.TryGetValue(id, out var connection) && connection.Kind == kind)
                 candidates.Add(connection);
-        return ValidateAsync(candidates, ct);
+        return revalidate ? ValidateAsync(candidates, ct) : Task.FromResult(Unexpired(candidates));
+    }
+    private string[] Unexpired(IReadOnlyList<Connection> candidates)
+    {
+        var now = clock.GetUtcNow().ToUnixTimeSeconds();
+        var valid = new List<string>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            if (long.TryParse(candidate.Context.User?.FindFirstValue("exp"), out var expires) && expires > now)
+                valid.Add(candidate.Context.ConnectionId);
+            else Abort(candidate);
+        }
+        return valid.ToArray();
     }
     public Task RevalidateAsync(string connectionId, CancellationToken ct) =>
         ValidateAsync(connections.TryGetValue(connectionId, out var connection) ? [connection] : [], ct);

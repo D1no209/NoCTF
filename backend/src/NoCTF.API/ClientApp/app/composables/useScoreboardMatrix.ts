@@ -107,7 +107,7 @@ function createScoreboardMatrix(competitionId: string, options: { pollRounds?: b
     }, 250)
   }
 
-  async function refresh(
+  async function load(
     options: ScoreboardRefreshOptions = { catalog: true, schema: true, snapshot: true },
   ): Promise<ScoreboardRefreshOutcome> {
     const requestGeneration = ++generation
@@ -192,10 +192,46 @@ function createScoreboardMatrix(competitionId: string, options: { pollRounds?: b
     schema: false,
     snapshot: false,
   }
+  let activeRead: Promise<ScoreboardRefreshOutcome> | null = null
+  function refresh(options: ScoreboardRefreshOptions = { catalog: true, schema: true, snapshot: true }): Promise<ScoreboardRefreshOutcome> {
+    pendingRefresh = { catalog: pendingRefresh.catalog || (options.catalog ?? false),
+      schema: pendingRefresh.schema || (options.schema ?? false),
+      snapshot: pendingRefresh.snapshot || (options.snapshot ?? true) }
+    if (activeRead) return activeRead
+    activeRead = (async () => {
+      let outcome: ScoreboardRefreshOutcome
+      do {
+        const requested = pendingRefresh
+        pendingRefresh = { catalog: false, schema: false, snapshot: false }
+        outcome = await load(requested)
+      } while (!stopped && (pendingRefresh.catalog || pendingRefresh.schema || pendingRefresh.snapshot))
+      return outcome
+    })().finally(() => { activeRead = null })
+    return activeRead
+  }
+  let targetNotice: ScoreboardUpdatedPayload | null = null
+  function noticeRefreshOptions(): Required<ScoreboardRefreshOptions> {
+    if (!targetNotice || targetNotice.version !== null
+      && isScoreboardVersionAtLeast(snapshot.value?.version, targetNotice.version)
+      && isCoherentScoreboardBundle(catalog.value, schema.value, snapshot.value))
+      return { catalog: false, schema: false, snapshot: false }
+    return {
+      catalog: targetNotice.challengeCatalogRevision !== null
+        && targetNotice.challengeCatalogRevision !== (catalog.value?.revision ?? null),
+      schema: targetNotice.schemaRevision !== null
+        && targetNotice.schemaRevision !== (schema.value?.revision ?? null),
+      snapshot: targetNotice.version !== null
+        && !isScoreboardVersionAtLeast(snapshot.value?.version, targetNotice.version),
+    }
+  }
   const trailingRefresh = createTrailingRefresh(async () => {
+    if (activeRead) await activeRead
     const requested = pendingRefresh
     pendingRefresh = { catalog: false, schema: false, snapshot: false }
-    await refresh(requested)
+    const notice = noticeRefreshOptions()
+    const needed = { catalog: requested.catalog || notice.catalog,
+      schema: requested.schema || notice.schema, snapshot: requested.snapshot || notice.snapshot }
+    if (needed.catalog || needed.schema || needed.snapshot) await refresh(needed)
   })
   function queueRefresh(options: ScoreboardRefreshOptions): Promise<void> {
     pendingRefresh = {
@@ -206,11 +242,9 @@ function createScoreboardMatrix(competitionId: string, options: { pollRounds?: b
     return trailingRefresh()
   }
   let unwatch: (() => void) | null = null
-  let pendingNotice: Required<ScoreboardRefreshOptions> = { catalog: false, schema: false, snapshot: false }
   const refreshNotified = createTrailingRefresh(async () => {
-    const requested = pendingNotice
-    pendingNotice = { catalog: false, schema: false, snapshot: false }
-    if (!stopped && options.enabled?.value !== false) await queueRefresh(requested)
+    if (!stopped && options.enabled?.value !== false)
+      await queueRefresh({ catalog: false, schema: false, snapshot: false })
   }, 500)
 
   function start() {
@@ -233,7 +267,9 @@ function createScoreboardMatrix(competitionId: string, options: { pollRounds?: b
         const wantsSnapshot = notice.version !== null
           && !isScoreboardVersionAtLeast(snapshot.value?.version, notice.version)
         if (!wantsSnapshot && !wantsCatalog && !wantsSchema) return
-        pendingNotice = { catalog: pendingNotice.catalog || wantsCatalog, schema: pendingNotice.schema || wantsSchema, snapshot: true }
+        if (targetNotice?.version && notice.version
+          && !isScoreboardVersionAtLeast(notice.version, targetNotice.version)) return
+        targetNotice = notice
         void refreshNotified()
       },
       onReconnected: () => void queueRefresh({ catalog: true, schema: true, snapshot: true }),
@@ -253,6 +289,7 @@ function createScoreboardMatrix(competitionId: string, options: { pollRounds?: b
   })
   const { user } = useAuth()
   watch(() => user.value?.userId, () => {
+    targetNotice = null
     generation++; catalog.value = null; schema.value = null; snapshot.value = null
     if (options.enabled?.value !== false) void queueRefresh({ catalog: true, schema: true, snapshot: true })
   })

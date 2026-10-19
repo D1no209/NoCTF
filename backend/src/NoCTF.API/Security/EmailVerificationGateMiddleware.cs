@@ -14,6 +14,11 @@ internal enum EmailVerificationProblemCode
 
 public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
 {
+    private static readonly object PendingKey = new();
+
+    /// <summary>Records the gate decision read together with the bearer-token validation.</summary>
+    internal static void SetPending(HttpContext context, bool pending) => context.Items[PendingKey] = pending;
+
     private static readonly HashSet<PathString> AllowedPaths =
     [
         new("/api/v1/auth/me"),
@@ -47,11 +52,19 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
             return;
         }
 
-        var settings = await configuration.GetAsync(context.RequestAborted);
-        if (!settings.Enabled)
+        if (context.Items.TryGetValue(PendingKey, out var known) && known is false)
         {
             await next(context);
             return;
+        }
+        if (known is not true)
+        {
+            var settings = await configuration.GetAsync(context.RequestAborted);
+            if (!settings.Enabled)
+            {
+                await next(context);
+                return;
+            }
         }
 
         var subject = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value

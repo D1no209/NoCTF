@@ -88,8 +88,10 @@ public sealed class SignalRPublisherTests
                 harness.Coordinator)
             .Handle(message, CancellationToken.None);
 
-        await harness.Audiences.Received(1).CurrentAsync(
+        await harness.Audiences.Received(1).ForEventAsync(
             competitionId,
+            CompetitionEventVisibility.Public,
+            null,
             CancellationToken.None);
         await harness.Client.Received(1).CompetitionEventChanged(
             Arg.Is<CompetitionEventChangedNotification>(notification =>
@@ -137,6 +139,8 @@ public sealed class SignalRPublisherTests
         audiences.CurrentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(client);
         audiences.AllKnownAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(client);
+        audiences.ForEventAsync(Arg.Any<Guid>(), Arg.Any<CompetitionEventVisibility>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>()).Returns(client);
         return new(context, clients, client, audiences, coordinator);
     }
 

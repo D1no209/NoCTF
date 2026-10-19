@@ -165,7 +165,7 @@ public sealed class NoCtfDbContext(
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        if (StaffWebhookEventCapture.ChangedCompetitions(this).Length != 0)
+        if (InspectOnce(() => StaffWebhookEventCapture.ChangedCompetitions(this)).Length != 0)
             throw new InvalidOperationException("Staff-event source mutations require SaveChangesAsync for transactional projection capture.");
         EnsureAppendOnlyFacts();
         return base.SaveChanges(acceptAllChangesOnSuccess);
@@ -175,23 +175,8 @@ public sealed class NoCtfDbContext(
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        var changed = StaffWebhookEventCapture.ChangedCompetitions(this);
-        var accessChanges = ChangeTracker.Entries<CompetitionEvent>()
-            .Where(entry => entry.State == EntityState.Added && ScoreboardChangePolicy.ChangesAccess(entry.Entity.Kind))
-            .Select(entry => entry.Entity.CompetitionId)
-            .Concat(ChangeTracker.Entries<CompetitionChallenge>().Where(entry => entry.State == EntityState.Modified
-                && (entry.Property(item => item.IsPublished).IsModified || entry.Property(item => item.TimingRevision).IsModified))
-                .Select(entry => entry.Entity.CompetitionId))
-            .Concat(ChangeTracker.Entries<Team>().Where(entry => entry.State == EntityState.Modified
-                && (entry.Property(item => item.IsBanned).IsModified || entry.Property(item => item.RegistrationStatus).IsModified
-                    || entry.Property(item => item.DeletedAt).IsModified || entry.Property(item => item.TrackKey).IsModified))
-                .Select(entry => entry.Entity.CompetitionId))
-            .Concat(ChangeTracker.Entries<Competition>().Where(entry => entry.State == EntityState.Modified
-                && entry.Properties.Any(property => property.IsModified
-                    && property.Metadata.Name != nameof(Competition.ConcurrencyStamp)
-                    && property.Metadata.Name != nameof(Competition.ScoreboardAccessRevision)))
-                .Select(entry => entry.Entity.Id))
-            .Distinct().ToArray();
+        // Read-only inspection: one change detection instead of one per Entries<T>() call.
+        var (changed, accessChanges) = InspectOnce(() => (StaffWebhookEventCapture.ChangedCompetitions(this), AccessChanges()));
         await using var transaction = (changed.Length != 0 || accessChanges.Length != 0) && Database.IsRelational() && Database.CurrentTransaction is null
             ? await Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
         if (accessChanges.Length != 0)
@@ -211,6 +196,33 @@ public sealed class NoCtfDbContext(
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return result;
     }
+
+    private T InspectOnce<T>(Func<T> inspect)
+    {
+        var automaticDetection = ChangeTracker.AutoDetectChangesEnabled;
+        if (automaticDetection) ChangeTracker.DetectChanges();
+        ChangeTracker.AutoDetectChangesEnabled = false;
+        try { return inspect(); }
+        finally { ChangeTracker.AutoDetectChangesEnabled = automaticDetection; }
+    }
+
+    private Guid[] AccessChanges() =>
+        ChangeTracker.Entries<CompetitionEvent>()
+            .Where(entry => entry.State == EntityState.Added && ScoreboardChangePolicy.ChangesAccess(entry.Entity.Kind))
+            .Select(entry => entry.Entity.CompetitionId)
+            .Concat(ChangeTracker.Entries<CompetitionChallenge>().Where(entry => entry.State == EntityState.Modified
+                && (entry.Property(item => item.IsPublished).IsModified || entry.Property(item => item.TimingRevision).IsModified))
+                .Select(entry => entry.Entity.CompetitionId))
+            .Concat(ChangeTracker.Entries<Team>().Where(entry => entry.State == EntityState.Modified
+                && (entry.Property(item => item.IsBanned).IsModified || entry.Property(item => item.RegistrationStatus).IsModified
+                    || entry.Property(item => item.DeletedAt).IsModified || entry.Property(item => item.TrackKey).IsModified))
+                .Select(entry => entry.Entity.CompetitionId))
+            .Concat(ChangeTracker.Entries<Competition>().Where(entry => entry.State == EntityState.Modified
+                && entry.Properties.Any(property => property.IsModified
+                    && property.Metadata.Name != nameof(Competition.ConcurrencyStamp)
+                    && property.Metadata.Name != nameof(Competition.ScoreboardAccessRevision)))
+                .Select(entry => entry.Entity.Id))
+            .Distinct().ToArray();
 
     private void EnsureAppendOnlyFacts()
     {

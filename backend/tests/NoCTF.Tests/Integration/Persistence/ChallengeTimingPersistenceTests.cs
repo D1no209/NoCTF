@@ -101,7 +101,7 @@ public sealed class ChallengeTimingPersistenceTests
         await f.Db.SaveChangesAsync(ct);
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(f.Now.AddMinutes(-5)), f.Now), ct);
         var processor = new GameplayFactProcessor(f.Db, new NoCTF.GameModes.GameplayFact.GameModeGameplayFactEvaluatorCatalog(),
-            Substitute.For<IPostCommitMessagePublisher>(), Substitute.For<ILeaderboardSnapshotFactory>());
+            Substitute.For<IPostCommitMessagePublisher>(), new TestDbContextFactory(f.Db), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
         var expectedStamp = await f.Db.GameplayFacts.AsNoTracking().Where(item => item.Id == id)
             .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
         await processor.ProcessAsync(id, expectedStamp, ct);

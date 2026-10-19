@@ -15,7 +15,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.GameModes.PatchVerification.Scoring;
-using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -23,7 +22,7 @@ public sealed partial class InternalResultStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
-    ProgressionReconciler? progressionReconciler = null, NoCTF.Infrastructure.Authentication.PlatformSecretProtector? secrets = null) : IInternalResultStore
+    NoCTF.Infrastructure.Authentication.PlatformSecretProtector? secrets = null) : IInternalResultStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -216,9 +215,6 @@ public sealed partial class InternalResultStore(
             runtime.RunnerId
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner."),
             resolvedAt));
-        if (context.Mode == GameMode.Ctf)
-            await (progressionReconciler ?? new ProgressionReconciler(db))
-                .ReconcileCompletedFactAsync(fact, resolvedAt, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));

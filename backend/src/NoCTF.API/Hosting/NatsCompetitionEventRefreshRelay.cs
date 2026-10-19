@@ -37,7 +37,8 @@ public sealed class NatsCompetitionEventRefreshRelay(
                     .CanPublishAsync(notification.CompetitionId, notification.Kind, stoppingToken)) continue;
                 var clients = notification.Kind == CompetitionEventKind.CompetitionAudienceChanged
                     ? await audiences.AllKnownAsync(notification.CompetitionId, stoppingToken)
-                    : await audiences.CurrentAsync(notification.CompetitionId, stoppingToken);
+                    : await audiences.ForEventAsync(notification.CompetitionId, notification.Visibility,
+                        notification.AudienceTeamId, stoppingToken);
                 if (clients is null) continue;
                 await clients.CompetitionEventChanged(
                     new CompetitionEventChangedNotification(

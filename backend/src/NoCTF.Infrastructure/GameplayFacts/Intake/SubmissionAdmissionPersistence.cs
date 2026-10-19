@@ -86,7 +86,8 @@ internal static class GameplayFactAdmissionPersistence
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
             return null;
-        var competitionConfiguration = await db.Competitions.AsNoTracking().AsSplitQuery()
+        // One configuration leaf owns at most one child collection, so a single query cannot fan out.
+        var competitionConfiguration = await db.Competitions.AsNoTracking().AsSingleQuery()
             .Where(item => item.Id == competitionId).Select(item => item.ModeConfiguration)
             .SingleAsync(cancellationToken);
         var challengeRules = await db.CompetitionChallenges.AsNoTracking().AsSplitQuery()

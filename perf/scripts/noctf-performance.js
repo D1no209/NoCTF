@@ -86,6 +86,7 @@ const sessionsFailed = new Counter('participant_sessions_failed');
 const projectionLag = new Trend('scoreboard_event_to_snapshot', true);
 const snapshotAge = new Trend('scoreboard_snapshot_age', true);
 const responseCacheHits = new Rate('scoreboard_response_cache_hits');
+const compressedResponses = new Rate('scoreboard_compressed_responses');
 const state = { session: null, nextSubmit: null, attemptedCorrect: false, sequence: 0, measurement: false, phaseAnnounced: false, slowEvidence: 0, failedEvidence: 0 };
 
 function announcePhase(phase, utc = new Date().toISOString()) {
@@ -115,7 +116,8 @@ function jsonResponse(response, name, statuses = [200]) {
 }
 
 function request(method, path, name, body, token, extra = {}, timeout = '30s', asynchronous = false) {
-  const headers = { ...extra };
+  // Browsers always negotiate compression; k6 decompresses gzip/deflate/br transparently.
+  const headers = { 'Accept-Encoding': 'gzip, deflate, br', ...extra };
   const traceId = randomHex(16);
   headers.traceparent = `00-${traceId}-${randomHex(8)}-01`;
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -132,7 +134,10 @@ function request(method, path, name, body, token, extra = {}, timeout = '30s', a
     operationRequests.add(1, { endpoint: name, window });
     operationFailed.add(failed, { endpoint: name });
     if (['leaderboard', 'standing', 'trends'].includes(name)) projectionProcessing.add(response.status === 202, { endpoint: name });
-    if (name === 'leaderboard' && response.status === 200) responseCacheHits.add('Age' in response.headers);
+    if (name === 'leaderboard' && response.status === 200) {
+      responseCacheHits.add('Age' in response.headers);
+      compressedResponses.add('Content-Encoding' in response.headers);
+    }
     if (token && ['my_team','submit','fact'].includes(name) && state.session && Date.now() >= state.session.initialExpiresAt && response.status >= 200 && response.status < 300) afterExpiry.add(1);
     const slow = response.timings.duration >= (name === 'submit' ? config.submitP95Ms : config.readP95Ms);
     if (failed && state.failedEvidence < 10 || !failed && slow && state.slowEvidence < 10) {

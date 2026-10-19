@@ -68,7 +68,8 @@ public sealed class LocalCompetitionEventMessageHandler(
     {
         var clients = message.Kind == CompetitionEventKind.CompetitionAudienceChanged
             ? await audiences.AllKnownAsync(message.CompetitionId, cancellationToken)
-            : await audiences.CurrentAsync(message.CompetitionId, cancellationToken);
+            : await audiences.ForEventAsync(message.CompetitionId, message.Visibility,
+                message.AudienceTeamId, cancellationToken);
         if (clients is null)
             return;
         await clients.CompetitionEventChanged(

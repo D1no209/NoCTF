@@ -10,14 +10,16 @@ namespace NoCTF.Infrastructure.Theory.Scoring;
 internal sealed record TheoryScoreData(IReadOnlyList<LeaderboardTheoryScore>? Scores);
 internal static class TheoryScoreReader
 {
-    internal static async Task<TheoryScoreData> ReadAsync(NoCtfDbContext db, Guid competitionId, DateTimeOffset cutoff, CancellationToken ct)
+    internal static async Task<TheoryScoreData> ReadAsync(NoCtfDbContext db, Guid competitionId, DateTimeOffset cutoff, CancellationToken ct,
+        Guid? scoringTeamId = null)
     {
         var activityId = await db.CompetitionTheoryActivities.AsNoTracking().Where(link => link.CompetitionId == competitionId)
             .Select(link => (Guid?)link.ActivityId).SingleOrDefaultAsync(ct);
         if (activityId is null) return new(null);
         var activity = await db.TheoryActivities.AsNoTracking().SingleAsync(activity => activity.Id == activityId, ct);
         if (activity.State == TheoryActivityState.Draft) return new(null);
-        var participants = await db.TheoryParticipants.AsNoTracking().Where(participant => participant.ActivityId == activityId && participant.TeamId != null)
+        var participants = await db.TheoryParticipants.AsNoTracking().Where(participant => participant.ActivityId == activityId && participant.TeamId != null
+                && (scoringTeamId == null || participant.TeamId == scoringTeamId))
             .Select(participant => new { participant.Id, TeamId = participant.TeamId!.Value }).ToArrayAsync(ct);
         var ids = participants.Select(participant => participant.Id).ToArray();
         var papers = await db.TheoryPapers.AsNoTracking().Where(paper => ids.Contains(paper.ParticipantId)

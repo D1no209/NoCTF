@@ -11,7 +11,8 @@ namespace NoCTF.API.SignalR.Publishing;
 public sealed class NatsLeaderboardRefreshRelay(
     INatsConnection connection,
     ICompetitionHubAudienceRouter audiences,
-    ILogger<NatsLeaderboardRefreshRelay> logger) : BackgroundService
+    ILogger<NatsLeaderboardRefreshRelay> logger,
+    NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo? memo = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,6 +27,10 @@ public sealed class NatsLeaderboardRefreshRelay(
                 var notification = JsonSerializer.Deserialize(message.Data,
                     NoCtfMessageJsonContext.Default.ScoreboardUpdated);
                 if (notification is null) continue;
+                // Raise the memo floor before clients learn about the new version.
+                if (memo is not null && long.TryParse(notification.Version, System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out var version))
+                    memo.Published(notification.CompetitionId, version);
                 var clients = await audiences.CurrentAsync(
                     notification.CompetitionId, stoppingToken);
                 if (clients is null) continue;

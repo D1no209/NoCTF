@@ -13,12 +13,16 @@ namespace NoCTF.Worker;
 
 [StickyHandler(CompetitionEventFanoutQueueNames.Realtime)]
 public sealed class CompetitionEventRealtimeMessageHandler(
-    ICompetitionEventRefreshPublisher publisher)
+    ICompetitionEventRefreshPublisher publisher,
+    GameplayFactProgressionReconciler progression)
 {
-    public Task Handle(
+    public async Task Handle(
         CompetitionEventCommitted message,
-        CancellationToken cancellationToken) =>
-        publisher.PublishAsync(message, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await progression.ReconcileAsync(message, cancellationToken);
+        await publisher.PublishAsync(message, cancellationToken);
+    }
 }
 
 [StickyHandler(CompetitionEventFanoutQueueNames.Leaderboard)]

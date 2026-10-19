@@ -54,6 +54,7 @@ public static class AuthenticationRegistration
                             .GetRequiredService<CurrentAccessTokenValidator>();
                         var failure = await validator.ValidateAsync(
                                 context.Principal,
+                                context.HttpContext,
                                 context.HttpContext.RequestAborted);
                         if (failure is not null) context.Fail(new MfaAuthenticationDeniedException(failure.Value));
                     },

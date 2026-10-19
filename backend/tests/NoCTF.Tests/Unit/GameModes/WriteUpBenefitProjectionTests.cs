@@ -36,6 +36,31 @@ public sealed class WriteUpBenefitProjectionTests
         var plain = Project(input).Snapshot.Teams.Single();
         var taxed = Project(input with { WriteUpUnlocks = [new(Guid.NewGuid(), team, challenge, 20, Start.AddMinutes(1))] });
         var actual = taxed.Snapshot.Teams.Single();
+        var scoreCalculator = new TeamScoreCalculator(new LeaderboardProjectorCatalog());
+        await Assert.That(scoreCalculator.Calculate(input, team)).IsEqualTo(plain.TotalScore);
+        var other = Guid.NewGuid();
+        var competing = input with
+        {
+            Teams = input.Teams.Append(new(other, "other", false, false)).ToArray(),
+            GameplayFacts = input.GameplayFacts.Concat(input.GameplayFacts.Select(fact => fact with {
+                GameplayFactId = Guid.NewGuid(), TeamId = other, OccurredAt = fact.OccurredAt.AddSeconds(2) })).ToArray(),
+            AwdAggregates = mode == GameMode.Awd
+                ? input.AwdAggregates!.Append(new(other, challenge, 270, 200, 1, 1, Start, 400)).ToArray() : null
+        };
+        foreach (var row in Project(competing).Snapshot.Teams)
+            await Assert.That(scoreCalculator.Calculate(competing, row.TeamId)).IsEqualTo(row.TotalScore);
+        var paidHintInput = input with
+        {
+            GameplayFacts = input.GameplayFacts.Append(Fact(team, challenge, GameplayFactKind.HintUnlock,
+                GameplayFactResult.Unlocked) with { HintCost = 9 }).ToArray()
+        };
+        await Assert.That(scoreCalculator.Calculate(paidHintInput, team)).IsEqualTo(plain.TotalScore - 9);
+        await Assert.That(Project(paidHintInput).Snapshot.Teams.Single().TotalScore).IsEqualTo(plain.TotalScore - 9);
+        await Assert.That(scoreCalculator.Calculate(input with
+        {
+            WriteUpUnlocks = [new(Guid.NewGuid(), team, challenge, 20, Start.AddMinutes(1))],
+            TheoryScores = [new(team, 17, Start, true)]
+        }, team)).IsEqualTo(actual.TotalScore + (mode == GameMode.Koh ? 0 : 17));
         var gross = plain.ChallengeBenefits.Single().GrossPoints;
         await Assert.That(gross).IsGreaterThan(0);
         var deduction = ChallengeWriteUpPolicy.Deduction(gross, 20);
@@ -61,6 +86,9 @@ public sealed class WriteUpBenefitProjectionTests
             WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, percent, Start)]);
         var result = Project(input);
         var assisted = result.Snapshot.Teams.Single(x => x.TeamId == team);
+        var calculator = new TeamScoreCalculator(new LeaderboardProjectorCatalog());
+        foreach (var row in result.Snapshot.Teams)
+            await Assert.That(calculator.Calculate(input, row.TeamId)).IsEqualTo(row.TotalScore);
         await Assert.That(assisted.Achievements!.Count).IsEqualTo(1);
         await Assert.That(assisted.Slots.SelectMany(x => x.Entries).Any(x => x.Award is not null)).IsFalse();
         await Assert.That(result.Snapshot.Teams.Single(x => x.TeamId == other).Slots.SelectMany(x => x.Entries)

@@ -17,6 +17,7 @@ function harness() {
   let settled = false
   let processing = false
   let calls = 0
+  let pendingRead: Promise<void> | null = null
   let mount = () => {}
   let dispose = () => {}
   let tick = () => {}
@@ -45,6 +46,7 @@ function harness() {
     getLeaderboardEndpoint: async (request: { query: { endingRound: number | null } }) => {
       calls++
       requests.push(request.query.endingRound)
+      if (pendingRead) await pendingRead
       return processing ? { response: { status: 202 } } : { data: {
         version: String(version), schemaRevision: String(revision), dataScope: 'Live', currentRoundId: 'round',
         teams: [{ teamId: 'team', totalScore: 100, slots: [{ columnIndex: 0, netPoints: 100 }] }],
@@ -53,6 +55,11 @@ function harness() {
   }
   const board = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useScoreboardMatrix('competition');`)(deps)
   return {
+    holdRead: () => {
+      let release!: () => void
+      pendingRead = new Promise<void>(resolve => { release = resolve })
+      return () => { pendingRead = null; release() }
+    },
     board, mount: () => mount(), dispose: () => dispose(), tick: () => tick(),
     notice: () => handlers.scoreboardUpdated?.({ competitionId: 'competition', version: String(version), schemaRevision: String(revision), challengeCatalogRevision: 'catalog' }),
     update: (complete = false) => { version++; revision++; settled = complete },
@@ -60,6 +67,21 @@ function harness() {
     calls: () => calls, requests,
   }
 }
+
+test('notice covered by an active response does not fetch the same publication again', async () => {
+  const app = harness()
+  app.mount(); await drain()
+  app.update()
+  const release = app.holdRead()
+  const reading = app.board.refresh()
+  app.notice()
+  await drain(550)
+  expect(app.calls()).toBe(2)
+  release(); await reading; await drain(550)
+  expect(app.board.snapshot.value.version).toBe('2')
+  expect(app.calls()).toBe(2)
+  app.dispose()
+})
 
 async function drain(milliseconds = 0) { await new Promise(resolve => setTimeout(resolve, milliseconds)) }
 

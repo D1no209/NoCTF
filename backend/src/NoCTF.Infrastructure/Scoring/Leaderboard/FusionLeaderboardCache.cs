@@ -30,7 +30,8 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardPublicationFence? publicationFence = null,
     TimeProvider? clock = null,
     LeaderboardSnapshotDeserializer? snapshotDeserializer = null,
-    IPostCommitMessagePublisher? workPublisher = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    IPostCommitMessagePublisher? workPublisher = null,
+    PublishedLeaderboardMemo? memo = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
@@ -495,6 +496,7 @@ public sealed class FusionLeaderboardCache(
 
     public async Task InvalidateAccessAsync(Guid competitionId, CancellationToken ct)
     {
+        memo?.Invalidate(competitionId);
         if (publicationFence is not null)
             await publicationFence.InvalidateAccessAsync(competitionId, timeProvider.GetUtcNow().UtcTicks, ct);
     }
@@ -578,6 +580,11 @@ public sealed class FusionLeaderboardCache(
                 return;
             }
 
+            if (memo is not null)
+            {
+                memo.Published(competitionId, response.Scoreboard.Snapshot.Version);
+                memo.Set(competitionId, response);
+            }
             await publisher.PublishAsync(response.Scoreboard, ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
         }
@@ -648,13 +655,18 @@ public sealed class FusionLeaderboardCache(
             return unfenced is not null && await HasCurrentAccessAsync(competitionId, unfenced, ct) ? unfenced : null;
         }
 
+        if (memo is not null && memo.TryGet(competitionId, out var memoized))
+            return memoized;
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return null;
         var bundle = snapshotDeserializer is null
             ? LeaderboardSnapshotDeserializer.Deserialize(competitionId, published)
             : await snapshotDeserializer.ReadAsync(competitionId, published, ct);
-        return await HasCurrentAccessAsync(competitionId, bundle, ct) ? bundle : null;
+        if (!await HasCurrentAccessAsync(competitionId, bundle, ct))
+            return null;
+        memo?.Set(competitionId, bundle);
+        return bundle;
     }
 
     private async Task<bool> HasCurrentAccessAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct) =>

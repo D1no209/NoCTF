@@ -9,6 +9,10 @@ public interface ICompetitionAudienceReader
     Task<CompetitionAccessMode?> GetAccessModeAsync(
         Guid competitionId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Guid>> GetTeamMemberIdsAsync(
+        Guid teamId,
+        CancellationToken cancellationToken);
 }
 
 public static class CompetitionAudiencePolicy

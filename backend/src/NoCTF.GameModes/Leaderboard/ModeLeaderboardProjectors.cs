@@ -24,9 +24,9 @@ internal static class CtfLeaderboardProjection
 {
     private static readonly ScoreCurveEvaluator ScoreCurve = new();
 
-    public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
+    public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input, Guid? scoringTeamId = null)
     {
-        var (entries, cells, currentScores, challengePenalties) = ProjectCore(input);
+        var (entries, cells, currentScores, challengePenalties) = ProjectCore(input, scoringTeamId);
         return new(entries, cells, currentScores)
         {
             ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, cells, challengePenalties)
@@ -38,7 +38,7 @@ internal static class CtfLeaderboardProjection
         IReadOnlyList<LeaderboardCellFact> Cells,
         IReadOnlyDictionary<Guid, long> CurrentScores,
         IReadOnlyDictionary<(Guid TeamId, Guid CompetitionChallengeId), long> ChallengePenalties)
-        ProjectCore(LeaderboardProjectionInput input)
+        ProjectCore(LeaderboardProjectionInput input, Guid? scoringTeamId)
     {
         var activeTeams = input.Teams
             .Where(CtfCompletionEligibility.IsActive)
@@ -131,6 +131,7 @@ internal static class CtfLeaderboardProjection
                 bloodSolveNumber[challengeId] = bloodIndex + 1;
             }
             var teamId = solve.TeamId!.Value;
+            if (scoringTeamId is Guid target && teamId != target) continue;
             if (!awarded.TryGetValue(teamId, out var teamSolves))
                 awarded[teamId] = teamSolves = [];
             teamSolves.Add((solve, score, solveOrdinal, basePoints, bloodPoints));
@@ -162,7 +163,7 @@ internal static class CtfLeaderboardProjection
         var hintCosts = ProjectionPenalties.HintCosts(input, validTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, validTeams.Keys);
 
-        var rows = validTeams.Values.Select(team =>
+        var rows = validTeams.Values.Where(team => scoringTeamId is null || team.Id == scoringTeamId).Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.OccurredAt)
@@ -183,7 +184,7 @@ internal static class CtfLeaderboardProjection
                     team.TrackKey),
                 team.RegisteredAt);
         });
-        var entries = rows
+        var entries = scoringTeamId is not null ? rows.Select(row => row.Entry).ToList() : rows
             .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
             .SelectMany(track => track
                 .OrderByDescending(row => row.Entry.Score)
@@ -332,10 +333,12 @@ internal static class AwdLeaderboardProjection
             .Where(fact => fact.LastAttackAt is not null)
             .GroupBy(fact => fact.TeamId)
             .ToDictionary(group => group.Key, group => group.Max(fact => fact.LastAttackAt));
+        var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
             var teamCells = cellsByTeam.GetValueOrDefault(team.Id, []);
-            var score = teamCells.Values.Aggregate(0L, (total, cell) => checked(total + cell.Score));
+            var score = checked(teamCells.Values.Aggregate(0L, (total, cell) => checked(total + cell.Score))
+                - hintCosts.GetValueOrDefault(team.Id));
             var attackCount = attackCounts.GetValueOrDefault(team.Id);
             return new AwdRankedEntry(
                 new LeaderboardEntry(
@@ -399,10 +402,12 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
     public GameMode Mode => GameMode.Koh;
 
     // Score timeline series are only implemented for CTF; other modes return an empty list.
-    public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
+    public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input) => Project(input, null);
+
+    internal GameModeLeaderboardProjection Project(LeaderboardProjectionInput input, Guid? scoringTeamId)
     {
         input = ChallengeTimingProjection.ForScoring(input);
-        var projection = KohLeaderboardProjection.Project(input);
+        var projection = KohLeaderboardProjection.Project(input, scoringTeamId);
         return new(projection.Entries, projection.Cells)
         {
             ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, projection.Cells)
@@ -412,7 +417,7 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
 
 internal static class KohLeaderboardProjection
 {
-    public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
+    public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input, Guid? scoringTeamId = null)
     {
         var configuration = ParseCompetition(input.CompetitionConfiguration);
         var activeTeams = input.Teams
@@ -464,9 +469,10 @@ internal static class KohLeaderboardProjection
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
         var observationsByTeam = observations
+            .Where(fact => scoringTeamId is null || fact.TeamId == scoringTeamId)
             .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(group => group.Key, group => group.ToList());
-        var rows = teams.Values.Select(team =>
+        var rows = teams.Values.Where(team => scoringTeamId is null || team.Id == scoringTeamId).Select(team =>
         {
             var own = observationsByTeam.GetValueOrDefault(team.Id) ?? [];
             var first = own.Select(fact => fact.OccurredAt).FirstOrDefault();
@@ -496,7 +502,7 @@ internal static class KohLeaderboardProjection
                 first == default ? null : first,
                 team.RegisteredAt);
         });
-        var entries = rows
+        var entries = scoringTeamId is not null ? rows.Select(row => row.Entry).ToList() : rows
             .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
             .SelectMany(track => track
                 .OrderByDescending(row => row.Entry.Score)
@@ -508,6 +514,7 @@ internal static class KohLeaderboardProjection
                 .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, observations
+            .Where(fact => scoringTeamId is null || fact.TeamId == scoringTeamId)
             .GroupBy(fact => (
                 TeamId: fact.TeamId!.Value,
                 ChallengeId: fact.CompetitionChallengeId!.Value))

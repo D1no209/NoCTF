@@ -14,17 +14,17 @@ internal static class CompetitionOfficialWindowReader
         DateTimeOffset scheduledEndAt,
         CancellationToken ct)
     {
-        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
-            .Where(@event => @event.CompetitionId == competitionId
-                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
-            .OrderBy(@event => @event.OccurredAt)
-            .ThenBy(@event => @event.Id)
-            .Select(@event => new { @event.OccurredAt, @event.CompetitionStatus })
-            .ToArrayAsync(ct);
-        var finishedAt = lifecycleEvents
-            .Where(@event => @event.CompetitionStatus == CompetitionStatus.Finished)
-            .Select(@event => (DateTimeOffset?)@event.OccurredAt)
-            .FirstOrDefault();
+        var finishedAt = await FinishedAt(db, competitionId).FirstOrDefaultAsync(ct);
         return CompetitionOfficialWindow.Resolve(startAt, scheduledEndAt, finishedAt);
     }
+
+    /// <summary>The first transition to Finished; composable into a larger projection.</summary>
+    public static IQueryable<DateTimeOffset?> FinishedAt(NoCtfDbContext db, Guid competitionId) =>
+        db.CompetitionEvents.AsNoTracking()
+            .Where(@event => @event.CompetitionId == competitionId
+                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                && @event.CompetitionStatus == CompetitionStatus.Finished)
+            .OrderBy(@event => @event.OccurredAt)
+            .ThenBy(@event => @event.Id)
+            .Select(@event => (DateTimeOffset?)@event.OccurredAt);
 }

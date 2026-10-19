@@ -162,6 +162,8 @@ public sealed class ChallengeManagementStore(
                 includeDeleted,
                 competitionId,
                 competitionChallengeId)
+            // One challenge with its few tags: a single round trip instead of a split tags query.
+            .AsSingleQuery()
             .SingleOrDefaultAsync(ct);
         return projection is null ? null : Map(projection);
     }

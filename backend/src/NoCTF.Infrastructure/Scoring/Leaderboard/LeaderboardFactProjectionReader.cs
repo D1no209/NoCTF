@@ -32,10 +32,20 @@ internal static class LeaderboardFactProjectionReader
         IReadOnlyList<LeaderboardChallengeFact> challenges,
         CancellationToken ct,
         NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null,
-        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? awdScoringOverride = null)
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? awdScoringOverride = null,
+        Guid? scoringTeamId = null, Guid? excludedFactId = null)
     {
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId && fact.OccurredAt <= projectedAt);
+        if (excludedFactId is Guid excluded) query = query.Where(fact => fact.Id != excluded);
+        if (scoringTeamId is Guid teamId)
+            query = query.Where(fact => fact.TeamId == teamId
+                || mode == GameMode.Koh && fact.Kind == GameplayFactKind.KohControlObservation
+                || (mode == GameMode.Ctf || mode == GameMode.Awdp)
+                    && fact.State == GameplayFactState.Completed
+                    && (fact.Kind == GameplayFactKind.FlagAttempt || fact.Kind == GameplayFactKind.BreakAttempt
+                        || fact.Kind == GameplayFactKind.FixAttempt)
+                    && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue));
         var displayQuery = query;
         var overrideId = timingOverride?.CompetitionChallengeId;
         var overrideOpening = timingOverride?.Timing.AutoOpenAt;
@@ -66,6 +76,12 @@ internal static class LeaderboardFactProjectionReader
                 window.SettledPenaltyCutoff,
                 window.IncludePenaltyCutoff,
                 ct);
+            aggregateRows.AddRange(await ReadHintsAsync(query, ct));
+            if (scoringTeamId is not null)
+            {
+                var scoringRows = Map(aggregateRows, hintCosts);
+                return new(scoringRows, scoringRows);
+            }
             var windowRows = await ReadAwdpWindowAsync(
                 displayQuery.Where(fact => fact.OccurredAt >= window.StartAt
                     && fact.OccurredAt < window.EndAt),
@@ -86,6 +102,12 @@ internal static class LeaderboardFactProjectionReader
             var roundScores = await AwdScoreProjectionReader.ReadAsync(db, competitionId, challenges, teams, projectedAt, ct, awdScoringOverride);
             var aggregates = AwdScoreProjectionReader.Aggregate(roundScores);
             var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
+            aggregateRows.AddRange(await ReadHintsAsync(query, ct));
+            if (scoringTeamId is not null)
+            {
+                var scoringRows = Map(aggregateRows, hintCosts);
+                return new(scoringRows, scoringRows, aggregates, roundScores);
+            }
             var windowRows = await ReadAwdWindowAsync(displayQuery, awdWindowRounds ?? [], ct);
             if (awdWindowRounds is { Count: > 0 })
             {
@@ -113,7 +135,7 @@ internal static class LeaderboardFactProjectionReader
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         var mapped = Map(rows, hintCosts);
-        if (mode == GameMode.Ctf)
+        if (mode == GameMode.Ctf && scoringTeamId is null)
         {
             var displayed = await ReadCtfAsync(displayQuery,
                 CompetitionOfficialWindow.Resolve(competitionStart!.Value, competitionEnd!.Value, lifecycle), ct);
@@ -416,8 +438,16 @@ internal static class LeaderboardFactProjectionReader
                 group.Count(),
                 group.Max(fact => fact.OccurredAt)))
             .ToListAsync(ct));
+        observations.AddRange(await ReadHintsAsync(query, ct));
         return observations;
     }
+
+    private static Task<List<FactSummary>> ReadHintsAsync(IQueryable<GameplayFact> query, CancellationToken ct) => query
+        .Where(fact => fact.Kind == GameplayFactKind.HintUnlock && fact.State == GameplayFactState.Completed
+            && fact.Result == GameplayFactResult.Unlocked)
+        .Select(fact => new FactSummary(fact.Id, fact.TeamId, fact.CompetitionChallengeId, fact.Kind, fact.OccurredAt,
+            fact.State, fact.Result, fact.FailureCode, fact.ReferenceKind, fact.ReferenceId, null, fact.ActorUserId,
+            null, 1, fact.OccurredAt)).ToListAsync(ct);
 
     private static Expression<Func<GameplayFact, AwdpGroupingKey>> BuildRoundSelector(
         DateTimeOffset? competitionStart,

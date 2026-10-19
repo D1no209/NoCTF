@@ -25,10 +25,11 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Theory.Realtime.ITheoryChangePublisher _theoryChangePublisher2;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
+        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo _publishedLeaderboardMemo;
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public SweepTheoryActivityHandler1309923006(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Application.Theory.Realtime.ITheoryChangePublisher __theoryChangePublisher1, NoCTF.Application.Theory.Realtime.ITheoryChangePublisher __theoryChangePublisher2, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public SweepTheoryActivityHandler1309923006(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Application.Theory.Realtime.ITheoryChangePublisher __theoryChangePublisher1, NoCTF.Application.Theory.Realtime.ITheoryChangePublisher __theoryChangePublisher2, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo publishedLeaderboardMemo, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -40,6 +41,7 @@ namespace Internal.Generated.WolverineHandlers
             _theoryChangePublisher2 = __theoryChangePublisher2;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
+            _publishedLeaderboardMemo = publishedLeaderboardMemo;
             _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
@@ -51,7 +53,7 @@ namespace Internal.Generated.WolverineHandlers
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher, _publishedLeaderboardMemo);
             var theoryReviewStore = new NoCTF.Infrastructure.Theory.Activities.TheoryReviewStore(noCtfDbContext, wolverinePostCommitMessagePublisher, fusionLeaderboardCache, _theoryChangePublisher2);
             var theoryPaperStore = new NoCTF.Infrastructure.Theory.Papers.TheoryPaperStore(noCtfDbContext, wolverinePostCommitMessagePublisher, fusionLeaderboardCache, _theoryChangePublisher1);
             // The actual message body

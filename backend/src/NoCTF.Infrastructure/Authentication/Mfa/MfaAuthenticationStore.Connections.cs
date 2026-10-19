@@ -10,7 +10,8 @@ namespace NoCTF.Infrastructure.Authentication.Mfa;
 public sealed partial class MfaAuthenticationStore
 {
     private sealed record ContextUser(Guid Id, UserKind Kind, UserRole Role, UserAccountStatus AccountStatus,
-        int TokenVersion, bool MfaRequired, Guid? CredentialId, MfaPolicy Policy, bool Privileged);
+        int TokenVersion, bool MfaRequired, Guid? CredentialId, MfaPolicy Policy, bool Privileged,
+        bool EmailVerificationPending);
 
     private IQueryable<ContextUser> ContextUsers(Guid[] ids) => db.Users.AsNoTracking().IgnoreAutoIncludes().Where(user => ids.Contains(user.Id))
         .Select(user => new ContextUser(user.Id, user.Kind, user.Role, user.AccountStatus, user.TokenVersion, user.MfaRequired,
@@ -20,7 +21,10 @@ public sealed partial class MfaAuthenticationStore
                 && db.PlatformSettings.Any(settings => settings.Id == 1 && settings.MfaPolicy == MfaPolicy.RequirePrivileged)
                 && db.Competitions.Any(competition => competition.DeletedAt == null
                     && (competition.OwnerId == user.Id || competition.Collaborators.Any(collaborator => collaborator.UserId == user.Id
-                        && (collaborator.Role == CompetitionCollaboratorRole.Manager || collaborator.Role == CompetitionCollaboratorRole.Judge))))));
+                        && (collaborator.Role == CompetitionCollaboratorRole.Manager || collaborator.Role == CompetitionCollaboratorRole.Judge)))),
+            // Same rule as the email-verification gate, read in this round trip.
+            user.EmailVerifiedAt == null
+                && db.PlatformSettings.Any(settings => settings.Id == 1 && settings.EmailVerificationEnabled)));
 
     public async Task<IReadOnlyDictionary<string, MfaFailure?>> ValidateContextsAsync(IReadOnlyList<MfaContextValidationRequest> requests, CancellationToken ct)
     {

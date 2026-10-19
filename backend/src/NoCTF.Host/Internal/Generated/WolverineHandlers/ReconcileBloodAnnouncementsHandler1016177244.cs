@@ -22,13 +22,14 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine _leaderboardProjectionEngine;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
+        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo _publishedLeaderboardMemo;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
         private readonly System.TimeProvider _timeProvider4;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public ReconcileBloodAnnouncementsHandler1016177244(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public ReconcileBloodAnnouncementsHandler1016177244(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo publishedLeaderboardMemo, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -38,6 +39,7 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardProjectionEngine = leaderboardProjectionEngine;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
+            _publishedLeaderboardMemo = publishedLeaderboardMemo;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
             _timeProvider3 = __timeProvider3;
@@ -53,7 +55,7 @@ namespace Internal.Generated.WolverineHandlers
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider2);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider4, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider4, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher, _publishedLeaderboardMemo);
             var bloodAnnouncementReconciler = new NoCTF.Infrastructure.Scoring.Leaderboard.BloodAnnouncementReconciler(noCtfDbContext, competitionEventStore, wolverinePostCommitMessagePublisher, _timeProvider3);
             // The actual message body
             var reconcileBloodAnnouncements = (NoCTF.Application.Messaging.ReconcileBloodAnnouncements)context.Envelope.Message;

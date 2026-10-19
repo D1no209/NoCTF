@@ -18,6 +18,7 @@ public sealed class BloodAnnouncementReconciler(NoCtfDbContext db, ICompetitionE
     {
         if (projection.Schema.Mode != GameMode.Ctf) return;
         var id = projection.Snapshot.CompetitionId;
+        var awards = projection.BloodAwards.ToDictionary(item => (item.CompetitionChallengeId, Position: (BloodPosition)item.Rank));
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         var settings = await db.Competitions.AsNoTracking().Where(item => item.Id == id)
             .Select(item => new { item.FrozenStartAt, item.HiddenStartAt }).SingleAsync(ct);
@@ -30,15 +31,16 @@ public sealed class BloodAnnouncementReconciler(NoCtfDbContext db, ICompetitionE
             .Where(item => item.CompetitionId == id && !item.IsBanned
                 && item.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved)
             .Select(item => item.Id).ToArrayAsync(ct)).ToHashSet();
-        var existing = await db.BloodAnnouncements.Where(item => item.CompetitionId == id).ToListAsync(ct);
-        var challenges = projection.BloodAwards.Select(item => item.CompetitionChallengeId)
-            .Concat(existing.Select(item => item.CompetitionChallengeId)).Where(published.Contains).Distinct();
+        var existing = await db.BloodAnnouncements.Where(item => item.CompetitionId == id)
+            .ToDictionaryAsync(item => (item.CompetitionChallengeId, item.Position), ct);
+        var challenges = awards.Keys.Select(item => item.CompetitionChallengeId)
+            .Concat(existing.Keys.Select(item => item.CompetitionChallengeId)).Where(published.Contains).Distinct();
         foreach (var challengeId in challenges)
         foreach (var position in Enum.GetValues<BloodPosition>())
         {
-            var candidate = projection.BloodAwards.SingleOrDefault(item => item.CompetitionChallengeId == challengeId
-                && (int)item.Rank == (int)position && eligibleTeams.Contains(item.TeamId));
-            var row = existing.SingleOrDefault(item => item.CompetitionChallengeId == challengeId && item.Position == position);
+            var candidate = awards.GetValueOrDefault((challengeId, position));
+            if (candidate is not null && !eligibleTeams.Contains(candidate.TeamId)) candidate = null;
+            var row = existing.GetValueOrDefault((challengeId, position));
             if (row is not null && row.PublishedVersion >= projection.Snapshot.Version) continue;
             if (row is null && candidate is null) continue;
             if (row is null)

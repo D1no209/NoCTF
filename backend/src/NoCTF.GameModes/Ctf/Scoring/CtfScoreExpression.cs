@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using System.Collections.Concurrent;
 using System.Text;
 using DynamicExpresso;
 
@@ -15,9 +15,8 @@ public sealed class ScoreCurveExpression
 {
     public const int MaximumExpressionBytes = 4096;
     private const int Capacity = 1024;
-    private readonly object sync = new();
-    private readonly Dictionary<string, CacheEntry> cache = new(StringComparer.Ordinal);
-    private readonly LinkedList<string> recency = [];
+    // Lock-free: readers never block, and each distinct expression is compiled once.
+    private readonly ConcurrentDictionary<string, Lazy<Lambda>> cache = new(StringComparer.Ordinal);
 
     public decimal Evaluate(string expression, ScoreCurveVariables variables)
     {
@@ -74,20 +73,29 @@ public sealed class ScoreCurveExpression
                 $"Expression must contain 1..{MaximumExpressionBytes} UTF-8 bytes.");
         }
 
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(expression)));
-        lock (sync)
+        if (cache.TryGetValue(expression, out var cached))
+            return cached.Value;
+        // Competitions use a handful of curves; the bound only guards against unbounded validation input.
+        if (cache.Count >= Capacity)
+            cache.Clear();
+        var entry = cache.GetOrAdd(expression, static value => new Lazy<Lambda>(() => Compile(value)));
+        try
         {
-            if (cache.TryGetValue(key, out var cached))
-            {
-                recency.Remove(cached.Node);
-                recency.AddFirst(cached.Node);
-                return cached.Expression;
-            }
+            return entry.Value;
+        }
+        catch
+        {
+            // Invalid expressions are not retained.
+            cache.TryRemove(new KeyValuePair<string, Lazy<Lambda>>(expression, entry));
+            throw;
+        }
+    }
 
-            var interpreter = new Interpreter(InterpreterOptions.Default)
-                .EnableAssignment(AssignmentOperators.None)
-                .SetDefaultNumberType(DefaultNumberType.Decimal);
-            var compiled = interpreter.Parse(
+    private static Lambda Compile(string expression) =>
+        new Interpreter(InterpreterOptions.Default)
+            .EnableAssignment(AssignmentOperators.None)
+            .SetDefaultNumberType(DefaultNumberType.Decimal)
+            .Parse(
                 expression,
                 typeof(decimal),
                 new Parameter("initialPoints", typeof(decimal)),
@@ -95,17 +103,4 @@ public sealed class ScoreCurveExpression
                 new Parameter("solveCount", typeof(int)),
                 new Parameter("eligibleTeamCount", typeof(int)),
                 new Parameter("decayTeamCount", typeof(decimal)));
-            var node = recency.AddFirst(key);
-            cache.Add(key, new(compiled, node));
-            if (cache.Count > Capacity)
-            {
-                var oldest = recency.Last!;
-                recency.RemoveLast();
-                cache.Remove(oldest.Value);
-            }
-            return compiled;
-        }
-    }
-
-    private sealed record CacheEntry(Lambda Expression, LinkedListNode<string> Node);
 }

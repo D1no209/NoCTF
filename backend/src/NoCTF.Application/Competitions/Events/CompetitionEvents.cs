@@ -98,7 +98,10 @@ public sealed record CompetitionEventCommitted(
     CompetitionEventLevel Level,
     DateTimeOffset OccurredAt,
     CompetitionAudienceChangeKind? AudienceChangeKind = null,
-    CompetitionAccessMode? AccessMode = null);
+    CompetitionAccessMode? AccessMode = null,
+    // Realtime routing only. A Team event is readable by staff and by members of AudienceTeamId.
+    CompetitionEventVisibility Visibility = CompetitionEventVisibility.Public,
+    Guid? AudienceTeamId = null);
 
 public interface ICompetitionEventRecorder
 {

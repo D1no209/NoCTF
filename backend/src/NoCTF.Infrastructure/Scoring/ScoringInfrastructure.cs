@@ -15,6 +15,7 @@ internal static class ScoringInfrastructure
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddSingleton<LeaderboardSnapshotDeserializer>();
+        services.AddSingleton<PublishedLeaderboardMemo>();
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<BloodAnnouncementReconciler>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();

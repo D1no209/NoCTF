@@ -2,7 +2,9 @@
 #pragma warning disable
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using NoCTF.Application.Notifications;
+using NoCTF.Infrastructure.GameplayFacts.Processing;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
@@ -14,15 +16,21 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.PendingGameplayFactDispatchHandler> _loggerOfPendingGameplayFactDispatchHandler;
+        private readonly NATS.Client.Core.INatsConnection _natsConnection;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
+        private readonly NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore _gameplayFactRecoveryCursorStore;
         private readonly System.TimeProvider _timeProvider;
 
-        public DispatchPendingGameplayFactsHandler2068565956(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, System.TimeProvider timeProvider)
+        public DispatchPendingGameplayFactsHandler2068565956(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.PendingGameplayFactDispatchHandler> loggerOfPendingGameplayFactDispatchHandler, NATS.Client.Core.INatsConnection natsConnection, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore gameplayFactRecoveryCursorStore, System.TimeProvider timeProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
+            _loggerOfPendingGameplayFactDispatchHandler = loggerOfPendingGameplayFactDispatchHandler;
+            _natsConnection = natsConnection;
             _notificationChangePublisher = notificationChangePublisher;
+            _gameplayFactRecoveryCursorStore = gameplayFactRecoveryCursorStore;
             _timeProvider = timeProvider;
         }
 
@@ -38,7 +46,7 @@ namespace Internal.Generated.WolverineHandlers
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.PendingGameplayFactDispatchHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.PendingGameplayFactDispatchHandler");
-            var pendingGameplayFactDispatchHandler = new NoCTF.Worker.PendingGameplayFactDispatchHandler(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
+            var pendingGameplayFactDispatchHandler = new NoCTF.Worker.PendingGameplayFactDispatchHandler(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider, _natsConnection, _gameplayFactRecoveryCursorStore, _loggerOfPendingGameplayFactDispatchHandler);
             
             // The actual message execution
             await pendingGameplayFactDispatchHandler.Handle(dispatchPendingGameplayFacts, cancellation).ConfigureAwait(false);

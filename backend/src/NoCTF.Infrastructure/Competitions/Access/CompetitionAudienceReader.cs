@@ -20,4 +20,12 @@ public sealed class CompetitionAudienceReader(
                 .Select(competition => (CompetitionAccessMode?)competition.AccessMode)
                 .SingleOrDefaultAsync(token),
             cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> GetTeamMemberIdsAsync(
+        Guid teamId,
+        CancellationToken cancellationToken) =>
+        await db.Set<NoCTF.Domain.Teams.TeamMember>().AsNoTracking()
+            .Where(member => member.TeamId == teamId)
+            .Select(member => member.UserId)
+            .ToArrayAsync(cancellationToken);
 }

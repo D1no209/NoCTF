@@ -87,21 +87,6 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<ProgressionReconcileResult?> ReconcileCompletedFactAsync(
-        GameplayFact fact, DateTimeOffset now, CancellationToken ct)
-    {
-        if (fact.TeamId is not Guid teamId
-            || fact.Kind is not (GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt))
-            return null;
-        var graph = await db.CompetitionProgressions
-            .Include(item => item.Nodes).Include(item => item.Edges)
-            .AsSplitQuery().SingleOrDefaultAsync(
-                item => item.CompetitionId == fact.CompetitionId, ct);
-        if (graph is not { Enabled: true })
-            return null;
-        return await ReconcileTeamAsync(fact.CompetitionId, teamId, graph, now, fact, ct);
-    }
-
     public async Task<ProgressionReconcileResult> ReconcileTeamAsync(
         Guid competitionId,
         Guid teamId,
