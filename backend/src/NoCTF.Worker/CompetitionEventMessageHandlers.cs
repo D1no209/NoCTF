@@ -92,7 +92,12 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
 public sealed class CompetitionEventWebhookMessageHandler(IMessageBus bus)
 {
     public ValueTask Handle(CompetitionEventCommitted message) =>
-        bus.PublishAsync(new DispatchCompetitionWebhooks(
-            message.CompetitionId,
-            message.EventId));
+        // Only public, webhook-mapped events have an outbox row. Events are immutable, so the others
+        // never deliver; skipping them avoids a dispatch message, an event read and a no-op outbox update.
+        message.Visibility != NoCTF.Domain.Competitions.Events.CompetitionEventVisibility.Public
+            || NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookEventTypes.From(message.Kind) is null
+            ? ValueTask.CompletedTask
+            : bus.PublishAsync(new DispatchCompetitionWebhooks(
+                message.CompetitionId,
+                message.EventId));
 }

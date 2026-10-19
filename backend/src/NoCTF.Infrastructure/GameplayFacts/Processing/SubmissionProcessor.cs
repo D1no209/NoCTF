@@ -110,7 +110,8 @@ public sealed class GameplayFactProcessor(
         var challenge = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.Id == submission.CompetitionChallengeId && item.CompetitionId == competition.Id)
             .Select(item => new { item.Id, item.ChallengeId, item.Rules, item.AutoOpenAt, item.ScoringEndsAt, item.SubmissionDeadlineAt, item.TimingRevision })
-            .AsSplitQuery().SingleAsync(cancellationToken);
+            // Rules own at most a few blood rewards and AWD store rules; one query keeps the join product tiny.
+            .AsSingleQuery().SingleAsync(cancellationToken);
         var definition = await GameplayChallengeDefinitionReader.ReadAsync(db, challenge.ChallengeId, competition.Mode, cancellationToken);
         var configuration = new
         {

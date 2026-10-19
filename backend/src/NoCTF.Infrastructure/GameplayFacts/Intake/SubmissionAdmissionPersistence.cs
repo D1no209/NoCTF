@@ -92,7 +92,8 @@ internal static class GameplayFactAdmissionPersistence
         var competitionConfiguration = await db.Competitions.AsNoTracking().AsSingleQuery()
             .Where(item => item.Id == competitionId).Select(item => item.ModeConfiguration)
             .SingleAsync(cancellationToken);
-        var challengeRules = await db.CompetitionChallenges.AsNoTracking().AsSplitQuery()
+        // Rules own at most a few blood rewards and AWD store rules; one query keeps the join product tiny.
+        var challengeRules = await db.CompetitionChallenges.AsNoTracking().AsSingleQuery()
             .Where(item => item.Id == competitionChallengeId).Select(item => item.Rules)
             .SingleAsync(cancellationToken);
         var challengeDefinition = await Processing.GameplayChallengeDefinitionReader.ReadAsync(
