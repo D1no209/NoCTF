@@ -20,5 +20,8 @@ The host itself was mostly idle (thread-time trace dominated by idle waits).
 - Flag intake must keep the command receipt inside a transaction (`TransactionalRequestReplay.Store` guard);
   removing it broke every idempotent submit. Keep the transaction late (write + commit only).
 - k6 `data_received` counts decompressed bytes; use `scoreboard_compressed_responses` to check compression.
+- Each perf run keeps a Host copy (`perf/.local/<id>/application`), raw traces and Docker volumes. E: filled up
+  after ~80 runs, which made every stage ~1.5x slower and broke trace analysis. Check free disk before
+  trusting a slower run; prune `.local/*/application`, `*.nettrace`/`*.etlx` and old `noctf-perf-*` volumes.
 
 **Related**: perf/README.md, perf/optimistic-implementation-status.md

@@ -50,7 +50,8 @@ public sealed class MfaPersistenceTests
         commands.Commands.Clear();
         var batch = await store.ValidateContextsAsync([new("totp", userId, 0, local), new("recovery", userId, 0, local with { MfaSource = MfaSource.RecoveryCode })], ct);
         await Assert.That(batch.Values.All(value => value is null)).IsTrue();
-        await Assert.That(commands.Commands.Count).IsEqualTo(2);
+        // The MFA policy is projected with the users; settings are read separately only for OIDC-sourced MFA.
+        await Assert.That(commands.Commands.Count).IsEqualTo(1);
         await Assert.That(commands.Commands.Any(command => command.Contains("recovery_codes", StringComparison.OrdinalIgnoreCase)
             || command.Contains("secret_ciphertext", StringComparison.OrdinalIgnoreCase)
             || command.Contains("password_hash", StringComparison.OrdinalIgnoreCase)

@@ -35,8 +35,12 @@ public sealed partial class MfaAuthenticationStore
             .Select(value => value.Authentication!.PrimaryCredentialId!.Value).Distinct().ToArray();
         var passkeys = passkeyIds.Length == 0 ? new Dictionary<Guid, Guid>()
             : await db.UserPasskeys.AsNoTracking().Where(value => passkeyIds.Contains(value.Id)).Select(value => new { value.Id, value.UserId }).ToDictionaryAsync(value => value.Id, value => value.UserId, ct);
-        var settings = await db.PlatformSettings.AsNoTracking().IgnoreAutoIncludes().Where(value => value.Id == 1)
-            .Select(value => new { value.MfaPolicy, value.SsoEnabled }).SingleAsync(ct);
+        // The policy is already projected on every user row; SSO state matters only for OIDC-sourced MFA.
+        var oidcRequested = requests.Any(value => value.Authentication is { IsWellFormed: true, MfaSource: MfaSource.Oidc });
+        var settings = users.Count != 0 && !oidcRequested
+            ? new { MfaPolicy = users.Values.First().Policy, SsoEnabled = false }
+            : await db.PlatformSettings.AsNoTracking().IgnoreAutoIncludes().Where(value => value.Id == 1)
+                .Select(value => new { value.MfaPolicy, value.SsoEnabled }).SingleAsync(ct);
         var privilegeCandidates = settings.MfaPolicy == MfaPolicy.RequirePrivileged
             ? users.Values.Where(value => value.Kind == UserKind.Human && !value.MfaRequired && value.CredentialId is null
                 && value.Role is not (UserRole.Administrator or UserRole.Organizer)).Select(value => value.Id).ToArray()

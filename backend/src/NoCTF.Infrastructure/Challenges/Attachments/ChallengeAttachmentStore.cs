@@ -357,21 +357,20 @@ public sealed class ChallengeAttachmentStore(
         var scope = await ResolvePlayerScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null)
             return null;
-        if (await HasRandomCandidatesAsync(scope.ChallengeId, ct))
+        if (scope.RandomAttachments)
             return new(AttachmentDeliveryPolicy.RandomOnePerTeam, []);
+        // Attachments and their file metadata in one round trip.
         var attachments = await db.Challenges.AsNoTracking()
             .Where(challenge => challenge.Id == scope.ChallengeId)
             .SelectMany(challenge => challenge.Attachments)
             .Where(attachment => attachment.DeletedAt == null)
             .OrderBy(attachment => attachment.CreatedAt)
             .ThenBy(attachment => attachment.Id)
+            .Select(attachment => new { Attachment = attachment, attachment.File })
             .ToListAsync(ct);
-        var fileIds = attachments.Select(item => item.FileId).ToArray();
-        var files = await db.Files.AsNoTracking().Where(file => fileIds.Contains(file.Id))
-            .ToDictionaryAsync(file => file.Id, ct);
         return new(
             AttachmentDeliveryPolicy.All,
-            attachments.Select(item => Map(item, files[item.FileId])).ToArray());
+            attachments.Select(item => Map(item.Attachment, item.File)).ToArray());
     }
 
     public async Task<ChallengeAttachmentContent?> GetPlayerAsync(
@@ -382,11 +381,12 @@ public sealed class ChallengeAttachmentStore(
         Func<string, CancellationToken, Task<bool>> objectExistsAsync,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // No transaction: static delivery only reads, and the single assignment insert is atomic with its
+        // unique constraint deciding concurrent first downloads. No connection is held across the storage call.
         var scope = await ResolvePlayerScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null)
             return null;
-        var policy = await HasRandomCandidatesAsync(scope.ChallengeId, ct)
+        var policy = scope.RandomAttachments
             ? AttachmentDeliveryPolicy.RandomOnePerTeam
             : AttachmentDeliveryPolicy.All;
         if ((policy == AttachmentDeliveryPolicy.All) != attachmentId.HasValue)
@@ -474,7 +474,6 @@ public sealed class ChallengeAttachmentStore(
             catch (DbUpdateException)
             {
                 db.Entry(pendingAssignment).State = EntityState.Detached;
-                await transaction.RollbackAsync(ct);
                 var winningAttachmentId = await db.ChallengeFlags.AsNoTracking()
                     .Where(flag =>
                         flag.CompetitionChallengeId == competitionChallengeId
@@ -498,7 +497,6 @@ public sealed class ChallengeAttachmentStore(
                 return new(Map(winningAttachment), winningAttachment.File.ObjectKey, scope.TeamId);
             }
         }
-        await transaction.CommitAsync(ct);
         return new(Map(attachment), attachment.File.ObjectKey, scope.TeamId);
     }
 
@@ -548,7 +546,12 @@ public sealed class ChallengeAttachmentStore(
                 item.Team.Id,
                 item.Challenge.ChallengeId,
                 db.CompetitionProgressions.Any(progression =>
-                    progression.CompetitionId == competitionId && progression.Enabled)))
+                    progression.CompetitionId == competitionId && progression.Enabled),
+                db.ChallengeFlags.Any(flag =>
+                    flag.ChallengeId == item.Challenge.ChallengeId
+                    && flag.SpecificationKind == SpecificationKind.Attachment
+                    && flag.SpecificationId != null
+                    && flag.MatchKind == ChallengeFlagMatchKind.Exact)))
             .SingleOrDefaultAsync(ct);
         if (scope is { ProgressionEnabled: true }
             && !await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
@@ -615,5 +618,5 @@ public sealed class ChallengeAttachmentStore(
             file.ContentType, file.ByteLength,
             Convert.ToHexString(file.Sha256), exactFlag, attachment.DeletedAt, attachment.CreatedAt);
 
-    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, bool ProgressionEnabled);
+    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, bool ProgressionEnabled, bool RandomAttachments);
 }
