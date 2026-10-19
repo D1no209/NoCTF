@@ -546,9 +546,11 @@ public sealed class ChallengeAttachmentStore(
                         && item.Competition.PracticeModeEnabled))
             .Select(item => new PlayerScope(
                 item.Team.Id,
-                item.Challenge.ChallengeId))
+                item.Challenge.ChallengeId,
+                db.CompetitionProgressions.Any(progression =>
+                    progression.CompetitionId == competitionId && progression.Enabled)))
             .SingleOrDefaultAsync(ct);
-        if (scope is not null
+        if (scope is { ProgressionEnabled: true }
             && !await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
                 .IsActiveAsync(competitionId, competitionChallengeId, scope.TeamId, ct))
             return null;
@@ -613,5 +615,5 @@ public sealed class ChallengeAttachmentStore(
             file.ContentType, file.ByteLength,
             Convert.ToHexString(file.Sha256), exactFlag, attachment.DeletedAt, attachment.CreatedAt);
 
-    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId);
+    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, bool ProgressionEnabled);
 }

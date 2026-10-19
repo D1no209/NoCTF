@@ -7,7 +7,8 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Competitions.Visibility;
 
-public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
+public sealed class CompetitionVisibilityAccess(NoCtfDbContext db,
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
     : ICompetitionVisibilityAccess
 {
     public async Task<CompetitionVisibilityAccessDecision?> ResolveAsync(
@@ -16,6 +17,25 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
         DateTimeOffset now,
         CancellationToken ct)
     {
+        if (userId == Guid.Empty && readModels is not null)
+        {
+            // Anonymous decisions depend only on the competition row, whose writers invalidate this read model.
+            var anonymous = await readModels.GetAnonymousAccessAsync(competitionId, token => db.Competitions.AsNoTracking()
+                .Where(candidate => candidate.Id == competitionId)
+                .Select(candidate => new NoCTF.Infrastructure.Competitions.Management.CompetitionAnonymousAccess(
+                    candidate.Mode, candidate.Status, candidate.AccessMode, candidate.TracksEnabled,
+                    candidate.FrozenStartAt, candidate.HiddenStartAt))
+                .SingleOrDefaultAsync(token), ct);
+            if (anonymous is null
+                || anonymous.Status == CompetitionStatus.Draft
+                || anonymous.AccessMode == CompetitionAccessMode.StaffOnly)
+                return null;
+            var anonymousVisibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                anonymous.FrozenStartAt, anonymous.HiddenStartAt, now);
+            return new(anonymous.Mode, anonymous.Status, anonymousVisibility,
+                DataScope(false, anonymousVisibility), anonymous.TracksEnabled);
+        }
+
         var competition = await db.Competitions.AsNoTracking()
             .Where(candidate => candidate.Id == competitionId)
             .Select(candidate => new

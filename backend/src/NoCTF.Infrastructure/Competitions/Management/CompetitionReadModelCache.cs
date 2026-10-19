@@ -36,10 +36,21 @@ public sealed class CompetitionReadModelCache(IFusionCacheProvider caches)
             (_, token) => factory(token),
             token: cancellationToken).AsTask();
 
+    /// <summary>Competition-row inputs of the anonymous visibility decision; time comparisons stay per request.</summary>
+    public Task<CompetitionAnonymousAccess?> GetAnonymousAccessAsync(
+        Guid competitionId,
+        Func<CancellationToken, Task<CompetitionAnonymousAccess?>> factory,
+        CancellationToken cancellationToken) =>
+        cache.GetOrSetAsync<CompetitionAnonymousAccess?>(
+            AnonymousAccessKey(competitionId),
+            (_, token) => factory(token),
+            token: cancellationToken).AsTask();
+
     public async Task InvalidateAsync(
         Guid competitionId,
         CancellationToken cancellationToken)
     {
+        await cache.RemoveAsync(AnonymousAccessKey(competitionId), token: cancellationToken);
         await cache.RemoveAsync(DetailKey(competitionId), token: cancellationToken);
         await cache.RemoveAsync(ListKey, token: cancellationToken);
         await cache.RemoveAsync(AccessModeKey(competitionId), token: cancellationToken);
@@ -50,4 +61,15 @@ public sealed class CompetitionReadModelCache(IFusionCacheProvider caches)
 
     private static string AccessModeKey(Guid competitionId) =>
         $"competition:{competitionId:N}:access-mode";
+
+    private static string AnonymousAccessKey(Guid competitionId) =>
+        $"competition:{competitionId:N}:anonymous-access";
 }
+
+public sealed record CompetitionAnonymousAccess(
+    GameMode Mode,
+    CompetitionStatus Status,
+    CompetitionAccessMode AccessMode,
+    bool TracksEnabled,
+    DateTimeOffset? FrozenStartAt,
+    DateTimeOffset? HiddenStartAt);

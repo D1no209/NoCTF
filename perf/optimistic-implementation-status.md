@@ -126,3 +126,16 @@
 | Host CPU 平均 | 约 4.5 核 | 约 2.7 核 |
 
 已知未通过的测试（均与本轮修改无关，见 `perf/results/round3-relational-*.log`）：`Flag_recheck_rejects_rules_changed_after_initial_admission` 仍期望 CTF 受理时复查次数（WIP 已改为 Worker 判定）；四个期望读取时同步重建排行榜的测试与事件驱动设计冲突；AWDP 投影查询数断言针对 WIP 已修改的投影读取。API 单元测试 8 项、Infrastructure 2 项在本轮前即失败。
+
+## 查询合并与临界区收缩（第 4、5 轮）
+
+- 匿名可见性判定读取既有竞赛读模型缓存（竞赛写入均失效该缓存，补齐 `CompetitionTrackStore` 的遗漏失效）；冻结、隐藏时间仍按请求时刻计算。
+- 进度门槛：在已执行的查询中读取“是否启用进度”，未启用时跳过 `IsActiveAsync`（题目详情、提示、附件、提交）。未使用进度图缓存做授权。
+- 提交完成：普通完成只在最终写入前开启 ReadCommitted 事务（`LateTransaction`），评测读取不再处于事务中；Hint 解锁仍从开始即 Serializable。
+- `SaveChangesAsync` 自动事务只在员工 Webhook 捕获时使用 Serializable；仅访问修订变化时使用 ReadCommitted，避免并发报名在竞赛行上相互序列化失败。
+- 请求准入纯速率配额改为逐窗口原子条件更新，主键仲裁首次插入，后续拒绝时归还已占用额度；租约续期改为单条条件更新。含并发配额的路径保持 Serializable。
+- 血奖协调去掉包住读取的显式事务；保留 `PublishedVersion` 防护。
+
+第 4 轮（`20261019145102-583a2d`，同参数）通过：SQL 语句 328K → 269K；题目详情 p95 158 → 100 ms，提交 176 → 150 ms，本队排名 228 → 127 ms，数据库完成 p95 172 ms。第 5 轮临界区修改的关系测试 58/60 通过（1 项跳过，1 项为上述已知过期测试），尚未单独压测。
+
+未实施的架构项：Hint 解锁按队伍分区顺序处理以去掉 Serializable；访问修订改为按队伍粒度或由事件消费者更新，消除竞赛行热点；员工 Webhook 捕获移出业务事务异步执行。

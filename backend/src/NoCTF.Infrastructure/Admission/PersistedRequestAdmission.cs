@@ -55,6 +55,14 @@ public sealed class PersistedRequestAdmission(
         {
             try
             {
+                // Rate-only admission (login, SSO, sensitive entries) is the burst path. Atomic conditional
+                // updates replace the serializable read-check-write, so a shared NAT address does not turn
+                // one window row into a serialization-failure hotspot.
+                if (concurrency.Count == 0)
+                {
+                    await AcquireRatesAsync(rates, rateKeys, ct);
+                    return new UnrestrictedLease(ct);
+                }
                 return await AcquireOnceAsync(rates, rateKeys, concurrency, leaseKeys, ct);
             }
             catch (AdmissionRejectedException)
@@ -74,6 +82,76 @@ public sealed class PersistedRequestAdmission(
                 throw new AdmissionRejectedException(AdmissionFailure.DependencyUnavailable);
             }
             await Task.Delay(Random.Shared.Next(5, 51) * (attempt + 1), ct);
+        }
+        throw new AdmissionRejectedException(AdmissionFailure.DependencyUnavailable);
+    }
+
+    private async Task AcquireRatesAsync(IReadOnlyList<RateQuota> rates, string[] rateKeys, CancellationToken ct)
+    {
+        using var measurement = NoCtfTelemetry.MeasureAdmission(AdmissionPerformanceStage.AcquireAttempt);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var now = clock.GetUtcNow();
+        for (var index = 0; index < rates.Count; index++)
+        {
+            var retryAfter = await TryConsumeAsync(db, rateKeys[index], rates[index], now, ct);
+            if (retryAfter is not { } seconds) continue;
+            // All-or-nothing: return the units already taken from earlier windows.
+            for (var previous = 0; previous < index; previous++)
+            {
+                var key = rateKeys[previous];
+                await db.RequestAdmissionWindows.Where(item => item.KeyHash == key && item.Count > 0)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Count, item => item.Count - 1)
+                        .SetProperty(item => item.ConcurrencyStamp, Guid.NewGuid()), CancellationToken.None);
+            }
+            throw new AdmissionRejectedException(AdmissionFailure.RateLimited, seconds);
+        }
+    }
+
+    /// <summary>Consumes one unit, returning null on success or the retry-after seconds when full.</summary>
+    private static async Task<int?> TryConsumeAsync(NoCtfDbContext db, string key, RateQuota rate,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        var limit = rate.Limit;
+        var expiresAt = now.AddSeconds(rate.WindowSeconds);
+        // Each statement is atomic on the window row. A competing request can only move the row between
+        // states (missing -> open -> full/expired), so a few local rounds always reach a decision.
+        for (var round = 0; round < 4; round++)
+        {
+            if (await db.RequestAdmissionWindows
+                    .Where(item => item.KeyHash == key && item.ExpiresAt > now && item.Count < limit)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Count, item => item.Count + 1)
+                        .SetProperty(item => item.ConcurrencyStamp, Guid.NewGuid()), ct) == 1)
+                return null;
+            if (await db.RequestAdmissionWindows
+                    .Where(item => item.KeyHash == key && item.ExpiresAt <= now)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Count, 1)
+                        .SetProperty(item => item.ExpiresAt, expiresAt)
+                        .SetProperty(item => item.ConcurrencyStamp, Guid.NewGuid()), ct) == 1)
+                return null;
+            var current = await db.RequestAdmissionWindows.AsNoTracking()
+                .Where(item => item.KeyHash == key)
+                .Select(item => new { item.ExpiresAt, item.Count })
+                .SingleOrDefaultAsync(ct);
+            if (current is not null)
+            {
+                if (current.ExpiresAt > now && current.Count >= limit)
+                    return Math.Max(1, (int)Math.Ceiling((current.ExpiresAt - now).TotalSeconds));
+                continue; // Rolled over or decremented by another request meanwhile.
+            }
+            db.RequestAdmissionWindows.Add(new RequestAdmissionWindow { KeyHash = key, Count = 1, ExpiresAt = expiresAt });
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return null;
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is DbException { SqlState: "23505" })
+            {
+                // Another request created the window first; consume from it in the next round.
+            }
+            finally
+            {
+                db.ChangeTracker.Clear();
+            }
         }
         throw new AdmissionRejectedException(AdmissionFailure.DependencyUnavailable);
     }
@@ -185,22 +263,18 @@ public sealed class PersistedRequestAdmission(
                 while (await timer.WaitForNextTickAsync(stopping.Token))
                 {
                     await using var db = await contexts.CreateDbContextAsync(stopping.Token);
-                    await using var transaction = await db.Database.BeginTransactionAsync(
-                        IsolationLevel.Serializable, stopping.Token);
                     var now = clock.GetUtcNow();
-                    var leases = await db.RequestAdmissionLeases
-                        .Where(item => item.LeaseId == id && keys.Contains(item.KeyHash))
-                        .ToArrayAsync(stopping.Token);
-                    if (leases.Length != keys.Length
-                        || leases.Any(item => item.ExpiresAt <= now))
+                    var renewedUntil = now.Add(LeaseDuration);
+                    // One atomic statement: only still-live rows of this lease are extended.
+                    var renewed = await db.RequestAdmissionLeases
+                        .Where(item => item.LeaseId == id && keys.Contains(item.KeyHash) && item.ExpiresAt > now)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ExpiresAt, renewedUntil)
+                            .SetProperty(item => item.ConcurrencyStamp, Guid.NewGuid()), stopping.Token);
+                    if (renewed != keys.Length)
                     {
                         await source.CancelAsync();
                         return;
                     }
-                    foreach (var lease in leases)
-                        lease.ExpiresAt = now.Add(LeaseDuration);
-                    await db.SaveChangesAsync(stopping.Token);
-                    await transaction.CommitAsync(stopping.Token);
                 }
             }
             catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }

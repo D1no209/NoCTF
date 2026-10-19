@@ -17,9 +17,6 @@ public sealed class ParticipantChallengeHintStore(NoCtfDbContext db) : IParticip
     {
         if (competitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished))
             return null;
-        if (!await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
-                .IsActiveAsync(competitionId, competitionChallengeId, teamId, cancellationToken))
-            return null;
         var challenge = await db.CompetitionChallenges.AsNoTracking().IgnoreAutoIncludes()
             .Where(item => item.Id == competitionChallengeId
                 && item.CompetitionId == competitionId && item.IsPublished)
@@ -29,10 +26,16 @@ public sealed class ParticipantChallengeHintStore(NoCtfDbContext db) : IParticip
                 item.UpdatedAt,
                 Hints = item.Hints.Select(hint => new ChallengeHintView(
                     hint.Id, item.Id, hint.Content, hint.Cost, hint.PublishedAt,
-                    hint.HiddenAt, item.UpdatedAt, item.UpdatedAt)).ToArray()
+                    hint.HiddenAt, item.UpdatedAt, item.UpdatedAt)).ToArray(),
+                ProgressionEnabled = db.CompetitionProgressions.Any(progression =>
+                    progression.CompetitionId == competitionId && progression.Enabled)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (challenge is null)
+            return null;
+        if (challenge.ProgressionEnabled
+            && !await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
+                .IsActiveAsync(competitionId, competitionChallengeId, teamId, cancellationToken))
             return null;
         var unlocked = teamId is null || challenge.Hints.Length == 0 ? [] : await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId

@@ -80,7 +80,9 @@ internal static class GameplayFactAdmissionPersistence
                     TeamId = team.Id,
                     TeamDeleted = team.DeletedAt != null,
                     TeamBanned = team.IsBanned,
-                    TeamStatus = team.RegistrationStatus
+                    TeamStatus = team.RegistrationStatus,
+                    ProgressionEnabled = db.CompetitionProgressions.Any(progression =>
+                        progression.CompetitionId == competitionId && progression.Enabled)
                 })
             .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
@@ -98,6 +100,7 @@ internal static class GameplayFactAdmissionPersistence
         var rules = admissionModePolicy.GetRules(scope.Mode, competitionConfiguration!, challengeRules!,
             challengeDefinition);
         if (scope.Mode == GameMode.Ctf
+            && scope.ProgressionEnabled
             && !await new ProgressionChallengeAccess(db).IsActiveAsync(
                 competitionId, competitionChallengeId, scope.TeamId,
                 cancellationToken))

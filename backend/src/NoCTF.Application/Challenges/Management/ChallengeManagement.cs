@@ -106,7 +106,11 @@ public static class ParticipantChallengeVisibilityPolicy
 
 public sealed record CompetitionChallengeReadDecision(
     CompetitionVisibilityAccessDecision Visibility,
-    Guid? TeamId);
+    Guid? TeamId)
+{
+    /// <summary>Read in the same query; false means no progression gate applies. Defaults to checking.</summary>
+    public bool ProgressionEnabled { get; init; } = true;
+}
 
 public interface ICompetitionChallengeReadAccess
 {

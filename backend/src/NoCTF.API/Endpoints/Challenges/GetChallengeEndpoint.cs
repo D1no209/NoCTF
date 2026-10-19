@@ -249,6 +249,7 @@ public sealed class GetChallengeEndpoint(
         var visibility = decision.Visibility;
         var challengeInstanceId = Route<Guid>("competitionChallengeId");
         if (visibility.GameMode == GameMode.Ctf
+            && decision.ProgressionEnabled
             && !await progressionAccess.IsActiveAsync(
                 competitionId, challengeInstanceId, decision.TeamId, ct))
             return TypedResults.NotFound();

@@ -42,7 +42,9 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
                     && !team.IsBanned
                     && team.RegistrationStatus == TeamRegistrationStatus.Approved
                     && team.Members.Any(member => member.UserId == userId))
-                    .Select(team => (Guid?)team.Id).SingleOrDefault()
+                    .Select(team => (Guid?)team.Id).SingleOrDefault(),
+                ProgressionEnabled = db.CompetitionProgressions.Any(progression =>
+                    progression.CompetitionId == competitionId && progression.Enabled)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition?.UserRole is not UserRole role)
@@ -82,6 +84,9 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
             competition.Status,
             visibility,
             scope,
-            competition.TracksEnabled), competition.TeamId);
+            competition.TracksEnabled), competition.TeamId)
+        {
+            ProgressionEnabled = competition.ProgressionEnabled
+        };
     }
 }

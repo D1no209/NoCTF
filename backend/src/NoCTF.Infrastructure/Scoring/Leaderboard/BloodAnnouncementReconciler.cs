@@ -19,7 +19,8 @@ public sealed class BloodAnnouncementReconciler(NoCtfDbContext db, ICompetitionE
         if (projection.Schema.Mode != GameMode.Ctf) return;
         var id = projection.Snapshot.CompetitionId;
         var awards = projection.BloodAwards.ToDictionary(item => (item.CompetitionChallengeId, Position: (BloodPosition)item.Rank));
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        // No explicit transaction: the reads are ReadCommitted either way and the single SaveChanges is atomic.
+        // Row concurrency stamps plus PublishedVersion reject a stale reconciliation.
         var settings = await db.Competitions.AsNoTracking().Where(item => item.Id == id)
             .Select(item => new { item.FrozenStartAt, item.HiddenStartAt }).SingleAsync(ct);
         var now = clock.GetUtcNow();
@@ -71,8 +72,6 @@ public sealed class BloodAnnouncementReconciler(NoCtfDbContext db, ICompetitionE
             }
         }
         await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await transaction.DisposeAsync();
         await messages.FlushCommittedMessagesAsync();
     }
 

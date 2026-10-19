@@ -15,7 +15,8 @@ namespace NoCTF.Infrastructure.Competitions.Tracks;
 public sealed class CompetitionTrackStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    ICompetitionEventRecorder events) : ICompetitionTrackStore
+    ICompetitionEventRecorder events,
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null) : ICompetitionTrackStore
 {
     public async Task<CompetitionTracksView?> GetAsync(
         Guid competitionId,
@@ -311,6 +312,8 @@ public sealed class CompetitionTrackStore(
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, cancellationToken);
         await transaction.FlushMessagesAsync(outbox);
         return UpdateCompetitionTracksResult.Success(
             Map(competition, normalized, includeInvitationCodes: true, providers));

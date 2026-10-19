@@ -273,8 +273,11 @@ internal sealed class GameplayFactCompletionWriter(NoCtfDbContext db, IPostCommi
         CancellationToken cancellationToken)
     {
         var completionStarted = Stopwatch.GetTimestamp();
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            evaluation.HintCost is null ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable, cancellationToken);
+        // Hint unlocks serialize their duplicate and balance reads. Other completions rely on the fact's
+        // concurrency stamp and unique constraints, so their transaction only spans the final write.
+        await using var transaction = new LateTransaction(db);
+        if (evaluation.HintCost is not null)
+            await transaction.BeginAsync(IsolationLevel.Serializable, cancellationToken);
         var submission = await db.GameplayFacts.Include(fact => fact.Awd).SingleOrDefaultAsync(
             item => item.Id == gameplayFactId, cancellationToken);
         if (submission is null || submission.ConcurrencyStamp != evaluation.ExpectedStamp
@@ -324,6 +327,7 @@ internal sealed class GameplayFactCompletionWriter(NoCtfDbContext db, IPostCommi
                 GameplayFactState: submission.State,
                 GameplayFactResult: submission.Result), cancellationToken);
             await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
+            await transaction.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             Committed = true;
@@ -436,6 +440,7 @@ internal sealed class GameplayFactCompletionWriter(NoCtfDbContext db, IPostCommi
             GameplayFactState: submission.State,
             GameplayFactResult: submission.Result), cancellationToken);
         await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
+        await transaction.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         Committed = true;

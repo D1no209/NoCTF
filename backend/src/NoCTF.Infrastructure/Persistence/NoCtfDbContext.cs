@@ -177,8 +177,12 @@ public sealed class NoCtfDbContext(
     {
         // Read-only inspection: one change detection instead of one per Entries<T>() call.
         var (changed, accessChanges) = InspectOnce(() => (StaffWebhookEventCapture.ChangedCompetitions(this), AccessChanges()));
+        // Staff capture reads current state and advances a stream sequence, so it is serialized. The access
+        // revision is a blind write; ReadCommitted keeps it atomic with the save, and concurrent registrations
+        // queue briefly on the competition row instead of aborting each other with serialization failures.
         await using var transaction = (changed.Length != 0 || accessChanges.Length != 0) && Database.IsRelational() && Database.CurrentTransaction is null
-            ? await Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
+            ? await Database.BeginTransactionAsync(changed.Length != 0
+                ? System.Data.IsolationLevel.Serializable : System.Data.IsolationLevel.ReadCommitted, cancellationToken) : null;
         if (accessChanges.Length != 0)
         {
             var revision = Guid.NewGuid();
