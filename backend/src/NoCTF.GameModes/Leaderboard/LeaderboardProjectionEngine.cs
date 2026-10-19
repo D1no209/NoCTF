@@ -20,7 +20,10 @@ public sealed class LeaderboardProjectionEngine(
         var projection = projectors.Get(input.Mode).Project(input);
         var aggregate = ProjectAggregate(input, projection);
         var normalized = NormalizedScoreboardProjection.Project(input, aggregate);
-        return TheoryScoreProjection.Apply(input, projection, WriteUpBenefitProjection.Apply(input, projection, normalized, projectors));
+        return TheoryScoreProjection.Apply(input, projection, WriteUpBenefitProjection.Apply(input, projection, normalized, projectors)) with
+        {
+            BloodAwards = input.Mode == GameMode.Ctf ? BuildBloodAwards(input) : []
+        };
     }
 
     private static LeaderboardAggregateProjection ProjectAggregate(
@@ -129,6 +132,14 @@ public sealed class LeaderboardProjectionEngine(
             .ToDictionary(
                 item => (item.TeamId, item.ChallengeId),
                 item => item.BloodRank);
+
+    public static IReadOnlyList<ScoreboardBloodAward> BuildBloodAwards(LeaderboardProjectionInput input) =>
+        BuildCtfSolveObservations(input).GroupBy(item => item.ChallengeId)
+            .SelectMany(group => group.GroupBy(item => item.TeamId)
+                .Select(team => team.OrderBy(item => item.OccurredAt).ThenBy(item => item.StableId).First())
+                .OrderBy(item => item.OccurredAt).ThenBy(item => item.StableId).Take(3)
+                .Select((item, index) => new ScoreboardBloodAward(item.ChallengeId, item.TeamId,
+                    item.StableId, (LeaderboardBloodRank)(index + 1), item.OccurredAt))).ToArray();
 
     private sealed record CtfSolveObservation(
         Guid TeamId,

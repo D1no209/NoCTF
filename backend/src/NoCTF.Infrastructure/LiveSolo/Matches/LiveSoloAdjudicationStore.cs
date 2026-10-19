@@ -30,6 +30,7 @@ public sealed partial class LiveSoloMatchStore
             var persistedPauseIds = round?.Pauses.Select(x => x.Id).ToHashSet() ?? [];
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
             var decision = LiveSoloAdjudicationPolicy.Apply(match, round, command, effectiveAt);
+            var changedFacts = new List<GameplayFact>();
             if (round is not null)
             {
                 db.Set<LiveSoloPauseInterval>().AddRange(round.Pauses.Where(x => !persistedPauseIds.Contains(x.Id)));
@@ -43,7 +44,7 @@ public sealed partial class LiveSoloMatchStore
                     {
                         fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.Rejected;
                         fact.FailureCode = GameplayFactFailureCode.RoundOutOfRange; fact.UpdatedAt = effectiveAt;
-                        await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
+                        changedFacts.Add(fact);
                     }
                 }
                 else if (command.Action == LiveSoloJudgeAction.Resume && LiveSoloRoundSchedulePolicy.NextWakeup(round, effectiveAt) is { } next)
@@ -56,6 +57,8 @@ public sealed partial class LiveSoloMatchStore
                 await AdvanceBracketAsync(match, effectiveAt, ct);
             }
             await db.SaveChangesAsync(ct);
+            foreach (var fact in changedFacts)
+                await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
             return new(await MapAsync(match, ct), round is null ? null : Round(round, effectiveAt), Decision(decision));
         }, () => new(null, null, null, LiveSoloFailure.Conflict), ct);
         if (result.Failure is null && command.Action is LiveSoloJudgeAction.VoidRound or LiveSoloJudgeAction.ForfeitMatch)

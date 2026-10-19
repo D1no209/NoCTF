@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
@@ -40,6 +41,8 @@ public sealed class NotificationReaderPersistenceTests
             var ids = new TestIds(now);
 
             await SeedAsync(options, ids, now, cancellationToken);
+            options = new DbContextOptionsBuilder<NoCtfDbContext>(options)
+                .AddInterceptors(new AsynchronousQueryGuard()).Options;
 
             await using (var beforeChange = new NoCtfDbContext(options))
             {
@@ -269,6 +272,13 @@ public sealed class NotificationReaderPersistenceTests
                 ]);
             }
         });
+    }
+
+    private sealed class AsynchronousQueryGuard : DbCommandInterceptor
+    {
+        public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result) =>
+            throw new InvalidOperationException("Notification reads must execute database queries asynchronously.");
     }
 
     private static async Task SeedAsync(

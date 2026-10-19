@@ -51,7 +51,7 @@ public sealed partial class ChallengeWriteUpStore
                 db.GameplayFacts.Add(new WriteUpUnlockGameplayFact { Id = factId, CompetitionId = command.CompetitionId,
                     CompetitionChallengeId = command.CompetitionChallengeId, TeamId = teamId, ActorUserId = command.ActorId,
                     OccurredAt = command.Now, UpdatedAt = command.Now, ReferenceKind = GameplayFactReferenceKind.WriteUpVersion,
-                    ReferenceId = command.VersionId, State = GameplayFactState.Queued, Result = GameplayFactResult.Unlocked });
+                    ReferenceId = command.VersionId, State = GameplayFactState.Completed, Result = GameplayFactResult.Unlocked });
                 db.WriteUpUnlockReceipts.Add(new() { GameplayFactId = factId, CompetitionId = command.CompetitionId,
                     CompetitionChallengeId = command.CompetitionChallengeId, TeamId = teamId, VersionId = command.VersionId,
                     DeductionPercent = access.DeductionPercent, UnlockedAt = command.Now });
@@ -59,7 +59,6 @@ public sealed partial class ChallengeWriteUpStore
                     CompetitionEventLevel.Information, CompetitionEventVisibility.Team, command.Now, ActorUserId: command.ActorId,
                     TeamId: teamId, CompetitionChallengeId: command.CompetitionChallengeId, GameplayFactId: factId,
                     SubjectType: EntityReferenceKind.CompetitionChallenge, SubjectId: command.CompetitionChallengeId), ct);
-                await messages.PublishAsync(new ProjectLeaderboard(command.CompetitionId));
                 await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); committed = true;
                 if (leaderboards is not null) await leaderboards.InvalidateAsync(command.CompetitionId, ct);
                 await messages.FlushCommittedMessagesAsync();

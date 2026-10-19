@@ -27,17 +27,16 @@ public sealed class PendingGameplayFactDispatchHandler(
                     && fact.UpdatedAt <= queuedCutoff
                 || fact.State == GameplayFactState.Processing
                     && fact.UpdatedAt <= processingCutoff);
-        if (message.AfterId is { } afterId)
-            query = query.Where(fact => fact.Id.CompareTo(afterId) > 0);
-
-        var ids = await query.OrderBy(fact => fact.Id)
+        // A scheduled pass is deliberately bounded. Publishing a continuation from
+        // inside the pass creates a message storm when a large backlog exists.
+        var candidates = await query.OrderBy(fact => fact.UpdatedAt).ThenBy(fact => fact.Id)
             .Take(BatchSize)
-            .Select(fact => fact.Id)
+            .Select(fact => new { fact.Id, fact.ConcurrencyStamp })
             .ToArrayAsync(cancellationToken);
-        foreach (var id in ids)
-            await publisher.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7(now)));
-        if (ids.Length == BatchSize)
-            await publisher.PublishAsync(new DispatchPendingGameplayFacts(message.At, ids[^1]));
+        var window = now.ToUnixTimeSeconds() / 10;
+        foreach (var candidate in candidates)
+            await publisher.PublishAsync(new EvaluateGameplayFact(candidate.Id, candidate.ConcurrencyStamp,
+                GameplayFactDispatchPurpose.Recovery, window));
         await publisher.FlushCommittedMessagesAsync();
     }
 }

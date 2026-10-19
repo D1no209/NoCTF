@@ -2,5 +2,5 @@ namespace NoCTF.Application.GameplayFacts.Processing;
 
 public interface IGameplayFactProcessor
 {
-    Task ProcessAsync(Guid gameplayFactId, CancellationToken cancellationToken);
+    Task ProcessAsync(Guid gameplayFactId, Guid expectedConcurrencyStamp, CancellationToken cancellationToken);
 }

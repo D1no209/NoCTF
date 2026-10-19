@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, reactive, ref, toRefs, watch } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
+import { hasInjectionContext, inject as vueInject, provide as vueProvide } from 'vue'
+import * as coherence from '../app/utils/scoreboard-coherence'
 import { adminCompetitionPath, competitionPath, isCompetitionOverviewPath } from '../app/utils/app-routes'
 import { competitionBroadcastIdentity, competitionBroadcastQueryWindow, competitionBroadcastKinds, isCompetitionBroadcastKind, mergeCompetitionBroadcasts, previousCompetitionBroadcastWindow } from '../app/utils/competition-broadcast'
 
@@ -12,6 +14,11 @@ async function factory(path: string, name: string, additional: Record<string, un
     translate: (key: string) => key, describeMessage: (key: string) => key, parseApiError: () => ({ displayMessage: 'failed' }), ...additional }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
   for (const icon of ['ArrowLeft', 'ClipboardCheck', 'FileText', 'GitBranch', 'LayoutDashboard', 'MessageCircleQuestion', 'Puzzle', 'Trophy', 'UserRound', 'Megaphone']) deps[icon] = {}
+  if (name === 'useCompetitionsByIdPage') {
+    deps.provideCompetitionScoreboard = await factory('composables/useScoreboardMatrix.ts', 'provideCompetitionScoreboard', {
+      ...additional, ...coherence, hasInjectionContext, inject: vueInject, provide: vueProvide,
+    })
+  }
   return new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${code}; return ${name};`)(deps)
 }
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }

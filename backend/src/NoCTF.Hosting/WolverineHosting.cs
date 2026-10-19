@@ -1,5 +1,6 @@
 using JasperFx.CodeGeneration.Model;
 using Microsoft.Extensions.Configuration;
+using NATS.Client.JetStream.Models;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Hosting.Messaging;
@@ -54,10 +55,13 @@ public static class WolverineHosting
                 stream=>stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.LiveSoloMedia),
                     NatsSubjects.ScheduledSubject(WorkerQueue.LiveSoloMedia)).EnableScheduledDelivery(),
                 NatsSubjects.Subject(WorkerQueue.LiveSoloMedia))
-            .DefineWorkQueueStream(
+            .DefineStream(
                 NatsSubjects.ProjectionStream,
-                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Projection)),
-                NatsSubjects.Subject(WorkerQueue.Projection))
+                stream =>
+                {
+                    stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Projection));
+                    stream.Retention = StreamConfigRetention.Workqueue;
+                })
             .DefineWorkQueueStream(
                 NatsSubjects.BackgroundStream,
                 stream => stream.WithSubjects(
@@ -68,6 +72,10 @@ public static class WolverineHosting
                 NatsSubjects.WebhookStream,
                 stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Webhook)),
                 NatsSubjects.Subject(WorkerQueue.Webhook))
+            .DefineWorkQueueStream(
+                NatsSubjects.NotificationsStream,
+                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Notifications)),
+                NatsSubjects.Subject(WorkerQueue.Notifications))
             .DefineWorkQueueStream(
                 NatsSubjects.EventsStream,
                 stream => stream.WithSubjects(

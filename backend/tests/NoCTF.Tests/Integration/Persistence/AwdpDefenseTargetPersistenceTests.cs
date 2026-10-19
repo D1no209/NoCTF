@@ -56,7 +56,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await using var db = new NoCtfDbContext(options);
             var outbox = new RecordingOutbox();
             var intake = new GameplayFactIntakeStore(db, outbox,
-                new GameplayFactAttemptCriticalSection(),
                 new CompetitionEventStore(db, outbox), new PatchSourceAddress());
             var admission = await intake.LoadAdmissionAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId, ct);
             var id = Guid.NewGuid();
@@ -306,8 +305,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var attemptOutbox = new RecordingOutbox();
             var intake = new GameplayFactIntakeStore(
                 attemptDb,
-                attemptOutbox,
-                new GameplayFactAttemptCriticalSection());
+                attemptOutbox);
             var staleAdmission = await intake.LoadAdmissionAsync(
                 fixture.CompetitionId,
                 fixture.CompetitionChallengeId,
@@ -320,7 +318,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var patchStore = new PatchUploadStore(
                 patchDb,
                 patchOutbox,
-                new GameplayFactAttemptCriticalSection(),
                 new FileReferenceLock(),
                 NullLogger<PatchUploadStore>.Instance,
                 new CompetitionEventStore(patchDb, patchOutbox));
@@ -392,7 +389,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
         await using var db = new NoCtfDbContext(options);
         var store = new AwdpDefenseTargetStore(
             db,
-            new(),
             new FixedRuntimePlacementPolicy(),
             new RecordingOutbox());
         return await store.TryCreateAsync(
@@ -418,7 +414,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
         var store = new PatchUploadStore(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(),
             new FileReferenceLock(),
             NullLogger<PatchUploadStore>.Instance,
             new CompetitionEventStore(db, outbox),

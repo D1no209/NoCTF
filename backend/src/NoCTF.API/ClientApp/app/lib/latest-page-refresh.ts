@@ -8,7 +8,7 @@ export interface LatestPageRefreshOptions {
  * an in-flight request. The callback owns its error presentation so a failed
  * refresh can preserve the currently rendered state.
  */
-export function createTrailingRefresh(run: () => Promise<void>) {
+export function createTrailingRefresh(run: () => Promise<void>, coalesceMilliseconds = 0) {
   let refresh: Promise<void> | null = null
   let refreshRequested = false
 
@@ -19,6 +19,10 @@ export function createTrailingRefresh(run: () => Promise<void>) {
     refresh = (async () => {
       do {
         refreshRequested = false
+        if (coalesceMilliseconds > 0) {
+          await new Promise(resolve => setTimeout(resolve, coalesceMilliseconds))
+          refreshRequested = false
+        }
         await run()
       } while (refreshRequested)
     })().finally(() => {

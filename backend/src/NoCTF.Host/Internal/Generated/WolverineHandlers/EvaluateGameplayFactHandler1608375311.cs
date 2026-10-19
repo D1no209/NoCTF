@@ -3,7 +3,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.LiveSolo.Media;
 using NoCTF.Application.Notifications;
@@ -25,7 +24,6 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> _loggerOfGameplayFactProcessor;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
-        private readonly NoCTF.Application.GameplayFacts.Intake.IGameplayFactAdmissionModePolicy _gameplayFactAdmissionModePolicy;
         private readonly NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog _gameplayFactEvaluatorCatalog;
         private readonly NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway _liveSoloEgressGateway;
         private readonly NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway _liveSoloMediaGateway;
@@ -38,8 +36,6 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine _leaderboardProjectionEngine;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
-        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock _leaderboardProjectionKeyedLock;
-        private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardRebuildCoordinator _leaderboardRebuildCoordinator;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
@@ -48,16 +44,16 @@ namespace Internal.Generated.WolverineHandlers
         private readonly System.TimeProvider _timeProvider5;
         private readonly System.TimeProvider _timeProvider6;
         private readonly System.TimeProvider _timeProvider7;
+        private readonly System.TimeProvider _timeProvider8;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public EvaluateGameplayFactHandler1608375311(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.GameplayFacts.Intake.IGameplayFactAdmissionModePolicy gameplayFactAdmissionModePolicy, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy1, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy2, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardRebuildCoordinator leaderboardRebuildCoordinator, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, System.TimeProvider __timeProvider5, System.TimeProvider __timeProvider6, System.TimeProvider __timeProvider7, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public EvaluateGameplayFactHandler1608375311(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy1, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy2, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, System.TimeProvider __timeProvider5, System.TimeProvider __timeProvider6, System.TimeProvider __timeProvider7, System.TimeProvider __timeProvider8, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _httpContextAccessor = httpContextAccessor;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfGameplayFactProcessor = loggerOfGameplayFactProcessor;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
-            _gameplayFactAdmissionModePolicy = gameplayFactAdmissionModePolicy;
             _gameplayFactEvaluatorCatalog = gameplayFactEvaluatorCatalog;
             _liveSoloEgressGateway = liveSoloEgressGateway;
             _liveSoloMediaGateway = liveSoloMediaGateway;
@@ -70,8 +66,6 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardProjectionEngine = leaderboardProjectionEngine;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
             _leaderboardPublicationFence = leaderboardPublicationFence;
-            _leaderboardProjectionKeyedLock = leaderboardProjectionKeyedLock;
-            _leaderboardRebuildCoordinator = leaderboardRebuildCoordinator;
             _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
@@ -80,6 +74,7 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider5 = __timeProvider5;
             _timeProvider6 = __timeProvider6;
             _timeProvider7 = __timeProvider7;
+            _timeProvider8 = __timeProvider8;
             _fusionCacheProvider = fusionCacheProvider;
         }
 
@@ -94,21 +89,22 @@ namespace Internal.Generated.WolverineHandlers
             var requestCommandKey = new NoCTF.API.Security.RequestCommandKey(_httpContextAccessor);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider5);
-            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider4, transactionalRequestReplay);
+            var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider6);
+            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider5, transactionalRequestReplay);
             var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
+            var progressionReconciler = new NoCTF.Infrastructure.Competitions.Progression.ProgressionReconciler(noCtfDbContext);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider3);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider2, _leaderboardSnapshotDeserializer, _leaderboardRebuildCoordinator);
-            var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, _liveSoloEgressGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider6);
-            var gameplayFactProcessor = new NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor(noCtfDbContext, _gameplayFactEvaluatorCatalog, _gameplayFactAdmissionModePolicy, wolverinePostCommitMessagePublisher, fusionLeaderboardCache, competitionEventStore, _loggerOfGameplayFactProcessor);
-            var gameplayFactProcessorRouter = new NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessorRouter(noCtfDbContext, gameplayFactProcessor, liveSoloMatchStore, _timeProvider7);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider2, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher);
+            var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, _liveSoloEgressGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider7);
+            var gameplayFactProcessor = new NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor(noCtfDbContext, _gameplayFactEvaluatorCatalog, wolverinePostCommitMessagePublisher, fusionLeaderboardCache, competitionEventStore, _loggerOfGameplayFactProcessor, _timeProvider4, progressionReconciler);
+            var gameplayFactProcessorRouter = new NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessorRouter(noCtfDbContext, gameplayFactProcessor, liveSoloMatchStore, _timeProvider8, wolverinePostCommitMessagePublisher);
             // The actual message body
             var evaluateGameplayFact = (NoCTF.Application.Messaging.EvaluateGameplayFact)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.GameplayFactMessageHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.GameplayFactMessageHandler");
-            var gameplayFactMessageHandler = new NoCTF.Worker.GameplayFactMessageHandler(gameplayFactProcessorRouter, noCtfDbContext, _gameplayFactStateChangedNotification, wolverinePostCommitMessagePublisher);
+            var gameplayFactMessageHandler = new NoCTF.Worker.GameplayFactMessageHandler(gameplayFactProcessorRouter, noCtfDbContext, _gameplayFactStateChangedNotification);
             
             // The actual message execution
             await gameplayFactMessageHandler.Handle(evaluateGameplayFact, cancellation).ConfigureAwait(false);

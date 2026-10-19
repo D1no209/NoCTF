@@ -18,6 +18,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Competitions.Webhooks;
 using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -27,38 +28,27 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardRefreshPublisher publisher,
     IFusionCacheProvider caches,
     ILeaderboardPublicationFence? publicationFence = null,
-    LeaderboardProjectionKeyedLock? projectionKeyedLock = null,
     TimeProvider? clock = null,
     LeaderboardSnapshotDeserializer? snapshotDeserializer = null,
-    LeaderboardRebuildCoordinator? rebuildCoordinator = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    IPostCommitMessagePublisher? workPublisher = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
-    private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken ct) =>
-        (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Scoreboard;
+        (await ReadPublishedBundleAsync(competitionId, ct))?.Scoreboard;
 
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
 
     public async Task<ScoreboardProjection?> GetFrozenSpectatorScoreboardAsync(Guid competitionId, CancellationToken ct)
-    {
-        var frozenAt = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
-            .Select(x => x.FrozenStartAt).SingleOrDefaultAsync(ct);
-        if (frozenAt is null) return null;
-        // A public read never reconstructs a past freeze from mutable current facts.
-        // Visibility processing captures the immutable generation transactionally.
-        var frozen = await db.CompetitionWebhookFrozenProjections.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.CompetitionId == competitionId && x.FrozenAt == frozenAt.Value, ct);
-        return frozen is null ? null : ReadFrozen(frozen).Projection;
-    }
+        => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
 
     public async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
         Guid competitionId, bool frozen, CancellationToken ct)
     {
         var bundle = frozen
             ? await GetFrozenBundleAsync(competitionId, ct)
-            : await GetOrRebuildPublishedBundleAsync(competitionId, ct);
+            : await ReadPublishedBundleAsync(competitionId, ct);
         return bundle is null ? null : new(
             bundle.Scoreboard, bundle.SourceEventSequenceThrough);
     }
@@ -127,13 +117,25 @@ public sealed class FusionLeaderboardCache(
         Guid competitionId,
         CancellationToken ct)
     {
-        var frozenAt = await db.Competitions.AsNoTracking()
+        var access = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.FrozenStartAt)
+            .Select(competition => new { competition.FrozenStartAt, competition.ScoreboardAccessRevision })
             .SingleOrDefaultAsync(ct);
-        return frozenAt is null
-            ? null
-            : await ProjectBundleAsync(competitionId, null, frozenAt.Value, null, ct);
+        if (access?.FrozenStartAt is not { } frozenAt) return null;
+        var captured = await db.CompetitionWebhookFrozenProjections.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.CompetitionId == competitionId && item.FrozenAt == frozenAt, ct);
+        if (captured is null) return null;
+        var bundle = JsonSerializer.Deserialize(captured.Payload,
+            CachedScoreboardJsonContext.Default.CachedScoreboardProjection)
+            ?? throw new InvalidOperationException("Frozen scoreboard projection is invalid.");
+        if (bundle.AccessRevision == access.ScoreboardAccessRevision) return bundle;
+        var challenges = (await db.CompetitionChallenges.AsNoTracking().Where(item => item.CompetitionId == competitionId && item.IsPublished)
+            .Select(item => item.Id).ToArrayAsync(ct)).ToHashSet();
+        var teams = await db.Teams.AsNoTracking().Where(item => item.CompetitionId == competitionId && item.DeletedAt == null
+            && !item.IsBanned && item.RegistrationStatus == TeamRegistrationStatus.Approved)
+            .ToDictionaryAsync(item => item.Id, item => item.TrackKey, ct);
+        var filtered = ScoreboardAudienceProjection.FilterCurrentAccess(bundle.Scoreboard, challenges, teams);
+        return bundle with { Scoreboard = filtered with { ParticipantView = ScoreboardAudienceView.From(filtered) } };
     }
 
     public async Task<ScoreboardProjection?> CreateScoreboardAsync(
@@ -154,20 +156,8 @@ public sealed class FusionLeaderboardCache(
         Guid competitionId,
         int endingRound,
         DateTimeOffset projectedAt,
-        CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.RepeatableRead,
-            ct);
-        var scoreboard = (await ProjectBundleAsync(
-            competitionId,
-            null,
-            projectedAt,
-            endingRound,
-            ct))?.Scoreboard;
-        await transaction.CommitAsync(ct);
-        return scoreboard;
-    }
+        CancellationToken ct) =>
+        (await ProjectBundleAsync(competitionId, null, projectedAt, endingRound, ct))?.Scoreboard;
 
     private async Task<CachedScoreboardProjection?> ProjectBundleAsync(
         Guid competitionId,
@@ -178,6 +168,9 @@ public sealed class FusionLeaderboardCache(
         NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null,
         NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? awdScoringOverride = null)
     {
+        await using var inputTransaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
+            : null;
         var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
@@ -374,7 +367,14 @@ public sealed class FusionLeaderboardCache(
                 .Select(rule => rule.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null,
             rankingRound is null ? null : AwdTieBreakPolicy.Resolve(rankingRound.TieBreakers.OrderBy(item => item.Position)
                  .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))),
-            theory.Scores, theory.Receipts);
+            theory.Scores);
+        var spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct,
+            timingOverride, rankingRound?.Id);
+        if (inputTransaction is not null)
+        {
+            await inputTransaction.CommitAsync(ct);
+            await inputTransaction.DisposeAsync();
+        }
         var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
@@ -433,8 +433,7 @@ public sealed class FusionLeaderboardCache(
         }
         scoreboard = scoreboard with
         {
-            Spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct, timingOverride,
-                participantScoreboard.Snapshot.CurrentRoundId),
+            Spectator = spectator,
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
         return new(
@@ -445,7 +444,8 @@ public sealed class FusionLeaderboardCache(
                 : null,
             sourceEventSequenceThrough)
         {
-            TimingRevisions = challengeEntities.ToDictionary(x => x.Id, x => x.TimingRevision)
+            TimingRevisions = challengeEntities.ToDictionary(x => x.Id, x => x.TimingRevision),
+            AccessRevision = competition.ScoreboardAccessRevision
         };
     }
 
@@ -478,45 +478,40 @@ public sealed class FusionLeaderboardCache(
         return new(rounds, startRound, endRound, latestRound);
     }
 
-    public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
+    public Task RefreshAsync(Guid competitionId, CancellationToken ct) => RefreshCoreAsync(competitionId, ct);
+
+    public async Task<bool> NeedsRefreshAsync(Guid competitionId, CancellationToken ct) =>
+        publicationFence is null || await publicationFence.HasPendingAsync(competitionId, ct)
+            || await GetPublishedBundleAsync(competitionId, ct) is null;
+
+    public async Task RequestRefreshAsync(Guid competitionId, CancellationToken ct)
     {
-        using var projectionLock = await keyedLock.EnterAsync(competitionId, ct);
-        await RebuildAsync(competitionId, onlyIfMissing: false, ct);
+        if (workPublisher is null) throw new InvalidOperationException("A leaderboard refresh publisher is required.");
+        ct.ThrowIfCancellationRequested();
+        await InvalidateAsync(competitionId, ct);
+        await workPublisher.PublishAsync(new ProjectLeaderboard(competitionId, LeaderboardRefreshMode.IfMissing));
+        await workPublisher.FlushCommittedMessagesAsync();
     }
 
-    private async Task RebuildAsync(Guid competitionId, bool onlyIfMissing, CancellationToken ct)
+    public async Task InvalidateAccessAsync(Guid competitionId, CancellationToken ct)
     {
-        if (rebuildCoordinator is null)
-        {
-            await RefreshCoreAsync(competitionId, ct);
-            return;
-        }
-        await using var lease = await rebuildCoordinator.AcquireAsync(competitionId, ct);
-        // Another process may have completed this missing generation while this process waited.
-        // Explicit refreshes keep their stronger contract, including crash recovery of queued facts.
-        if (onlyIfMissing && await GetPublishedBundleAsync(competitionId, lease.Token) is not null) return;
-        try { await RefreshCoreAsync(competitionId, lease.Token, lease); }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            lease.ThrowIfLost();
-            throw;
-        }
+        if (publicationFence is not null)
+            await publicationFence.InvalidateAccessAsync(competitionId, timeProvider.GetUtcNow().UtcTicks, ct);
     }
 
-    private async Task RefreshCoreAsync(Guid competitionId, CancellationToken ct,
-        LeaderboardRebuildCoordinator.RebuildLease? lease = null)
+    private async Task RefreshCoreAsync(Guid competitionId, CancellationToken ct)
     {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TimeSpan.FromMinutes(2));
+        ct = budget.Token;
         var publicationPhase = false;
         CachedScoreboardProjection? response = null;
-        long? publicationToken = null;
+        LeaderboardBuildTicket? ticket = null;
         try
         {
             if (publicationFence is not null)
-                publicationToken = await publicationFence.IssueAsync(
+                ticket = await publicationFence.BeginBuildAsync(
                     competitionId, timeProvider.GetUtcNow().UtcTicks, ct);
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.RepeatableRead,
-                ct);
             var projectionStarted = Stopwatch.GetTimestamp();
             try
             {
@@ -545,10 +540,8 @@ public sealed class FusionLeaderboardCache(
                 Stopwatch.GetElapsedTime(projectionStarted).TotalSeconds,
                 response.Scoreboard.EntryAllocations.Count,
                 response.Scoreboard.Snapshot.Teams.Count);
-            await transaction.CommitAsync(ct);
             publicationPhase = true;
-            if (!await HasCurrentTimingAsync(competitionId, response, ct))
-                return;
+            if (!await HasCurrentAccessAsync(competitionId, response, ct)) return;
 
             if (publicationFence is null)
             {
@@ -559,18 +552,18 @@ public sealed class FusionLeaderboardCache(
             else
             {
                 response = SetScoreboardVersion(response,
-                    publicationToken ?? throw new InvalidOperationException(
+                    ticket?.Version ?? throw new InvalidOperationException(
                         "Scoreboard publication has no fencing token."));
             }
 
             if (publicationFence is not null)
             {
-                if (lease is not null) await lease.ConfirmOwnershipAsync();
                 var payload = JsonSerializer.Serialize(response,
                     CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
-                var accepted = await publicationFence.TryCommitAsync(
+                var accepted = await publicationFence.TryPublishAsync(
                     competitionId,
-                    publicationToken!.Value,
+                    ticket!,
+                    response.SourceEventSequenceThrough,
                     payload,
                     ct);
                 if (!accepted)
@@ -578,15 +571,13 @@ public sealed class FusionLeaderboardCache(
             }
 
             if (publicationFence is null)
-                await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
+                await cache.SetAsync(ProjectionKey(competitionId), response, new FusionCacheEntryOptions().SetDurationInfinite(), token: ct);
             else if (!await publicationFence.IsCurrentAsync(
-                competitionId, publicationToken!.Value, ct))
+                competitionId, ticket!.Version, ct))
             {
                 return;
             }
 
-            if (!await HasCurrentTimingAsync(competitionId, response, ct))
-                return;
             await publisher.PublishAsync(response.Scoreboard, ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
         }
@@ -615,8 +606,6 @@ public sealed class FusionLeaderboardCache(
                     timeProvider.GetUtcNow().UtcTicks,
                     ct);
             }
-            if (publicationFence is null)
-                await cache.RemoveAsync(ProjectionKey(competitionId), token: ct);
         }
         catch
         {
@@ -639,47 +628,24 @@ public sealed class FusionLeaderboardCache(
     private static string ProjectionKey(Guid competitionId) => $"scoreboard:v3:{competitionId:N}";
     private static string FailureKey(Guid competitionId) => $"leaderboard:v3:{competitionId:N}:last-failure";
 
-    private async Task<CachedScoreboardProjection?> GetOrRebuildPublishedBundleAsync(
+    private async Task<CachedScoreboardProjection?> ReadPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
-        var published = await GetPublishedBundleAsync(competitionId, ct);
-        if (published is not null)
-            return published;
-
-        using var projectionLock = await keyedLock.EnterAsync(competitionId, ct);
-        published = await GetPublishedBundleAsync(competitionId, ct);
-        if (published is not null)
-            return published;
-
-        try
-        {
-            await RebuildAsync(competitionId, onlyIfMissing: true, ct);
-            published = await GetPublishedBundleAsync(competitionId, ct);
-            NoCtfTelemetry.RecordLeaderboardCacheMissRebuild(
-                published is null ? "not_found" : "success");
-            return published;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            NoCtfTelemetry.RecordLeaderboardCacheMissRebuild("failure");
-            return null;
-        }
+        using var measurement = NoCtfTelemetry.MeasureLeaderboardRead(LeaderboardReadPerformanceStage.Read);
+        return await GetPublishedBundleAsync(competitionId, ct);
     }
 
     private async Task<CachedScoreboardProjection?> GetPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
+        using var measurement = NoCtfTelemetry.MeasureLeaderboardRead(LeaderboardReadPerformanceStage.PublishedBundle);
         if (publicationFence is null)
         {
             var unfenced = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
                 ProjectionKey(competitionId), null, token: ct);
-            return IsExpired(unfenced) || unfenced is not null && !await HasCurrentTimingAsync(competitionId, unfenced, ct) ? null : unfenced;
+            return unfenced is not null && await HasCurrentAccessAsync(competitionId, unfenced, ct) ? unfenced : null;
         }
 
         var published = await publicationFence.GetAsync(competitionId, ct);
@@ -688,28 +654,12 @@ public sealed class FusionLeaderboardCache(
         var bundle = snapshotDeserializer is null
             ? LeaderboardSnapshotDeserializer.Deserialize(competitionId, published)
             : await snapshotDeserializer.ReadAsync(competitionId, published, ct);
-        if (IsExpired(bundle) || !await HasCurrentTimingAsync(competitionId, bundle, ct))
-            return null;
-
-        return bundle;
+        return await HasCurrentAccessAsync(competitionId, bundle, ct) ? bundle : null;
     }
 
-    private async Task<bool> HasCurrentTimingAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct)
-    {
-        // Missing revision metadata makes a cached projection invalid.
-        // Rebuild it from current relational facts before serving any score.
-        if (bundle.TimingRevisions is null
-            || bundle.Scoreboard.Schema.Mode is GameMode.Awd or GameMode.Koh && bundle.Scoreboard.Spectator is null) return false;
-        var current = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .Select(x => new { x.Id, x.TimingRevision }).ToArrayAsync(ct);
-        return current.Length == bundle.TimingRevisions.Count
-            && current.All(x => bundle.TimingRevisions.TryGetValue(x.Id, out var revision) && revision == x.TimingRevision);
-    }
-
-    private bool IsExpired(CachedScoreboardProjection? bundle) =>
-        bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
-        || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
-            && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
+    private async Task<bool> HasCurrentAccessAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct) =>
+        await db.Competitions.AsNoTracking().Where(item => item.Id == competitionId)
+            .Select(item => (Guid?)item.ScoreboardAccessRevision).SingleOrDefaultAsync(ct) == bundle.AccessRevision;
 
     private static CachedScoreboardProjection AdvanceScoreboardVersion(
         CachedScoreboardProjection candidate,
@@ -766,6 +716,7 @@ internal sealed record CachedScoreboardProjection(
     DateTimeOffset? ValidUntil = null,
     long SourceEventSequenceThrough = 0)
 {
+    public Guid AccessRevision { get; init; }
     public IReadOnlyDictionary<Guid, Guid> TimingRevisions { get; init; } = new Dictionary<Guid, Guid>();
 }
 

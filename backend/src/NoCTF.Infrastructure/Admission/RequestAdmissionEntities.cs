@@ -41,5 +41,6 @@ internal sealed class RequestAdmissionLeaseConfiguration
         builder.HasKey(item => new { item.KeyHash, item.LeaseId });
         builder.HasIndex(item => item.ExpiresAt);
         builder.HasIndex(item => item.LeaseId);
+        builder.HasIndex(item => new { item.KeyHash, item.ExpiresAt });
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
@@ -24,12 +25,177 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
+using Microsoft.Extensions.DependencyInjection;
+using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Scoring.Leaderboard;
+using NoCTF.GameModes.Leaderboard;
+using NoCTF.Application.Notifications;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
 public sealed class GameplayFactOrderingPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Challenge_detail_projects_runtime_capabilities_without_loading_definitions(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync("noctf_challenge_capabilities", ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, ct);
+            var commands = new CapabilityReadCommands();
+            await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(options)
+                .AddInterceptors(commands).Options);
+            var store = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(
+                db, new RecordingOutbox(), new ChallengeRuntimeTemplateCatalog());
+            var initial = await store.FindAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, true, false, ct);
+            await Assert.That(initial!.HasRuntime).IsFalse();
+            await Assert.That(initial.UsesDynamicFlag).IsFalse();
+            var template = await db.Challenges.AsSplitQuery().SingleAsync(ct);
+            template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate
+            {
+                ChallengeId = template.Id,
+                FlagSource = PersistedRuntimeFlagSource.PerTeam,
+                Services = [new() { ChallengeId = template.Id, Name = "target", Image = "alpine:3" }]
+            };
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            commands.Texts.Clear();
+            var current = await store.FindAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, true, false, ct);
+            await Assert.That(current!.HasRuntime).IsTrue();
+            await Assert.That(current.UsesDynamicFlag).IsTrue();
+            await Assert.That(current.InteractionKind).IsEqualTo(CtfInteractionKind.FlagSubmission);
+            await Assert.That(db.ChangeTracker.Entries().Any()).IsFalse();
+            await Assert.That(commands.Texts.Count).IsGreaterThan(0);
+            Console.WriteLine($"ChallengeCapabilityRead SQL commands: {commands.Texts.Count}");
+            await Assert.That(commands.Texts.Any(sql => sql.Contains("runtime_services", StringComparison.OrdinalIgnoreCase)
+                || sql.Contains("runtime_service_commands", StringComparison.OrdinalIgnoreCase))).IsFalse();
+        });
+    }
+
+    private sealed class CapabilityReadCommands : DbCommandInterceptor
+    {
+        public List<string> Texts { get; } = [];
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            Texts.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [Test, Timeout(300_000)]
+    [Arguments(GameplayFactKind.FlagAttempt)]
+    [Arguments(GameplayFactKind.ManualAdjustment)]
+    public async Task Duplicate_delivery_and_old_revision_do_not_complete_twice(GameplayFactKind kind, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync("noctf_duplicate_fact", ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, ct);
+            var fact = Fact(fixture, Guid.CreateVersion7(), fixture.TeamIds[0], fixture.Now, kind: kind);
+            if (kind == GameplayFactKind.ManualAdjustment)
+            {
+                fact.Value = "25";
+                fact.ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(fact.Value));
+            }
+            await AddFactsAsync(options, [fact], ct);
+            Guid stamp;
+            await using (var read = new NoCtfDbContext(options))
+                stamp = await read.GameplayFacts.Where(item => item.Id == fact.Id)
+                    .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
+            var writes = new ConcurrentBag<string>();
+            async Task Deliver(Guid expected)
+            {
+                var commands = new CapabilityReadCommands();
+                await using var workerDb = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(options)
+                    .AddInterceptors(commands).Options);
+                var outgoing = new RecordingOutbox();
+                var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
+                    outgoing, eventRecorder: new CompetitionEventStore(workerDb, outgoing));
+                await processor.ProcessAsync(fact.Id, expected, ct);
+                foreach (var sql in commands.Texts.Where(sql => sql.Contains("UPDATE gameplay_facts", StringComparison.OrdinalIgnoreCase)
+                    || sql.Contains("UPDATE \"gameplay_facts\"", StringComparison.OrdinalIgnoreCase)))
+                    writes.Add(sql);
+            }
+            await Task.WhenAll(Deliver(stamp), Deliver(stamp));
+            await Deliver(stamp);
+            await Assert.That(writes.Count).IsGreaterThan(0);
+            await Assert.That(writes.All(sql => sql.LastIndexOf("WHERE", StringComparison.OrdinalIgnoreCase) is var where && where >= 0
+                && sql[where..].Contains("concurrency_stamp", StringComparison.OrdinalIgnoreCase))).IsTrue();
+            await using var verify = new NoCtfDbContext(options);
+            var saved = await verify.GameplayFacts.SingleAsync(item => item.Id == fact.Id, ct);
+            await Assert.That(saved.State).IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(saved.Result).IsEqualTo(kind == GameplayFactKind.ManualAdjustment
+                ? GameplayFactResult.Applied : GameplayFactResult.Correct);
+            await Assert.That(saved.ConcurrencyStamp).IsNotEqualTo(stamp);
+            await Assert.That(await verify.CompetitionEvents.CountAsync(item => item.GameplayFactId == fact.Id
+                && item.Kind == CompetitionEventKind.GameplayFactAdjudicated, ct)).IsEqualTo(1);
+            saved.State = GameplayFactState.Queued;
+            saved.Result = null;
+            await verify.SaveChangesAsync(ct);
+            await Deliver(stamp);
+            await Assert.That(await verify.GameplayFacts.AsNoTracking().Where(item => item.Id == fact.Id)
+                .Select(item => item.State).SingleAsync(ct)).IsEqualTo(GameplayFactState.Queued);
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Intake_messages_use_saved_stamps_and_worker_applies_attempt_positions(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync("noctf_saved_dispatch", ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, ct);
+            await using (var configure = new NoCtfDbContext(options))
+            {
+                var challenge = await configure.CompetitionChallenges.AsSplitQuery().SingleAsync(ct);
+                challenge.Rules!.MaxFlagAttempts = 3;
+                await configure.SaveChangesAsync(ct);
+            }
+            var deliveries = new List<EvaluateGameplayFact>();
+            for (var index = 0; index < 5; index++)
+            {
+                await using var intakeDb = new NoCtfDbContext(options);
+                var outgoing = new RecordingOutbox();
+                var intake = new NoCTF.Infrastructure.GameplayFacts.Intake.GameplayFactIntakeStore(
+                    intakeDb, outgoing, new CompetitionEventStore(intakeDb, outgoing));
+                var result = await new NoCTF.Application.GameplayFacts.Intake.SubmitFlag(
+                    intake, new GameModeGameplayFactAdmissionPolicy()).ExecuteBatchAsync(
+                        fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.MemberIds[0],
+                        [fixture.Flag], fixture.Now.AddMilliseconds(index), ct);
+                await Assert.That(result.Succeeded).IsTrue();
+                var message = outgoing.Messages.OfType<EvaluateGameplayFact>().Single();
+                var saved = await intakeDb.GameplayFacts.AsNoTracking().SingleAsync(item => item.Id == message.GameplayFactId, ct);
+                await Assert.That(message.ExpectedConcurrencyStamp).IsEqualTo(saved.ConcurrencyStamp);
+                deliveries.Add(message);
+            }
+            foreach (var message in deliveries.AsEnumerable().Reverse())
+            {
+                await using var workerDb = new NoCtfDbContext(options);
+                var outgoing = new RecordingOutbox();
+                var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
+                    outgoing, eventRecorder: new CompetitionEventStore(workerDb, outgoing));
+                await processor.ProcessAsync(message.GameplayFactId, message.ExpectedConcurrencyStamp, ct);
+                var saved = await workerDb.GameplayFacts.AsNoTracking().SingleAsync(item => item.Id == message.GameplayFactId, ct);
+                await Assert.That(saved.State).IsEqualTo(GameplayFactState.Completed);
+                await Assert.That(outgoing.Messages.OfType<GameplayFactStateChanged>().Single().ConcurrencyStamp)
+                    .IsEqualTo(saved.ConcurrencyStamp);
+                await Assert.That(outgoing.Messages.OfType<StopSolvedChallengeRuntimes>().Count())
+                    .IsEqualTo(saved.Result == GameplayFactResult.Correct ? 1 : 0);
+            }
+            await using var verify = new NoCtfDbContext(options);
+            var results = await verify.GameplayFacts.AsNoTracking().OrderBy(item => item.OccurredAt)
+                .Select(item => item.Result).ToArrayAsync(ct);
+            await Assert.That(results.Take(3).All(result => result == GameplayFactResult.Correct)).IsTrue();
+            await Assert.That(results.Skip(3).All(result => result == GameplayFactResult.AttemptsExhausted)).IsTrue();
+        });
+    }
+
     [Test]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
@@ -135,6 +301,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             }
             var outbox = new RecordingOutbox();
             await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Wrong)));
+            await Assert.That(outbox.Messages.OfType<StopSolvedChallengeRuntimes>().Any()).IsFalse();
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(1), ct);
             await using (var verify = new NoCtfDbContext(options))
             {
@@ -291,8 +458,8 @@ public sealed class GameplayFactOrderingPersistenceTests
                     .OrderBy(item => item.OccurredAt)
                     .ThenBy(item => item.Id)
                     .ToArrayAsync(cancellationToken);
-                await Assert.That(facts[0].Result).IsEqualTo(GameplayFactResult.Correct);
-                await Assert.That(facts[1].State).IsEqualTo(GameplayFactState.Queued);
+                await Assert.That(facts[0].State).IsEqualTo(GameplayFactState.Queued);
+                await Assert.That(facts[1].State).IsEqualTo(GameplayFactState.Completed);
             }
 
             await ProcessAsync(options, laterId, outbox, cancellationToken);
@@ -304,11 +471,12 @@ public sealed class GameplayFactOrderingPersistenceTests
                 .Select(item => item.Result)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(results.Length).IsEqualTo(2);
-            await Assert.That(results[0]).IsEqualTo(GameplayFactResult.Correct);
+            await Assert.That(results[0]).IsNull();
             await Assert.That(results[1]).IsEqualTo(GameplayFactResult.Correct);
-            var awards = outbox.Messages.OfType<BloodAwarded>().ToArray();
-            await Assert.That(awards.Length).IsEqualTo(1);
-            await Assert.That(awards[0].BloodRank).IsEqualTo(LeaderboardBloodRank.First);
+            await Assert.That(outbox.Messages.OfType<BloodAwarded>().Count()).IsEqualTo(0);
+            await ProcessAsync(options, earlierId, outbox, cancellationToken);
+            await Assert.That(await verification.GameplayFacts.AsNoTracking().Where(item => item.Id == earlierId)
+                .Select(item => item.State).SingleAsync(cancellationToken)).IsEqualTo(GameplayFactState.Completed);
         });
     }
 
@@ -333,7 +501,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             var outbox = new RecordingOutbox();
 
             await ProcessAsync(options, higherId, outbox, cancellationToken);
-            await ProcessAsync(options, higherId, outbox, cancellationToken);
+            await ProcessAsync(options, lowerId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
             var facts = await verification.GameplayFacts.AsNoTracking()
@@ -348,7 +516,7 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_cross_team_delivery_preserves_authoritative_blood_order(
+    public async Task Concurrent_cross_team_delivery_completes_each_fact_once_and_emits_one_adjudication(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -385,23 +553,11 @@ public sealed class GameplayFactOrderingPersistenceTests
             await Assert.That(facts.Length).IsEqualTo(3);
             await Assert.That(facts.All(item => item.Result == GameplayFactResult.Correct))
                 .IsTrue();
-            var awards = outbox.Messages.OfType<BloodAwarded>()
-                .OrderBy(message => message.BloodRank)
-                .ToArray();
-            await Assert.That(awards.Length).IsEqualTo(3);
-            await Assert.That(awards[0].BloodRank).IsEqualTo(LeaderboardBloodRank.First);
-            await Assert.That(awards[1].BloodRank).IsEqualTo(LeaderboardBloodRank.Second);
-            await Assert.That(awards[2].BloodRank).IsEqualTo(LeaderboardBloodRank.Third);
-            await Assert.That(awards[0].TeamId).IsEqualTo(fixture.TeamIds[0]);
-            await Assert.That(awards[1].TeamId).IsEqualTo(fixture.TeamIds[1]);
-            await Assert.That(awards[2].TeamId).IsEqualTo(fixture.TeamIds[2]);
-            var bloodEvents = await verification.CompetitionEvents.AsNoTracking()
-                .CountAsync(@event =>
-                    @event.Kind == CompetitionEventKind.FirstBloodAwarded
-                    || @event.Kind == CompetitionEventKind.SecondBloodAwarded
-                    || @event.Kind == CompetitionEventKind.ThirdBloodAwarded,
-                    cancellationToken);
-            await Assert.That(bloodEvents).IsEqualTo(3);
+            await Assert.That(outbox.Messages.OfType<GameplayFactStateChanged>().Count())
+                .IsEqualTo(3);
+            await Assert.That(await verification.CompetitionEvents.AsNoTracking()
+                .CountAsync(item => item.Kind == CompetitionEventKind.GameplayFactAdjudicated, cancellationToken))
+                .IsEqualTo(3);
         });
     }
 
@@ -479,6 +635,7 @@ public sealed class GameplayFactOrderingPersistenceTests
 
             await ProcessAsync(options, internalFactId, outbox, cancellationToken);
             await ProcessAsync(options, publicFactId, outbox, cancellationToken);
+            await PublishBloodAsync(options, fixture.CompetitionId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
             var facts = await verification.GameplayFacts.AsNoTracking()
@@ -515,16 +672,19 @@ public sealed class GameplayFactOrderingPersistenceTests
             var outbox = new RecordingOutbox();
 
             await ProcessAsync(options, factId, outbox, cancellationToken);
+            await PublishBloodAsync(options, fixture.CompetitionId, outbox, cancellationToken);
             await using (var rejudge = new NoCtfDbContext(options))
             {
                 await rejudge.GameplayFacts.Where(fact => fact.Id == factId)
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(fact => fact.State, GameplayFactState.Queued)
+                        .SetProperty(fact => fact.ConcurrencyStamp, Guid.NewGuid())
                         .SetProperty(fact => fact.UpdatedAt, DateTimeOffset.UtcNow),
                         cancellationToken);
             }
 
             await ProcessAsync(options, factId, outbox, cancellationToken);
+            await PublishBloodAsync(options, fixture.CompetitionId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
             var fact = await verification.GameplayFacts.AsNoTracking()
@@ -647,11 +807,40 @@ public sealed class GameplayFactOrderingPersistenceTests
         var processor = new GameplayFactProcessor(
             db,
             evaluatorCatalog ?? new GameModeGameplayFactEvaluatorCatalog(),
-            new GameModeGameplayFactAdmissionPolicy(),
             outbox,
             Substitute.For<ILeaderboardSnapshotFactory>(),
             new CompetitionEventStore(db, outbox));
-        await processor.ProcessAsync(gameplayFactId, cancellationToken);
+        var expectedStamp = await db.GameplayFacts.AsNoTracking().Where(item => item.Id == gameplayFactId)
+            .Select(item => item.ConcurrencyStamp).SingleAsync(cancellationToken);
+        await processor.ProcessAsync(gameplayFactId, expectedStamp, cancellationToken);
+        var completed = await db.GameplayFacts.AsNoTracking().IgnoreAutoIncludes()
+            .SingleAsync(item => item.Id == gameplayFactId, cancellationToken);
+        await using var cleanupDb = new NoCtfDbContext(options);
+        await new StopSolvedChallengeRuntimesHandler(cleanupDb, outbox,
+            new CompetitionEventStore(cleanupDb, outbox), TimeProvider.System)
+            .Handle(new StopSolvedChallengeRuntimes(completed.Id, completed.ConcurrencyStamp), cancellationToken);
+    }
+
+    private static async Task PublishBloodAsync(DbContextOptions<NoCtfDbContext> options,
+        Guid competitionId, RecordingOutbox outgoing, CancellationToken ct)
+    {
+        await using var db = new NoCtfDbContext(options);
+        using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards)
+            .Services.BuildServiceProvider();
+        var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+            new RecordingRefreshPublisher(), services.GetRequiredService<IFusionCacheProvider>());
+        await cache.RefreshAsync(competitionId, ct);
+        var projection = await cache.GetScoreboardAsync(competitionId, ct)
+            ?? throw new InvalidOperationException("Published projection is missing.");
+        await new BloodAnnouncementReconciler(db, new CompetitionEventStore(db, outgoing), outgoing, TimeProvider.System)
+            .ReconcileAsync(projection, ct);
+        await new BloodAnnouncementReconciler(db, new CompetitionEventStore(db, outgoing), outgoing, TimeProvider.System)
+            .ReconcileAsync(projection, ct);
+    }
+
+    private sealed class RecordingRefreshPublisher : ILeaderboardRefreshPublisher
+    {
+        public Task PublishAsync(ScoreboardProjection projection, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private static async Task<Fixture> SeedAsync(

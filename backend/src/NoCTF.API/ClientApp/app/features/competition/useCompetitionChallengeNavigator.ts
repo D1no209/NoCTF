@@ -4,8 +4,8 @@ import { challengeTagOptions, matchesAllTags, tagsFromQuery, uniqueTags } from '
 import { toRefs } from 'vue'
 
 import { ShieldCheck, Swords, Users } from '@lucide/vue'
-import { getMyTeamEndpoint, listChallengesEndpoint } from '../../api'
-import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
+import { listChallengesEndpoint } from '../../api'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { bloodRankLabel } from '../leaderboard/types'
 import { directionGlyph } from '../../utils/directions'
 import { challengeProgressIcon } from './challenge-progress-icon'
@@ -53,7 +53,11 @@ export function affectsCompetitionChallengeList(kind: string): boolean {
     || kind === 'TeamUnbanned'
     || kind === 'TeamBanCorrectionPublished'
     || kind === 'CompetitionUpdated'
-    || kind === 'GameplayFactAdjudicated'
+}
+
+export function affectsCompetitionChallengeProgression(enabled: boolean,
+  fact: Pick<NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse, 'teamId' | 'state'>, teamId: string | null): boolean {
+  return enabled && teamId !== null && fact.teamId === teamId && fact.state === 'Completed'
 }
 
 interface ChallengeBloodMark {
@@ -96,7 +100,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const dataScope = ref<NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
 
-  const myTeamId = ref<string | null>(null)
+  const myTeamId = computed(() => ctx.teamId?.value ?? ctx.standing.value?.teamId ?? null)
 
   const hideSolved = ref(false)
 
@@ -122,17 +126,6 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const board = useScoreboardMatrix(props.competitionId)
 
-  async function loadMyTeam(): Promise<void> {
-    if (!isLoggedIn.value) {
-      myTeamId.value = null
-      return
-    }
-    const { data, error: requestError } = await getMyTeamEndpoint({
-      path: { competitionId: props.competitionId },
-    })
-    myTeamId.value = requestError ? null : data?.id ?? null
-  }
-
   async function loadChallenges(): Promise<void> {
     const { data, error: requestError, response } = await listChallengesEndpoint({
       path: { competitionId: props.competitionId },
@@ -156,17 +149,21 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     unwatch = watchCompetition(props.competitionId, {
       competitionEventChanged: notification => {
         if (affectsCompetitionChallengeList(notification.kind)) {
-          void Promise.all([refreshChallenges(), loadMyTeam()])
+          void refreshChallenges()
         }
+      },
+      gameplayFactStateChanged: fact => {
+        if (affectsCompetitionChallengeProgression(ctx.competition.value?.features?.progressionEnabled === true,
+          fact, myTeamId.value)) void refreshChallenges()
       },
       onReconnected: () => void refreshChallenges(),
     })
-    void Promise.all([refreshChallenges(), loadMyTeam()])
+    void refreshChallenges()
   })
 
   onUnmounted(() => unwatch?.())
 
-  watch(isLoggedIn, () => void loadMyTeam())
+  watch(isLoggedIn, () => void refreshChallenges())
 
 
   const progressByChallenge = computed(() => {

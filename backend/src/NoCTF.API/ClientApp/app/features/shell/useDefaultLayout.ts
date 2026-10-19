@@ -1,8 +1,8 @@
 import { markRaw } from 'vue'
+import { useNavigationCapabilities } from '../../composables/useNavigationCapabilities'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 
 import { Bell, Database, Flag, ShieldAlert, BookOpen, GraduationCap } from '@lucide/vue'
-import { theoryQuestionsList } from '~/api'
 import PlatformGearIconComponent from '../../components/ui/icons/PlatformGearIcon.vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
@@ -84,15 +84,8 @@ export function useDefaultLayout() {
       : undefined
   }
 
-  const theoryBankVisible = ref(false)
-  let theoryPermissionEpoch = 0
-  watch(() => [user.value?.userId, canOrganize.value, route.path], async () => {
-    const epoch = ++theoryPermissionEpoch
-    theoryBankVisible.value = canOrganize.value
-    if (!user.value || canOrganize.value) return
-    const response = await theoryQuestionsList({ query: { offset: 0, limit: 1, desc: true } })
-    if (epoch === theoryPermissionEpoch) theoryBankVisible.value = (response.data?.total ?? 0) > 0
-  }, { immediate: true })
+  const navigation = useNavigationCapabilities()
+  const theoryBankVisible = computed(() => canOrganize.value || navigation.capabilities.value?.canAccessTheoryBank === true)
 
   const navItems = computed(() => [
     { to: '/competitions', label: t("common.label.competitions"), icon: Flag, show: true, unread: false },
@@ -134,7 +127,6 @@ export function useDefaultLayout() {
   )
 
   onBeforeUnmount(() => {
-    theoryPermissionEpoch++
     if (notificationTimer) clearInterval(notificationTimer)
     document.removeEventListener('visibilitychange', refreshWhenVisible)
     window.removeEventListener('focus', refreshWhenVisible)

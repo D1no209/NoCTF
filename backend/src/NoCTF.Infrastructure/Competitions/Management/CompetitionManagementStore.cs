@@ -92,6 +92,7 @@ public sealed class CompetitionManagementStore(
             ActorUserId: command.OwnerId,
             CompetitionStatus: CompetitionStatus.Draft,
             CompetitionAccessMode: command.AccessMode), ct);
+        await outbox.PublishAsync(new NavigationCapabilitiesChanged([command.OwnerId]));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
@@ -215,6 +216,10 @@ public sealed class CompetitionManagementStore(
             return false;
         competition.DeletedAt = deletedAt;
         competition.UpdatedAt = deletedAt;
+        var navigationUsers = await db.Set<CompetitionCollaborator>().AsNoTracking()
+            .Where(item => item.CompetitionId == competition.Id).Select(item => item.UserId).ToArrayAsync(ct);
+        await outbox.PublishAsync(new NavigationCapabilitiesChanged(
+            navigationUsers.Append(competition.OwnerId).Distinct().ToArray()));
         await events.RecordAsync(new(
             competition.Id,
             CompetitionEventKind.CompetitionDeleted,

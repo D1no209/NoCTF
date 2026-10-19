@@ -34,7 +34,7 @@ public sealed class ParticipantChallengeHintStore(NoCtfDbContext db) : IParticip
             .SingleOrDefaultAsync(cancellationToken);
         if (challenge is null)
             return null;
-        var unlocked = teamId is null ? [] : await db.GameplayFacts.AsNoTracking()
+        var unlocked = teamId is null || challenge.Hints.Length == 0 ? [] : await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && fact.CompetitionChallengeId == competitionChallengeId && fact.TeamId == teamId
                 && fact.Kind == GameplayFactKind.HintUnlock && fact.ReferenceKind == GameplayFactReferenceKind.Hint

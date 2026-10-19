@@ -13,6 +13,7 @@ public abstract class Competition : IConcurrencyTracked
     protected Competition(GameMode mode) => Mode = mode;
     public Guid Id { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
+    public Guid ScoreboardAccessRevision { get; set; } = Guid.NewGuid();
     [MaxLength(160)]
     public string Title { get; set; } = string.Empty;
     [MaxLength(160)]

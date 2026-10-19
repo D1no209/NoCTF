@@ -126,25 +126,6 @@ public sealed partial class InternalResultStore(
         fact.FailureCode = decision.FailureCode;
         fact.UpdatedAt = resolvedAt;
         runtime.State = RuntimeState.Stopping;
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        var bloodAward = context.Mode == GameMode.Ctf
-                && decision.Result == GameplayFactResult.Correct
-            ? await TryCreateCtfPatchBloodAwardAsync(fact, resolvedAt, ct)
-            : null;
-        var bloodVisibility = bloodAward is null
-            ? (CompetitionLeaderboardVisibility?)null
-            : CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                context.FrozenStartAt,
-                context.HiddenStartAt,
-                bloodAward.OccurredAt);
-        var announceBlood = bloodAward is not null
-            && bloodVisibility != CompetitionLeaderboardVisibility.Blackout
-            && CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
-                context.FrozenStartAt,
-                context.HiddenStartAt,
-                resolvedAt);
-        if (announceBlood && bloodAward is not null)
-            await outbox.PublishAsync(bloodAward);
         if (context.Mode == GameMode.Ctf
             && NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(decision.Result, fact.TimeEligibility))
         {
@@ -197,30 +178,6 @@ public sealed partial class InternalResultStore(
             GameplayFactState: fact.State,
             GameplayFactResult: fact.Result,
             RuntimeState: runtime.State), ct);
-        if (announceBlood && bloodAward is not null)
-        {
-            var bloodKind = bloodAward.BloodRank switch
-            {
-                LeaderboardBloodRank.First => CompetitionEventKind.FirstBloodAwarded,
-                LeaderboardBloodRank.Second => CompetitionEventKind.SecondBloodAwarded,
-                LeaderboardBloodRank.Third => CompetitionEventKind.ThirdBloodAwarded,
-                _ => throw new InvalidOperationException("Unsupported leaderboard blood rank.")
-            };
-            await events.RecordAsync(new(
-                fact.CompetitionId,
-                bloodKind,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Public,
-                resolvedAt,
-                TeamId: fact.TeamId,
-                CompetitionChallengeId: fact.CompetitionChallengeId!.Value,
-                GameplayFactId: fact.Id,
-                GameplayFactKind: fact.Kind,
-                GameplayFactResult: fact.Result,
-                LeaderboardVisibility: bloodVisibility,
-                FrozenStartAt: context.FrozenStartAt,
-                ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), ct);
-        }
         if (context.Mode == GameMode.Awdp)
         {
             await events.RecordAsync(new(
@@ -259,33 +216,14 @@ public sealed partial class InternalResultStore(
             runtime.RunnerId
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner."),
             resolvedAt));
-        await QueueNextAwdpFixAttemptAsync(fact, ct);
         if (context.Mode == GameMode.Ctf)
             await (progressionReconciler ?? new ProgressionReconciler(db))
                 .ReconcileCompletedFactAsync(fact, resolvedAt, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return InternalResultDisposition.Applied;
-    }
-
-    private async Task QueueNextAwdpFixAttemptAsync(
-        GameplayFact completed,
-        CancellationToken ct)
-    {
-        var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
-            .Where(candidate =>
-                candidate.CompetitionId == completed.CompetitionId
-                && candidate.CompetitionChallengeId == completed.CompetitionChallengeId
-                && candidate.TeamId == completed.TeamId
-                && candidate.Kind == GameplayFactKind.FixAttempt
-                && candidate.State == GameplayFactState.Queued)
-            .OrderBy(candidate => candidate.OccurredAt)
-            .ThenBy(candidate => candidate.Id)
-            .Select(candidate => (Guid?)candidate.Id)
-            .FirstOrDefaultAsync(ct);
-        if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7()));
     }
 
     private static DateTimeOffset ToPostgresPrecision(DateTimeOffset value) =>
@@ -297,101 +235,4 @@ public sealed partial class InternalResultStore(
         return new(decision.Result, decision.FailureCode);
     }
 
-    private async Task<BloodAwarded?> TryCreateCtfPatchBloodAwardAsync(
-        GameplayFact fact,
-        DateTimeOffset resolvedAt,
-        CancellationToken ct)
-    {
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == fact.CompetitionId)
-            .Select(item => new
-            {
-                item.Mode,
-                item.StartAt,
-                item.EndAt,
-                item.TracksEnabled,
-                item.Tracks
-            })
-            .SingleAsync(ct);
-        if (competition.Mode != GameMode.Ctf)
-            return null;
-        var officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
-            db,
-            fact.CompetitionId,
-            competition.StartAt,
-            competition.EndAt,
-            ct);
-        if (!officialWindow.Contains(fact.OccurredAt))
-            return null;
-        var tracks = CompetitionTrackConfiguration.EffectiveFor(
-            competition.Mode,
-            competition.TracksEnabled,
-            competition.Tracks);
-        var currentTrackKey = await db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams)
-            .Where(team => team.Id == fact.TeamId)
-            .Select(team => team.TrackKey)
-            .SingleOrDefaultAsync(ct);
-        if (currentTrackKey is null) return null;
-        var currentTrack = CtfCompletionEligibility.Track(tracks, currentTrackKey);
-        if (currentTrack?.EarnsBlood != true)
-            return null;
-        if (await db.WriteUpUnlockReceipts.AsNoTracking().AnyAsync(x => x.TeamId == fact.TeamId
-            && x.CompetitionChallengeId == fact.CompetitionChallengeId && x.UnlockedAt <= fact.OccurredAt, ct)) return null;
-        var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
-            .Select(track => track.Key.ToLowerInvariant())
-            .ToArray();
-        var timing = await db.CompetitionChallenges.AsNoTracking()
-            .Where(x => x.Id == fact.CompetitionChallengeId)
-            .Select(x => new { x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt }).SingleAsync(ct);
-        var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
-            .Where(CtfCompletionEligibility.Before(fact.OccurredAt, fact.Id))
-            .Where(candidate => !db.WriteUpUnlockReceipts.Any(x => x.TeamId == candidate.TeamId
-                && x.CompetitionChallengeId == candidate.CompetitionChallengeId && x.UnlockedAt <= candidate.OccurredAt))
-            .Where(candidate => candidate.CompetitionId == fact.CompetitionId
-                && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
-                && candidate.Kind == GameplayFactKind.FixAttempt
-                && (candidate.Result == GameplayFactResult.Correct || candidate.Result == GameplayFactResult.RightButDue)
-                && (timing.AutoOpenAt == null || candidate.OccurredAt >= timing.AutoOpenAt)
-                && (timing.ScoringEndsAt == null || candidate.OccurredAt < timing.ScoringEndsAt)
-                && (timing.SubmissionDeadlineAt == null || candidate.OccurredAt < timing.SubmissionDeadlineAt)
-                && candidate.OccurredAt >= officialWindow.StartAt
-                && candidate.OccurredAt < officialWindow.EndAt
-                && candidate.Id != fact.Id)
-            .Join(
-                db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams).Where(team => (!competition.TracksEnabled
-                        || bloodTrackKeys.Contains(team.TrackKey))
-                    && team.RegisteredAt < officialWindow.EndAt),
-                candidate => candidate.TeamId,
-                team => (Guid?)team.Id,
-                (candidate, _) => candidate.TeamId!.Value)
-            .Distinct()
-            .ToArrayAsync(ct);
-        if (fact.TeamId is Guid teamId && solvedTeamIds.Contains(teamId)
-            || solvedTeamIds.Length >= 3)
-            return null;
-        var context = await db.CompetitionChallenges.AsNoTracking()
-            .Where(challenge => challenge.Id == fact.CompetitionChallengeId)
-            .Join(
-                db.Challenges.AsNoTracking(),
-                challenge => challenge.ChallengeId,
-                template => template.Id,
-                (challenge, template) => new
-                {
-                    Title = challenge.CustomTitle ?? template.Title
-                })
-            .Join(
-                db.Teams.AsNoTracking().Where(team => team.Id == fact.TeamId),
-                _ => fact.TeamId,
-                team => team.Id,
-                (challenge, team) => new { challenge.Title, TeamName = team.Name })
-            .SingleAsync(ct);
-        return new BloodAwarded(
-            fact.CompetitionId,
-            fact.CompetitionChallengeId!.Value,
-            context.Title,
-            (LeaderboardBloodRank)(solvedTeamIds.Length + 1),
-            fact.TeamId!.Value,
-            context.TeamName,
-            resolvedAt);
-    }
 }

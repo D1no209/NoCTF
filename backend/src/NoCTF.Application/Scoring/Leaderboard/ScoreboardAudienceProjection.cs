@@ -56,6 +56,47 @@ public static class ScoreboardAudienceProjection
         };
     }
 
+    public static ScoreboardProjection FilterCurrentAccess(ScoreboardProjection projection,
+        IReadOnlySet<Guid> challengeIds, IReadOnlyDictionary<Guid, string> teamTracks)
+    {
+        var teamIds = teamTracks.Keys.ToHashSet();
+        projection = ForPublishedChallenges(projection);
+        var challenges = projection.ChallengeCatalog.Challenges.Where(item => challengeIds.Contains(item.CompetitionChallengeId)).ToArray();
+        var columns = projection.Schema.Columns.Where(item => challengeIds.Contains(item.CompetitionChallengeId)).ToArray();
+        var indexes = columns.Select(item => item.Index).ToHashSet();
+        var catalogRevision = StableRevision(challenges.Select(item => $"{projection.ChallengeCatalog.Revision}:{item.CompetitionChallengeId:N}"));
+        var schemaRevision = ScoreboardRevision.ForSchema(projection.Schema.Rounds, columns);
+        var teams = projection.Snapshot.Teams.Where(team => teamIds.Contains(team.TeamId)).Select(team => team with
+        {
+            TrackKey = teamTracks[team.TeamId],
+            Slots = team.Slots.Where(slot => indexes.Contains(slot.ColumnIndex)).ToArray(),
+            ChallengeBenefits = team.ChallengeBenefits.Where(item => challengeIds.Contains(item.CompetitionChallengeId)).ToArray()
+        }).ToArray();
+        var actorIndexes = teams.SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
+            .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
+            .Where(index => index.HasValue).Select(index => index!.Value).ToHashSet();
+        int? VisibleActor(int? index) => index is int value && actorIndexes.Contains(value) ? value : null;
+        Guid? VisibleTeam(Guid? id) => id is Guid value && teamIds.Contains(value) ? value : null;
+        return projection with
+        {
+            ChallengeCatalog = projection.ChallengeCatalog with { Revision = catalogRevision, Challenges = challenges },
+            Schema = projection.Schema with { Revision = schemaRevision, ChallengeCatalogRevision = catalogRevision, Columns = columns },
+            Snapshot = projection.Snapshot with
+            {
+                SchemaRevision = schemaRevision,
+                Actors = projection.Snapshot.Actors.Where(actor => actorIndexes.Contains(actor.Index)).ToArray(),
+                Teams = teams.Select(team => team with
+                {
+                    Slots = team.Slots.Select(slot => slot with { Entries = slot.Entries.Select(entry => entry with
+                        { ActorIndex = VisibleActor(entry.ActorIndex), TargetTeamId = VisibleTeam(entry.TargetTeamId) }).ToArray() }).ToArray()
+                }).ToArray(),
+                CurrentChallengeScores = projection.Snapshot.CurrentChallengeScores.Where(item => challengeIds.Contains(item.CompetitionChallengeId)).ToArray()
+            },
+            EntryAllocations = projection.EntryAllocations.Where(item => teamIds.Contains(item.TeamId) && indexes.Contains(item.ColumnIndex)).ToArray(),
+            ParticipantView = null
+        };
+    }
+
     public static ScoreboardProjection FilterTracks(
         ScoreboardProjection projection,
         CompetitionTracksView tracks,

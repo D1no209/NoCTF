@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
+using System.Diagnostics.Tracing;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Gameplay;
@@ -8,6 +9,60 @@ namespace NoCTF.Tests.Unit.Application.Observability;
 
 public sealed class NoCtfTelemetryTests
 {
+    [Test]
+    public async Task Performance_events_can_be_enabled_and_preserve_request_correlation()
+    {
+        using var listener = new PerformanceEventListener();
+        var traceId = System.Diagnostics.ActivityTraceId.CreateRandom().ToString();
+        PerformanceEvents.Log.RequestCompleted(traceId, "/performance-test", "success", 0.01);
+        PerformanceEvents.Log.StageCompleted(traceId, "Leaderboard", "KeyedLockWait", 0.005);
+        var errors = listener.Events.Where(item => item.EventId == 0)
+            .Select(item => string.Join(" ", item.Payload?.Select(value => value?.ToString()) ?? []));
+        await Assert.That(string.Join("; ", errors)).IsEqualTo(string.Empty);
+        await Assert.That(listener.Events.Any(item => item.EventId == 1 && item.Payload?[0]?.ToString() == traceId)).IsTrue();
+        await Assert.That(listener.Events.Any(item => item.EventId == 2 && item.Payload?[0]?.ToString() == traceId)).IsTrue();
+    }
+
+    private sealed class PerformanceEventListener : EventListener
+    {
+        public ConcurrentBag<EventWrittenEventArgs> Events { get; } = [];
+        public PerformanceEventListener() => EnableEvents(PerformanceEvents.Log, EventLevel.Informational, EventKeywords.All);
+        protected override void OnEventWritten(EventWrittenEventArgs eventData) => Events.Add(eventData);
+    }
+
+    [Test]
+    public async Task Performance_measurements_export_bounded_stages_and_transaction_failures()
+    {
+        var stages = new ConcurrentBag<(string Area, string Stage)>();
+        var failures = new ConcurrentBag<(string Outcome, string Failure)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName
+                && instrument.Name is "noctf.performance.stage.duration" or "noctf.admission.transactions")
+                meterListener.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<double>((_, duration, tags, _) =>
+        {
+            if (duration < 0) throw new InvalidOperationException("Performance duration must be nonnegative.");
+            var values = tags.ToArray();
+            stages.Add((values.Single(tag => tag.Key == "area").Value!.ToString()!,
+                values.Single(tag => tag.Key == "stage").Value!.ToString()!));
+        });
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            var values = tags.ToArray();
+            failures.Add((values.Single(tag => tag.Key == "outcome").Value!.ToString()!,
+                values.Single(tag => tag.Key == "failure").Value!.ToString()!));
+        });
+        listener.Start();
+        using (NoCtfTelemetry.MeasureAdmission(AdmissionPerformanceStage.AcquireAttempt)) { }
+        using (NoCtfTelemetry.MeasureLeaderboardRead(LeaderboardReadPerformanceStage.KeyedLockWait)) { }
+        NoCtfTelemetry.RecordAdmissionTransaction(AdmissionDiagnosticOutcome.Retry, AdmissionDiagnosticFailure.Serialization);
+        await Assert.That(stages).IsEquivalentTo([("Admission", "AcquireAttempt"), ("Leaderboard", "KeyedLockWait")]);
+        await Assert.That(failures).IsEquivalentTo([("Retry", "Serialization")]);
+    }
+
     [Test]
     public async Task Webhook_materialization_race_is_counted_without_dynamic_labels()
     {

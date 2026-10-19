@@ -15400,6 +15400,39 @@
         ]
       }
     },
+    "/api/v1/auth/navigation-capabilities": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get the current user's navigation capabilities.",
+        "description": "Executes GET /api/v1/auth/navigation-capabilities.",
+        "operationId": "GetNavigationCapabilitiesEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationNavigationCapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/sso/flows/{flowId}": {
       "get": {
         "tags": [
@@ -43857,6 +43890,18 @@
           },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationNavigationCapabilitiesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "canAccessTheoryBank": {
+            "type": "boolean"
+          },
+          "hasManagedCompetitions": {
+            "type": "boolean"
           }
         }
       },

@@ -17,11 +17,11 @@ public static class CompetitionNotificationMessageHandlers
     public static async Task Handle(
         BloodAwarded message,
         CompetitionNotificationDelivery delivery,
-        ILeaderboardSnapshotFactory projections,
+        ILeaderboardCache projections,
         TimeProvider clock,
         CancellationToken ct)
     {
-        if (!await new ConfirmCurrentBloodAward(projections, clock).ExecuteAsync(message, ct)) return;
+        if (!await new ConfirmCurrentBloodAward(projections).ExecuteAsync(message, ct)) return;
         await delivery.DeliverAsync(
             message.CompetitionId,
             message.CompetitionChallengeId,

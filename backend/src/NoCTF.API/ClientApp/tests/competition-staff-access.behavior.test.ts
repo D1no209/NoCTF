@@ -209,7 +209,10 @@ describe('staff competition discovery', () => {
   const managedDraft = { id: 'draft', status: 'Draft' as const, administrationRole: 'Manager' as const }
   async function browser(session: ReturnType<typeof auth>, list: () => Promise<any>) {
     const calls: any[] = []
+    const capabilities = computed(() => ({ canAccessTheoryBank: false,
+      hasManagedCompetitions: session.user.value?.userId === 'staff' }))
     const app = await controller('features/routes/competitions/useCompetitionsIndexPage.ts', 'useCompetitionsIndexPage', {
+      useNavigationCapabilities: () => ({ capabilities, refresh: async () => {} }),
       useAuth: () => session, useRoute: () => ({ params: { id: 'draft' }, query: {} }), useRouter: () => ({ push: () => {}, replace: () => {} }),
       resolveCompetitionBrowser, competitionPath, competitionsPath,
       listCompetitionsEndpoint: async () => ({ data: { items: [publicContest] } }),
@@ -243,7 +246,17 @@ describe('staff competition discovery', () => {
       expect(app.state.missing.value).toBe(true)
       session.isLoggedIn.value = false; session.user.value = null
       await drain()
-      expect(app.calls).toHaveLength(2)
+      expect(app.calls).toHaveLength(1)
+    } finally { app.stop() }
+  })
+  test('a participant with no managed competitions only reads the public catalog', async () => {
+    const session = auth()
+    session.user.value = { userId: 'participant' }
+    const app = await browser(session, async () => ({ data: { items: [] } }))
+    try {
+      await drain()
+      expect(app.calls).toHaveLength(0)
+      expect(app.state.counts.value.running).toBe(1)
     } finally { app.stop() }
   })
 })

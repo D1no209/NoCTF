@@ -33,8 +33,10 @@ public sealed class NatsNotificationChangeRelay(
 
                 var users = await audienceResolver.ResolveAsync(change.Audiences, stoppingToken);
                 if (users.Count == 0) continue;
-                await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), stoppingToken))
-                    .NotificationChanged(stoppingToken);
+                var clients = hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), stoppingToken));
+                if (change.Kind == NotificationChangeKind.NavigationCapabilities)
+                    await clients.NavigationCapabilitiesChanged(stoppingToken);
+                else await clients.NotificationChanged(stoppingToken);
                 NoCtfTelemetry.RecordSignalRPublish(
                     "notifications", "success",
                     Stopwatch.GetElapsedTime(started).TotalSeconds);

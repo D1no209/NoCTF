@@ -111,7 +111,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const { submissionsClosed, judgementOnly } = useSubmissionTiming(() => props.timing, () => props.practice)
   const inputDisabled = computed(() => props.completion === 'Break' && solved.value
-    && !props.readOnlyJudgement && !judgementOnly.value || attemptsExhausted.value || submissionsClosed.value)
+    && !props.readOnlyJudgement && !judgementOnly.value || submissionsClosed.value)
 
   function showResult(correct: boolean, message: UiMessage): void {
     persistentResult.value = { correct, message }
@@ -133,7 +133,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       await refreshPending()
       return !tracked.value.some((t) => isGameplayFactPending(t.state))
     },
-    { interval: 1500, delays: [350, 1500], timeout: 120_000 },
+    { interval: 1500, delays: [350, 1500], timeout: 30_000 },
   )
 
   const pollingErrorMessage = computed(() => pollingError.value

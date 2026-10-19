@@ -53,6 +53,14 @@ export function shouldRestoreRequestedRoundWindow(outcome: ScoreboardRefreshOutc
   return outcome === 'failed'
 }
 
+export function canReplaceScoreboardSnapshot(
+  candidate: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  current: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+): boolean {
+  return candidate !== null && isScoreboardVersionAtLeast(candidate.version,
+    candidate.dataScope === current?.dataScope ? current?.version : null)
+}
+
 export function isCoherentScoreboardBundle(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
   schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,

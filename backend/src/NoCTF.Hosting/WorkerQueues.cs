@@ -18,6 +18,7 @@ public static class WorkerQueues
     public const string Projection = WorkerQueueNames.Projection;
     public const string Background = WorkerQueueNames.Background;
     public const string Webhook = WorkerQueueNames.Webhook;
+    public const string Notifications = WorkerQueueNames.Notifications;
     public const string LiveSoloMedia = WorkerQueueNames.LiveSoloMedia;
 
     public static IReadOnlyList<WorkerQueue> All => WorkerQueueNames.All;
@@ -48,7 +49,7 @@ public static class WorkerQueues
             if (!TryParse(value, out var queue))
             {
                 throw new InvalidOperationException(
-                    $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, webhook, livesolo-media, all.");
+                $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, webhook, notifications, livesolo-media, all.");
             }
 
             if (!queues.Contains(queue))
@@ -69,6 +70,7 @@ public static class WorkerQueues
             WorkerQueue.Projection => 2,
             WorkerQueue.Background => 2,
             WorkerQueue.Webhook => 32,
+            WorkerQueue.Notifications => 4,
             WorkerQueue.LiveSoloMedia => 4,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
@@ -86,6 +88,12 @@ public static class WorkerQueues
 
     private static bool TryParse(string value, out WorkerQueue queue)
     {
+        if (value.Equals("notifications", StringComparison.OrdinalIgnoreCase)
+            || value.Equals(Notifications, StringComparison.OrdinalIgnoreCase))
+        {
+            queue = WorkerQueue.Notifications;
+            return true;
+        }
         if (value.Equals("control", StringComparison.OrdinalIgnoreCase)
             || value.Equals(Control, StringComparison.OrdinalIgnoreCase))
         {

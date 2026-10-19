@@ -129,12 +129,12 @@ public sealed partial class InternalResultStore
             CompetitionChallengeId: fact.CompetitionChallengeId, RuntimeInstanceId: result.RuntimeInstanceId,
             GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State,
             GameplayFactResult: fact.Result), ct);
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
         if (details.Settlement == AwdSettlementState.Provisional)
             await outbox.ScheduleAsync(new DispatchAwdCheckers(result.ReceivedAt.AddSeconds(rules.Options.RetryIntervalSeconds)),
                 result.ReceivedAt.AddSeconds(rules.Options.RetryIntervalSeconds));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return InternalResultDisposition.Applied;
     }

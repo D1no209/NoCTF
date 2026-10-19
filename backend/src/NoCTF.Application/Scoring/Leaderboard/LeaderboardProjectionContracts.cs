@@ -24,11 +24,9 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<AwdRoundScoreProjection>? AwdRoundScores = null,
     long? AwdMinimumTotalScore = null,
     IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdTieBreakCriterion>? AwdTieBreakers = null,
-    IReadOnlyList<LeaderboardTheoryScore>? TheoryScores = null,
-    IReadOnlyList<TheoryProjectionReceipt>? TheoryReceipts = null);
+    IReadOnlyList<LeaderboardTheoryScore>? TheoryScores = null);
 
 public sealed record LeaderboardTheoryScore(Guid TeamId, long Points, DateTimeOffset? AchievedAt, bool HasSubmission);
-public sealed record TheoryProjectionReceipt(Guid FactId, Guid ConcurrencyStamp);
 
 public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
     int DeductionPercent, DateTimeOffset UnlockedAt);

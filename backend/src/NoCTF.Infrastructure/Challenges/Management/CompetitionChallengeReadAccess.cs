@@ -22,14 +22,6 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
         if (userId == Guid.Empty)
             return null;
 
-        var identity = await db.Users.AsNoTracking()
-            .Where(user => user.Id == userId
-                && user.AccountStatus == UserAccountStatus.Active)
-            .Select(user => new { user.Role })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (identity is null)
-            return null;
-
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId)
             .Select(item => new
@@ -42,10 +34,18 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
                 item.DeletedAt,
                 item.FrozenStartAt,
                 item.HiddenStartAt,
-                IsCollaborator = item.Collaborators.Any(collaborator => collaborator.UserId == userId)
+                IsCollaborator = item.Collaborators.Any(collaborator => collaborator.UserId == userId),
+                UserRole = db.Users.Where(user => user.Id == userId
+                    && user.AccountStatus == UserAccountStatus.Active)
+                    .Select(user => (UserRole?)user.Role).SingleOrDefault(),
+                TeamId = db.Teams.Where(team => team.CompetitionId == competitionId
+                    && !team.IsBanned
+                    && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                    && team.Members.Any(member => member.UserId == userId))
+                    .Select(team => (Guid?)team.Id).SingleOrDefault()
             })
             .SingleOrDefaultAsync(cancellationToken);
-        if (competition is null)
+        if (competition?.UserRole is not UserRole role)
             return null;
         // Scoped modes expose live resources through their own authorized execution context.
         // Post-event writeup/catalog access retains the ordinary participant qualification.
@@ -53,7 +53,7 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
             && competition.Status != CompetitionStatus.Finished)
             return null;
 
-        var isStaff = identity.Role == UserRole.Administrator
+        var isStaff = role == UserRole.Administrator
             || competition.OwnerId == userId
             || competition.IsCollaborator;
         if ((competition.Status == CompetitionStatus.Draft
@@ -61,16 +61,9 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
             && !isStaff)
             return null;
 
-        var team = await db.Teams.AsNoTracking()
-            .Where(team => team.CompetitionId == competitionId
-                && !team.IsBanned
-                && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                && team.Members.Any(member => member.UserId == userId))
-            .Select(team => new { team.Id, team.DeletedAt })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (identity.Role != UserRole.Administrator
+        if (role != UserRole.Administrator
             && !(competition.DeletedAt is null && isStaff)
-            && (team is null || team.DeletedAt is not null))
+            && competition.TeamId is null)
             return null;
 
         var visibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
@@ -89,6 +82,6 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
             competition.Status,
             visibility,
             scope,
-            competition.TracksEnabled), team?.Id);
+            competition.TracksEnabled), competition.TeamId);
     }
 }

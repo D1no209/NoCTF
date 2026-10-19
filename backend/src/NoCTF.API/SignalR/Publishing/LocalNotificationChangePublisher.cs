@@ -18,7 +18,9 @@ public sealed class LocalNotificationChangePublisher(
     {
         var users = await audienceResolver.ResolveAsync(change.Audiences, cancellationToken);
         if (users.Count == 0) return;
-        await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), cancellationToken))
-            .NotificationChanged(cancellationToken);
+        var clients = hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), cancellationToken));
+        if (change.Kind == NotificationChangeKind.NavigationCapabilities)
+            await clients.NavigationCapabilitiesChanged(cancellationToken);
+        else await clients.NotificationChanged(cancellationToken);
     }
 }

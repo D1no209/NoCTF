@@ -32,30 +32,33 @@ public static class PipelineConfiguration
         if (serviceCatalog?.IsService(typeof(NoCTF.Application.Admission.IHumanVerificationVerifier)) == true)
             app.UseMiddleware<Security.HumanVerificationMiddleware>();
         app.UseMiddleware<SpaDocumentMetadataMiddleware>();
+        if (serviceCatalog?.IsService(typeof(Microsoft.AspNetCore.OutputCaching.IOutputCacheStore)) == true)
+            app.UseOutputCache();
+        app.UseWhen(context => context.Request.Path.StartsWithSegments("/api"), branch => branch.UseResponseCompression());
         return app;
     }
 
     public static WebApplication UseNoCtfStaticAssetDelivery(this WebApplication app)
     {
-        app.UseResponseCompression();
-        app.UseStaticFiles(new StaticFileOptions
+        app.UseWhen(context => !context.Request.Path.StartsWithSegments("/api"), branch =>
         {
-            OnPrepareResponse = context =>
+            branch.UseResponseCompression();
+            branch.UseStaticFiles(new StaticFileOptions
             {
-                var path = context.Context.Request.Path;
-                if (path.StartsWithSegments("/_nuxt"))
+                OnPrepareResponse = context =>
                 {
-                    context.Context.Response.Headers.CacheControl =
-                        "public,max-age=31536000,immutable";
+                    var path = context.Context.Request.Path;
+                    if (path.StartsWithSegments("/_nuxt"))
+                    {
+                        context.Context.Response.Headers.CacheControl =
+                            "public,max-age=31536000,immutable";
+                    }
+                    else if (string.Equals(context.File.Name, "index.html", StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.Context.Response.Headers.CacheControl = "no-cache";
+                    }
                 }
-                else if (string.Equals(
-                    context.File.Name,
-                    "index.html",
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    context.Context.Response.Headers.CacheControl = "no-cache";
-                }
-            }
+            });
         });
         return app;
     }

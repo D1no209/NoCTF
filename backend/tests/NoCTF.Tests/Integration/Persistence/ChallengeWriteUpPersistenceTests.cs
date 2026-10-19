@@ -186,6 +186,8 @@ public sealed class ChallengeWriteUpPersistenceTests
             db.ChangeTracker.Clear();
             await Assert.That(await db.WriteUpUnlockReceipts.CountAsync(ct)).IsEqualTo(1);
             await Assert.That(await db.GameplayFacts.CountAsync(x => x.Kind == GameplayFactKind.WriteUpUnlock, ct)).IsEqualTo(1);
+            await Assert.That(await db.GameplayFacts.Where(x => x.Kind == GameplayFactKind.WriteUpUnlock)
+                .Select(x => x.State).SingleAsync(ct)).IsEqualTo(GameplayFactState.Completed);
             await Assert.That((await store.ReadContentAsync(a.Id, second.Id, two.PublishedVersionId.Value, reader.Id, false, now, ct)).Failure).IsEqualTo(ChallengeWriteUpFailure.Forbidden);
             db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = a.Id,
                 CompetitionChallengeId = first.Id, TeamId = readerA.Id, ActorUserId = reader.Id, State = GameplayFactState.Completed,

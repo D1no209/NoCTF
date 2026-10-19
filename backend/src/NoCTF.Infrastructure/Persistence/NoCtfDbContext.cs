@@ -112,6 +112,7 @@ public sealed class NoCtfDbContext(
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
     public DbSet<GameplayFact> GameplayFacts => Set<GameplayFact>();
+    public DbSet<NoCTF.Domain.Competitions.Blood.BloodAnnouncement> BloodAnnouncements => Set<NoCTF.Domain.Competitions.Blood.BloodAnnouncement>();
     public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp> ChallengeWriteUps => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp>();
     public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion> ChallengeWriteUpVersions => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion>();
     public DbSet<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt> WriteUpUnlockReceipts => Set<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>();
@@ -175,8 +176,34 @@ public sealed class NoCtfDbContext(
         CancellationToken cancellationToken = default)
     {
         var changed = StaffWebhookEventCapture.ChangedCompetitions(this);
-        await using var transaction = changed.Length != 0 && Database.IsRelational() && Database.CurrentTransaction is null
+        var accessChanges = ChangeTracker.Entries<CompetitionEvent>()
+            .Where(entry => entry.State == EntityState.Added && ScoreboardChangePolicy.ChangesAccess(entry.Entity.Kind))
+            .Select(entry => entry.Entity.CompetitionId)
+            .Concat(ChangeTracker.Entries<CompetitionChallenge>().Where(entry => entry.State == EntityState.Modified
+                && (entry.Property(item => item.IsPublished).IsModified || entry.Property(item => item.TimingRevision).IsModified))
+                .Select(entry => entry.Entity.CompetitionId))
+            .Concat(ChangeTracker.Entries<Team>().Where(entry => entry.State == EntityState.Modified
+                && (entry.Property(item => item.IsBanned).IsModified || entry.Property(item => item.RegistrationStatus).IsModified
+                    || entry.Property(item => item.DeletedAt).IsModified || entry.Property(item => item.TrackKey).IsModified))
+                .Select(entry => entry.Entity.CompetitionId))
+            .Concat(ChangeTracker.Entries<Competition>().Where(entry => entry.State == EntityState.Modified
+                && entry.Properties.Any(property => property.IsModified
+                    && property.Metadata.Name != nameof(Competition.ConcurrencyStamp)
+                    && property.Metadata.Name != nameof(Competition.ScoreboardAccessRevision)))
+                .Select(entry => entry.Entity.Id))
+            .Distinct().ToArray();
+        await using var transaction = (changed.Length != 0 || accessChanges.Length != 0) && Database.IsRelational() && Database.CurrentTransaction is null
             ? await Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
+        if (accessChanges.Length != 0)
+        {
+            var revision = Guid.NewGuid();
+            var tracked = ChangeTracker.Entries<Competition>().Where(entry => accessChanges.Contains(entry.Entity.Id)).ToArray();
+            foreach (var entry in tracked) entry.Entity.ScoreboardAccessRevision = revision;
+            var untracked = accessChanges.Except(tracked.Select(entry => entry.Entity.Id)).ToArray();
+            if (untracked.Length != 0)
+                await Competitions.Where(item => untracked.Contains(item.Id)).ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.ScoreboardAccessRevision, revision), cancellationToken);
+        }
         if (changed.Length != 0)
             await StaffWebhookEventCapture.CaptureAsync(this, changed, timeProvider.GetUtcNow(), cancellationToken);
         EnsureAppendOnlyFacts();
@@ -186,6 +213,15 @@ public sealed class NoCtfDbContext(
     }
 
     private void EnsureAppendOnlyFacts()
+    {
+        var automaticDetection = ChangeTracker.AutoDetectChangesEnabled;
+        if (automaticDetection) ChangeTracker.DetectChanges();
+        ChangeTracker.AutoDetectChangesEnabled = false;
+        try { EnsureAppendOnlyFactsCore(automaticDetection); }
+        finally { ChangeTracker.AutoDetectChangesEnabled = automaticDetection; }
+    }
+
+    private void EnsureAppendOnlyFactsCore(bool detectSynchronizedChanges)
     {
         NoCTF.Infrastructure.Theory.TheoryPersistenceInvariants.Validate(ChangeTracker);
         foreach (var entry in ChangeTracker.Entries<GameplayFact>().Where(entry => entry.State is EntityState.Added or EntityState.Modified))
@@ -203,6 +239,8 @@ public sealed class NoCtfDbContext(
         SynchronizeChallengeFlagIdentities();
         SynchronizeSsoProviderChildren();
         ValidateExternalIdentities();
+        // 同步过程可能创建关联记录；检查这些更改一次，后续只读验证共享结果。
+        if (detectSynchronizedChanges) ChangeTracker.DetectChanges();
         foreach (var entry in ChangeTracker.Entries<IConcurrencyTracked>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
         {

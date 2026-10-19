@@ -1,9 +1,16 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { challengeProgressIcon } from '../app/features/competition/challenge-progress-icon'
-import { affectsCompetitionChallengeList, isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
+import { affectsCompetitionChallengeList, affectsCompetitionChallengeProgression, isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
 
 describe('participant challenge progress', () => {
+  test('score notifications use the shared snapshot and progression only reloads for the current team', () => {
+    expect(affectsCompetitionChallengeList('GameplayFactAdjudicated')).toBeFalse()
+    expect(affectsCompetitionChallengeProgression(false, { teamId: 'current', state: 'Completed' }, 'current')).toBeFalse()
+    expect(affectsCompetitionChallengeProgression(true, { teamId: 'another', state: 'Completed' }, 'current')).toBeFalse()
+    expect(affectsCompetitionChallengeProgression(true, { teamId: 'current', state: 'Queued' }, 'current')).toBeFalse()
+    expect(affectsCompetitionChallengeProgression(true, { teamId: 'current', state: 'Completed' }, 'current')).toBeTrue()
+  })
   test('shows solve counts and a color-independent solved marker', async () => {
     const navigator = await sourceFile(
       new URL('../app/features/competition/CompetitionChallengeNavigator.vue', import.meta.url),

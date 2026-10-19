@@ -266,7 +266,7 @@ public sealed class TheoryPaperStore(NoCtfDbContext db, IPostCommitMessagePublis
         {
             if (changed)
             {
-                existing.State = GameplayFactState.Queued; existing.UpdatedAt = now;
+                existing.State = GameplayFactState.Completed; existing.UpdatedAt = now;
                 changedCompetitions.Add(access.Competition.Id);
             }
             return;
@@ -275,7 +275,7 @@ public sealed class TheoryPaperStore(NoCtfDbContext db, IPostCommitMessagePublis
         {
             Id = Guid.CreateVersion7(now), CompetitionId = access.Competition.Id, TheoryPaperId = paper.Id,
             TeamId = participant.TeamId, ActorUserId = paper.SubmittedById, OccurredAt = paper.SubmittedAt!.Value,
-            UpdatedAt = now, State = GameplayFactState.Queued, Result = GameplayFactResult.Applied
+            UpdatedAt = now, State = GameplayFactState.Completed, Result = GameplayFactResult.Applied
         });
         changedCompetitions.Add(access.Competition.Id);
     }

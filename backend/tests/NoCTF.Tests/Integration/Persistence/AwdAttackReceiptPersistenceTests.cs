@@ -64,7 +64,7 @@ public sealed partial class AwdRoundCoordinationTests
             {
                 await using var intakeDb = new NoCtfDbContext(options);
                 var intake = new GameplayFactIntakeStore(intakeDb, new RecordingOutbox(),
-                    new GameplayFactAttemptCriticalSection(), clock: clock);
+                    clock: clock);
                 return await new SubmitFlag(intake, new GameModeGameplayFactAdmissionPolicy()).ExecuteBatchAsync(
                     fixture.CompetitionId, fixture.CompetitionChallengeId, team.CaptainId, values, clock.UtcNow, ct);
             }
@@ -95,8 +95,10 @@ public sealed partial class AwdRoundCoordinationTests
             {
                 await using var workerDb = new NoCtfDbContext(options);
                 var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
-                    new GameModeGameplayFactAdmissionPolicy(), new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
-                await processor.ProcessAsync(id, ct);
+                    new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
+                var expectedStamp = await workerDb.GameplayFacts.AsNoTracking().Where(item => item.Id == id)
+                    .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
+                await processor.ProcessAsync(id, expectedStamp, ct);
             }
             await Task.WhenAll(receipts.Select(fact => Process(fact.Id)));
             // Dispatch any next-in-scope wakeups that the recording message publisher did not deliver.

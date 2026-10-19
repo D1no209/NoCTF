@@ -141,17 +141,21 @@ public sealed class AdminCompetitionStore(
         entity.DeletedAt = null;
         entity.UpdatedAt = now;
         entity.ConcurrencyStamp = Guid.NewGuid();
+        await outbox.PublishAsync(new NavigationCapabilitiesChanged(
+            entity.Collaborators.Select(item => item.UserId).Append(entity.OwnerId).Distinct().ToArray()));
         try
         {
             await db.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
+            outbox.DiscardPendingMessages();
             return new(CompetitionRestoreState.NotFound);
         }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(entity.Id, CancellationToken.None);
+        await transaction.FlushMessagesAsync(outbox);
         return new(CompetitionRestoreState.Restored);
     }
 
@@ -460,6 +464,7 @@ public sealed class AdminCompetitionStore(
         entity.UpdatedAt = now;
         if (previousOwnerId != ownerId)
         {
+            await outbox.PublishAsync(new NavigationCapabilitiesChanged([previousOwnerId, ownerId]));
             await events.RecordAsync(new(
                 entity.Id,
                 CompetitionEventKind.CompetitionAudienceChanged,

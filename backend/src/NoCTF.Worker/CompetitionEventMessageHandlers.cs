@@ -35,7 +35,9 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             return;
         if (!await applicability.HasOrdinaryScoreboardAsync(message.CompetitionId, cancellationToken)) return;
 
-        await leaderboard.InvalidateAsync(message.CompetitionId, cancellationToken);
+        if (ScoreboardChangePolicy.ChangesAccess(message.Kind))
+            await leaderboard.InvalidateAccessAsync(message.CompetitionId, cancellationToken);
+        else await leaderboard.InvalidateAsync(message.CompetitionId, cancellationToken);
         var startedWindow = mergeQueue.Enqueue(
             message.CompetitionId,
             timeProvider.GetUtcNow());
@@ -66,9 +68,6 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             or CompetitionEventKind.AwdScoringRulesChanged
             or CompetitionEventKind.GameplayFactAdjudicated
             or CompetitionEventKind.ScoringRecorded
-            or CompetitionEventKind.FirstBloodAwarded
-            or CompetitionEventKind.SecondBloodAwarded
-            or CompetitionEventKind.ThirdBloodAwarded
             or CompetitionEventKind.CheatIncidentConfirmed
             or CompetitionEventKind.CheatIncidentSuperseded
             or CompetitionEventKind.CheatIncidentCorrected

@@ -157,7 +157,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             await Assert.That(visibleAttempts)
                 .IsEqualTo(new FlagAttemptState(1, 1, 0, true));
             var intake = new GameplayFactIntakeStore(
-                intakeDb, new RecordingOutbox(), new GameplayFactAttemptCriticalSection());
+                intakeDb, new RecordingOutbox());
             var admission = await intake.LoadAdmissionAsync(
                 fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId,
                 cancellationToken);
@@ -441,7 +441,6 @@ public sealed class CompetitionPracticeModePersistenceTests
         new(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(),
             events,
             runtimeTemplates: new ChallengeRuntimeTemplateCatalog(),
             clock: clock);
@@ -456,11 +455,12 @@ public sealed class CompetitionPracticeModePersistenceTests
         var processor = new GameplayFactProcessor(
             db,
             new GameModeGameplayFactEvaluatorCatalog(),
-            new GameModeGameplayFactAdmissionPolicy(),
             outbox,
             Substitute.For<ILeaderboardSnapshotFactory>(),
             events);
-        await processor.ProcessAsync(gameplayFactId, cancellationToken);
+        var expectedStamp = await db.GameplayFacts.AsNoTracking().Where(item => item.Id == gameplayFactId)
+            .Select(item => item.ConcurrencyStamp).SingleAsync(cancellationToken);
+        await processor.ProcessAsync(gameplayFactId, expectedStamp, cancellationToken);
     }
 
     private static async Task<Fixture> SeedAsync(

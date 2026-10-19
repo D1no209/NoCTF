@@ -24,7 +24,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.PatchVerification;
 
 public sealed class PatchVerificationTargetStore(
     NoCtfDbContext db,
-    GameplayFactAttemptCriticalSection criticalSection,
     IRuntimePlacementPolicy placementPolicy,
     TeamRuntimeQuota runtimeQuota,
     IPostCommitMessagePublisher outbox,
@@ -53,12 +52,6 @@ public sealed class PatchVerificationTargetStore(
             db,
             competitionId,
             teamId.Value,
-            ct);
-        using var lease = await criticalSection.AcquireAsync(
-            db,
-            teamId.Value,
-            competitionChallengeId,
-            GameplayFactKind.FixAttempt,
             ct);
         var prior = replay is null
             ? null

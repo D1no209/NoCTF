@@ -4,6 +4,23 @@ import { usePolling } from '../app/composables/usePolling'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+test('the observation deadline includes time spent awaiting a slow probe', async () => {
+  const scope = effectScope()
+  let probes = 0
+  const polling = scope.run(() => usePolling(async () => {
+    probes++
+    await sleep(100)
+    return false
+  }, { interval: 5, timeout: 40 }))!
+  polling.start()
+  await sleep(65)
+  expect(polling.timedOut.value).toBe(true)
+  expect(polling.polling.value).toBe(false)
+  await sleep(100)
+  expect(probes).toBe(1)
+  scope.stop()
+})
+
 function deferred() {
   let resolve!: () => void
   const promise = new Promise<void>((done) => { resolve = done })

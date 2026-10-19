@@ -65,8 +65,6 @@ public sealed class AwdCheckAdjudicationStore(NoCtfDbContext db, ICompetitionEve
             GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State,
             GameplayFactResult: fact.Result, Reason: command.Reason, ResolvedAt: command.At,
             AwdAdjudication: new(command.Action, previousHealth, evidence.Health, previousSettlement, evidence.Settlement)), ct);
-        await publisher.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        await publisher.PublishAsync(new ProjectLeaderboard(fact.CompetitionId));
         try
         {
             await db.SaveChangesAsync(ct);
@@ -79,6 +77,7 @@ public sealed class AwdCheckAdjudicationStore(NoCtfDbContext db, ICompetitionEve
             db.ChangeTracker.Clear();
             return new(AwdCheckAdjudicationState.Conflict);
         }
+        await publisher.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
         await publisher.FlushCommittedMessagesAsync();
         return new(AwdCheckAdjudicationState.Applied, View(fact));
     }

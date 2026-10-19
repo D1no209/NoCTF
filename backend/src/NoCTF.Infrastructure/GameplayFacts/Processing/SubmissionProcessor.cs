@@ -5,18 +5,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
-using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Challenges;
 using System.Globalization;
-using System.Text.Json;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Competitions.Progression;
@@ -27,40 +24,14 @@ namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 public sealed class GameplayFactProcessor(
     NoCtfDbContext db,
     IGameplayFactEvaluatorCatalog evaluatorCatalog,
-    IGameplayFactAdmissionModePolicy admissionModePolicy,
     IPostCommitMessagePublisher outbox,
-    ILeaderboardSnapshotFactory leaderboardSnapshots,
-    BloodRankCriticalSection bloodRankCriticalSection,
-    TeamChallengeCriticalSection teamChallengeCriticalSection,
+    ILeaderboardSnapshotFactory? leaderboardSnapshots = null,
     ICompetitionEventRecorder? eventRecorder = null,
     ILogger<GameplayFactProcessor>? logger = null,
     TimeProvider? clock = null,
     ProgressionReconciler? progressionReconciler = null) : IGameplayFactProcessor
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
-    public GameplayFactProcessor(
-        NoCtfDbContext db,
-        IGameplayFactEvaluatorCatalog evaluatorCatalog,
-        IGameplayFactAdmissionModePolicy admissionModePolicy,
-        IPostCommitMessagePublisher outbox,
-        ILeaderboardSnapshotFactory leaderboardSnapshots,
-        ICompetitionEventRecorder? eventRecorder = null,
-        ILogger<GameplayFactProcessor>? logger = null)
-        : this(
-            db,
-            evaluatorCatalog,
-            admissionModePolicy,
-            outbox,
-            leaderboardSnapshots,
-            new BloodRankCriticalSection(),
-            new TeamChallengeCriticalSection(),
-            eventRecorder,
-            logger)
-    { }
-
     private static readonly CompetitionEventKind[] CheatResolutionKinds =
     [
         CompetitionEventKind.CheatIncidentConfirmed,
@@ -76,163 +47,66 @@ public sealed class GameplayFactProcessor(
 
     public async Task ProcessAsync(
         Guid gameplayFactId,
+        Guid expectedConcurrencyStamp,
         CancellationToken cancellationToken)
     {
-        Guid? claimedGameplayFactId = null;
-        for (var attempt = 0; attempt < 3 && claimedGameplayFactId is null; attempt++)
-        {
-            try
-            {
-                claimedGameplayFactId = await ClaimAsync(
-                    gameplayFactId,
-                    cancellationToken);
-            }
-            catch (Exception exception) when (exception is DbUpdateConcurrencyException
-                || TransactionFailureClassifier.IsRetryable(exception))
-            {
-                db.ChangeTracker.Clear();
-            }
-
-            if (claimedGameplayFactId is null && attempt < 2)
-            {
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(Random.Shared.Next(15, 51)),
-                    cancellationToken);
-            }
-        }
-        if (claimedGameplayFactId is null)
-            return;
-
-        log.LogDebug("Evaluating GameplayFact {GameplayFactId}.", claimedGameplayFactId.Value);
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                var evaluationStarted = Stopwatch.GetTimestamp();
-                Evaluation evaluation;
-                using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.WorkerEvaluation"))
-                {
-                    try
-                    {
-                        evaluation = await EvaluateAsync(
-                            claimedGameplayFactId.Value, cancellationToken);
-                    }
-                    finally
-                    {
-                        NoCtfTelemetry.RecordGameplayFactStage(
-                            GameplayFactPerformanceStage.WorkerEvaluation,
-                            Stopwatch.GetElapsedTime(evaluationStarted).TotalSeconds);
-                    }
-                }
-                log.LogDebug("GameplayFact {GameplayFactId} evaluated with {Result}.",
-                    claimedGameplayFactId.Value, evaluation.Decision.Result);
-                var completionStarted = Stopwatch.GetTimestamp();
-                using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.WorkerCompletion"))
-                {
-                    try
-                    {
-                        await CompleteAsync(claimedGameplayFactId.Value, evaluation, cancellationToken);
-                    }
-                    finally
-                    {
-                        NoCtfTelemetry.RecordGameplayFactStage(
-                            GameplayFactPerformanceStage.WorkerCompletion,
-                            Stopwatch.GetElapsedTime(completionStarted).TotalSeconds);
-                    }
-                }
-                log.LogDebug("GameplayFact {GameplayFactId} completion persisted.",
-                    claimedGameplayFactId.Value);
-                return;
-            }
-            catch (Exception exception) when (attempt < 2
-                && TransactionFailureClassifier.IsRetryable(exception))
-            {
-                log.LogWarning(exception,
-                    "Retrying GameplayFact {GameplayFactId} after transient persistence failure ({Attempt}/3).",
-                    claimedGameplayFactId.Value, attempt + 1);
-                outbox.DiscardPendingMessages();
-                db.ChangeTracker.Clear();
-                await Task.Delay(TimeSpan.FromMilliseconds(
-                    Random.Shared.Next(25, 76) * (attempt + 1)), cancellationToken);
-            }
-        }
-        throw new InvalidOperationException("GameplayFact evaluation retry loop did not complete.");
+        var optimistic = await db.GameplayFacts.AsNoTracking()
+            .Include(item => item.Awd)
+            .Where(item => item.Id == gameplayFactId
+                && item.ConcurrencyStamp == expectedConcurrencyStamp)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (optimistic is null) return;
+        await ProcessAsync(optimistic, cancellationToken);
     }
 
-    private async Task<Guid?> ClaimAsync(
-        Guid requestedGameplayFactId,
-        CancellationToken cancellationToken)
+    internal async Task ProcessAsync(GameplayFact optimistic, CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
-        var requested = await db.GameplayFacts.AsNoTracking().SingleOrDefaultAsync(
-            item => item.Id == requestedGameplayFactId, cancellationToken);
-        if (requested is null)
-            return null;
-        if (requested.State == GameplayFactState.Queued)
-            NoCtfTelemetry.RecordGameplayFactStage(
-                GameplayFactPerformanceStage.DispatchAge,
-                (timeProvider.GetUtcNow() - requested.OccurredAt).TotalSeconds);
-        if (requested.State == GameplayFactState.Processing)
-            return requested.Id;
-        if (requested.State != GameplayFactState.Queued)
-            return null;
-        var scope = await ResolveProcessingScopeAsync(requested, cancellationToken);
-        using var processingLease = await AcquireProcessingScopeAsync(
-            scope, cancellationToken);
-        if (await ApplyProcessingScope(db.GameplayFacts.AsNoTracking(), scope)
-                .AnyAsync(item => item.State == GameplayFactState.Processing, cancellationToken))
-            return null;
-        var submission = await ApplyProcessingScope(db.GameplayFacts, scope)
-            .Where(item => item.State == GameplayFactState.Queued)
-            .OrderBy(item => item.OccurredAt)
-            .ThenBy(item => item.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (submission is null)
-            return null;
-        submission.State = GameplayFactState.Processing;
-        submission.UpdatedAt = timeProvider.GetUtcNow();
-        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        db.ChangeTracker.Clear();
-        return submission.Id;
+        if (optimistic.State is not (GameplayFactState.Queued or GameplayFactState.Processing)) return;
+        NoCtfTelemetry.RecordGameplayFactStage(GameplayFactPerformanceStage.DispatchAge,
+            (timeProvider.GetUtcNow() - optimistic.OccurredAt).TotalSeconds);
+        var started = Stopwatch.GetTimestamp();
+        var directEvaluation = await EvaluateAsync(optimistic, cancellationToken);
+        NoCtfTelemetry.RecordGameplayFactStage(GameplayFactPerformanceStage.WorkerEvaluation,
+            Stopwatch.GetElapsedTime(started).TotalSeconds);
+        try
+        {
+            await CompleteAsync(optimistic.Id, directEvaluation with { ExpectedStamp = optimistic.ConcurrencyStamp }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            NoCtfTelemetry.RecordGameplayFactDelivery(GameplayFactDeliveryOutcome.CompletionConflict);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            var current = await db.GameplayFacts.AsNoTracking().Where(item => item.Id == optimistic.Id)
+                .Select(item => new { item.ConcurrencyStamp, item.State }).SingleOrDefaultAsync(cancellationToken);
+            if (current is not null && current.ConcurrencyStamp == optimistic.ConcurrencyStamp
+                && current.State is GameplayFactState.Queued or GameplayFactState.Processing)
+                throw;
+        }
     }
 
-    private async Task<Evaluation> EvaluateAsync(Guid gameplayFactId, CancellationToken cancellationToken)
+    private async Task<Evaluation> EvaluateAsync(GameplayFact submission, CancellationToken cancellationToken)
     {
-        var submission = await db.GameplayFacts.AsNoTracking()
-            .Include(fact => fact.Awd)
-            .SingleAsync(item => item.Id == gameplayFactId, cancellationToken);
-        var configuration = await db.Competitions.AsNoTracking()
+        if (submission.Kind == GameplayFactKind.ManualAdjustment)
+            return new(EvaluateManualAdjustment(submission));
+        // Load each configuration root independently. Joining entire aggregates makes
+        // every split collection repeat the competition/challenge join tree.
+        var competition = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
-            .Join(
-                db.CompetitionChallenges.AsNoTracking()
-                    .Where(challenge => challenge.Id == submission.CompetitionChallengeId),
-                competition => competition.Id,
-                challenge => challenge.CompetitionId,
-                (competition, challenge) => new
-                {
-                    Competition = competition,
-                    CompetitionChallenge = challenge
-                })
-            .Join(
-                db.Challenges.AsNoTracking(),
-                scope => scope.CompetitionChallenge.ChallengeId,
-                challenge => challenge.Id,
-                (scope, challenge) => new
-                {
-                    scope.Competition,
-                    scope.CompetitionChallenge,
-                    Challenge = challenge
-                })
+            .Select(item => new { item.Id, item.Mode, item.Status, item.StartAt, item.EndAt, item.ModeConfiguration })
             .AsSplitQuery()
             .SingleAsync(cancellationToken);
-        var rules = admissionModePolicy.GetRules(
-            configuration.Competition.Mode,
-            configuration.Competition.ModeConfiguration!,
-            configuration.CompetitionChallenge.Rules!,
-            configuration.Challenge.Definition);
+        var challenge = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.Id == submission.CompetitionChallengeId && item.CompetitionId == competition.Id)
+            .Select(item => new { item.Id, item.ChallengeId, item.Rules, item.AutoOpenAt, item.ScoringEndsAt, item.SubmissionDeadlineAt, item.TimingRevision })
+            .AsSplitQuery().SingleAsync(cancellationToken);
+        var definition = await GameplayChallengeDefinitionReader.ReadAsync(db, challenge.ChallengeId, competition.Mode, cancellationToken);
+        var configuration = new
+        {
+            Competition = competition,
+            CompetitionChallenge = challenge,
+            Challenge = new { Definition = definition }
+        };
         var officialWindow = configuration.Competition.Mode == GameMode.Ctf
             ? await CompetitionOfficialWindowReader.ReadAsync(
                 db,
@@ -243,16 +117,38 @@ public sealed class GameplayFactProcessor(
             : (CompetitionOfficialWindow?)null;
         var practiceFact = officialWindow is { } ctfWindow
             && submission.OccurredAt >= ctfWindow.EndAt;
-        var currentTiming = ChallengeTiming.From(configuration.CompetitionChallenge);
-        if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
+        var currentTiming = new ChallengeTiming(challenge.AutoOpenAt, challenge.ScoringEndsAt, challenge.SubmissionDeadlineAt);
+        if (!practiceFact && submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt)
+        {
+            var rules = new NoCTF.GameModes.Registration.GameModeGameplayFactAdmissionPolicy()
+                .GetRules(competition.Mode, competition.ModeConfiguration!, challenge.Rules!, definition);
+            if (rules.MaxFlagAttempts is > 0)
+            {
+                var preceding = db.GameplayFacts.AsNoTracking().Where(item =>
+                    item.CompetitionId == submission.CompetitionId && item.TeamId == submission.TeamId
+                    && item.CompetitionChallengeId == submission.CompetitionChallengeId && item.Kind == submission.Kind
+                    && item.State != GameplayFactState.PlatformFailed
+                    && (item.OccurredAt < submission.OccurredAt
+                        || item.OccurredAt == submission.OccurredAt && item.Id.CompareTo(submission.Id) < 0)
+                    && (challenge.AutoOpenAt == null || item.OccurredAt >= challenge.AutoOpenAt)
+                    && (challenge.SubmissionDeadlineAt == null || item.OccurredAt < challenge.SubmissionDeadlineAt));
+                if (officialWindow is { } window)
+                    preceding = preceding.Where(item => item.OccurredAt >= window.StartAt && item.OccurredAt < window.EndAt);
+                if (await preceding.CountAsync(cancellationToken) >= rules.MaxFlagAttempts.Value)
+                    return new(new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt),
+                        TimingEligibility: currentTiming.Eligibility(submission.OccurredAt), TimingRevision: challenge.TimingRevision);
+            }
+        }
+        if (submission.Kind == GameplayFactKind.HintUnlock)
         {
             var special = await EvaluateSpecialAsync(
                 submission,
                 configuration.Competition.Status,
-                configuration.CompetitionChallenge,
+                await db.CompetitionChallenges.AsNoTracking().AsSplitQuery()
+                    .SingleAsync(item => item.Id == challenge.Id, cancellationToken),
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return new(special, officialWindow);
+            return new(special);
         }
         if (configuration.Competition.Mode == GameMode.Awd)
         {
@@ -264,41 +160,9 @@ public sealed class GameplayFactProcessor(
                 .Where(snapshot => rulesIds.Contains(snapshot.Id)).ToArrayAsync(cancellationToken);
             return new(evaluatorCatalog.Get(GameMode.Awd).Evaluate(new(submission, [], issued, null,
                 configuration.Competition.ModeConfiguration!, configuration.CompetitionChallenge.Rules!,
-                AwdIssuanceRules: issuanceRules)), null);
+                AwdIssuanceRules: issuanceRules)), TimingEligibility: submission.TimeEligibility,
+                TimingRevision: submission.AppliedTimingRevision);
         }
-        var maxAttempts = practiceFact
-            ? null
-            : submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
-                ? rules.MaxFlagAttempts
-                : rules.MaxFixAttempts;
-        if (maxAttempts is > 0)
-        {
-            var acceptedQuery = db.GameplayFacts.AsNoTracking()
-                .Where(candidate =>
-                    candidate.CompetitionId == submission.CompetitionId
-                    && candidate.TeamId == submission.TeamId
-                    && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
-                    && candidate.Kind == submission.Kind
-                    && candidate.State != GameplayFactState.PlatformFailed
-                    && (currentTiming.AutoOpenAt == null || candidate.OccurredAt >= currentTiming.AutoOpenAt)
-                    && (practiceFact || currentTiming.SubmissionDeadlineAt == null || candidate.OccurredAt < currentTiming.SubmissionDeadlineAt)
-                    && (candidate.OccurredAt < submission.OccurredAt
-                        || candidate.OccurredAt == submission.OccurredAt
-                        && candidate.Id.CompareTo(submission.Id) <= 0));
-            if (officialWindow is { } attemptWindow)
-            {
-                acceptedQuery = practiceFact
-                    ? acceptedQuery.Where(candidate => candidate.OccurredAt >= attemptWindow.EndAt)
-                    : acceptedQuery.Where(candidate => candidate.OccurredAt >= attemptWindow.StartAt
-                        && candidate.OccurredAt < attemptWindow.EndAt);
-            }
-            var acceptedPosition = await acceptedQuery.CountAsync(cancellationToken);
-            if (acceptedPosition > maxAttempts)
-                return new(
-                    new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt),
-                    officialWindow);
-        }
-
         var priorQuery = db.GameplayFacts.AsNoTracking()
             .Where(item =>
                 item.CompetitionId == submission.CompetitionId
@@ -348,7 +212,11 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.StartAt,
             null,
             configuration.Challenge.Definition));
-        return new(decision, officialWindow);
+        if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt)
+            return new(decision with { Result = decision.Result is { } result
+                ? currentTiming.Classify(result, submission.OccurredAt, practiceFact) : null },
+                TimingEligibility: currentTiming.Eligibility(submission.OccurredAt, practiceFact), TimingRevision: challenge.TimingRevision);
+        return new(decision);
     }
 
     private async Task<GameplayFactDecision> EvaluateSpecialAsync(
@@ -358,27 +226,6 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset projectedAt,
         CancellationToken ct)
     {
-        if (submission.Kind == GameplayFactKind.ManualAdjustment)
-        {
-            if (!int.TryParse(
-                    submission.Value,
-                    NumberStyles.AllowLeadingSign,
-                    CultureInfo.InvariantCulture,
-                    out var delta)
-                || delta == 0
-                || delta.ToString(CultureInfo.InvariantCulture) != submission.Value)
-            {
-                return new(
-                    null,
-                    GameplayFactFailureCode.HintUnavailable,
-                    submission.OccurredAt);
-            }
-            return new(
-                GameplayFactResult.Applied,
-                null,
-                submission.OccurredAt);
-        }
-
         if (competitionStatus != CompetitionStatus.Running)
             return new(GameplayFactResult.Rejected,
                 GameplayFactFailureCode.HintUnavailable, submission.OccurredAt);
@@ -428,12 +275,9 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset projectedAt,
         CancellationToken ct)
     {
-        var projection = await leaderboardSnapshots.CreateScoreboardAsync(
-                submission.CompetitionId,
-                projectedAt,
-                ct)
-            ?? throw new InvalidOperationException(
-                $"Competition {submission.CompetitionId} has no leaderboard projection.");
+        var projection = await (leaderboardSnapshots ?? throw new InvalidOperationException("Hint scoring requires a snapshot factory."))
+            .CreateScoreboardAsync(submission.CompetitionId, projectedAt, ct)
+            ?? throw new InvalidOperationException($"Competition {submission.CompetitionId} has no leaderboard projection.");
         var score = projection.Snapshot.Teams
             .SingleOrDefault(entry => entry.TeamId == submission.TeamId)?.TotalScore ?? 0;
         var currentEventContributes = submission.Kind == GameplayFactKind.HintUnlock
@@ -448,47 +292,20 @@ public sealed class GameplayFactProcessor(
         Evaluation evaluation,
         CancellationToken cancellationToken)
     {
+        var completionStarted = Stopwatch.GetTimestamp();
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
+            IsolationLevel.ReadCommitted, cancellationToken);
         var submission = await db.GameplayFacts.Include(fact => fact.Awd).SingleOrDefaultAsync(
             item => item.Id == gameplayFactId, cancellationToken);
-        if (submission is null
-            || submission.State != GameplayFactState.Processing)
+        if (submission is null || submission.ConcurrencyStamp != evaluation.ExpectedStamp
+            || submission.State is not (GameplayFactState.Queued or GameplayFactState.Processing))
             return;
-        var processingScope = await ResolveProcessingScopeAsync(
-            submission, cancellationToken);
-        using var processingLease = await AcquireProcessingScopeAsync(
-            processingScope, cancellationToken);
-
+        db.Entry(submission).Property(item => item.ConcurrencyStamp).OriginalValue = evaluation.ExpectedStamp;
         var now = timeProvider.GetUtcNow();
         var firstAdjudication = submission.Result is null
             && submission.FailureCode is null;
         if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
-        {
-            await AcquireTeamScoringLockAsync(
-                submission.CompetitionId,
-                submission.TeamId!.Value,
-                cancellationToken);
-            var specialScope = await db.Competitions.AsNoTracking()
-                .Where(competition => competition.Id == submission.CompetitionId)
-                .Join(
-                    db.CompetitionChallenges.AsNoTracking()
-                        .Where(challenge => challenge.Id == submission.CompetitionChallengeId),
-                    competition => competition.Id,
-                    challenge => challenge.CompetitionId,
-                    (competition, challenge) => new { Competition = competition, Challenge = challenge })
-                .AsSplitQuery()
-                .SingleAsync(cancellationToken);
-            evaluation = evaluation with
-            {
-                Decision = await EvaluateSpecialAsync(
-                    submission,
-                    specialScope.Competition.Status,
-                    specialScope.Challenge,
-                    now,
-                    cancellationToken)
-            };
-        }
+            await EnsureScoringTeamExistsAsync(submission.CompetitionId, submission.TeamId!.Value, cancellationToken);
 
         if (evaluation.Decision.AwdAttack is not null)
             evaluation = evaluation with { Decision = await ApplyAwdAttackAsync(submission, evaluation.Decision, cancellationToken) };
@@ -499,7 +316,6 @@ public sealed class GameplayFactProcessor(
             submission.FailureCode =
                 evaluation.Decision.FailureCode ?? GameplayFactFailureCode.CheckerPlatformError;
             submission.UpdatedAt = now;
-            await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
             await events.RecordAsync(new(
                 submission.CompetitionId,
                 CompetitionEventKind.GameplayFactAdjudicated,
@@ -514,16 +330,19 @@ public sealed class GameplayFactProcessor(
                 GameplayFactState: submission.State,
                 GameplayFactResult: submission.Result), cancellationToken);
             await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
-            await QueueNextGameplayFactAsync(processingScope, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            NoCtfTelemetry.RecordGameplayFactStage(GameplayFactPerformanceStage.WorkerCompletion,
+                Stopwatch.GetElapsedTime(completionStarted).TotalSeconds);
+            NoCtfTelemetry.RecordGameplayFactDelivery(GameplayFactDeliveryOutcome.Completed);
+            await transaction.DisposeAsync();
+            await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State, submission.ConcurrencyStamp));
             if (firstAdjudication)
                 RecordProcessingTelemetry(submission, now);
             await outbox.FlushCommittedMessagesAsync();
             return;
         }
 
-        var previousGameplayFactResult = submission.Result;
         var previousFailureCode = submission.FailureCode;
         if (CheatIncidentFailures.IsIncident(submission.FailureCode))
         {
@@ -551,28 +370,14 @@ public sealed class GameplayFactProcessor(
             }
         }
         submission.VictimTeamId = evaluation.Decision.VictimTeamId;
-        if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt)
-        {
-            var timingChallenge = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == submission.CompetitionChallengeId)
-                .Select(x => new { x.Mode, x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt, x.TimingRevision }).SingleAsync(cancellationToken);
-            if (timingChallenge.Mode is not (GameMode.LiveSolo or GameMode.Awd))
-            {
-                var timing = new NoCTF.Domain.Challenges.ChallengeTiming(timingChallenge.AutoOpenAt, timingChallenge.ScoringEndsAt, timingChallenge.SubmissionDeadlineAt);
-                var practice = timingChallenge.Mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt
-                    && evaluation.OfficialWindow is { } official && submission.OccurredAt >= official.EndAt;
-                submission.TimeEligibility = timing.Eligibility(submission.OccurredAt, practice);
-                submission.AppliedTimingRevision = timingChallenge.TimingRevision;
-                evaluation = evaluation with { Decision = evaluation.Decision with
-                    { Result = timing.Classify(evaluation.Decision.Result!.Value, submission.OccurredAt, practice) } };
-            }
-        }
+        submission.TimeEligibility = evaluation.TimingEligibility;
+        submission.AppliedTimingRevision = evaluation.TimingRevision;
         submission.Result = evaluation.Decision.Result;
         submission.FailureCode = evaluation.Decision.FailureCode;
         submission.ReferenceKind = evaluation.Decision.ReferenceKind ?? submission.ReferenceKind;
         submission.ReferenceId = evaluation.Decision.ReferenceId ?? submission.ReferenceId;
         submission.State = GameplayFactState.Completed;
         submission.UpdatedAt = now;
-        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         if (CheatIncidentFailures.IsIncident(submission.FailureCode)
             && submission.TeamId is Guid sourceTeamId
             && submission.ActorUserId is Guid actorUserId)
@@ -620,44 +425,7 @@ public sealed class GameplayFactProcessor(
                 submission.Id,
                 submission.TeamId);
         }
-        var bloodAward = previousGameplayFactResult == GameplayFactResult.Correct
-            ? null
-            : await TryCreateBloodAwardAsync(
-                submission,
-                evaluation,
-                cancellationToken);
-        var announceBlood = false;
-        CompetitionLeaderboardVisibility? bloodVisibility = null;
-        DateTimeOffset? bloodFrozenAt = null;
-        if (bloodAward is not null)
-        {
-            var visibilityTimes = await db.Competitions.AsNoTracking()
-                .Where(competition => competition.Id == submission.CompetitionId)
-                .Select(competition => new
-                {
-                    competition.FrozenStartAt,
-                    competition.HiddenStartAt
-                })
-                .SingleAsync(cancellationToken);
-            bloodFrozenAt = visibilityTimes.FrozenStartAt;
-            bloodVisibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                visibilityTimes.FrozenStartAt,
-                visibilityTimes.HiddenStartAt,
-                bloodAward.OccurredAt);
-            announceBlood = bloodVisibility != CompetitionLeaderboardVisibility.Blackout
-                && CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
-                    visibilityTimes.FrozenStartAt,
-                    visibilityTimes.HiddenStartAt,
-                    now);
-        }
-        await StopSolvedChallengeRuntimesAsync(
-            submission,
-            submission,
-            now,
-            cancellationToken);
-        if (announceBlood && bloodAward is not null)
-            await outbox.PublishAsync(bloodAward);
-        var adjudicationEventId = await events.RecordAsync(new(
+        await events.RecordAsync(new(
             submission.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
             evaluation.Decision.Result is null
@@ -673,38 +441,30 @@ public sealed class GameplayFactProcessor(
             GameplayFactState: submission.State,
             GameplayFactResult: submission.Result), cancellationToken);
         await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
-        if (announceBlood && bloodAward is not null)
-        {
-            var bloodKind = bloodAward.BloodRank switch
-            {
-                LeaderboardBloodRank.First => CompetitionEventKind.FirstBloodAwarded,
-                LeaderboardBloodRank.Second => CompetitionEventKind.SecondBloodAwarded,
-                LeaderboardBloodRank.Third => CompetitionEventKind.ThirdBloodAwarded,
-                _ => throw new InvalidOperationException("Unsupported leaderboard blood rank.")
-            };
-            await events.RecordAsync(new(
-                submission.CompetitionId,
-                bloodKind,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Public,
-                bloodAward.OccurredAt,
-                TeamId: submission.TeamId,
-                CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
-                GameplayFactId: submission.Id,
-                GameplayFactKind: submission.Kind,
-                GameplayFactResult: submission.Result,
-                LeaderboardVisibility: bloodVisibility,
-                FrozenStartAt: bloodFrozenAt,
-                ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), cancellationToken);
-        }
-        await QueueNextGameplayFactAsync(processingScope, cancellationToken);
         await (progressionReconciler ?? new ProgressionReconciler(db))
             .ReconcileCompletedFactAsync(submission, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NoCtfTelemetry.RecordGameplayFactStage(GameplayFactPerformanceStage.WorkerCompletion,
+            Stopwatch.GetElapsedTime(completionStarted).TotalSeconds);
+        NoCtfTelemetry.RecordGameplayFactDelivery(GameplayFactDeliveryOutcome.Completed);
+        await transaction.DisposeAsync();
+        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State, submission.ConcurrencyStamp));
+        if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
+            && GameplayFactCompletion.IsSuccessful(submission.Result, submission.TimeEligibility))
+            await outbox.PublishAsync(new StopSolvedChallengeRuntimes(submission.Id, submission.ConcurrencyStamp));
         if (firstAdjudication)
             RecordProcessingTelemetry(submission, now);
         await outbox.FlushCommittedMessagesAsync();
+    }
+
+    private static GameplayFactDecision EvaluateManualAdjustment(GameplayFact submission)
+    {
+        var valid = int.TryParse(submission.Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var delta)
+            && delta != 0 && delta.ToString(CultureInfo.InvariantCulture) == submission.Value;
+        return valid
+            ? new(GameplayFactResult.Applied, null, submission.OccurredAt)
+            : new(null, GameplayFactFailureCode.HintUnavailable, submission.OccurredAt);
     }
 
     private static void RecordProcessingTelemetry(
@@ -806,80 +566,7 @@ public sealed class GameplayFactProcessor(
             GameplayFactResult: submission.Result), ct);
     }
 
-    private async Task StopSolvedChallengeRuntimesAsync(
-        GameplayFact submission,
-        GameplayFact evaluatedFact,
-        DateTimeOffset occurredAt,
-        CancellationToken ct)
-    {
-        if (!NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(evaluatedFact.Result, evaluatedFact.TimeEligibility))
-            return;
-
-        var competitionMode = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == submission.CompetitionId)
-            .Select(competition => competition.Mode)
-            .SingleAsync(ct);
-        var runtimePurpose = (competitionMode, submission.Kind) switch
-        {
-            (GameMode.Ctf, GameplayFactKind.FlagAttempt) => RuntimePurpose.Player,
-            (GameMode.Awdp, GameplayFactKind.BreakAttempt) => RuntimePurpose.AwdpAttack,
-            _ => (RuntimePurpose?)null
-        };
-        if (runtimePurpose is null)
-            return;
-
-        await AcquireTeamScoringLockAsync(
-            submission.CompetitionId,
-            submission.TeamId!.Value,
-            ct);
-        var runtimes = await db.RuntimeInstances
-            .Where(instance =>
-                instance.CompetitionId == submission.CompetitionId
-                && instance.CompetitionChallengeId == submission.CompetitionChallengeId
-                && instance.TeamId == submission.TeamId
-                && instance.Purpose == runtimePurpose.Value
-                // Judge completion/redelivery can arrive after a reset or a fresh start.
-                // Only instances already created at submission intake belong to this solve.
-                && instance.CreatedAt <= submission.OccurredAt
-                && (instance.RuntimeKind == RuntimeKind.Container)
-                && (instance.State == RuntimeState.Queued
-                    || instance.State == RuntimeState.Provisioning
-                    || instance.State == RuntimeState.Running
-                    || instance.State == RuntimeState.Failed
-                        && instance.ProviderReceipt != null))
-            .OrderBy(instance => instance.CreatedAt)
-            .ThenBy(instance => instance.Id)
-            .AsSplitQuery()
-            .ToListAsync(ct);
-        foreach (var runtime in runtimes)
-        {
-            if (runtime.State == RuntimeState.Queued)
-            {
-                runtime.State = RuntimeState.Stopped;
-                runtime.StoppedAt = occurredAt;
-            }
-            else
-            {
-                runtime.State = RuntimeState.Stopping;
-                await outbox.PublishAsync(new StopRuntime(runtime.Id));
-            }
-
-            await events.RecordAsync(new(
-                runtime.CompetitionId!.Value,
-                CompetitionEventKind.RuntimeStateChanged,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Team,
-                occurredAt,
-                ActorUserId: submission.ActorUserId,
-                TeamId: runtime.TeamId,
-                CompetitionChallengeId: runtime.CompetitionChallengeId,
-                RuntimeInstanceId: runtime.Id,
-                GameplayFactId: submission.Id,
-                RuntimeState: runtime.State), ct);
-        }
-    }
-
-    private async Task AcquireTeamScoringLockAsync(
+    private async Task EnsureScoringTeamExistsAsync(
         Guid competitionId,
         Guid teamId,
         CancellationToken ct)
@@ -890,173 +577,10 @@ public sealed class GameplayFactProcessor(
             throw new DbUpdateConcurrencyException("The scoring team no longer exists.");
     }
 
-    private async Task<GameplayFactProcessingScope> ResolveProcessingScopeAsync(
-        GameplayFact submission,
-        CancellationToken ct)
-    {
-        var mode = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == submission.CompetitionId)
-            .Select(competition => competition.Mode)
-            .SingleAsync(ct);
-        return new(
-            submission.CompetitionId,
-            submission.CompetitionChallengeId!.Value,
-            submission.Kind,
-            submission.TeamId,
-            submission.TeamId is null
-                || mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt);
-    }
-
-    private ValueTask<IDisposable> AcquireProcessingScopeAsync(
-        GameplayFactProcessingScope scope,
-        CancellationToken ct) =>
-        scope.ChallengeWide
-            ? bloodRankCriticalSection.AcquireAsync(db, scope.CompetitionChallengeId, ct)
-            : teamChallengeCriticalSection.AcquireAsync(
-                db,
-                scope.TeamId!.Value,
-                scope.CompetitionChallengeId,
-                ct);
-
-    private static IQueryable<GameplayFact> ApplyProcessingScope(
-        IQueryable<GameplayFact> facts,
-        GameplayFactProcessingScope scope)
-    {
-        var scoped = facts.Where(item =>
-            item.CompetitionId == scope.CompetitionId
-            && item.CompetitionChallengeId == scope.CompetitionChallengeId
-            && item.Kind == scope.Kind);
-        return scope.ChallengeWide
-            ? scoped
-            : scoped.Where(item => item.TeamId == scope.TeamId);
-    }
-
-    private async Task QueueNextGameplayFactAsync(
-        GameplayFactProcessingScope scope,
-        CancellationToken ct)
-    {
-        var nextGameplayFactId = await ApplyProcessingScope(
-                db.GameplayFacts.AsNoTracking(), scope)
-            .Where(item => item.State == GameplayFactState.Queued)
-            .OrderBy(item => item.OccurredAt)
-            .ThenBy(item => item.Id)
-            .Select(item => (Guid?)item.Id)
-            .FirstOrDefaultAsync(ct);
-        if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(
-                id,
-                Guid.CreateVersion7(timeProvider.GetUtcNow())));
-    }
-
-    private async Task<BloodAwarded?> TryCreateBloodAwardAsync(
-        GameplayFact submission,
-        Evaluation evaluation,
-        CancellationToken ct)
-    {
-        if (submission.Kind != GameplayFactKind.FlagAttempt
-            || submission.Result != GameplayFactResult.Correct
-            || submission.TimeEligibility != NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid)
-            return null;
-        if (evaluation.OfficialWindow is not { } officialWindow
-            || !officialWindow.Contains(submission.OccurredAt))
-            return null;
-
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == submission.CompetitionId)
-            .Select(competition => new
-            {
-                competition.Mode,
-                competition.TracksEnabled,
-                competition.Tracks
-            })
-            .SingleAsync(ct);
-        if (competition.Mode != GameMode.Ctf)
-            return null;
-
-        var tracks = CompetitionTrackConfiguration.EffectiveFor(
-            competition.Mode,
-            competition.TracksEnabled,
-            competition.Tracks);
-        var currentTrackKey = await db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams)
-            .Where(team => team.Id == submission.TeamId)
-            .Select(team => team.TrackKey)
-            .SingleOrDefaultAsync(ct);
-        if (currentTrackKey is null) return null;
-        var currentTrack = CtfCompletionEligibility.Track(tracks, currentTrackKey);
-        if (currentTrack?.EarnsBlood != true)
-            return null;
-        if (await db.WriteUpUnlockReceipts.AsNoTracking().AnyAsync(x => x.TeamId == submission.TeamId
-            && x.CompetitionChallengeId == submission.CompetitionChallengeId && x.UnlockedAt <= submission.OccurredAt, ct)) return null;
-        var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
-            .Select(track => track.Key.ToLowerInvariant())
-            .ToArray();
-        var timing = await db.CompetitionChallenges.AsNoTracking()
-            .Where(x => x.Id == submission.CompetitionChallengeId)
-            .Select(x => new { x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt }).SingleAsync(ct);
-
-        var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
-            .Where(CtfCompletionEligibility.Before(submission.OccurredAt, submission.Id))
-            .Where(candidate => !db.WriteUpUnlockReceipts.Any(x => x.TeamId == candidate.TeamId
-                && x.CompetitionChallengeId == candidate.CompetitionChallengeId && x.UnlockedAt <= candidate.OccurredAt))
-            .Where(candidate =>
-                candidate.CompetitionId == submission.CompetitionId
-                && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
-                && candidate.Kind == GameplayFactKind.FlagAttempt
-                && (candidate.Result == GameplayFactResult.Correct || candidate.Result == GameplayFactResult.RightButDue)
-                && (timing.AutoOpenAt == null || candidate.OccurredAt >= timing.AutoOpenAt)
-                && (timing.ScoringEndsAt == null || candidate.OccurredAt < timing.ScoringEndsAt)
-                && (timing.SubmissionDeadlineAt == null || candidate.OccurredAt < timing.SubmissionDeadlineAt)
-                && candidate.OccurredAt >= officialWindow.StartAt
-                && candidate.OccurredAt < officialWindow.EndAt
-                && candidate.Id != submission.Id)
-            .Join(
-                db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams).Where(team => (!competition.TracksEnabled
-                        || bloodTrackKeys.Contains(team.TrackKey))
-                    && team.RegisteredAt < officialWindow.EndAt),
-                candidate => candidate.TeamId,
-                team => (Guid?)team.Id,
-                (candidate, _) => candidate.TeamId!.Value)
-            .Distinct()
-            .ToArrayAsync(ct);
-        if (submission.TeamId is Guid teamId && solvedTeamIds.Contains(teamId)
-            || solvedTeamIds.Length >= 3)
-            return null;
-
-        var context = await db.CompetitionChallenges.AsNoTracking()
-            .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
-            .Join(
-                db.Challenges.AsNoTracking(),
-                challenge => challenge.ChallengeId,
-                template => template.Id,
-                (challenge, template) => new
-                {
-                    Title = challenge.CustomTitle ?? template.Title
-                })
-            .Join(
-                db.Teams.AsNoTracking().Where(team => team.Id == submission.TeamId),
-                _ => submission.TeamId,
-                team => team.Id,
-                (challenge, team) => new { challenge.Title, TeamName = team.Name })
-            .SingleAsync(ct);
-        return new BloodAwarded(
-            submission.CompetitionId,
-            submission.CompetitionChallengeId!.Value,
-            context.Title,
-            (LeaderboardBloodRank)(solvedTeamIds.Length + 1),
-            submission.TeamId!.Value,
-            context.TeamName,
-            evaluation.Decision.OccurredAt);
-    }
-
     private sealed record Evaluation(
         GameplayFactDecision Decision,
-        CompetitionOfficialWindow? OfficialWindow = null);
-
-    private sealed record GameplayFactProcessingScope(
-        Guid CompetitionId,
-        Guid CompetitionChallengeId,
-        GameplayFactKind Kind,
-        Guid? TeamId,
-        bool ChallengeWide);
+        Guid ExpectedStamp = default,
+        GameplayFactTimeEligibility TimingEligibility = GameplayFactTimeEligibility.Valid,
+        Guid TimingRevision = default);
 
 }

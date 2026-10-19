@@ -10,6 +10,17 @@ function deferred() {
 }
 
 describe('createLatestPageRefresh', () => {
+  test('notification coalescing has a fixed window and retains one trailing refresh', async () => {
+    let runs = 0
+    const refresh = createTrailingRefresh(async () => { runs++ }, 30)
+    const started = Date.now()
+    const first = refresh()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    const second = refresh()
+    await Promise.all([first, second])
+    expect(runs).toBe(1)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(25)
+  })
   test('resets and loads the first page', async () => {
     const calls: string[] = []
     const latest = createLatestPageRefresh({

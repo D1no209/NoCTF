@@ -3,11 +3,11 @@ using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Application.Notifications;
 
-public sealed class ConfirmCurrentBloodAward(ILeaderboardSnapshotFactory projections, TimeProvider clock)
+public sealed class ConfirmCurrentBloodAward(ILeaderboardCache projections)
 {
     public async Task<bool> ExecuteAsync(BloodAwarded message, CancellationToken ct)
     {
-        var current = await projections.CreateScoreboardAsync(message.CompetitionId, clock.GetUtcNow(), ct);
+        var current = await projections.GetScoreboardAsync(message.CompetitionId, ct);
         if (current is null) return false;
         var award = message.BloodRank switch
         {

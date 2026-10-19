@@ -50,12 +50,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
         }
         if (user.CredentialId is not null) return MfaFailure.LocalMfaRequired;
         if (user.MfaRequired) return MfaFailure.NotEnrolled;
-        var policy = await db.PlatformSettings.AsNoTracking().IgnoreAutoIncludes()
-            .Where(value => value.Id == 1).Select(value => value.MfaPolicy).SingleAsync(ct);
-        var privileged = policy == MfaPolicy.RequirePrivileged
-            && user.Role is not (UserRole.Administrator or UserRole.Organizer)
-            && await CompetitionPrivilegedAsync(userId, ct);
-        if (MfaRequirements.IsRequired(user.Kind, user.Role, user.MfaRequired, policy, privileged, hasTotp: false))
+        if (MfaRequirements.IsRequired(user.Kind, user.Role, user.MfaRequired, user.Policy, user.Privileged, hasTotp: false))
             return MfaFailure.NotEnrolled;
         return null;
     }

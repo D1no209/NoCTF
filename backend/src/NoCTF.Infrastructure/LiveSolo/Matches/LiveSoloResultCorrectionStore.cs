@@ -104,6 +104,7 @@ public sealed partial class LiveSoloMatchStore
                 || command.Replays.Any(x => downstream.Single(m => m.Id == x.MatchId).ConcurrencyStamp != x.ConcurrencyStamp)))
                 return new(null, LiveSoloFailure.Conflict);
             var now = (clock ?? TimeProvider.System).GetUtcNow();
+            var changedFacts = new List<GameplayFact>();
             if (command.Apply)
             {
                 source.WinnerTeamId = correction.WinnerTeamId; source.LeftWins = correction.LeftWins; source.RightWins = correction.RightWins;
@@ -136,7 +137,7 @@ public sealed partial class LiveSoloMatchStore
                             && db.LiveSoloSubmissions.Any(s => s.RoundId == round.Id && s.GameplayFactId == x.Id)).ToArrayAsync(ct);
                         foreach (var fact in pending)
                         { fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.Rejected; fact.FailureCode = GameplayFactFailureCode.RoundOutOfRange;
-                            fact.UpdatedAt = now; await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State)); }
+                            fact.UpdatedAt = now; changedFacts.Add(fact); }
                     }
                     if (old.CurrentMediaSessionId is Guid mediaId)
                     {
@@ -173,7 +174,10 @@ public sealed partial class LiveSoloMatchStore
             source.ConcurrencyStamp = Guid.NewGuid();
             correction.State = command.Apply ? LiveSoloCorrectionState.Applied : LiveSoloCorrectionState.Canceled;
             correction.ResolvedAt = now; correction.ResolvedByUserId = command.ActorId; correction.ResolutionReason = command.Reason;
-            await db.SaveChangesAsync(ct); return new(await CorrectionViewAsync(correction, ct));
+            await db.SaveChangesAsync(ct);
+            foreach (var fact in changedFacts)
+                await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
+            return new(await CorrectionViewAsync(correction, ct));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
         if (result.Failure is null && command.Apply && result.Correction is { } applied)
             foreach (var roundId in await db.LiveSoloRounds.Where(x => applied.Downstream.Select(m => m.MatchId).Contains(x.MatchId)).Select(x => x.Id).ToArrayAsync(ct))

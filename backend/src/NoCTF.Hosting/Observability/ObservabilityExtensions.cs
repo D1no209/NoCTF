@@ -135,6 +135,11 @@ public static class ObservabilityExtensions
 
     internal static MeterProviderBuilder AddNoCtfDurationViews(this MeterProviderBuilder metrics)
     {
+        metrics.AddView("noctf.leaderboard.decoded_cache.payload_size", new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = [1024, 4096, 16384, 65536, 262144, 1048576, 2097152, 4194304,
+                8388608, 16777216, 33554432, 67108864]
+        });
         // Instrument names, not the names rewritten by the Prometheus exporter. All values are seconds.
         foreach (var name in new[]
         {
@@ -146,6 +151,7 @@ public static class ObservabilityExtensions
             "noctf.scheduler.dispatch.lateness",
             "noctf.gameplay_fact.processing.duration",
             "noctf.gameplay_fact.stage.duration",
+            "noctf.performance.stage.duration",
             "noctf.runtime.dispatch.stage.duration",
             "noctf.webhook.queue.age",
             "noctf.webhook.projection.wait",
@@ -223,6 +229,9 @@ public static class ObservabilityExtensions
             }
             finally
             {
+                if (PerformanceEvents.Log.IsEnabled())
+                    PerformanceEvents.Log.RequestCompleted(Activity.Current?.TraceId.ToString() ?? string.Empty,
+                        route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds);
                 if (ClassifyRequest(context) is { } kind)
                     NoCtfTelemetry.RecordApiRequest(route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds, kind);
                 var operation = context.GetEndpoint()?.Metadata

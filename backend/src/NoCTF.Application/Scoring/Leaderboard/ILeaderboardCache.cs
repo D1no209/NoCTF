@@ -49,6 +49,9 @@ public interface ILeaderboardCache
         Task.FromResult<ScoreboardProjection?>(null);
     Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken);
     Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken);
+    Task InvalidateAccessAsync(Guid competitionId, CancellationToken ct) => InvalidateAsync(competitionId, ct);
+    Task RequestRefreshAsync(Guid competitionId, CancellationToken ct) => InvalidateAsync(competitionId, ct);
+    Task<bool> NeedsRefreshAsync(Guid competitionId, CancellationToken ct) => Task.FromResult(true);
     Task<LeaderboardCacheStatus> GetStatusAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>

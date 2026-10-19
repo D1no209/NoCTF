@@ -238,7 +238,7 @@ public sealed class TheoryReviewStore(NoCtfDbContext db, IPostCommitMessagePubli
     {
         var stamp = Guid.NewGuid();
         return db.GameplayFacts.Where(fact => fact.TheoryPaperId != null && ids.Contains(fact.TheoryPaperId.Value))
-            .ExecuteUpdateAsync(setters => setters.SetProperty(fact => fact.State, GameplayFactState.Queued).SetProperty(fact => fact.UpdatedAt, now)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(fact => fact.State, GameplayFactState.Completed).SetProperty(fact => fact.UpdatedAt, now)
                 .SetProperty(fact => fact.ConcurrencyStamp, stamp), ct);
     }
     private async Task NotifyAsync(Guid activityId, CancellationToken ct)

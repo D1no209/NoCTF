@@ -2291,6 +2291,56 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("awd_scoring_rule_changes", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Blood.BloodAnnouncement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid?>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<Guid?>("LastEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_event_id");
+
+                    b.Property<short>("Position")
+                        .HasColumnType("smallint")
+                        .HasColumnName("position");
+
+                    b.Property<long>("PublishedVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("published_version");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_blood_announcements");
+
+                    b.HasIndex("CompetitionChallengeId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_blood_announcements_competition_challenge_id_po");
+
+                    b.ToTable("competition_blood_announcements", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2396,6 +2446,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasDefaultValue((short)0)
                         .HasColumnName("runtime_access_mode");
+
+                    b.Property<Guid>("ScoreboardAccessRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scoreboard_access_revision");
 
                     b.Property<int>("SingleWriteUpDeadlineHours")
                         .HasColumnType("integer")
@@ -8329,6 +8383,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("LeaseId")
                         .HasDatabaseName("ix_request_admission_leases_lease_id");
 
+                    b.HasIndex("KeyHash", "ExpiresAt")
+                        .HasDatabaseName("ix_request_admission_leases_key_hash_expires_at");
+
                     b.ToTable("request_admission_leases", (string)null);
                 });
 
@@ -10288,6 +10345,24 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)24);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.FirstBloodCorrectedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)69);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.FirstBloodWithdrawnEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)72);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.GameplayFactAdjudicatedEvent", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
@@ -10486,6 +10561,24 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)25);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.SecondBloodCorrectedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)70);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.SecondBloodWithdrawnEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)73);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.TeamBanAppealAcceptedEvent", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
@@ -10628,6 +10721,24 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competition_events", (string)null);
 
                     b.HasDiscriminator().HasValue((short)26);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ThirdBloodCorrectedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)71);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ThirdBloodWithdrawnEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)74);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.TrackConfigurationUpdatedEvent", b =>

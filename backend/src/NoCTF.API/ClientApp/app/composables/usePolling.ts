@@ -30,6 +30,7 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
    */
   let run = 0
   let timer: ReturnType<typeof setTimeout> | undefined
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined
 
   async function tick(token: number, delay: number, elapsed: number, attempt: number): Promise<void> {
     if (disposed || token !== run) return
@@ -50,7 +51,10 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
         // Keep polling through transient failures until the timeout.
       }
       if (done || disposed || token !== run) {
-        if (token === run) polling.value = false
+        if (token === run) {
+          polling.value = false
+          if (deadlineTimer) clearTimeout(deadlineTimer)
+        }
         return
       }
       const nextDelay = delays[attempt + 1]
@@ -68,6 +72,13 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
     timedOut.value = false
     error.value = null
     polling.value = true
+    deadlineTimer = setTimeout(() => {
+      if (disposed || token !== run) return
+      run += 1
+      if (timer) clearTimeout(timer)
+      polling.value = false
+      timedOut.value = true
+    }, timeout)
     void tick(token, delays[0] ?? interval, 0, 0)
   }
 
@@ -77,7 +88,9 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
     timedOut.value = false
     error.value = null
     if (timer) clearTimeout(timer)
+    if (deadlineTimer) clearTimeout(deadlineTimer)
     timer = undefined
+    deadlineTimer = undefined
   }
 
   onScopeDispose(() => { disposed = true; stop() })

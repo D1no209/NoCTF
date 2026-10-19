@@ -1,12 +1,14 @@
 using JasperFx;
 using JasperFx.CodeGeneration;
 using System.Data.Common;
+using System.Reflection;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using Wolverine;
 using Wolverine.Configuration;
 using Wolverine.ErrorHandling;
 using Wolverine.Runtime.Handlers;
+using Wolverine.Attributes;
 
 namespace NoCTF.Hosting.Messaging;
 
@@ -72,6 +74,7 @@ public static class NoCtfMessagingRetryPolicies
             WorkerQueue.Gameplay => GameplayRetryDelays,
             WorkerQueue.Projection => ProjectionRetryDelays,
             WorkerQueue.Background => BackgroundRetryDelays,
+            WorkerQueue.Notifications => BackgroundRetryDelays,
             WorkerQueue.Webhook => WebhookRetryDelays,
             WorkerQueue.LiveSoloMedia => ControlRetryDelays,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
@@ -122,8 +125,11 @@ public static class NoCtfMessagingRetryPolicies
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
-                chain.OnException<DbException>()
-                    .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
+                chain.OnException(exception => NoCTF.Infrastructure.Persistence.TransactionFailureClassifier.IsRetryable(exception)
+                        || NoCTF.Infrastructure.Persistence.TransactionFailureClassifier.IsDependencyUnavailable(exception)
+                        || exception is NoCTF.Application.Scoring.Leaderboard.LeaderboardPublicationConcurrencyException,
+                        "Known transient infrastructure failure")
+                    .RetryWithCooldown(TimeSpan.FromMilliseconds(100))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
             }
@@ -134,10 +140,9 @@ public static class NoCtfMessagingRetryPolicies
             if (chain.MessageType != messageType)
                 return false;
 
-            // These single-consumer messages have one handler and one background destination.
-            // Handler policies may run before endpoint associations are populated.
-            if (messageType == typeof(CleanupFile)
-                || messageType == typeof(InvalidateDeletedCompetitionReadModels))
+            // Single-destination policies must apply before listening endpoint
+            // associations are populated by Wolverine.
+            if (messageType != typeof(CompetitionEventCommitted))
                 return true;
 
             return chain.Endpoints.Any(endpoint =>
@@ -145,7 +150,10 @@ public static class NoCtfMessagingRetryPolicies
                 || string.Equals(
                     endpoint.Uri?.ToString().TrimEnd('/'),
                     NatsEndpointAddress(endpointName),
-                    StringComparison.OrdinalIgnoreCase));
+                    StringComparison.OrdinalIgnoreCase))
+                || chain.Handlers.Any(handler =>
+                    (handler.Method.GetCustomAttribute<StickyHandlerAttribute>()
+                        ?? handler.HandlerType.GetCustomAttribute<StickyHandlerAttribute>())?.EndpointName == endpointName);
         }
 
         private static string NatsEndpointAddress(string endpointName) =>
@@ -157,7 +165,14 @@ public static class NoCtfMessagingRetryPolicies
                     "nats://subject/noctf.v2.events.leaderboard",
                 CompetitionEventFanoutQueueNames.Webhook =>
                     "nats://subject/noctf.v2.events.webhook",
-                _ => $"nats://subject/noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
+                WorkerQueueNames.Control => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Control)}",
+                WorkerQueueNames.Gameplay => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Gameplay)}",
+                WorkerQueueNames.Projection => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Projection)}",
+                WorkerQueueNames.Background => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Background)}",
+                WorkerQueueNames.Notifications => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Notifications)}",
+                WorkerQueueNames.Webhook => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Webhook)}",
+                WorkerQueueNames.LiveSoloMedia => $"nats://subject/{NatsSubjects.Subject(WorkerQueue.LiveSoloMedia)}",
+                _ => throw new ArgumentOutOfRangeException(nameof(endpointName), endpointName, null)
             };
     }
 }

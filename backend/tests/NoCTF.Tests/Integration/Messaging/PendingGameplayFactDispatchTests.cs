@@ -111,7 +111,9 @@ public sealed class PendingGameplayFactDispatchTests
                 .Select(message => message.GameplayFactId).ToArray();
             await Assert.That(dispatched).IsEquivalentTo([queuedId, processingId]);
             await Assert.That(publisher.Messages.OfType<EvaluateGameplayFact>()
-                .All(message => message.DispatchAttemptId != Guid.Empty)).IsTrue();
+                .All(message => message.ExpectedConcurrencyStamp != Guid.Empty
+                    && message.Purpose == GameplayFactDispatchPurpose.Recovery
+                    && message.RecoveryWindow > 0)).IsTrue();
             await Assert.That(publisher.FlushCount).IsEqualTo(1);
         });
     }

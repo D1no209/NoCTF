@@ -29,6 +29,7 @@ internal static class GameplayFactAdmissionPersistence
             userId,
             TimeProvider.System.GetUtcNow(),
             new ChallengeRuntimeTemplateCatalog(),
+            new GameModeGameplayFactAdmissionPolicy(),
             cancellationToken);
 
     public static async Task<GameplayFactAdmissionSnapshot?> LoadAsync(
@@ -38,7 +39,9 @@ internal static class GameplayFactAdmissionPersistence
         Guid userId,
         DateTimeOffset observedAt,
         IChallengeRuntimeTemplateCatalog runtimeTemplates,
-        CancellationToken cancellationToken)
+        IGameplayFactAdmissionModePolicy admissionModePolicy,
+        CancellationToken cancellationToken,
+        bool flagIntake = false)
     {
         var scope = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
@@ -66,16 +69,14 @@ internal static class GameplayFactAdmissionPersistence
                     item.Competition.EndAt,
                     item.Competition.PracticeModeEnabled,
                     CompetitionDeleted = item.Competition.DeletedAt != null,
-                    CompetitionConfiguration = item.Competition.ModeConfiguration,
                     CompetitionChallengeId = item.CompetitionChallenge.Id,
-                    ChallengeRules = item.CompetitionChallenge.Rules,
+                    item.CompetitionChallenge.ChallengeId,
                     ChallengePublished = item.CompetitionChallenge.IsPublished,
                     item.CompetitionChallenge.AutoOpenAt,
                     item.CompetitionChallenge.ScoringEndsAt,
                     item.CompetitionChallenge.SubmissionDeadlineAt,
                     ChallengeDeleted = item.Challenge.DeletedAt != null
                         || item.CompetitionChallenge.DeletedAt != null,
-                    ChallengeDefinition = item.Challenge.Definition,
                     TeamId = team.Id,
                     TeamDeleted = team.DeletedAt != null,
                     TeamBanned = team.IsBanned,
@@ -85,6 +86,16 @@ internal static class GameplayFactAdmissionPersistence
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
             return null;
+        var competitionConfiguration = await db.Competitions.AsNoTracking().AsSplitQuery()
+            .Where(item => item.Id == competitionId).Select(item => item.ModeConfiguration)
+            .SingleAsync(cancellationToken);
+        var challengeRules = await db.CompetitionChallenges.AsNoTracking().AsSplitQuery()
+            .Where(item => item.Id == competitionChallengeId).Select(item => item.Rules)
+            .SingleAsync(cancellationToken);
+        var challengeDefinition = await Processing.GameplayChallengeDefinitionReader.ReadAsync(
+            db, scope.ChallengeId, scope.Mode, cancellationToken);
+        var rules = admissionModePolicy.GetRules(scope.Mode, competitionConfiguration!, challengeRules!,
+            challengeDefinition);
         if (scope.Mode == GameMode.Ctf
             && !await new ProgressionChallengeAccess(db).IsActiveAsync(
                 competitionId, competitionChallengeId, scope.TeamId,
@@ -116,24 +127,23 @@ internal static class GameplayFactAdmissionPersistence
                 : attemptQuery.Where(submission => submission.OccurredAt >= officialWindow.StartAt
                     && submission.OccurredAt < officialWindow.EndAt);
         }
-        var attempts = await attemptQuery
-            .Where(fact => (scope.AutoOpenAt == null || fact.OccurredAt >= scope.AutoOpenAt)
-                && (practicePhase || scope.SubmissionDeadlineAt == null || fact.OccurredAt < scope.SubmissionDeadlineAt))
-            .GroupBy(submission => submission.Kind)
-            .Select(group => new
-            {
-                Kind = group.Key,
-                Count = group.Count(),
-                HasCorrect = group.Any(fact => fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
-            })
-            .ToDictionaryAsync(item => item.Kind, cancellationToken);
+        var attempts = !flagIntake && !practicePhase && (rules.MaxFlagAttempts is > 0 || rules.MaxFixAttempts is > 0)
+            || scope.Mode == GameMode.Awdp
+            ? await attemptQuery
+                .Where(fact => (scope.AutoOpenAt == null || fact.OccurredAt >= scope.AutoOpenAt)
+                    && (practicePhase || scope.SubmissionDeadlineAt == null || fact.OccurredAt < scope.SubmissionDeadlineAt))
+                .GroupBy(submission => submission.Kind)
+                .Select(group => new AttemptSummary(group.Key, group.Count(),
+                    group.Any(fact => fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)))
+                .ToDictionaryAsync(item => item.Kind, cancellationToken)
+            : new Dictionary<GameplayFactKind, AttemptSummary>();
         var flagAttempts = attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt);
         var breakAttempts = attempts.GetValueOrDefault(GameplayFactKind.BreakAttempt);
         var fixAttempts = attempts.GetValueOrDefault(GameplayFactKind.FixAttempt);
         var practiceRuntimeState = PracticeRuntimeAdmissionState.NotRequired;
         if (practicePhase && scope.PracticeModeEnabled)
         {
-            var template = runtimeTemplates.Get(scope.ChallengeDefinition);
+            var template = runtimeTemplates.Get(challengeDefinition);
             if (template is not null)
             {
                 if (template.RuntimeKind is not (RuntimeKind.Container))
@@ -159,15 +169,15 @@ internal static class GameplayFactAdmissionPersistence
 
         var awdDeadline = scope.Mode == GameMode.Awd
             ? await AwdCompetitionDeadline.ReadAsync(db, competitionId, scope.StartAt, scope.EndAt,
-                (AwdCompetitionModeConfiguration)scope.CompetitionConfiguration!, observedAt, cancellationToken) : null;
+                (AwdCompetitionModeConfiguration)competitionConfiguration!, observedAt, cancellationToken) : null;
         return new(
             competitionId,
             scope.TeamId,
             competitionChallengeId,
             scope.Mode,
-            scope.CompetitionConfiguration
+            competitionConfiguration
                 ?? throw new InvalidOperationException("Competition configuration is required."),
-            scope.ChallengeRules
+            challengeRules
                 ?? throw new InvalidOperationException("Challenge rules are required."),
             (flagAttempts?.Count ?? 0) + (breakAttempts?.Count ?? 0),
             fixAttempts?.Count ?? 0,
@@ -187,10 +197,12 @@ internal static class GameplayFactAdmissionPersistence
             awdDeadline?.EndsAt ?? officialWindow.EndAt,
             scope.PracticeModeEnabled,
             practiceRuntimeState,
-            scope.ChallengeDefinition,
+            challengeDefinition,
             new ChallengeTiming(scope.AutoOpenAt, scope.ScoringEndsAt, scope.SubmissionDeadlineAt),
             awdDeadline?.AcceptanceEndsAt);
     }
+
+    private sealed record AttemptSummary(GameplayFactKind Kind, int Count, bool HasCorrect);
 
     public static bool Matches(
         GameplayFactAdmissionSnapshot expected,

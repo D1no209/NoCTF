@@ -78,15 +78,17 @@ public sealed partial class AwdRoundCoordinationTests
             async Task<GameplayFact> SubmitAndProcess(Team team, string flag)
             {
                 await using var intakeDb = new NoCtfDbContext(options);
-                var intake = new GameplayFactIntakeStore(intakeDb, new RecordingOutbox(), new GameplayFactAttemptCriticalSection(), clock: clock);
+                var intake = new GameplayFactIntakeStore(intakeDb, new RecordingOutbox(), clock: clock);
                 var accepted = await new SubmitFlag(intake, new GameModeGameplayFactAdmissionPolicy()).ExecuteBatchAsync(
                     fixture.CompetitionId, fixture.CompetitionChallengeId, team.CaptainId, [flag], clock.UtcNow, ct);
                 await Assert.That(accepted.Succeeded).IsTrue();
                 var factId = accepted.Value!.Single().GameplayFactId;
                 await using var workerDb = new NoCtfDbContext(options);
                 var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
-                    new GameModeGameplayFactAdmissionPolicy(), new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
-                await processor.ProcessAsync(factId, ct);
+                    new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
+                var expectedStamp = await workerDb.GameplayFacts.AsNoTracking().Where(item => item.Id == factId)
+                    .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
+                await processor.ProcessAsync(factId, expectedStamp, ct);
                 return await workerDb.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Id == factId, ct);
             }
             var qualified = await SubmitAndProcess(teams[0], defenderFlag.Flag);

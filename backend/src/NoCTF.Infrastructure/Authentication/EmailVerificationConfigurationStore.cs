@@ -14,10 +14,17 @@ public sealed class EmailVerificationConfigurationStore(
 {
     private const short SettingsId = 1;
 
-    public async Task<EmailVerificationConfigurationView> GetAsync(CancellationToken ct) =>
-        ToView(await db.PlatformSettings.AsNoTracking()
-            .AsSplitQuery()
-            .SingleAsync(settings => settings.Id == SettingsId, ct));
+    public Task<EmailVerificationConfigurationView> GetAsync(CancellationToken ct) =>
+        db.PlatformSettings.AsNoTracking().IgnoreAutoIncludes().Where(settings => settings.Id == SettingsId)
+            .Select(settings => new EmailVerificationConfigurationView(
+                settings.EmailVerificationEnabled, settings.PublicBaseUrl,
+                settings.EmailVerificationTokenLifetimeMinutes, settings.EmailVerificationResendCooldownSeconds,
+                settings.EmailPasswordResetTokenLifetimeMinutes, settings.EmailPasswordResetCooldownSeconds,
+                settings.EmailPasswordResetMaxRequestsPerHour, settings.EmailSmtpHost, settings.EmailSmtpPort,
+                settings.EmailSmtpSecurityMode ?? SmtpSecurityMode.None, settings.EmailSmtpUserName,
+                settings.EmailSmtpPasswordCiphertext != null && settings.EmailSmtpPasswordCiphertext.Length > 0,
+                settings.EmailSmtpFromAddress, settings.EmailSmtpFromName, settings.EmailSmtpTimeoutSeconds, settings.UpdatedAt))
+            .SingleAsync(ct);
 
     public async Task<EmailVerificationConfigurationView> UpdateAsync(
         UpdateEmailVerificationConfigurationCommand command,
@@ -107,26 +114,6 @@ public sealed class EmailVerificationConfigurationStore(
             settings.EmailSmtpFromName,
             settings.EmailSmtpTimeoutSeconds);
     }
-
-    private static EmailVerificationConfigurationView ToView(
-        PlatformSettings settings) =>
-        new(
-            settings.EmailVerificationEnabled,
-            settings.PublicBaseUrl,
-            settings.EmailVerificationTokenLifetimeMinutes,
-            settings.EmailVerificationResendCooldownSeconds,
-            settings.EmailPasswordResetTokenLifetimeMinutes,
-            settings.EmailPasswordResetCooldownSeconds,
-            settings.EmailPasswordResetMaxRequestsPerHour,
-            settings.EmailSmtpHost,
-            settings.EmailSmtpPort,
-            ResolveSecurityMode(settings),
-            settings.EmailSmtpUserName,
-            settings.EmailSmtpPasswordCiphertext is { Length: > 0 },
-            settings.EmailSmtpFromAddress,
-            settings.EmailSmtpFromName,
-            settings.EmailSmtpTimeoutSeconds,
-            settings.UpdatedAt);
 
     private static SmtpSecurityMode ResolveSecurityMode(PlatformSettings settings) =>
         settings.EmailSmtpSecurityMode ?? SmtpSecurityMode.None;

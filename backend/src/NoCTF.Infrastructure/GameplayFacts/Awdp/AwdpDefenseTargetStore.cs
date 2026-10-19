@@ -22,7 +22,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.Awdp;
 
 public sealed class AwdpDefenseTargetStore(
     NoCtfDbContext db,
-    GameplayFactAttemptCriticalSection criticalSection,
     IRuntimePlacementPolicy placementPolicy,
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
@@ -51,12 +50,6 @@ public sealed class AwdpDefenseTargetStore(
 
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
-            cancellationToken);
-        using var lease = await criticalSection.AcquireAsync(
-            db,
-            scope.TeamId,
-            competitionChallengeId,
-            GameplayFactKind.FixAttempt,
             cancellationToken);
         var teamIsStillEligible = await db.Teams.AsNoTracking().AnyAsync(team =>
             team.Id == scope.TeamId

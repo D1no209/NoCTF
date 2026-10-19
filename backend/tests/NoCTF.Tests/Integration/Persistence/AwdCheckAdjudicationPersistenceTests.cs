@@ -31,7 +31,12 @@ public sealed partial class AwdRoundCoordinationTests
             var result = await new AdjudicateAwdCheck(new AwdCheckAdjudicationStore(db,
                 new CompetitionEventStore(db, publisher), publisher)).ExecuteAsync(command, ct);
             if (result.State == AwdCheckAdjudicationState.Applied)
-                await Assert.That(publisher.Published.OfType<ProjectLeaderboard>().Count()).IsEqualTo(1);
+            {
+                await Assert.That(publisher.Published.OfType<ProjectLeaderboard>().Count()).IsEqualTo(0);
+                var notification = publisher.Published.OfType<GameplayFactStateChanged>().Single();
+                await Assert.That(notification.ConcurrencyStamp).IsEqualTo(await db.GameplayFacts.AsNoTracking()
+                    .Where(fact => fact.Id == notification.GameplayFactId).Select(fact => fact.ConcurrencyStamp).SingleAsync(ct));
+            }
             return result;
         }
         var late = await Read(lateId);

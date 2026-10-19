@@ -1,6 +1,7 @@
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { computed, markRaw, ref, watch } from 'vue'
+import { useNavigationCapabilities } from '../../../composables/useNavigationCapabilities'
 import { Plus } from '@lucide/vue'
 import { adminListCompetitions, listCompetitionsEndpoint } from '../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../api'
@@ -16,6 +17,7 @@ export function useCompetitionsIndexPage() {
   if ('competition' in route.query) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
   const router = useRouter()
   const { isAdministrator, isLoggedIn, user } = useAuth()
+  const navigation = useNavigationCapabilities(false)
   const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
@@ -77,9 +79,11 @@ export function useCompetitionsIndexPage() {
         if (failure || !data) throw failure
         competitions = data.items ?? []
       } else {
+        if (isLoggedIn.value && !navigation.capabilities.value) await navigation.refresh()
         const [catalog, managed] = await Promise.all([
           listCompetitionsEndpoint(),
-          isLoggedIn.value ? adminListCompetitions({ query: { includeDeleted: false } }) : null,
+          isLoggedIn.value && navigation.capabilities.value?.hasManagedCompetitions
+            ? adminListCompetitions({ query: { includeDeleted: false } }) : null,
         ])
         if (catalog.error || !catalog.data || managed?.error) throw catalog.error ?? managed?.error
         const rows = new Map((catalog.data.items ?? []).map(item => [item.id, item]))

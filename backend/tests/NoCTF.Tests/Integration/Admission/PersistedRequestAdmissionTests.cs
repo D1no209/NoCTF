@@ -31,6 +31,7 @@ public sealed class PersistedRequestAdmissionTests
             var factory = new TestDbContextFactory(options);
             var first = new PersistedRequestAdmission(factory, TimeProvider.System);
             var second = new PersistedRequestAdmission(factory, TimeProvider.System);
+            await first.WarmupAsync(ct);
 
             for (var i = 0; i < 20; i++)
                 await using (await first.AcquireAsync(
@@ -80,7 +81,9 @@ public sealed class PersistedRequestAdmissionTests
             }
             catch (OperationCanceledException) when (interrupted.Token.IsCancellationRequested) { }
             await Assert.That(interrupted.Token.IsCancellationRequested).IsTrue();
-            await ExpectFailure(() => second.AcquireAsync([], [], ct),
+            await using (var unrestricted = await second.AcquireAsync([], [], ct))
+                await Assert.That(unrestricted.Token).IsEqualTo(ct);
+            await ExpectFailure(() => second.AcquireAsync([new("offline", 1, 60)], [], ct),
                 AdmissionFailure.DependencyUnavailable);
         });
     }

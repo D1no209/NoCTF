@@ -14,7 +14,7 @@ public sealed class LeaderboardSnapshotDeserializerTests
         var id = Guid.NewGuid();
         var first = Payload(id, 7);
         var values = await Task.WhenAll(Enumerable.Range(0, 16)
-            .Select(_ => decoder.ReadAsync(id, first, CancellationToken.None).AsTask()));
+            .Select(_ => Task.Run(async () => await decoder.ReadAsync(id, first, CancellationToken.None))));
         foreach (var value in values)
             await Assert.That(value).IsSameReferenceAs(values[0]);
         var next = await decoder.ReadAsync(id, Payload(id, 8), CancellationToken.None);
@@ -24,6 +24,35 @@ public sealed class LeaderboardSnapshotDeserializerTests
         var changed = Payload(id, 8, DateTimeOffset.UnixEpoch.AddSeconds(1));
         var replacement = await decoder.ReadAsync(id, changed, CancellationToken.None);
         await Assert.That(replacement.Scoreboard.Snapshot.GeneratedAt).IsEqualTo(DateTimeOffset.UnixEpoch.AddSeconds(1));
+    }
+
+    [Test]
+    public async Task Current_generation_is_retained_when_the_budget_only_fits_one_generation()
+    {
+        var id = Guid.NewGuid();
+        var first = Payload(id, 7);
+        using var decoder = new LeaderboardSnapshotDeserializer(first.Payload.Length + 64);
+        _ = await decoder.ReadAsync(id, first, CancellationToken.None);
+        var nextPayload = Payload(id, 8);
+        var next = await decoder.ReadAsync(id, nextPayload, CancellationToken.None);
+        await Assert.That(await decoder.ReadAsync(id, nextPayload, CancellationToken.None)).IsSameReferenceAs(next);
+        var earlier = await decoder.ReadAsync(id, first, CancellationToken.None);
+        await Assert.That(earlier.Scoreboard.Snapshot.Version).IsEqualTo(7L);
+        await Assert.That(await decoder.ReadAsync(id, nextPayload, CancellationToken.None)).IsSameReferenceAs(next);
+    }
+
+    [Test]
+    public async Task Larger_late_payload_cannot_evict_the_newer_decoded_version()
+    {
+        var id = Guid.NewGuid();
+        var current = Payload(id, 8);
+        var old = Payload(id, 7);
+        old = old with { Payload = old.Payload + new string(' ', old.Payload.Length * 2) };
+        using var decoder = new LeaderboardSnapshotDeserializer(old.Payload.Length * 2);
+        var installed = await decoder.ReadAsync(id, current, CancellationToken.None);
+        var earlier = await decoder.ReadAsync(id, old, CancellationToken.None);
+        await Assert.That(earlier.Scoreboard.Snapshot.Version).IsEqualTo(7L);
+        await Assert.That(await decoder.ReadAsync(id, current, CancellationToken.None)).IsSameReferenceAs(installed);
     }
 
     [Test]

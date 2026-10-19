@@ -176,21 +176,15 @@ public sealed class HintUnlockLifecyclePersistenceTests
 
             await using (var processingDb = new NoCtfDbContext(options))
             {
-                var admissionPolicy = Substitute.For<IGameplayFactAdmissionModePolicy>();
-                admissionPolicy.GetRules(
-                        Arg.Any<GameMode>(),
-                        Arg.Any<CompetitionModeConfiguration>(),
-                        Arg.Any<CompetitionChallengeRules>(),
-                        Arg.Any<ChallengeDefinition?>())
-                    .Returns(new GameplayFactAdmissionRules(false, false, null, null));
                 var processor = new GameplayFactProcessor(
                     processingDb,
                     Substitute.For<IGameplayFactEvaluatorCatalog>(),
-                    admissionPolicy,
                     Substitute.For<IPostCommitMessagePublisher>(),
                     Substitute.For<ILeaderboardSnapshotFactory>());
 
-                await processor.ProcessAsync(gameplayFactId, cancellationToken);
+                var expectedStamp = await processingDb.GameplayFacts.AsNoTracking().Where(item => item.Id == gameplayFactId)
+                    .Select(item => item.ConcurrencyStamp).SingleAsync(cancellationToken);
+                await processor.ProcessAsync(gameplayFactId, expectedStamp, cancellationToken);
             }
 
             await using var verification = new NoCtfDbContext(options);

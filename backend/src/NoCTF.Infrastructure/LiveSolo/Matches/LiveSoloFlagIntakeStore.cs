@@ -55,9 +55,10 @@ public sealed partial class LiveSoloMatchStore
         var sequence = checked(round.LastAdmissionSequence + 1); round.LastAdmissionSequence = sequence;
         db.GameplayFacts.Add(fact); db.LiveSoloSubmissions.Add(new() { GameplayFactId = fact.Id, RoundId = round.Id,
             RoundQuestionId = question.Id, AdmissionSequence = sequence });
-        await messages.PublishAsync(new NoCTF.Application.Messaging.EvaluateGameplayFact(fact.Id));
         replay?.Store(new[] { new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, fact.Id, admittedAt) });
-        await db.SaveChangesAsync(ct); return new(fact.Id, sequence, admittedAt);
+        await db.SaveChangesAsync(ct);
+        await messages.PublishAsync(new NoCTF.Application.Messaging.EvaluateGameplayFact(fact.Id, fact.ConcurrencyStamp));
+        return new(fact.Id, sequence, admittedAt);
     }, () => new(null, null, null, LiveSoloFailure.Conflict), ct);
 
     private async Task<FlagAcquisitionEvidence> CaptureEvidenceAsync(LiveSoloRoundQuestion question, bool required, Guid teamId, DateTimeOffset at, CancellationToken ct)

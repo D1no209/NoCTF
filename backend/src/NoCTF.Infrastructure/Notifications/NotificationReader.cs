@@ -186,7 +186,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(notification => notification.SourceId!.Value)
             .Distinct()
             .ToArray();
-        var sourceNames = await db.Users.IgnoreQueryFilters().AsNoTracking()
+        var sourceNames = sourceIds.Length == 0 ? new Dictionary<Guid, string>() : await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(user => sourceIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
         var changes = await CompetitionAnnouncementProjection.LatestAsync(db, notifications, ct);
@@ -214,10 +214,10 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
     {
         if (!db.Database.IsRelational())
             return CompetitionAnnouncementProjection.ActiveMessages(db, await VisibleToInMemoryAsync(userId, ct));
-        var activeAdministrator = db.Users.IgnoreQueryFilters().Any(user =>
+        var activeAdministrator = await db.Users.IgnoreQueryFilters().AnyAsync(user =>
             user.Id == userId
             && user.Role == UserRole.Administrator
-            && user.AccountStatus == UserAccountStatus.Active);
+            && user.AccountStatus == UserAccountStatus.Active, ct);
         var inaccessibleStaffCompetitionIds = db.Competitions.IgnoreQueryFilters()
             .Where(competition =>
                 competition.AccessMode == NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly

@@ -1,4 +1,6 @@
 import { message as describeMessage } from '../utils/i18n'
+import type { InjectionKey, Ref } from 'vue'
+import { hasInjectionContext, inject, provide } from 'vue'
 import type { UiMessage } from '../utils/i18n'
 import {
   getLeaderboardEndpoint,
@@ -15,7 +17,7 @@ import { createTrailingRefresh } from '../lib/latest-page-refresh'
 import {
   isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
-  newestScoreboardVersion,
+  canReplaceScoreboardSnapshot,
   needsAwdpRoundRefresh,
   shouldRestoreRequestedRoundWindow,
 } from '../utils/scoreboard-coherence'
@@ -53,7 +55,22 @@ function scoreboardUpdatedPayload(payload: ScoreboardUpdatedNotification): Score
  * Owns the three normalized scoreboard resources. Every accepted refresh is
  * generation- and version-fenced, so an older response cannot replace newer page state.
  */
+type ScoreboardMatrix = ReturnType<typeof createScoreboardMatrix>
+const sharedScoreboardKey: InjectionKey<{ competitionId: string; board: ScoreboardMatrix }> = Symbol('competition-scoreboard')
+
 export function useScoreboardMatrix(competitionId: string, options: { pollRounds?: boolean } = {}) {
+  const shared = hasInjectionContext() ? inject(sharedScoreboardKey, null) : null
+  if (shared?.competitionId === competitionId && options.pollRounds !== false) return shared.board
+  return createScoreboardMatrix(competitionId, options)
+}
+
+export function provideCompetitionScoreboard(competitionId: string, enabled: Readonly<Ref<boolean>>) {
+  const board = createScoreboardMatrix(competitionId, { enabled })
+  if (hasInjectionContext()) provide(sharedScoreboardKey, { competitionId, board })
+  return board
+}
+
+function createScoreboardMatrix(competitionId: string, options: { pollRounds?: boolean; enabled?: Readonly<Ref<boolean>> } = {}) {
   const catalog = ref<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null>(null)
   const schema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
   const snapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
@@ -68,7 +85,6 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
   let coherenceRetryTimer: ReturnType<typeof setTimeout> | null = null
   let roundRefreshTimer: ReturnType<typeof setInterval> | null = null
   let coherenceRetryCount = 0
-  let minimumSnapshotVersion: string | null = null
 
   function scheduleProcessingRetry(): void {
     if (retryTimer || stopped) return
@@ -141,18 +157,11 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
           const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
           candidateSnapshot = incoming
         }
-        const sameDataScope = candidateSnapshot?.dataScope === snapshot.value?.dataScope
-        let versionFloor = sameDataScope ? (snapshot.value?.version ?? null) : null
-        if (candidateSnapshot?.dataScope === 'Live')
-          versionFloor = newestScoreboardVersion(versionFloor, minimumSnapshotVersion)
         if (isCoherentScoreboardBundle(candidateCatalog, candidateSchema, candidateSnapshot)
-          && isScoreboardVersionAtLeast(candidateSnapshot?.version, versionFloor)) {
+          && canReplaceScoreboardSnapshot(candidateSnapshot, snapshot.value)) {
           catalog.value = candidateCatalog
           schema.value = candidateSchema
           snapshot.value = candidateSnapshot
-          minimumSnapshotVersion = candidateSnapshot?.dataScope === 'Live'
-            ? newestScoreboardVersion(minimumSnapshotVersion, candidateSnapshot.version)
-            : null
           coherenceRetryCount = 0
           error.value = null
           outcome = 'accepted'
@@ -197,9 +206,16 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
     return trailingRefresh()
   }
   let unwatch: (() => void) | null = null
+  let pendingNotice: Required<ScoreboardRefreshOptions> = { catalog: false, schema: false, snapshot: false }
+  const refreshNotified = createTrailingRefresh(async () => {
+    const requested = pendingNotice
+    pendingNotice = { catalog: false, schema: false, snapshot: false }
+    if (!stopped && options.enabled?.value !== false) await queueRefresh(requested)
+  }, 500)
 
-  onMounted(() => {
-    void refresh({ catalog: true, schema: true, snapshot: true })
+  function start() {
+    if (stopped || unwatch || options.enabled?.value === false) return
+    void refresh({ catalog: catalog.value === null, schema: schema.value === null, snapshot: true })
     if (options.pollRounds !== false) {
       roundRefreshTimer = setInterval(() => {
         if (!refreshing.value && needsAwdpRoundRefresh(schema.value, snapshot.value))
@@ -210,8 +226,6 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
       competitionLifecycleChanged: () => void queueRefresh({ catalog: true, schema: true, snapshot: true }),
       scoreboardUpdated: (raw) => {
         const notice = scoreboardUpdatedPayload(raw)
-        if (snapshot.value === null || snapshot.value.dataScope === 'Live')
-          minimumSnapshotVersion = newestScoreboardVersion(minimumSnapshotVersion, notice.version)
         const wantsCatalog = notice.challengeCatalogRevision !== null
           && notice.challengeCatalogRevision !== (catalog.value?.revision ?? null)
         const wantsSchema = notice.schemaRevision !== null
@@ -219,14 +233,28 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
         const wantsSnapshot = notice.version !== null
           && !isScoreboardVersionAtLeast(snapshot.value?.version, notice.version)
         if (!wantsSnapshot && !wantsCatalog && !wantsSchema) return
-        void queueRefresh({
-          catalog: wantsCatalog,
-          schema: wantsSchema,
-          snapshot: true,
-        })
+        pendingNotice = { catalog: pendingNotice.catalog || wantsCatalog, schema: pendingNotice.schema || wantsSchema, snapshot: true }
+        void refreshNotified()
       },
       onReconnected: () => void queueRefresh({ catalog: true, schema: true, snapshot: true }),
     })
+  }
+  onMounted(start)
+  watch(() => options.enabled?.value, value => {
+    if (value !== false) { start(); return }
+    generation++
+    unwatch?.(); unwatch = null
+    if (roundRefreshTimer) clearInterval(roundRefreshTimer)
+    roundRefreshTimer = null
+    if (retryTimer) clearTimeout(retryTimer)
+    retryTimer = null
+    if (coherenceRetryTimer) clearTimeout(coherenceRetryTimer)
+    coherenceRetryTimer = null
+  })
+  const { user } = useAuth()
+  watch(() => user.value?.userId, () => {
+    generation++; catalog.value = null; schema.value = null; snapshot.value = null
+    if (options.enabled?.value !== false) void queueRefresh({ catalog: true, schema: true, snapshot: true })
   })
 
   onBeforeUnmount(() => {

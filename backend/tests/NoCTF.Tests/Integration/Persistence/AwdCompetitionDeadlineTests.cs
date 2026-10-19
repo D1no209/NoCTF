@@ -126,7 +126,7 @@ public sealed partial class AwdRoundCoordinationTests
             async Task<NoCTF.Application.Common.OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>> Submit()
             {
                 await using var intakeDb = new NoCtfDbContext(options);
-                var intake = new GameplayFactIntakeStore(intakeDb, new RecordingOutbox(), new GameplayFactAttemptCriticalSection(), clock: clock);
+                var intake = new GameplayFactIntakeStore(intakeDb, new RecordingOutbox(), clock: clock);
                 return await new SubmitFlag(intake, new GameModeGameplayFactAdmissionPolicy()).ExecuteAsync(
                     new(fixture.CompetitionId, fixture.CompetitionChallengeId, attackerUserId, flag.Flag, clock.UtcNow), ct);
             }
@@ -157,8 +157,8 @@ public sealed partial class AwdRoundCoordinationTests
             await Assert.That((await Submit()).FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.CompetitionFinished);
             await using var workerDb = new NoCtfDbContext(options);
             var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
-                new GameModeGameplayFactAdmissionPolicy(), new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
-            await processor.ProcessAsync(fact.Id, ct);
+                new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
+            await processor.ProcessAsync(fact.Id, fact.ConcurrencyStamp, ct);
             await Assert.That((await workerDb.GameplayFacts.AsNoTracking().SingleAsync(x => x.Id == fact.Id, ct)).Result)
                 .IsEqualTo(GameplayFactResult.Correct);
         });

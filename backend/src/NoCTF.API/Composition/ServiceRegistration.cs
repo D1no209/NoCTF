@@ -50,6 +50,7 @@ public static class ServiceRegistration
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddNoCtfLocalization();
+        services.AddNoCtfLeaderboardOutputCaching();
         var allowDevelopmentHumanVerification = development
             || configuration.GetValue<bool>("OpenApi:Exporting");
         services.AddOptions<HumanVerificationOptions>()
@@ -321,6 +322,18 @@ public static class ServiceRegistration
                         Window = TimeSpan.FromMinutes(15),
                         QueueLimit = 0
                     }));
+        });
+        return services;
+    }
+
+    public static IServiceCollection AddNoCtfLeaderboardOutputCaching(this IServiceCollection services)
+    {
+        services.AddOutputCache(options =>
+        {
+            options.SizeLimit = 64 * 1024 * 1024;
+            options.MaximumBodySize = 4 * 1024 * 1024;
+            options.AddPolicy(NoCTF.API.Endpoints.Competitions.PublicCtfLeaderboardCachePolicy.Name,
+                policy => policy.AddPolicy<NoCTF.API.Endpoints.Competitions.PublicCtfLeaderboardCachePolicy>(), true);
         });
         return services;
     }

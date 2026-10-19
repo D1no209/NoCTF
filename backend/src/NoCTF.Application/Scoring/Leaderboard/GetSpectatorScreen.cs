@@ -35,7 +35,7 @@ public sealed class GetSpectatorScreen(ILeaderboardCache cache, ICompetitionVisi
         {
             if (permission.DataScope == LeaderboardDataScope.Frozen)
                 await messages.ApplyCompetitionVisibilityAsync(id, now, ct);
-            else await cache.InvalidateAsync(id, ct);
+            else await cache.RequestRefreshAsync(id, ct);
             return new(SpectatorReadState.Processing);
         }
         var publicTracks = await tracks.ExecuteAsync(id, null, false, false, ct);

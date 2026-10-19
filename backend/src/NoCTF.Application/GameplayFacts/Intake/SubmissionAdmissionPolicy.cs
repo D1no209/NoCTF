@@ -124,7 +124,7 @@ public static class GameplayFactAdmissionPolicy
         var acceptedAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
             ? snapshot.AcceptedFlagAttempts
             : snapshot.AcceptedFixAttempts;
-        if (!practice && maxAttempts is > 0 && acceptedAttempts >= maxAttempts)
+        if (kind == GameplayFactKind.FixAttempt && !practice && maxAttempts is > 0 && acceptedAttempts >= maxAttempts)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.AttemptsExhausted, "The maximum number of accepted attempts has been reached.");
         return OperationResult<GameplayFactAdmissionFailureCode>.Success();
     }

@@ -47,6 +47,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/trends");
         AllowAnonymous();
+        Options(builder => builder.CacheOutput(PublicCtfLeaderboardCachePolicy.Name));
         Summary(summary => summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection.");
     }
 
@@ -55,7 +56,8 @@ public sealed class GetLeaderboardTrendsEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var visibility = await access.ResolveAsync(
+        var prepared = PublicCtfLeaderboardCachePolicy.GetPrepared(HttpContext, request.CompetitionId);
+        var visibility = prepared?.Permission ?? await access.ResolveAsync(
             user.UserId,
             request.CompetitionId,
             timeProvider.GetUtcNow(),
@@ -74,9 +76,9 @@ public sealed class GetLeaderboardTrendsEndpoint(
                 []));
         }
 
-        var projection = visibility.DataScope == LeaderboardDataScope.Frozen
+        var projection = prepared?.Projection ?? (visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
-            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
+            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken));
         if (projection is null)
         {
             if (visibility.DataScope == LeaderboardDataScope.Frozen)
@@ -100,26 +102,29 @@ public sealed class GetLeaderboardTrendsEndpoint(
                     });
             }
 
-            await leaderboard.InvalidateAsync(request.CompetitionId, cancellationToken);
+            await leaderboard.RequestRefreshAsync(request.CompetitionId, cancellationToken);
             return Processing(request.CompetitionId);
         }
 
+        var requiresTrackScope = visibility.TracksEnabled || projection.Snapshot.TracksEnabled
+            || projection.Snapshot.Tracks.Any(track => track.IsInternal);
         var canViewInternalTracks = user.UserId != Guid.Empty
+            && requiresTrackScope
             && await authorizer.CanJudgeAsync(
                 user.UserId,
                 request.CompetitionId,
                 cancellationToken);
-        var tracks = await getTracks.ExecuteAsync(
+        var tracks = requiresTrackScope ? await getTracks.ExecuteAsync(
             request.CompetitionId,
             user.UserId == Guid.Empty ? null : user.UserId,
             canViewInternalTracks,
             includeInvitationCodes: false,
-            cancellationToken);
-        if (tracks is null)
+            cancellationToken) : null;
+        if (requiresTrackScope && tracks is null)
             return TypedResults.NotFound();
 
         projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
-        projection = ScoreboardAudienceProjection.FilterTracks(
+        if (tracks is not null) projection = ScoreboardAudienceProjection.FilterTracks(
             projection,
             tracks,
             canViewInternalTracks);
@@ -135,6 +140,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
             }
         };
         var trends = await buildTrends.ExecuteAsync(projection, cancellationToken);
+        if (trends is not null) PublicCtfLeaderboardCachePolicy.SetResponseVersion(HttpContext, trends.Version);
         return trends is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(ToResponse(trends));

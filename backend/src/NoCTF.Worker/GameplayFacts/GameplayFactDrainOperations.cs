@@ -19,7 +19,8 @@ internal static partial class BackendMessageOperations
             message.Cutoff,
             rejudge: false,
             message.GameplayFactId,
-            message,
+            message.AfterOccurredAt,
+            message.AfterId,
             db,
             outbox,
             timeProvider,
@@ -37,7 +38,8 @@ internal static partial class BackendMessageOperations
             message.Cutoff,
             rejudge: true,
             message.GameplayFactId,
-            message,
+            message.AfterOccurredAt,
+            message.AfterId,
             db,
             outbox,
             timeProvider,
@@ -49,7 +51,8 @@ internal static partial class BackendMessageOperations
         DateTimeOffset cutoff,
         bool rejudge,
         Guid? requestedGameplayFactId,
-        object continuationMessage,
+        DateTimeOffset? afterOccurredAt,
+        Guid? afterId,
         NoCtfDbContext db,
         IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
@@ -64,6 +67,9 @@ internal static partial class BackendMessageOperations
             submission.CompetitionId == competitionId
             && submission.CompetitionChallengeId == competitionChallengeId
             && submission.OccurredAt <= cutoff);
+        if (afterOccurredAt is { } after && afterId is { } cursorId)
+            candidates = candidates.Where(item => item.OccurredAt > after
+                || item.OccurredAt == after && item.Id.CompareTo(cursorId) > 0);
         if (requestedGameplayFactId is Guid gameplayFactId)
         {
             candidates = candidates.Where(submission =>
@@ -98,11 +104,13 @@ internal static partial class BackendMessageOperations
             return;
 
         var now = timeProvider.GetUtcNow();
+        var revision = Guid.NewGuid();
         await candidates.Where(submission => candidateIds.Contains(submission.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(
                     submission => submission.State,
                     NoCTF.Domain.Gameplay.GameplayFactState.Queued)
+                .SetProperty(submission => submission.ConcurrencyStamp, revision)
                 .SetProperty(submission => submission.UpdatedAt, now),
                 cancellationToken);
         var submissions = await db.GameplayFacts.AsNoTracking()
@@ -113,10 +121,19 @@ internal static partial class BackendMessageOperations
         foreach (var submission in submissions)
             await outbox.PublishAsync(new EvaluateGameplayFact(
                 submission.Id,
-                Guid.CreateVersion7(now)));
-        if (candidateIds.Length == batchSize && requestedGameplayFactId is null)
-            await outbox.PublishAsync(continuationMessage);
+                submission.ConcurrencyStamp,
+                GameplayFactDispatchPurpose.Rejudgement));
         await db.SaveChangesAsync(cancellationToken);
+        if (submissions.Length == batchSize && requestedGameplayFactId is null)
+        {
+            var last = submissions[^1];
+            if (rejudge)
+                await outbox.PublishAsync(new DrainGameplayFactRejudge(competitionId, competitionChallengeId,
+                    cutoff, AfterOccurredAt: last.OccurredAt, AfterId: last.Id));
+            else
+                await outbox.PublishAsync(new DrainGameplayFactEvaluation(competitionId, competitionChallengeId,
+                    cutoff, AfterOccurredAt: last.OccurredAt, AfterId: last.Id));
+        }
         await outbox.FlushOutgoingMessagesAsync();
     }
 }

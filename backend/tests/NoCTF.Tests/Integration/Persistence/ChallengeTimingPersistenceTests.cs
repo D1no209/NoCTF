@@ -100,9 +100,11 @@ public sealed class ChallengeTimingPersistenceTests
             State = GameplayFactState.Queued, OccurredAt = f.Now.AddMinutes(-1), UpdatedAt = f.Now.AddMinutes(-1) });
         await f.Db.SaveChangesAsync(ct);
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(f.Now.AddMinutes(-5)), f.Now), ct);
-        var processor = new GameplayFactProcessor(f.Db, new NoCTF.GameModes.GameplayFact.GameModeGameplayFactEvaluatorCatalog(), new GameModeGameplayFactAdmissionPolicy(),
+        var processor = new GameplayFactProcessor(f.Db, new NoCTF.GameModes.GameplayFact.GameModeGameplayFactEvaluatorCatalog(),
             Substitute.For<IPostCommitMessagePublisher>(), Substitute.For<ILeaderboardSnapshotFactory>());
-        await processor.ProcessAsync(id, ct);
+        var expectedStamp = await f.Db.GameplayFacts.AsNoTracking().Where(item => item.Id == id)
+            .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
+        await processor.ProcessAsync(id, expectedStamp, ct);
         await Assert.That(await f.Db.GameplayFacts.Where(x => x.Id == id).Select(x => x.Result).SingleAsync(ct)).IsEqualTo(GameplayFactResult.Correct);
         await Assert.That((await new FlagAttemptStateReader(f.Db).ReadAsync(f.Competition.Id, f.Challenge.Id, team.Id, GameMode.Ctf, CompetitionStatus.Running, ct))!.Accepted).IsEqualTo(1);
     });
@@ -385,7 +387,7 @@ public sealed class ChallengeTimingPersistenceTests
         builder.Services.AddSingleton<IChallengeTimingPreviewReader, ChallengeTimingPreviewReader>();
         builder.Services.AddSingleton<IChallengeTimingStore>(f.Store);
         builder.Services.AddSingleton<ManageChallengeTiming>();
-        builder.Services.AddSingleton(new SubmitFlag(new GameplayFactIntakeStore(f.Db, messages, new GameplayFactAttemptCriticalSection()), new GameModeGameplayFactAdmissionPolicy()));
+        builder.Services.AddSingleton(new SubmitFlag(new GameplayFactIntakeStore(f.Db, messages), new GameModeGameplayFactAdmissionPolicy()));
         await using var app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.UseNoCtfEndpoints(); await app.StartAsync(ct);
         using var client = app.GetTestClient();
         var uri = $"/api/v1/admin/competitions/{f.Competition.Id}/challenges/{f.Challenge.Id}";

@@ -114,6 +114,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             pending.Select(fact => fact.CompetitionId), pending.Select(fact => fact.Awd!.ReceivedRoundId!.Value), ct);
         var applied = added;
         var ready = new List<GameplayFact>();
+        var held = new List<GameplayFact>();
         foreach (var fact in pending)
         {
             var details = fact.Awd!;
@@ -133,6 +134,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             if (details.AttemptStartedAt is null && competition.Status == CompetitionStatus.Finished)
             {
                 await HoldAsync(fact, AwdCheckReason.TaskNotExecuted, now, ct);
+                held.Add(fact);
                 applied = true;
                 continue;
             }
@@ -140,6 +142,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             if (now > details.ReceiptDeadline || details.AttemptStartedAt is null && now >= details.Deadline)
             {
                 await HoldAsync(fact, details.AttemptStartedAt is null ? AwdCheckReason.TaskNotExecuted : AwdCheckReason.CallbackMissing, now, ct);
+                held.Add(fact);
                 applied = true;
                 continue;
             }
@@ -192,6 +195,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             if (details.RuntimeId != runtime.Id)
             {
                 await HoldAsync(fact, AwdCheckReason.RuntimeSuperseded, now, ct);
+                held.Add(fact);
                 applied = true;
                 continue;
             }
@@ -216,6 +220,8 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             await outbox.PublishAsync(new DispatchAwdCheckers(now));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        foreach (var fact in held)
+            await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return applied ? MessageExecutionOutcome.Applied : MessageExecutionOutcome.Idempotent;
     }
@@ -341,6 +347,5 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             CompetitionEventLevel.Warning, CompetitionEventVisibility.Team, now, TeamId: fact.TeamId,
             CompetitionChallengeId: fact.CompetitionChallengeId, RuntimeInstanceId: details.RuntimeId,
             GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State), ct);
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
     }
 }

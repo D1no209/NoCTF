@@ -53,7 +53,6 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             var quota = new TeamRuntimeQuota(new());
             var store = new PatchVerificationTargetStore(
                 db,
-                new GameplayFactAttemptCriticalSection(),
                 new FixedRuntimePlacementPolicy(),
                 quota,
                 outbox);

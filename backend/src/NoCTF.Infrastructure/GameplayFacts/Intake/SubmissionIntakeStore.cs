@@ -21,7 +21,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 public sealed class GameplayFactIntakeStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    GameplayFactAttemptCriticalSection attemptCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null,
     IRequestReplay? replay = null,
@@ -29,17 +28,6 @@ public sealed class GameplayFactIntakeStore(
     TimeProvider? clock = null,
     IGameplayFactAdmissionModePolicy? admissionModePolicy = null) : IGameplayFactIntakeStore
 {
-    public GameplayFactIntakeStore(
-        NoCtfDbContext db,
-        IPostCommitMessagePublisher outbox,
-        ICompetitionEventRecorder? eventRecorder = null)
-        : this(
-            db,
-            outbox,
-            new GameplayFactAttemptCriticalSection(),
-            eventRecorder)
-    { }
-
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
     private readonly IChallengeRuntimeTemplateCatalog templates =
@@ -71,7 +59,8 @@ public sealed class GameplayFactIntakeStore(
                 userId,
                 timeProvider.GetUtcNow(),
                 templates,
-                cancellationToken);
+                modePolicy,
+                cancellationToken, flagIntake: true);
         }
         finally
         {
@@ -98,39 +87,68 @@ public sealed class GameplayFactIntakeStore(
         int? maxAttempts,
         CancellationToken cancellationToken)
     {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var committed = false;
+            try
+            {
+                return await TryAcceptFlagsCoreAsync(received, snapshot, maxAttempts,
+                    () => committed = true, cancellationToken);
+            }
+            catch (Exception exception) when (!committed)
+            {
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                var receiptRace = replay is not null && exception.GetBaseException() is System.Data.Common.DbException { SqlState: "23505" }
+                    && exception is DbUpdateException update && update.Entries.Any(entry => entry.Entity is CommandReceipt);
+                if (attempt == 2 || !TransactionFailureClassifier.IsRetryable(exception) && !receiptRace) throw;
+                await Task.Delay(Random.Shared.Next(5, 26), cancellationToken);
+            }
+        }
+        throw new InvalidOperationException("Flag admission retries exhausted.");
+    }
+
+    private async Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsCoreAsync(
+        IReadOnlyList<FlagGameplayFactReceived> received,
+        GameplayFactAdmissionSnapshot snapshot,
+        int? maxAttempts,
+        Action markCommitted,
+        CancellationToken cancellationToken)
+    {
         if (received.Count == 0)
             return [];
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
-        using var attemptLease = await attemptCriticalSection.AcquireAsync(
-            db,
-            received[0].TeamId,
-            received[0].CompetitionChallengeId,
-            received[0].Kind,
-            cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var previous = await FindFlagReplayAsync(received[0].CompetitionId, received[0].CompetitionChallengeId,
             received[0].UserId, received.Select(item => item.Value).ToArray(), cancellationToken);
         if (previous is not null) return previous;
         var recheckStarted = Stopwatch.GetTimestamp();
         GameplayFactAdmissionSnapshot? current;
-        using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.AdmissionRecheck"))
+        if (snapshot.Mode == GameMode.Ctf)
         {
-            try
+            current = snapshot;
+        }
+        else
+        {
+            using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.AdmissionRecheck"))
             {
-                current = await GameplayFactAdmissionPersistence.LoadAsync(
-                    db,
-                    received[0].CompetitionId,
-                    received[0].CompetitionChallengeId,
-                    received[0].UserId,
-                    timeProvider.GetUtcNow(),
-                    templates,
-                    cancellationToken);
-            }
-            finally
-            {
-                NoCtfTelemetry.RecordGameplayFactStage(
-                    GameplayFactPerformanceStage.AdmissionRecheck,
-                    Stopwatch.GetElapsedTime(recheckStarted).TotalSeconds);
+                try
+                {
+                    current = await GameplayFactAdmissionPersistence.LoadAsync(
+                        db,
+                        received[0].CompetitionId,
+                        received[0].CompetitionChallengeId,
+                        received[0].UserId,
+                        timeProvider.GetUtcNow(),
+                        templates,
+                        modePolicy,
+                        cancellationToken, flagIntake: true);
+                }
+                finally
+                {
+                    NoCtfTelemetry.RecordGameplayFactStage(
+                        GameplayFactPerformanceStage.AdmissionRecheck,
+                        Stopwatch.GetElapsedTime(recheckStarted).TotalSeconds);
+                }
             }
         }
         if (current is not null
@@ -160,10 +178,6 @@ public sealed class GameplayFactIntakeStore(
                 && !GameplayFactAdmissionPolicy.IsAwdAcceptanceWindow(current, received[0].Kind, received[0].OccurredAt))
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
-        if (!practice && maxAttempts is > 0
-            && checked(current.AcceptedFlagAttempts + received.Count) > maxAttempts)
-            return received.Select(_ => new GameplayFactAcceptanceResult(
-                GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();
 
         AwdFactDetails? awdReceipt = null;
         if (current.Mode == GameMode.Awd)
@@ -218,8 +232,6 @@ public sealed class GameplayFactIntakeStore(
         db.GameplayFacts.AddRange(entities);
         foreach (var entity in entities)
         {
-            await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id));
-            await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
             await events.RecordAsync(new(
                 entity.CompetitionId,
                 CompetitionEventKind.GameplayFactReceived,
@@ -253,6 +265,12 @@ public sealed class GameplayFactIntakeStore(
         var commitStarted = Stopwatch.GetTimestamp();
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        markCommitted();
+        foreach (var entity in entities)
+        {
+            await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id, entity.ConcurrencyStamp));
+            await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State, entity.ConcurrencyStamp));
+        }
         NoCtfTelemetry.RecordGameplayFactStage(
             GameplayFactPerformanceStage.PersistenceCommit,
             Stopwatch.GetElapsedTime(commitStarted).TotalSeconds);
@@ -301,10 +319,10 @@ public sealed class GameplayFactIntakeStore(
             UpdatedAt = received.OccurredAt
         };
         db.GameplayFacts.Add(entity);
-        await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id));
-        await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id, entity.ConcurrencyStamp));
+        await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State, entity.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return new(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt);
     }
@@ -314,8 +332,6 @@ public sealed class GameplayFactIntakeStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        using var attemptLease = await attemptCriticalSection.AcquireAsync(db, received.TeamId,
-            received.CompetitionChallengeId, GameplayFactKind.ManualAdjustment, cancellationToken);
         var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == received.CompetitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(cancellationToken);
         if (mode is not null && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).ManualScoreAdjustment)
             return new(GameplayFactAcceptanceState.UnsupportedMode);
@@ -348,7 +364,6 @@ public sealed class GameplayFactIntakeStore(
             UpdatedAt = received.OccurredAt
         };
         db.GameplayFacts.Add(entity);
-        await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
         await events.RecordAsync(new(
             entity.CompetitionId,
             CompetitionEventKind.ScoringRecorded,
@@ -365,6 +380,7 @@ public sealed class GameplayFactIntakeStore(
         replay?.Store(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State, entity.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return new(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt);
     }

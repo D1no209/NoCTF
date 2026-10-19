@@ -13,20 +13,8 @@ namespace NoCTF.Infrastructure.Challenges.Hints;
 public sealed class ChallengeHintStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    TeamChallengeCriticalSection criticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
-    public ChallengeHintStore(
-        NoCtfDbContext db,
-        IPostCommitMessagePublisher outbox,
-        ICompetitionEventRecorder? eventRecorder = null)
-        : this(
-            db,
-            outbox,
-            new TeamChallengeCriticalSection(),
-            eventRecorder)
-    { }
-
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -214,11 +202,6 @@ public sealed class ChallengeHintStore(
         if (!await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
                 .IsActiveAsync(competitionId, competitionChallengeId, teamId, ct))
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        using var unlockLease = await criticalSection.AcquireAsync(
-            db,
-            teamId.Value,
-            competitionChallengeId,
-            ct);
         var challenge = await db.CompetitionChallenges
             .SingleOrDefaultAsync(item =>
                 item.Id == competitionChallengeId &&
@@ -248,7 +231,7 @@ public sealed class ChallengeHintStore(
             return HintUnlockAttempt.Success(new(existingId, false));
 
         var gameplayFactId = Guid.CreateVersion7(now);
-        db.GameplayFacts.Add(new HintUnlockGameplayFact
+        var entity = new HintUnlockGameplayFact
         {
             Id = gameplayFactId,
             CompetitionId = competitionId,
@@ -260,10 +243,11 @@ public sealed class ChallengeHintStore(
             OccurredAt = now,
             State = GameplayFactState.Queued,
             UpdatedAt = now
-        });
-        await outbox.PublishAsync(new EvaluateGameplayFact(gameplayFactId));
+        };
+        db.GameplayFacts.Add(entity);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await outbox.PublishAsync(new EvaluateGameplayFact(gameplayFactId, entity.ConcurrencyStamp));
         await outbox.FlushCommittedMessagesAsync();
         return HintUnlockAttempt.Success(new(gameplayFactId, true));
     }

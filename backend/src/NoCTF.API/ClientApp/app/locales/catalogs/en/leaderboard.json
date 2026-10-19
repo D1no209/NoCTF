@@ -1,4 +1,5 @@
 {
+  "leaderboard.label.lastUpdated": "Last updated: {time}",
   "leaderboard.label.solvedChallenges": "Solved challenges",
   "leaderboard.label.solved": "Solved by",
   "leaderboard.label.solved.detailDialogView": "Solved at",

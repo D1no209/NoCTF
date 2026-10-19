@@ -18,6 +18,7 @@ public sealed class CurrentAccessTokenValidator(IMfaAuthenticationStore mfa)
         ClaimsPrincipal? principal,
         CancellationToken cancellationToken)
     {
+        using var measurement = NoCTF.Application.Observability.NoCtfTelemetry.MeasureAuthentication();
         var subject = principal?.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? principal?.FindFirstValue("sub");
         var version = principal?.FindFirstValue("token_version");

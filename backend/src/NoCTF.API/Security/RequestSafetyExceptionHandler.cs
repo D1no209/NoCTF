@@ -26,6 +26,15 @@ public sealed class RequestSafetyExceptionHandler(ILogger<RequestSafetyException
         }
         var cause = exception;
         while (cause.InnerException is not null) cause = cause.InnerException;
+        if (TransactionFailureClassifier.IsDependencyUnavailable(exception))
+        {
+            logger.LogWarning("Database dependency unavailable: {CauseType}, state {SqlState}; request {TraceId}.",
+                cause.GetType().Name, (cause as System.Data.Common.DbException)?.SqlState, context.TraceIdentifier);
+            await ApiProblems.Problem(statusCode: 503,
+                title: ApiMessages.Get(ApiMessageId.RequestSafetyExceptionHandlerTitleRequestSafetyExceptionHandler),
+                extensions: new Dictionary<string, object?> { ["code"] = "DependencyUnavailable" }).ExecuteAsync(context);
+            return true;
+        }
         if (!TransactionFailureClassifier.IsRetryable(exception))
             return false;
         logger.LogWarning("Transactional request contention: {ExceptionType}, cause {CauseType}; request {TraceId}.",

@@ -37,8 +37,11 @@ public static class MessageRouting
         Route<NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture>(options, WorkerQueue.LiveSoloMedia);
         Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles>(options, WorkerQueue.LiveSoloMedia);
         Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw>(options, WorkerQueue.LiveSoloMedia);
-        Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
+        Route<GameplayFactStateChanged>(options, WorkerQueue.Notifications);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
+        Route<ReconcileBloodAnnouncements>(options, WorkerQueue.Projection);
+        Route<StopSolvedChallengeRuntimes>(options, WorkerQueue.Gameplay);
+        Route<NavigationCapabilitiesChanged>(options, WorkerQueue.Background);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);
         Route<CleanupCompetitionRuntimes>(options, WorkerQueue.Control);
         Route<ProvisionCompetitionRuntimes>(options, WorkerQueue.Control);

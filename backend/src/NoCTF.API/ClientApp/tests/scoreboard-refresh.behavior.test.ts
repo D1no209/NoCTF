@@ -1,6 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
-import { computed, ref } from 'vue'
+import { computed, ref, watch, hasInjectionContext, inject, provide } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import * as coherence from '../app/utils/scoreboard-coherence'
 
@@ -9,7 +9,7 @@ import * as coherence from '../app/utils/scoreboard-coherence'
 const source = await sourceFile(new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '')
-  .replace('export function useScoreboardMatrix', 'function useScoreboardMatrix')
+  .replace(/export function /g, 'function ')
 
 function harness() {
   let version = 1
@@ -23,7 +23,8 @@ function harness() {
   let handlers: Record<string, (value?: unknown) => void> = {}
   const requests: Array<number | null> = []
   const deps = {
-    ref, computed, createTrailingRefresh, ...coherence,
+    ref, computed, watch, hasInjectionContext, inject, provide, createTrailingRefresh, ...coherence,
+    useAuth: () => ({ user: ref(null) }),
     translate: (value: string) => value,
     parseApiError: (value: unknown) => ({ message: String(value) }),
     competitionHubString: (value: Record<string, unknown>, key: string) => value[key],
@@ -60,13 +61,13 @@ function harness() {
   }
 }
 
-async function drain() { await new Promise(resolve => setTimeout(resolve, 0)) }
+async function drain(milliseconds = 0) { await new Promise(resolve => setTimeout(resolve, milliseconds)) }
 
 test('duration update notification replaces schema and snapshot together without a page reload', async () => {
   const app = harness()
   app.mount(); await drain()
   expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:01:00Z')
-  app.update(); app.notice(); await drain()
+  app.update(); app.notice(); await drain(550)
   expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:02:00Z')
   expect(app.board.snapshot.value.schemaRevision).toBe(app.board.schema.value.revision)
   expect(app.board.schema.value.columns).toHaveLength(1)
@@ -88,7 +89,7 @@ test('terminal refresh retains rounds and cells, then stops periodic REST reads'
 test('processing refresh preserves the last coherent board and recovers on the next fetch', async () => {
   const app = harness()
   app.mount(); await drain()
-  app.update(); app.processing(true); app.notice(); await drain()
+  app.update(); app.processing(true); app.notice(); await drain(550)
   expect(app.board.snapshot.value.version).toBe('1')
   expect(app.board.schema.value.revision).toBe('10')
   expect(app.board.processing.value).toBeTrue()

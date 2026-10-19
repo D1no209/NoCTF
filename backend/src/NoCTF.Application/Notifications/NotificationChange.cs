@@ -7,7 +7,8 @@ public readonly record struct NotificationAudience(
     Guid TargetId,
     Guid? ThreadRootId = null);
 
-public sealed record NotificationChanged(NotificationAudience[] Audiences);
+public enum NotificationChangeKind { Content, NavigationCapabilities }
+public sealed record NotificationChanged(NotificationAudience[] Audiences, NotificationChangeKind Kind = NotificationChangeKind.Content);
 
 public interface INotificationChangePublisher
 {

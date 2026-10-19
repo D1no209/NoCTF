@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2514,
+  "textAssertions": 2508,
   "sourceTextAssertions": {
-    "total": 1807,
+    "total": 1801,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -75,7 +75,7 @@
       "runtime-card.test.ts": 9,
       "runtime-operation-coordinator.test.ts": 7,
       "runtime-url.test.ts": 4,
-      "scoreboard-matrix.test.ts": 112,
+      "scoreboard-matrix.test.ts": 106,
       "scrollbar-position.test.ts": 2,
       "sdk-download.test.ts": 19,
       "sso.test.ts": 35,

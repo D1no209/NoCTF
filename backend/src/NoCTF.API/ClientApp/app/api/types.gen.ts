@@ -4078,6 +4078,11 @@ export type NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse = {
     protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
 };
 
+export type NoCtfapiEndpointsAuthenticationNavigationCapabilitiesResponse = {
+    canAccessTheoryBank?: boolean;
+    hasManagedCompetitions?: boolean;
+};
+
 export type NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse = {
     flowId?: string;
     providerId?: string;
@@ -14378,6 +14383,33 @@ export type AuthenticationUploadMyWallpaperResponses = {
 };
 
 export type AuthenticationUploadMyWallpaperResponse = AuthenticationUploadMyWallpaperResponses[keyof AuthenticationUploadMyWallpaperResponses];
+
+export type GetNavigationCapabilitiesEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/navigation-capabilities';
+};
+
+export type GetNavigationCapabilitiesEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type GetNavigationCapabilitiesEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationNavigationCapabilitiesResponse;
+};
+
+export type GetNavigationCapabilitiesEndpointResponse = GetNavigationCapabilitiesEndpointResponses[keyof GetNavigationCapabilitiesEndpointResponses];
 
 export type AuthenticationSsoGetFlowData = {
     body?: never;

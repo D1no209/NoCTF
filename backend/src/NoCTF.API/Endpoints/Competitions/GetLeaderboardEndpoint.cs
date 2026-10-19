@@ -338,6 +338,7 @@ public sealed class GetLeaderboardEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
+        Options(builder => builder.CacheOutput(PublicCtfLeaderboardCachePolicy.Name));
         Summary(summary => summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh.");
     }
 
@@ -346,7 +347,8 @@ public sealed class GetLeaderboardEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var visibility = await access.ResolveAsync(
+        var prepared = PublicCtfLeaderboardCachePolicy.GetPrepared(HttpContext, request.CompetitionId);
+        var visibility = prepared?.Permission ?? await access.ResolveAsync(
             user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null)
             return TypedResults.NotFound();
@@ -361,9 +363,9 @@ public sealed class GetLeaderboardEndpoint(
             }));
         }
 
-        var projection = visibility.DataScope == LeaderboardDataScope.Frozen
+        var projection = prepared?.Projection ?? (visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
-            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
+            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken));
         if (projection is not null
             && visibility.DataScope != LeaderboardDataScope.Frozen
             && request.EndingRound is int endingRound
@@ -382,18 +384,20 @@ public sealed class GetLeaderboardEndpoint(
         }
         if (projection is not null)
         {
+            var requiresTrackScope = visibility.TracksEnabled || projection.Snapshot.TracksEnabled
+                || projection.Snapshot.Tracks.Any(track => track.IsInternal);
             var canViewInternalTracks = user.UserId != Guid.Empty
-                && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
-            var tracks = await getTracks.ExecuteAsync(
+                && requiresTrackScope && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
+            var tracks = requiresTrackScope ? await getTracks.ExecuteAsync(
                 request.CompetitionId,
                 user.UserId == Guid.Empty ? null : user.UserId,
                 canViewInternalTracks,
                 includeInvitationCodes: false,
-                cancellationToken);
-            if (tracks is null)
+                cancellationToken) : null;
+            if (requiresTrackScope && tracks is null)
                 return TypedResults.NotFound();
             projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
-            projection = ScoreboardAudienceProjection.FilterTracks(
+            if (tracks is not null) projection = ScoreboardAudienceProjection.FilterTracks(
                 projection,
                 tracks,
                 canViewInternalTracks);
@@ -405,6 +409,7 @@ public sealed class GetLeaderboardEndpoint(
                     ? projection.Snapshot.DataAsOf
                     : projection.Snapshot.GeneratedAt
             };
+            PublicCtfLeaderboardCachePolicy.SetResponseVersion(HttpContext, snapshot.Version);
             return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(snapshot));
         }
 
@@ -425,7 +430,7 @@ public sealed class GetLeaderboardEndpoint(
                     ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed
                 });
         }
-        await leaderboard.InvalidateAsync(request.CompetitionId, cancellationToken);
+        await leaderboard.RequestRefreshAsync(request.CompetitionId, cancellationToken);
         return Processing(request.CompetitionId);
     }
 

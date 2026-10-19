@@ -18,8 +18,15 @@ public class WolverinePostCommitMessagePublisher(
 
     public ValueTask PublishAsync<T>(T message)
     {
-        pending.Add(() => bus.PublishAsync(message, Delivery(message)));
+        pending.Add(() => PublishCurrentAsync(message));
         return ValueTask.CompletedTask;
+    }
+
+    private ValueTask PublishCurrentAsync<T>(T message)
+    {
+        if (message is EvaluateGameplayFact evaluation)
+            return bus.PublishAsync(evaluation, Delivery(evaluation));
+        return bus.PublishAsync(message, Delivery(message));
     }
 
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt)
@@ -97,7 +104,9 @@ public class WolverinePostCommitMessagePublisher(
         var typeName = typeof(T).FullName ?? typeof(T).Name;
         var scheduleIdentity = scheduledAt?.UtcTicks.ToString(
             System.Globalization.CultureInfo.InvariantCulture) ?? "immediate";
-        var identity = $"{typeName}:{scheduleIdentity}:{Convert.ToHexString(SHA256.HashData(payload))}";
+        var identity = message is ProjectLeaderboard or NavigationCapabilitiesChanged
+            ? $"{typeName}:{Guid.NewGuid():N}"
+            : $"{typeName}:{scheduleIdentity}:{Convert.ToHexString(SHA256.HashData(payload))}";
         var options = new DeliveryOptions
         {
             ScheduledTime = scheduledAt,

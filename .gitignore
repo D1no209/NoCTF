@@ -67,6 +67,7 @@ backend/artifacts/*
 # Crowdin CI staging contains build-only candidate catalogs.
 .crowdin-stage/
 .crowdin-stage.yml
+.playwright-cli/
 
 # Private operational records and local recovery material
 /HANDOFF.md

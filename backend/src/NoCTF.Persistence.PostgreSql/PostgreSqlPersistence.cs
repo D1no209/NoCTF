@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Infrastructure.Persistence;
+using Npgsql;
 
 namespace NoCTF.Persistence.PostgreSql;
 
@@ -18,15 +19,25 @@ public static class PostgreSqlPersistence
                 $"Database provider '{provider}' is not installed. This build supports PostgreSql only.");
         var connectionString = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        void Configure(DbContextOptionsBuilder options) => options
-                .UseNpgsql(connectionString, npgsql => npgsql
+        services.AddSingleton<NpgsqlDataSource>(_ =>
+        {
+            var settings = new NpgsqlConnectionStringBuilder(connectionString);
+            settings.MaxPoolSize = Math.Min(settings.MaxPoolSize,
+                configuration.GetValue("Database:MaximumPoolSize", 80));
+            settings.MaxAutoPrepare = configuration.GetValue("Database:MaximumAutoPreparedStatements", 64);
+            settings.AutoPrepareMinUsages = configuration.GetValue("Database:AutoPrepareMinUsages", 2);
+            var builder = new NpgsqlDataSourceBuilder(settings.ConnectionString) { Name = "NoCTF" };
+            return builder.Build();
+        });
+        void Configure(IServiceProvider provider, DbContextOptionsBuilder options) => options
+                .UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql
                     .MigrationsAssembly(typeof(PostgreSqlPersistence).Assembly.FullName)
                     // Aggregate decisions keep one statement's snapshot; bounded read projections opt into splitting.
                     .UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery))
-                .UseSnakeCaseNamingConvention();
-        services.AddDbContext<NoCtfDbContext>(Configure,
-            contextLifetime: ServiceLifetime.Scoped,
-            optionsLifetime: ServiceLifetime.Singleton);
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(new NoCTF.Infrastructure.Observability.DatabaseCommandPerformanceInterceptor(),
+                    new NoCTF.Infrastructure.Observability.DatabaseConnectionPerformanceInterceptor());
+        services.AddScoped<NoCtfDbContext>();
         services.AddDbContextFactory<NoCtfDbContext>(Configure);
         return services;
     }

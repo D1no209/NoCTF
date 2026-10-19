@@ -8,7 +8,8 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Theory.Questions;
 
-public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
+public sealed class TheoryQuestionBank(NoCtfDbContext db,
+    NoCTF.Application.Messaging.IPostCommitMessagePublisher? navigationChanges = null) : ITheoryQuestionBank
 {
     public Task<TheoryBankWriteResult> SaveAsync(Guid actorId, Guid? questionId, TheoryQuestionRevision revision, CancellationToken ct)
         => MutateAsync(() => SaveCoreAsync(actorId, questionId, revision, ct), new TheoryBankWriteResult(Failure: TheoryBankFailure.Conflict));
@@ -192,8 +193,11 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
         else if (grant is null) question.Grants.Add(new() { UserId = userId, Permission = permission.Value });
         else grant.Permission = permission.Value;
         db.Entry(question).Property(item => item.ConcurrencyStamp).IsModified = true;
+        if (navigationChanges is not null)
+            await navigationChanges.PublishAsync(new NoCTF.Application.Messaging.NavigationCapabilitiesChanged([userId]));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        if (navigationChanges is not null) await navigationChanges.FlushCommittedMessagesAsync();
         return null;
     }
 
@@ -206,6 +210,7 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
         catch (Exception exception) when (exception is DbUpdateConcurrencyException
             || exception.GetBaseException() is DbException { SqlState: "40001" or "40P01" or "23505" })
         {
+            navigationChanges?.DiscardPendingMessages();
             db.ChangeTracker.Clear();
             return conflict;
         }

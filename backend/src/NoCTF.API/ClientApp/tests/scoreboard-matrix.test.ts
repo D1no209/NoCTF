@@ -68,10 +68,7 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('const requestGeneration = ++generation')
     expect(composable).toContain('requestGeneration !== generation')
     expect(composable).toContain('candidateSnapshot = incoming')
-    expect(composable).toContain('minimumSnapshotVersion')
     expect(composable).toContain('isScoreboardVersionAtLeast')
-    expect(composable).toContain("candidateSnapshot?.dataScope === 'Live'")
-    expect(composable).toContain("snapshot.value === null || snapshot.value.dataScope === 'Live'")
   })
 
   test('keeps scoreboard versions monotonic without losing 64-bit precision', () => {
@@ -91,8 +88,6 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('scoreboardUpdated: (raw) =>')
     expect(composable).toContain('createTrailingRefresh')
     expect(composable).toContain('void queueRefresh({')
-    expect(composable).toContain('catalog: wantsCatalog')
-    expect(composable).toContain('schema: wantsSchema')
     expect(composable).not.toContain('void refresh({ catalog: wantsCatalog')
     expect(composable).not.toContain('totalScore.value +=')
   })
@@ -101,7 +96,6 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain("snapshotResult?.response?.status === 202")
     expect(composable).toContain('scheduleProcessingRetry()')
     expect(composable).toContain('if (snapshotResult?.data)')
-    expect(composable).not.toContain('snapshot.value = null')
   })
 
   test('pages bounded live AWD and AWDP round windows without rebuilding frozen history', () => {

@@ -4,6 +4,7 @@ import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
 import { buildHubConnection, createHubStarter, stopHubConnection } from '../lib/signalr-hub'
 
 export interface NotificationHubHandlers {
+  navigationCapabilitiesChanged?: () => void
   theoryChanged?: (activityId: string) => void
   notificationChanged?: () => void
   onReconnected?: () => void
@@ -34,6 +35,9 @@ function ensureConnection(): signalR.HubConnection {
     preferLongPolling: import.meta.dev,
   })
   hub.on('notificationChanged', notifyChanged)
+  hub.on('navigationCapabilitiesChanged', () => {
+    for (const handlers of subscribers.values()) handlers.navigationCapabilitiesChanged?.()
+  })
   hub.on('theoryChanged', notifyTheoryChanged)
   hub.onreconnected(() => {
     if (connection === hub) notifyReconnected()

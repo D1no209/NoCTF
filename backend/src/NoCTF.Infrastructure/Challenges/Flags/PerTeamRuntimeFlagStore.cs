@@ -9,15 +9,9 @@ using NoCTF.GameModes.Awdp.Configuration;
 
 namespace NoCTF.Infrastructure.Challenges.Flags;
 
-public sealed class PerTeamRuntimeFlagStore(
-    NoCtfDbContext db,
-    TeamChallengeCriticalSection criticalSection)
+public sealed class PerTeamRuntimeFlagStore(NoCtfDbContext db)
     : IPerTeamRuntimeFlagStore
 {
-    public PerTeamRuntimeFlagStore(NoCtfDbContext db)
-        : this(db, new TeamChallengeCriticalSection())
-    { }
-
     public async Task<string> EnsureAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -25,12 +19,6 @@ public sealed class PerTeamRuntimeFlagStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        using var generationLease = await criticalSection.AcquireAsync(
-            db,
-            teamId,
-            competitionChallengeId,
-            cancellationToken);
-
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.CompetitionChallengeId == competitionChallengeId
                 && flag.TeamId == teamId
@@ -96,11 +84,6 @@ public sealed class PerTeamRuntimeFlagStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        using var generationLease = await criticalSection.AcquireAsync(
-            db,
-            teamId,
-            competitionChallengeId,
-            cancellationToken);
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.CompetitionChallengeId == competitionChallengeId
                 && flag.TeamId == teamId

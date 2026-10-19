@@ -189,12 +189,15 @@ public sealed class CompetitionPermissionStore(
         var audienceChanged = !competition.ManagerIds.SequenceEqual(managerIds)
             || !competition.JudgeIds.SequenceEqual(judgeIds)
             || !competition.ObserverIds.SequenceEqual(observerIds);
+        var navigationUsers = competition.Collaborators.Select(item => item.UserId)
+            .Concat(managerIds).Concat(judgeIds).Concat(observerIds).Distinct().ToArray();
         competition.ManagerIds = managerIds;
         competition.JudgeIds = judgeIds;
         competition.ObserverIds = observerIds;
         competition.UpdatedAt = timeProvider.GetUtcNow();
         if (audienceChanged)
         {
+            await outbox.PublishAsync(new NavigationCapabilitiesChanged(navigationUsers));
             await events.RecordAsync(new(
                 competition.Id,
                 CompetitionEventKind.CompetitionAudienceChanged,

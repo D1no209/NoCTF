@@ -1,4 +1,5 @@
 {
+  "leaderboard.label.lastUpdated": "最近更新时间：{time}",
   "leaderboard.label.solvedChallenges": "已解出题目",
   "leaderboard.label.solved": "解出人",
   "leaderboard.label.solved.detailDialogView": "解题时间",

@@ -23,7 +23,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 public sealed class PatchUploadStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    GameplayFactAttemptCriticalSection attemptCriticalSection,
     FileReferenceLock fileLock,
     ILogger<PatchUploadStore> logger,
     ICompetitionEventRecorder? eventRecorder = null,
@@ -58,7 +57,6 @@ public sealed class PatchUploadStore(
         : this(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(),
             new FileReferenceLock(),
             logger,
             null)
@@ -159,12 +157,6 @@ public sealed class PatchUploadStore(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
-            ct);
-        using var attemptLease = await attemptCriticalSection.AcquireAsync(
-            db,
-            scope.TeamId,
-            scope.CompetitionChallengeId,
-            GameplayFactKind.FixAttempt,
             ct);
         if (!await fileLock.AcquireAsync(db, fileId, ct))
             return new(PatchUploadSaveState.ConcurrencyConflict);
@@ -271,7 +263,6 @@ public sealed class PatchUploadStore(
         };
         db.GameplayFacts.Add(fact);
         target.GameplayFactId = fact.Id;
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
         if (target.Purpose == RuntimePurpose.AwdpTarget)
             await outbox.PublishAsync(new StartAwdpFixVerification(fact.Id, target.Id));
         else
@@ -308,6 +299,7 @@ public sealed class PatchUploadStore(
             replay?.Store(new AcceptedAwdpFix(patchUploadId, fact.Id, fact.State));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
             NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
             try
             {

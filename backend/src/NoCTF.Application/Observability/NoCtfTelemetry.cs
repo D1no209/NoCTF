@@ -6,6 +6,22 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Observability;
 
+public enum AdmissionPerformanceStage { AcquireAttempt, Release }
+public enum AdmissionDiagnosticOutcome { Retry, Exhausted }
+public enum AdmissionDiagnosticFailure { Serialization, Deadlock, Other }
+public enum DatabasePerformanceStage { Read, Write, Failed, ConnectionOpen }
+public enum LeaderboardReadPerformanceStage { Read, PublishedBundle, TimingValidation, KeyedLockWait, ClusterLeaseWait, Decode }
+
+public readonly struct PerformanceMeasurement(string area, string stage) : IDisposable
+{
+    private readonly long started = Stopwatch.GetTimestamp();
+
+    public void Dispose()
+    {
+        if (started != 0) NoCtfTelemetry.RecordPerformanceStage(area, stage, Stopwatch.GetElapsedTime(started).TotalSeconds);
+    }
+}
+
 public enum GameplayFactPerformanceStage
 {
     ChallengeAttemptStateRead,
@@ -17,6 +33,8 @@ public enum GameplayFactPerformanceStage
     WorkerEvaluation,
     WorkerCompletion
 }
+
+public enum GameplayFactDeliveryOutcome { Received, Missing, Stale, AlreadyFinished, Completed, CompletionConflict }
 
 public enum RuntimeDispatchPerformanceStage
 {
@@ -84,6 +102,46 @@ public static class NoCtfTelemetry
 
     public static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     private static readonly Meter Meter = new(MeterName);
+    private static readonly Histogram<double> PerformanceStageDuration = Meter.CreateHistogram<double>(
+        "noctf.performance.stage.duration", unit: "s");
+    private static readonly Counter<long> AdmissionTransactions = Meter.CreateCounter<long>(
+        "noctf.admission.transactions", unit: "{transaction}");
+
+    public static PerformanceMeasurement MeasureAdmission(AdmissionPerformanceStage stage) =>
+        PerformanceStageDuration.Enabled || PerformanceEvents.Log.IsEnabled() ? new("Admission", stage.ToString()) : default;
+
+    public static PerformanceMeasurement MeasureLeaderboardRead(LeaderboardReadPerformanceStage stage) =>
+        PerformanceStageDuration.Enabled || PerformanceEvents.Log.IsEnabled() ? new("Leaderboard", stage.ToString()) : default;
+
+    private static readonly Counter<long> LeaderboardDecodedCacheReads = Meter.CreateCounter<long>(
+        "noctf.leaderboard.decoded_cache.reads", unit: "{read}");
+    private static readonly Histogram<long> LeaderboardDecodedPayloadCharacters = Meter.CreateHistogram<long>(
+        "noctf.leaderboard.decoded_cache.payload_size", unit: "{character}");
+
+    public static void RecordLeaderboardDecodedCache(bool hit, int payloadCharacters)
+    {
+        LeaderboardDecodedCacheReads.Add(1, new KeyValuePair<string, object?>("result", hit ? "hit" : "miss"));
+        if (!hit) LeaderboardDecodedPayloadCharacters.Record(payloadCharacters);
+    }
+
+    public static PerformanceMeasurement MeasureAuthentication() =>
+        PerformanceStageDuration.Enabled || PerformanceEvents.Log.IsEnabled() ? new("Authentication", "ValidateContext") : default;
+
+    public static void RecordDatabaseOperation(DatabasePerformanceStage stage, double seconds)
+    {
+        if (PerformanceStageDuration.Enabled || PerformanceEvents.Log.IsEnabled())
+            RecordPerformanceStage("Database", stage.ToString(), seconds);
+    }
+
+    internal static void RecordPerformanceStage(string area, string stage, double seconds)
+    {
+        PerformanceStageDuration.Record(seconds, new TagList { { "area", area }, { "stage", stage } });
+        if (PerformanceEvents.Log.IsEnabled())
+            PerformanceEvents.Log.StageCompleted(Activity.Current?.TraceId.ToString() ?? string.Empty, area, stage, seconds);
+    }
+
+    public static void RecordAdmissionTransaction(AdmissionDiagnosticOutcome outcome, AdmissionDiagnosticFailure failure) =>
+        AdmissionTransactions.Add(1, new TagList { { "outcome", outcome.ToString() }, { "failure", failure.ToString() } });
 
     private static readonly Counter<long> ApiRequests = Meter.CreateCounter<long>(
         "noctf.api.requests", unit: "{request}");
@@ -139,6 +197,8 @@ public static class NoCtfTelemetry
         "noctf.gameplay_fact.submissions", unit: "{submission}");
     private static readonly Counter<long> GameplayFactProcessing = Meter.CreateCounter<long>(
         "noctf.gameplay_fact.processing", unit: "{submission}");
+    private static readonly Counter<long> GameplayFactDeliveries = Meter.CreateCounter<long>(
+        "noctf.gameplay_fact.deliveries", unit: "{delivery}");
     private static readonly Histogram<double> GameplayFactProcessingDuration =
         Meter.CreateHistogram<double>(
             "noctf.gameplay_fact.processing.duration",
@@ -531,6 +591,9 @@ public static class NoCtfTelemetry
         GameplayFactProcessing.Add(1, tags);
         GameplayFactProcessingDuration.Record(Math.Max(0, elapsedSeconds), tags);
     }
+
+    public static void RecordGameplayFactDelivery(GameplayFactDeliveryOutcome outcome) =>
+        GameplayFactDeliveries.Add(1, new TagList { { "outcome", outcome.ToString() } });
 
     public static void RecordGameplayFactStage(
         GameplayFactPerformanceStage stage,

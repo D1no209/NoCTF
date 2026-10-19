@@ -63,7 +63,6 @@ public static class AwdpFixFailureConvergence
                 events,
                 failedAt,
                 cancellationToken);
-            await QueueNextFixAsync(fact, db, outbox, cancellationToken);
         }
 
         var runtimeStateChanged = false;
@@ -141,24 +140,4 @@ public static class AwdpFixFailureConvergence
             ResolvedAt: failedAt), cancellationToken);
     }
 
-    private static async Task QueueNextFixAsync(
-        GameplayFact failed,
-        NoCtfDbContext db,
-        IPostCommitMessagePublisher outbox,
-        CancellationToken cancellationToken)
-    {
-        var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
-            .Where(candidate =>
-                candidate.CompetitionId == failed.CompetitionId
-                && candidate.CompetitionChallengeId == failed.CompetitionChallengeId
-                && candidate.TeamId == failed.TeamId
-                && candidate.Kind == GameplayFactKind.FixAttempt
-                && candidate.State == GameplayFactState.Queued)
-            .OrderBy(candidate => candidate.OccurredAt)
-            .ThenBy(candidate => candidate.Id)
-            .Select(candidate => (Guid?)candidate.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7()));
-    }
 }

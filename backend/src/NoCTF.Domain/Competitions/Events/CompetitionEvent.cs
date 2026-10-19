@@ -73,7 +73,13 @@ public enum CompetitionEventKind : short
     ChallengeWriteUpWithdrawn,
     ChallengeWriteUpRejected,
     ChallengeWriteUpUnlocked,
-    AwdScoringRulesChanged
+    AwdScoringRulesChanged,
+    FirstBloodCorrected,
+    SecondBloodCorrected,
+    ThirdBloodCorrected,
+    FirstBloodWithdrawn,
+    SecondBloodWithdrawn,
+    ThirdBloodWithdrawn
 }
 
 public enum CompetitionEventLevel : short

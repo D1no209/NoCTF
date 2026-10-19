@@ -27,6 +27,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 candidate.OwnerId,
                 IsCollaborator = candidate.Collaborators.Any(collaborator =>
                     collaborator.UserId == userId),
+                IsAdministrator = db.Users.Any(user => user.Id == userId && user.Role == UserRole.Administrator),
                 candidate.FrozenStartAt,
                 candidate.HiddenStartAt
             })
@@ -34,14 +35,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
         if (competition is null)
             return null;
 
-        var identity = userId == Guid.Empty
-            ? null
-            : await db.Users.AsNoTracking()
-                .Where(user => user.Id == userId)
-                .Select(user => new { user.Role })
-                .SingleOrDefaultAsync(ct);
-        var isCollaborator = identity is not null
-            && (identity.Role == UserRole.Administrator
+        var isCollaborator = userId != Guid.Empty
+            && (competition.IsAdministrator
                 || competition.OwnerId == userId
                 || competition.IsCollaborator);
         if ((competition.Status == CompetitionStatus.Draft

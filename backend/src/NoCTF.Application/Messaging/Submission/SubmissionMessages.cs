@@ -2,21 +2,34 @@ namespace NoCTF.Application.Messaging;
 
 public sealed record EvaluateGameplayFact(
     Guid GameplayFactId,
-    Guid DispatchAttemptId = default);
+    Guid ExpectedConcurrencyStamp,
+    GameplayFactDispatchPurpose Purpose = GameplayFactDispatchPurpose.Intake,
+    long RecoveryWindow = 0);
 
-public sealed record GameplayFactStateChanged(Guid GameplayFactId, NoCTF.Domain.Gameplay.GameplayFactState State);
+public enum GameplayFactDispatchPurpose { Intake, Recovery, Rejudgement }
+
+public sealed record GameplayFactStateChanged(Guid GameplayFactId, NoCTF.Domain.Gameplay.GameplayFactState State,
+    Guid ConcurrencyStamp = default);
+
+public sealed record ReconcileBloodAnnouncements(Guid CompetitionId, long ProjectionVersion = 0);
+
+public sealed record StopSolvedChallengeRuntimes(Guid GameplayFactId, Guid ExpectedConcurrencyStamp);
 
 public sealed record DrainGameplayFactEvaluation(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     DateTimeOffset Cutoff,
-    Guid? GameplayFactId = null);
+    Guid? GameplayFactId = null,
+    DateTimeOffset? AfterOccurredAt = null,
+    Guid? AfterId = null);
 
 public sealed record DrainGameplayFactRejudge(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     DateTimeOffset Cutoff,
-    Guid? GameplayFactId = null);
+    Guid? GameplayFactId = null,
+    DateTimeOffset? AfterOccurredAt = null,
+    Guid? AfterId = null);
 
 public sealed record ForeignTeamFlagDetected(
     Guid CompetitionId,

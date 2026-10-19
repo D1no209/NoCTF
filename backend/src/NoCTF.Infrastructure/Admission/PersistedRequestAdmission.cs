@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Admission;
+using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Admission;
@@ -16,11 +17,32 @@ public sealed class PersistedRequestAdmission(
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(30);
     private const int MaximumAttempts = 3;
 
+    public async Task WarmupAsync(CancellationToken ct)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        string[] keys = [Key("warmup", "query-shape")];
+        await ReadWindowsAsync(db, keys, ct);
+        await ReadLeasesAsync(db, keys, clock.GetUtcNow(), ct);
+    }
+
+    private static Task<Dictionary<string, RequestAdmissionWindow>> ReadWindowsAsync(NoCtfDbContext db, string[] keys, CancellationToken ct) =>
+        db.RequestAdmissionWindows.Where(item => keys.Contains(item.KeyHash)).ToDictionaryAsync(item => item.KeyHash, ct);
+
+    private static Task<Dictionary<string, int>> ReadLeasesAsync(NoCtfDbContext db, string[] keys, DateTimeOffset now, CancellationToken ct) =>
+        db.RequestAdmissionLeases.AsNoTracking().Where(item => keys.Contains(item.KeyHash) && item.ExpiresAt > now)
+            .GroupBy(item => item.KeyHash).Select(group => new { KeyHash = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.KeyHash, item => item.Count, ct);
+
     public async ValueTask<IRequestAdmissionLease> AcquireAsync(
         IReadOnlyList<RateQuota> rates,
         IReadOnlyList<ConcurrentQuota> concurrency,
         CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+        if (rates.Count == 0 && concurrency.Count == 0)
+            return new UnrestrictedLease(ct);
+        rates = rates.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
+        concurrency = concurrency.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
         var rateKeys = rates.Select(item => Key("rate", item.Key)).ToArray();
         var leaseKeys = concurrency.Select(item => Key("lease", item.Key)).ToArray();
         if (rateKeys.Distinct().Count() != rateKeys.Length
@@ -40,16 +62,18 @@ public sealed class PersistedRequestAdmission(
                 throw;
             }
             catch (Exception exception) when (attempt + 1 < MaximumAttempts
-                && (exception is DbUpdateException
-                    || TransactionFailureClassifier.IsRetryable(exception)))
+                && IsAdmissionConflict(exception))
             {
-                await Task.Delay(Random.Shared.Next(2, 17), ct);
+                NoCtfTelemetry.RecordAdmissionTransaction(AdmissionDiagnosticOutcome.Retry, ClassifyFailure(exception));
             }
-            catch (Exception exception) when (exception is DbException or DbUpdateException
-                || TransactionFailureClassifier.IsRetryable(exception))
+            catch (Exception exception) when (TransactionFailureClassifier.IsDependencyUnavailable(exception)
+                || IsAdmissionConflict(exception))
             {
+                NoCtfTelemetry.RecordAdmissionTransaction(AdmissionDiagnosticOutcome.Exhausted, ClassifyFailure(exception));
+                if (IsAdmissionConflict(exception)) throw;
                 throw new AdmissionRejectedException(AdmissionFailure.DependencyUnavailable);
             }
+            await Task.Delay(Random.Shared.Next(5, 51) * (attempt + 1), ct);
         }
         throw new AdmissionRejectedException(AdmissionFailure.DependencyUnavailable);
     }
@@ -59,19 +83,13 @@ public sealed class PersistedRequestAdmission(
         IReadOnlyList<ConcurrentQuota> concurrency, string[] leaseKeys,
         CancellationToken ct)
     {
+        using var measurement = NoCtfTelemetry.MeasureAdmission(AdmissionPerformanceStage.AcquireAttempt);
         await using var db = await contexts.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
         var now = clock.GetUtcNow();
-        var windows = await db.RequestAdmissionWindows
-            .Where(item => rateKeys.Contains(item.KeyHash))
-            .ToDictionaryAsync(item => item.KeyHash, ct);
-        var activeLeases = await db.RequestAdmissionLeases.AsNoTracking()
-            .Where(item => leaseKeys.Contains(item.KeyHash)
-                && item.ExpiresAt > now)
-            .GroupBy(item => item.KeyHash)
-            .Select(group => new { KeyHash = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(item => item.KeyHash, item => item.Count, ct);
+        var windows = rateKeys.Length == 0 ? new Dictionary<string, RequestAdmissionWindow>() : await ReadWindowsAsync(db, rateKeys, ct);
+        var activeLeases = leaseKeys.Length == 0 ? new Dictionary<string, int>() : await ReadLeasesAsync(db, leaseKeys, now, ct);
 
         for (var index = 0; index < rates.Count; index++)
         {
@@ -114,9 +132,28 @@ public sealed class PersistedRequestAdmission(
         return new Lease(contexts, clock, leaseId, leaseKeys, ct);
     }
 
+    private static bool IsAdmissionConflict(Exception exception) =>
+        TransactionFailureClassifier.IsRetryable(exception)
+        || exception is DbUpdateException { InnerException: DbException { SqlState: "23505" } } update
+            && update.Entries.All(entry => entry.Entity is RequestAdmissionWindow);
+
     private static string Key(string prefix, string identity) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             prefix + ':' + identity)));
+
+    private static AdmissionDiagnosticFailure ClassifyFailure(Exception exception) =>
+        (exception.GetBaseException() as DbException)?.SqlState switch
+        {
+            "40001" => AdmissionDiagnosticFailure.Serialization,
+            "40P01" => AdmissionDiagnosticFailure.Deadlock,
+            _ => AdmissionDiagnosticFailure.Other
+        };
+
+    private sealed class UnrestrictedLease(CancellationToken token) : IRequestAdmissionLease
+    {
+        public CancellationToken Token => token;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private sealed class Lease : IRequestAdmissionLease
     {
@@ -175,6 +212,7 @@ public sealed class PersistedRequestAdmission(
 
         public async ValueTask DisposeAsync()
         {
+            using var measurement = NoCtfTelemetry.MeasureAdmission(AdmissionPerformanceStage.Release);
             await stopping.CancelAsync();
             await renewal;
             if (keys.Length > 0)

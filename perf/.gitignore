@@ -1,0 +1,7 @@
+.local/
+results/
+node_modules/
+analysis/bin/
+analysis/obj/
+database/bin/
+database/obj/

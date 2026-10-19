@@ -352,7 +352,7 @@ public sealed record ScoreboardProjection(
     ScoreboardSchema Schema,
     ScoreboardSnapshot Snapshot)
 {
-    public IReadOnlyList<TheoryProjectionReceipt> TheoryReceipts { get; init; } = [];
+    public IReadOnlyList<ScoreboardBloodAward> BloodAwards { get; init; } = [];
     // These bounded scoring identities let the PostgreSQL detail reader attribute points
     // without embedding raw history in the main snapshot.
     public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
@@ -360,6 +360,9 @@ public sealed record ScoreboardProjection(
     public ScoreboardAudienceView? ParticipantView { get; init; }
     public SpectatorFrame? Spectator { get; init; }
 }
+
+public sealed record ScoreboardBloodAward(Guid CompetitionChallengeId, Guid TeamId,
+    Guid GameplayFactId, LeaderboardBloodRank Rank, DateTimeOffset OccurredAt);
 
 public sealed record ScoreboardAudienceView(
     ScoreboardChallengeCatalog ChallengeCatalog,

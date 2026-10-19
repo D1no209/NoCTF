@@ -34,6 +34,9 @@ public static class ServiceRegistration
         await Competitions.Directions.CompetitionDirectionBaseline.InitializeAsync(db, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
+        if (scope.ServiceProvider.GetRequiredService<NoCTF.Application.Admission.IRequestAdmission>()
+            is NoCTF.Infrastructure.Admission.PersistedRequestAdmission admission)
+            await admission.WarmupAsync(cancellationToken);
     }
 
     public static IServiceCollection AddNoCtfInfrastructure(

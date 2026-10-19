@@ -4,30 +4,21 @@ using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Worker;
 
 public sealed class GameplayFactMessageHandler(
     IGameplayFactProcessor processor,
     NoCtfDbContext db,
-    IGameplayFactStateChangedNotification notifications,
-    IPostCommitMessagePublisher publisher)
+    IGameplayFactStateChangedNotification notifications)
 {
     public async Task Handle(
         EvaluateGameplayFact message,
         CancellationToken cancellationToken)
     {
-        var unlock = await db.GameplayFacts.AsNoTracking().Where(x => x.Id == message.GameplayFactId
-            && (x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.WriteUpUnlock || x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.TheoryPaperSubmission)
-            && x.State == NoCTF.Domain.Gameplay.GameplayFactState.Queued)
-            .Select(x => (Guid?)x.CompetitionId).SingleOrDefaultAsync(cancellationToken);
-        if (unlock is Guid competitionId)
-        {
-            await publisher.PublishAsync(new ProjectLeaderboard(competitionId));
-            await publisher.FlushCommittedMessagesAsync();
-            return;
-        }
-        await processor.ProcessAsync(message.GameplayFactId, cancellationToken);
+        NoCtfTelemetry.RecordGameplayFactDelivery(GameplayFactDeliveryOutcome.Received);
+        await processor.ProcessAsync(message.GameplayFactId, message.ExpectedConcurrencyStamp, cancellationToken);
     }
 
     public async Task Handle(
@@ -38,7 +29,8 @@ public sealed class GameplayFactMessageHandler(
             .SingleOrDefaultAsync(
                 candidate => candidate.Id == message.GameplayFactId,
                 cancellationToken);
-        if (fact?.ActorUserId is not Guid userId || fact.State != message.State || fact.CompetitionChallengeId is null)
+        if (fact?.ActorUserId is not Guid userId || fact.State != message.State || fact.CompetitionChallengeId is null
+            || message.ConcurrencyStamp != Guid.Empty && fact.ConcurrencyStamp != message.ConcurrencyStamp)
             return;
         var view = new GameplayFactStatusView(
             fact.Id,

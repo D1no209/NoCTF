@@ -35,6 +35,7 @@ public sealed partial class LiveSoloMatchStore
                 && (directory.Values.Select(d => d.Template.Id).Contains(x.ChallengeId ?? Guid.Empty)
                     || directory.Keys.Contains(x.CompetitionChallengeId ?? Guid.Empty))).ToArrayAsync(ct);
             var resolution = new LiveSoloOrderedResolution(round.LastAdmissionSequence);
+            var changedFacts = new List<GameplayFact>();
             var priorByQuestion = new Dictionary<Guid, List<GameplayFact>>();
             var evaluator = new LiveSoloFlagEvaluator();
             foreach (var association in associations)
@@ -42,7 +43,7 @@ public sealed partial class LiveSoloMatchStore
                 var fact = facts[association.GameplayFactId];
                 if (round.State == LiveSoloRoundState.Won)
                 {
-                    if (fact.State != GameplayFactState.Completed) { fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.Rejected; fact.FailureCode = GameplayFactFailureCode.RoundOutOfRange; fact.UpdatedAt = now; }
+                    if (fact.State != GameplayFactState.Completed) { fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.Rejected; fact.FailureCode = GameplayFactFailureCode.RoundOutOfRange; fact.UpdatedAt = now; changedFacts.Add(fact); }
                     continue;
                 }
                 if (!priorByQuestion.TryGetValue(association.RoundQuestionId, out var prior))
@@ -65,7 +66,7 @@ public sealed partial class LiveSoloMatchStore
                         ChallengeDefinition: challenge.Template.Definition));
                     fact.Result = decision.Result; fact.FailureCode = decision.FailureCode; fact.VictimTeamId = decision.VictimTeamId;
                     fact.State = decision.Result is null ? GameplayFactState.PlatformFailed : GameplayFactState.Completed; fact.UpdatedAt = now;
-                    await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
+                    changedFacts.Add(fact);
                     if (fact.TeamId is Guid sourceTeam && fact.ActorUserId is Guid actor && CheatIncidentFailures.IsIncident(fact.FailureCode))
                     {
                         if (fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected && fact.VictimTeamId is Guid owner)
@@ -94,6 +95,8 @@ public sealed partial class LiveSoloMatchStore
                 await AdvanceBracketAsync(match, now, ct);
             }
             await db.SaveChangesAsync(ct);
+            foreach (var fact in changedFacts)
+                await messages.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
             return round.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut;
         }, () => false, ct);
         if (ended) await runtimePreparation.StopRoundAsync(roundId, now, ct);

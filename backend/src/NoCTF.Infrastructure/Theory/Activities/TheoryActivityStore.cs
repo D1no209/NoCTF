@@ -132,7 +132,7 @@ public sealed class TheoryActivityStore(NoCtfDbContext db, IPostCommitMessagePub
         {
             var stamp = Guid.NewGuid();
             await db.GameplayFacts.Where(fact => fact.CompetitionId == context.Competition.Id && fact.Kind == GameplayFactKind.TheoryPaperSubmission)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(fact => fact.State, GameplayFactState.Queued)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(fact => fact.State, GameplayFactState.Completed)
                     .SetProperty(fact => fact.UpdatedAt, command.Now).SetProperty(fact => fact.ConcurrencyStamp, stamp), ct);
         }
         await db.SaveChangesAsync(ct);

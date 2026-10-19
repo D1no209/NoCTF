@@ -31,6 +31,7 @@ internal static class TeamInfrastructure
         services.AddScoped<SubmitTeamRegistration>();
         services.AddScoped<GetTeam>();
         services.AddScoped<GetMyTeam>();
+        services.AddScoped<NoCTF.Application.Teams.Standings.IMyTeamStandingIdentityReader, Standings.MyTeamStandingIdentityReader>();
         services.AddScoped<ITeamWriteUpStore, TeamWriteUpStore>();
         services.AddScoped<ManageTeamWriteUps>();
         services.AddScoped<UpdateTeam>();

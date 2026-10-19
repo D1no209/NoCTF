@@ -35,6 +35,7 @@ export interface CompetitionContext {
   error: Ref<UiMessage | null>
   refresh: () => Promise<void>
   standing: Ref<NoCtfapiEndpointsTeamsMyTeamStandingResponse | null>
+  teamId?: Readonly<Ref<string | null>>
   refreshStanding: () => Promise<void>
   canReadBroadcasts: Ref<boolean>
 }

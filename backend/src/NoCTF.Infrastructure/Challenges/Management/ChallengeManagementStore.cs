@@ -457,8 +457,12 @@ public sealed class ChallengeManagementStore(
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
-                item.Template.Mode,
-                item.Template.Definition,
+                item.Template.Definition != null && item.Template.Definition.Runtime != null,
+                item.Template.Definition != null && item.Template.Definition.Runtime != null
+                    && item.Template.Definition.Runtime.FlagSource != PersistedRuntimeFlagSource.Static,
+                item.Template.Definition is CtfChallengeDefinition
+                    ? ((CtfChallengeDefinition)item.Template.Definition).InteractionKind
+                    : CtfInteractionKind.FlagSubmission,
                 item.Template.CreatedAt,
                 item.Instance.UpdatedAt,
                 item.Instance.DirectionId,
@@ -499,7 +503,6 @@ public sealed class ChallengeManagementStore(
 
     private ChallengeView Map(ChallengeProjection projection)
     {
-        var runtime = runtimeTemplates.Get(projection.Definition);
         return new(
             projection.Id,
             projection.CompetitionId,
@@ -511,7 +514,7 @@ public sealed class ChallengeManagementStore(
             projection.Order,
             projection.IsPublished,
             projection.DeletedAt,
-            runtime is not null,
+            projection.HasRuntime,
             projection.CreatedAt,
             projection.UpdatedAt)
         {
@@ -520,8 +523,8 @@ public sealed class ChallengeManagementStore(
             OpeningState = projection.OpeningState, TimingRecalculationPending = projection.TimingRecalculationPending,
             DirectionId = projection.DirectionId,
             DirectionIcon = projection.DirectionIcon,
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
-            InteractionKind = GetInteractionKind(projection.Definition)
+            UsesDynamicFlag = projection.UsesDynamicFlag,
+            InteractionKind = projection.InteractionKind
         };
     }
 
@@ -558,8 +561,9 @@ public sealed class ChallengeManagementStore(
         int Order,
         bool IsPublished,
         DateTimeOffset? DeletedAt,
-        GameMode Mode,
-        ChallengeDefinition? Definition,
+        bool HasRuntime,
+        bool UsesDynamicFlag,
+        CtfInteractionKind InteractionKind,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         Guid? DirectionId,

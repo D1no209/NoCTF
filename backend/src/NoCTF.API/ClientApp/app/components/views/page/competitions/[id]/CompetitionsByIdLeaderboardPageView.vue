@@ -46,6 +46,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
           <Button variant="outline" :disabled="!filteredTeams.length || (!filteredColumnGroups.length && !theoryEnabled)" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('leaderboard.label.downloadExcel') }}</Button>
         </div>
       </div>
+      <p class="text-sm text-muted-foreground">{{ $t('leaderboard.label.lastUpdated', { time: formatDateTime(board.snapshot.value.generatedAt) }) }}</p>
       <Alert v-if="board.processing.value"><AlertDescription>{{ $t('common.competitionChallenge.description.scoreboardDataProjectedWait') }}</AlertDescription></Alert>
       <Alert v-if="board.snapshot.value.dataScope === 'Frozen'"><AlertDescription>{{ $t('leaderboard.competitionsBy.description.leaderboardFrozenSnapshot', { time: formatDateTime(board.snapshot.value.dataAsOf) }) }}</AlertDescription></Alert>
       <Empty v-if="board.snapshot.value.dataScope === 'Hidden'" class="border py-12"><EmptyHeader><EmptyTitle>{{ $t('common.competitionsBy.description.rankingsPublicYet') }}</EmptyTitle><EmptyDescription>{{ $t('common.competitionsBy.description.organizerCurrentlyHidesRanking') }}</EmptyDescription></EmptyHeader></Empty>

@@ -11,6 +11,7 @@ public sealed record CreateNotification(
     string Payload);
 
 public sealed record DeliverNotification(Guid NotificationId);
+public sealed record NavigationCapabilitiesChanged(Guid[] UserIds);
 
 public sealed record BloodAwarded(
     Guid CompetitionId,

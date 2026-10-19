@@ -76,6 +76,7 @@ public sealed class TheoryActivityWorkflowTests
             await Assert.That(result.View.Deadline.At).IsEqualTo(now.AddSeconds(71));
             var fact = await db.GameplayFacts.SingleAsync(ct);
             await Assert.That(fact.Kind).IsEqualTo(GameplayFactKind.TheoryPaperSubmission);
+            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
             await Assert.That(fact.CompetitionChallengeId).IsNull();
             await Assert.That(fact.TheoryPaperId).IsEqualTo(result.View.Paper.Id);
             await Assert.That(fact.TeamId).IsEqualTo(team.Id);
@@ -128,7 +129,9 @@ public sealed class TheoryActivityWorkflowTests
             await Assert.That((await review.ListAsync(owner.Id, activityId, 0, 20, now.AddSeconds(25), ct))!.Total).IsEqualTo(1);
 
             var snapshot = await TheoryScoreReader.ReadAsync(db, competition.Id, now.AddSeconds(21), ct);
-            await Assert.That(snapshot.Receipts.Single().ConcurrencyStamp).IsEqualTo(fact.ConcurrencyStamp);
+            await Assert.That(snapshot.Scores!.Single().Points).IsEqualTo(20L);
+            await Assert.That(await db.GameplayFacts.Where(item => item.Id == fact.Id)
+                .Select(item => item.State).SingleAsync(ct)).IsEqualTo(GameplayFactState.Completed);
             // The deletion graph must be atomic and must never delete reusable bank content.
             await using (var transaction = await db.Database.BeginTransactionAsync(ct))
             {

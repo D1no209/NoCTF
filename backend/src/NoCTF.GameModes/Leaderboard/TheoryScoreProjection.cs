@@ -23,7 +23,7 @@ internal static class TheoryScoreProjection
         var teams = updated.Select(team => ranked.GetValueOrDefault(team.TeamId, team)).ToArray();
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(board.Snapshot.Version + ":theory:" + string.Join(';', teams.OrderBy(team => team.TeamId)
             .Select(team => $"{team.TeamId:N}:{team.TheoryScore}:{team.HasTheorySubmission}:{team.TheoryAchievedAt?.UtcTicks}:{team.Rank}"))));
-        return board with { TheoryReceipts = input.TheoryReceipts ?? [], Snapshot = board.Snapshot with { Teams = teams, TheoryEnabled = true,
+        return board with { Snapshot = board.Snapshot with { Teams = teams, TheoryEnabled = true,
             Version = Math.Max(1, BitConverter.ToInt64(digest) & long.MaxValue) } };
     }
 }

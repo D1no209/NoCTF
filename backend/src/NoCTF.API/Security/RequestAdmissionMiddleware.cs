@@ -47,6 +47,11 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
                 extensions: new Dictionary<string, object?> { ["code"] = "IdempotencyKeyRequired" }).ExecuteAsync(context);
             return;
         }
+        if (entry == ProtectedEntry.FlagSubmission)
+        {
+            await next(context);
+            return;
+        }
         var rates = new List<RateQuota>(); var slots = new List<ConcurrentQuota>();
         if (entry is ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
             rates.Add(new($"sso-ip:{ip}", options.Value.SsoIpPerMinute, 60));

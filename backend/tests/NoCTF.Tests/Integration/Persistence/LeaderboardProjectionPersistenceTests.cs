@@ -96,10 +96,11 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                         await handler.Handle(new(change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
                 clock.Advance(TimeSpan.FromMilliseconds(500));
                 await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);
-                await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(new(fixture.Competition.Id), ct);
+                await new LeaderboardMessageHandler(cache, db).Handle(new(fixture.Competition.Id), ct);
                 return (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             }
             long Score(ScoreboardProjection projection, Guid team) => projection.Snapshot.Teams.Single(item => item.TeamId == team).TotalScore;
+            await cache.RefreshAsync(fixture.Competition.Id, ct);
             var original = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             await Assert.That(Score(original, fixture.Team.Id)).IsEqualTo(440);
             await competitionStore.TryUpdateAsync(fixture.Competition.Id, Configuration(CtfScoreSettlementMode.AtSolve), true, now, ct);
@@ -124,8 +125,11 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             var rejudged = await Reproject();
             await Assert.That(Score(rejudged, fixture.Team.Id)).IsEqualTo(0);
             await Assert.That(Score(rejudged, second.Id)).IsEqualTo(770);
+            var published = (await new NatsLeaderboardPublicationFence(connection, cacheProvider).GetAsync(fixture.Competition.Id, ct))!;
             await cacheProvider.GetCache(NoCtfCacheNames.Leaderboards).RemoveAsync(
-                $"scoreboard:published:{fixture.Competition.Id:N}:{rejudged.Snapshot.Version}", token: ct);
+                NatsLeaderboardPublicationFence.PayloadKey(fixture.Competition.Id, published.Fence, published.Payload), token: ct);
+            await Assert.That(await cache.GetScoreboardAsync(fixture.Competition.Id, ct)).IsNull();
+            await cache.RefreshAsync(fixture.Competition.Id, ct);
             var rebuilt = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             await Assert.That(Score(rebuilt, second.Id)).IsEqualTo(770);
             await Assert.That(rebuilt.Snapshot.Version).IsGreaterThan(original.Snapshot.Version);
@@ -134,7 +138,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(entry.AwardPoints).IsEqualTo(70);
             var trends = (await new BuildScoreboardTrends(new ScoreboardTrendFactReader(db)).ExecuteAsync(rebuilt, ct))!;
             await Assert.That(trends.Teams.Single(team => team.TeamId == second.Id).Points.Last().Score).IsEqualTo(770);
-            await publisher.Received().PublishAsync(Arg.Is<ScoreboardProjection>(projection => projection != null && projection.Snapshot.Version == rebuilt.Snapshot.Version), ct);
+            await publisher.Received().PublishAsync(Arg.Is<ScoreboardProjection>(projection => projection != null && projection.Snapshot.Version == rebuilt.Snapshot.Version), Arg.Any<CancellationToken>());
         });
     }
 
@@ -258,6 +262,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             var publisher = Substitute.For<ILeaderboardRefreshPublisher>();
             var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 publisher, cacheServices.GetRequiredService<IFusionCacheProvider>(), clock: clock);
+            await cache.RefreshAsync(fixture.Competition.Id, ct);
             var before = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             var outbox = new NoCTF.Infrastructure.Messaging.NoOpPostCommitMessagePublisher();
             var store = new NoCTF.Infrastructure.Competitions.Configuration.CompetitionConfigurationStore(db, outbox,
@@ -269,7 +274,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
             clock.Advance(TimeSpan.FromMilliseconds(500));
             await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);
-            await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(new(fixture.Competition.Id), ct);
+            await new LeaderboardMessageHandler(cache, db).Handle(new(fixture.Competition.Id), ct);
             var after = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             await Assert.That(before.Schema.LatestRound).IsEqualTo(3);
             await Assert.That(after.Schema.LatestRound).IsEqualTo(2);
@@ -277,13 +282,13 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(after.Snapshot.Version).IsGreaterThan(before.Snapshot.Version);
             await Assert.That(after.Snapshot.Teams.Single().TotalScore).IsEqualTo(100);
             await publisher.Received().PublishAsync(Arg.Is<ScoreboardProjection>(value =>
-                value != null && value.Schema.Revision == after.Schema.Revision), ct);
+                value != null && value.Schema.Revision == after.Schema.Revision), Arg.Any<CancellationToken>());
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Awdp_cache_rebuilds_after_round_boundary_without_a_business_event(
+    public async Task Awdp_round_boundary_retains_snapshot_until_background_projection(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -348,9 +353,9 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 cacheServices.GetRequiredService<IFusionCacheProvider>(),
                 new NatsLeaderboardPublicationFence(connection,
                     cacheServices.GetRequiredService<IFusionCacheProvider>()),
-                new LeaderboardProjectionKeyedLock(),
                 clock);
 
+            await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
             var first = await cache.GetScoreboardAsync(
                 fixture.Competition.Id,
                 cancellationToken);
@@ -358,6 +363,9 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(first!.Schema.Rounds[^1].Number).IsEqualTo(1);
 
             clock.Advance(TimeSpan.FromSeconds(2));
+            var retained = await cache.GetScoreboardAsync(fixture.Competition.Id, cancellationToken);
+            await Assert.That(retained!.Snapshot.Version).IsEqualTo(first.Snapshot.Version);
+            await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
             var second = await cache.GetScoreboardAsync(
                 fixture.Competition.Id,
                 cancellationToken);
@@ -372,7 +380,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_cache_misses_and_complete_cache_loss_rebuild_from_PostgreSQL_once(
+    public async Task Cold_reads_and_cache_loss_wait_for_explicit_background_projection(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -424,8 +432,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 publisher,
                 cacheProvider,
-                new NatsLeaderboardPublicationFence(connection, cacheProvider),
-                new LeaderboardProjectionKeyedLock());
+                new NatsLeaderboardPublicationFence(connection, cacheProvider));
 
             var initialReads = await Task.WhenAll(
                 Enumerable.Range(0, 8)
@@ -433,15 +440,18 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                         fixture.Competition.Id,
                         cancellationToken)));
 
-            await Assert.That(initialReads.All(item => item is not null)).IsTrue();
+            await Assert.That(initialReads.All(item => item is null)).IsTrue();
+            await publisher.DidNotReceive().PublishAsync(Arg.Any<ScoreboardProjection>(), Arg.Any<CancellationToken>());
+            await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
             await publisher.Received(1).PublishAsync(
                 Arg.Any<ScoreboardProjection>(),
                 Arg.Any<CancellationToken>());
 
+            var published = (await new NatsLeaderboardPublicationFence(connection, cacheProvider).GetAsync(fixture.Competition.Id, cancellationToken))!;
             await cacheProvider.GetCache(NoCtfCacheNames.Leaderboards).RemoveAsync(
-                $"scoreboard:published:{fixture.Competition.Id:N}:" +
-                initialReads[0]!.Snapshot.Version,
-                token: cancellationToken);
+                NatsLeaderboardPublicationFence.PayloadKey(fixture.Competition.Id, published.Fence, published.Payload), token: cancellationToken);
+            await Assert.That(await cache.GetScoreboardAsync(fixture.Competition.Id, cancellationToken)).IsNull();
+            await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
 
             var rebuilt = await cache.GetScoreboardAsync(
                 fixture.Competition.Id,
@@ -452,58 +462,6 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await publisher.Received(2).PublishAsync(
                 Arg.Any<ScoreboardProjection>(),
                 Arg.Any<CancellationToken>());
-        });
-    }
-
-    [Test]
-    [Timeout(300_000)]
-    public async Task Publication_runs_after_projection_lock_release_and_failure_requeues_projection(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_projection_publication_failure")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var now = DateTimeOffset.UtcNow;
-            await using var db = new NoCtfDbContext(options);
-            await db.Database.EnsureCreatedAsync(cancellationToken);
-            var owner = CreateUser(now);
-            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
-            db.Users.Add(owner);
-            db.Competitions.Add(fixture.Competition);
-            db.Challenges.Add(fixture.Challenge);
-            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
-            db.Teams.Add(fixture.Team);
-            db.GameplayFacts.AddRange(fixture.Facts);
-            await db.SaveChangesAsync(cancellationToken);
-
-            using var cacheServices = new ServiceCollection()
-                .AddFusionCache(NoCtfCacheNames.Leaderboards)
-                .Services
-                .BuildServiceProvider();
-            var fence = new LockObservingFailingPublicationFence(
-                postgres.GetConnectionString(),
-                fixture.Competition.Id);
-            var cache = new FusionLeaderboardCache(
-                db,
-                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
-                Substitute.For<ILeaderboardRefreshPublisher>(),
-                cacheServices.GetRequiredService<IFusionCacheProvider>(),
-                fence);
-
-            await Assert.That(async () =>
-                    await cache.RefreshAsync(fixture.Competition.Id, cancellationToken))
-                .Throws<InvalidOperationException>();
-            await Assert.That(fence.ProjectionLockWasAvailable).IsTrue();
         });
     }
 
@@ -1500,7 +1458,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         ILeaderboardCache cache,
         CancellationToken cancellationToken)
     {
-        await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(
+        await new LeaderboardMessageHandler(cache, db).Handle(
             new ProjectLeaderboard(db.Competitions.Select(item => item.Id).Single()),
             cancellationToken);
     }
@@ -1611,53 +1569,4 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         }
     }
 
-    private sealed class LockObservingFailingPublicationFence(
-        string connectionString,
-        Guid competitionId) : ILeaderboardPublicationFence
-    {
-        public bool ProjectionLockWasAvailable { get; private set; }
-
-        public Task<long> IssueAsync(
-            Guid ignoredCompetitionId,
-            long minimumFence,
-            CancellationToken cancellationToken) => Task.FromResult(minimumFence);
-
-        public async Task<bool> TryCommitAsync(
-            Guid ignoredCompetitionId,
-            long fence,
-            string payload,
-            CancellationToken cancellationToken)
-        {
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
-            await using var claim = new NpgsqlCommand(
-                "SELECT pg_try_advisory_lock(hashtextextended(@competition_id, 0))",
-                connection);
-            claim.Parameters.AddWithValue("competition_id", competitionId.ToString("N"));
-            ProjectionLockWasAvailable = (bool)(await claim.ExecuteScalarAsync(cancellationToken))!;
-            if (ProjectionLockWasAvailable)
-            {
-                await using var release = new NpgsqlCommand(
-                    "SELECT pg_advisory_unlock(hashtextextended(@competition_id, 0))",
-                    connection);
-                release.Parameters.AddWithValue("competition_id", competitionId.ToString("N"));
-                _ = await release.ExecuteScalarAsync(cancellationToken);
-            }
-            throw new InvalidOperationException("Injected leaderboard publication failure.");
-        }
-
-        public Task<LeaderboardFencedPayload?> GetAsync(
-            Guid ignoredCompetitionId,
-            CancellationToken cancellationToken) => Task.FromResult<LeaderboardFencedPayload?>(null);
-
-        public Task<bool> IsCurrentAsync(
-            Guid ignoredCompetitionId,
-            long fence,
-            CancellationToken cancellationToken) => Task.FromResult(false);
-
-        public Task InvalidateAsync(
-            Guid ignoredCompetitionId,
-            long minimumFence,
-            CancellationToken cancellationToken) => Task.CompletedTask;
-    }
 }

@@ -10,11 +10,17 @@ namespace NoCTF.Infrastructure.Authentication.Mfa;
 public sealed partial class MfaAuthenticationStore
 {
     private sealed record ContextUser(Guid Id, UserKind Kind, UserRole Role, UserAccountStatus AccountStatus,
-        int TokenVersion, bool MfaRequired, Guid? CredentialId);
+        int TokenVersion, bool MfaRequired, Guid? CredentialId, MfaPolicy Policy, bool Privileged);
 
     private IQueryable<ContextUser> ContextUsers(Guid[] ids) => db.Users.AsNoTracking().IgnoreAutoIncludes().Where(user => ids.Contains(user.Id))
         .Select(user => new ContextUser(user.Id, user.Kind, user.Role, user.AccountStatus, user.TokenVersion, user.MfaRequired,
-            db.UserTotpCredentials.Where(credential => credential.UserId == user.Id).Select(credential => (Guid?)credential.Id).FirstOrDefault()));
+            db.UserTotpCredentials.Where(credential => credential.UserId == user.Id).Select(credential => (Guid?)credential.Id).FirstOrDefault(),
+            db.PlatformSettings.Where(settings => settings.Id == 1).Select(settings => settings.MfaPolicy).First(),
+            user.Role != UserRole.Administrator && user.Role != UserRole.Organizer
+                && db.PlatformSettings.Any(settings => settings.Id == 1 && settings.MfaPolicy == MfaPolicy.RequirePrivileged)
+                && db.Competitions.Any(competition => competition.DeletedAt == null
+                    && (competition.OwnerId == user.Id || competition.Collaborators.Any(collaborator => collaborator.UserId == user.Id
+                        && (collaborator.Role == CompetitionCollaboratorRole.Manager || collaborator.Role == CompetitionCollaboratorRole.Judge))))));
 
     public async Task<IReadOnlyDictionary<string, MfaFailure?>> ValidateContextsAsync(IReadOnlyList<MfaContextValidationRequest> requests, CancellationToken ct)
     {

@@ -2,6 +2,7 @@ import CompetitionTeamBanScreenComponent from '../../competition/CompetitionTeam
 import { ensureLocaleDomains, message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
+import { provideCompetitionScoreboard } from '../../../composables/useScoreboardMatrix'
 
 import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, Monitor, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getMyTeamStanding, getMyTeamEndpoint } from '../../../api'
@@ -58,6 +59,10 @@ export function useCompetitionsByIdPage() {
   const error = ref<UiMessage | null>(null)
 
   const { user, isAdministrator } = useAuth()
+  const sharedBoardEnabled = computed(() => competition.value?.mode === 'Ctf'
+    && (route.path.includes('/challenges') || route.path.endsWith('/leaderboard')))
+  const sharedBoard = provideCompetitionScoreboard(competitionId.value, sharedBoardEnabled)
+  watch(sharedBoard.snapshot, () => { if (sharedBoardEnabled.value) void refreshMyStanding() })
   const competitionActorId = ref<string | null>(null)
   let competitionRequestId = 0
 
@@ -155,6 +160,18 @@ export function useCompetitionsByIdPage() {
       myStanding.value = null; standingError.value = null; standingLoading.value = false
       return Promise.resolve(true)
     }
+    if (sharedBoardEnabled.value) {
+      const snapshot = sharedBoard.snapshot.value
+      if (!snapshot || snapshot.competitionId !== competitionId.value) return Promise.resolve(false)
+      const teamId = myTeam.value.id
+      const row = snapshot.teams?.find(team => team.teamId === teamId)
+      myStanding.value = { teamId, rank: row?.rank, totalScore: row?.totalScore,
+        challengeBenefits: row?.challengeBenefits ?? [], version: snapshot.version,
+        generatedAt: snapshot.generatedAt, dataAsOf: snapshot.dataAsOf,
+        visibility: snapshot.visibility, dataScope: snapshot.dataScope }
+      standingLoading.value = false; standingError.value = null
+      return Promise.resolve(true)
+    }
     const generation = standingGeneration, teamId = myTeam.value.id
     let processing = false
     standingLoading.value = myStanding.value === null
@@ -190,7 +207,7 @@ export function useCompetitionsByIdPage() {
     if (!await loadStanding()) standingPolling.start()
   }
 
-  const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
+  const refreshStandingLatest = createTrailingRefresh(refreshMyStanding, 500)
 
   async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
     if (isPublicSpectator.value) return 'failed'
@@ -310,6 +327,7 @@ export function useCompetitionsByIdPage() {
     error,
     refresh: async () => { await refresh() },
     standing: myStanding,
+    teamId: computed(() => myTeam.value?.id ?? null),
     refreshStanding: refreshMyStanding,
     canReadBroadcasts,
   })

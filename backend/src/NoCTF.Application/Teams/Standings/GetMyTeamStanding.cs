@@ -16,13 +16,19 @@ public sealed record MyTeamStanding(Guid TeamId, int? Rank, long? TotalScore,
     CompetitionLeaderboardVisibility Visibility, LeaderboardDataScope DataScope);
 public sealed record MyTeamStandingResult(MyTeamStandingState State, MyTeamStanding? Standing = null);
 
-public sealed class GetMyTeamStanding(GetMyTeam teams, ICompetitionVisibilityAccess access,
+public sealed record MyTeamStandingIdentity(Guid Id, bool IsBanned, TeamRegistrationStatus RegistrationStatus, string TrackKey);
+public interface IMyTeamStandingIdentityReader
+{
+    Task<MyTeamStandingIdentity?> ReadAsync(Guid competitionId, Guid actorId, CancellationToken ct);
+}
+
+public sealed class GetMyTeamStanding(IMyTeamStandingIdentityReader teams, ICompetitionVisibilityAccess access,
     ILeaderboardCache cache, GetCompetitionTracks tracks, ICompetitionModerationAuthorizer authorizer,
     IBackendMessagePublisher messages, TimeProvider clock)
 {
     public async Task<MyTeamStandingResult> ExecuteAsync(Guid competitionId, Guid actorId, CancellationToken ct)
     {
-        var team = await teams.ExecuteAsync(competitionId, actorId, ct);
+        var team = await teams.ReadAsync(competitionId, actorId, ct);
         if (team is null || team.IsBanned || team.RegistrationStatus != TeamRegistrationStatus.Approved)
             return new(MyTeamStandingState.NotFound);
         var permission = await access.ResolveAsync(actorId, competitionId, clock.GetUtcNow(), ct);
@@ -44,19 +50,25 @@ public sealed class GetMyTeamStanding(GetMyTeam teams, ICompetitionVisibilityAcc
             {
                 if ((await cache.GetStatusAsync(competitionId, ct)).LastFailureAt is not null)
                     return new(MyTeamStandingState.ProjectionFailed);
-                await cache.InvalidateAsync(competitionId, ct);
+                await cache.RequestRefreshAsync(competitionId, ct);
             }
             return new(MyTeamStandingState.Processing);
         }
-        var internalTracks = await authorizer.CanJudgeAsync(actorId, competitionId, ct);
-        var visibleTracks = await tracks.ExecuteAsync(competitionId, actorId, internalTracks, false, ct);
-        if (visibleTracks is null) return new(MyTeamStandingState.NotFound);
-        var snapshot = ScoreboardAudienceProjection.FilterTracks(
-            ScoreboardAudienceProjection.ForPublishedChallenges(projection), visibleTracks, internalTracks).Snapshot;
+        var requiresTrackScope = permission.TracksEnabled || projection.Snapshot.TracksEnabled
+            || projection.Snapshot.Tracks.Any(track => track.IsInternal);
+        var internalTracks = requiresTrackScope && await authorizer.CanJudgeAsync(actorId, competitionId, ct);
+        projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
+        if (requiresTrackScope)
+        {
+            var visibleTracks = await tracks.ExecuteAsync(competitionId, actorId, internalTracks, false, ct);
+            if (visibleTracks is null) return new(MyTeamStandingState.NotFound);
+            projection = ScoreboardAudienceProjection.FilterTracks(projection, visibleTracks, internalTracks);
+        }
+        var snapshot = projection.Snapshot;
 
         // A visibility or membership change while reading must not publish a superseded private result.
         var current = await access.ResolveAsync(actorId, competitionId, clock.GetUtcNow(), ct);
-        var currentTeam = await teams.ExecuteAsync(competitionId, actorId, ct);
+        var currentTeam = await teams.ReadAsync(competitionId, actorId, ct);
         if (current is null || currentTeam?.Id != team.Id || currentTeam.IsBanned
             || currentTeam.RegistrationStatus != TeamRegistrationStatus.Approved)
             return new(MyTeamStandingState.NotFound);
@@ -64,7 +76,8 @@ public sealed class GetMyTeamStanding(GetMyTeam teams, ICompetitionVisibilityAcc
             return new(MyTeamStandingState.Ready, new(team.Id, null, null, [], 0,
                 clock.GetUtcNow(), null, current.Visibility, current.DataScope));
         if (current.DataScope != permission.DataScope || currentTeam.TrackKey != team.TrackKey
-            || await authorizer.CanJudgeAsync(actorId, competitionId, ct) != internalTracks)
+            || current.TracksEnabled != permission.TracksEnabled
+            || requiresTrackScope && await authorizer.CanJudgeAsync(actorId, competitionId, ct) != internalTracks)
             return new(MyTeamStandingState.Processing);
         var row = snapshot.Teams.SingleOrDefault(item => item.TeamId == team.Id);
         return new(MyTeamStandingState.Ready, new(team.Id, row?.Rank, row?.TotalScore,

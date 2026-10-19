@@ -27,7 +27,6 @@ internal static class GameplayFactInfrastructure
 {
     internal static IServiceCollection AddNoCtfSubmissions(this IServiceCollection services)
     {
-        services.AddScoped<GameplayFactAttemptCriticalSection>();
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
         services.AddScoped<IFlagAttemptStateReader, FlagAttemptStateReader>();
         services.AddScoped<GetFlagAttemptState>();
@@ -62,7 +61,6 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<PreviewHistoricalAdjudicationDifferences>();
         services.AddScoped<GameplayFactProcessor>();
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessorRouter>();
-        services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
         services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
         services.AddScoped<RecordInternalResult>();
