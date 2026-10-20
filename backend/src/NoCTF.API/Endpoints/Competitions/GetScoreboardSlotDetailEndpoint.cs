@@ -4,10 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
-using NoCTF.Application.Competitions.Tracks;
-using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -54,15 +51,10 @@ public sealed record ScoreboardSlotDetailResponse(
 }
 
 public sealed class GetScoreboardSlotDetailEndpoint(
-    ILeaderboardCache leaderboard,
-    ILeaderboardSnapshotFactory snapshots,
+    ReadScoreboardAudience audiences,
     IScoreboardDetailReader details,
-    ICompetitionVisibilityAccess access,
-    GetCompetitionTracks getTracks,
-    ICompetitionModerationAuthorizer authorizer,
     SignedKeysetCursor cursors,
-    IUserContext user,
-    TimeProvider timeProvider)
+    IUserContext user)
     : Endpoint<GetScoreboardSlotDetailRequest,
         Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
@@ -82,48 +74,13 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
         request.ColumnIndex = Route<int>("columnIndex");
-        var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
-        if (visibility is null || visibility.DataScope == LeaderboardDataScope.Hidden)
-            return TypedResults.NotFound();
-
-        var projection = visibility.DataScope == LeaderboardDataScope.Frozen
-            ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
-            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
-        if (projection is not null
-            && visibility.DataScope != LeaderboardDataScope.Frozen
-            && request.EndingRound is int endingRound
-            && visibility.GameMode is NoCTF.Domain.Competitions.GameMode.Awdp
-                or NoCTF.Domain.Competitions.GameMode.Awd)
-        {
-            var sourceSnapshot = projection.Snapshot;
-            var window = await snapshots.CreateScoreboardWindowAsync(
-                request.CompetitionId,
-                endingRound,
-                sourceSnapshot.DataAsOf ?? sourceSnapshot.GeneratedAt,
-                cancellationToken);
-            projection = window is null
-                ? null
-                : ScoreboardAudienceProjection.PreserveSnapshotScope(window, sourceSnapshot);
-        }
-        if (projection is null)
+        var audience = await audiences.ExecuteAsync(
+            request.CompetitionId, user.UserId, request.EndingRound, cancellationToken);
+        if (audience.State == ScoreboardAudienceState.Unavailable)
             return Processing(request.CompetitionId);
-
-        var canViewInternalTracks = user.UserId != Guid.Empty
-            && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
-        var tracks = await getTracks.ExecuteAsync(
-            request.CompetitionId,
-            user.UserId == Guid.Empty ? null : user.UserId,
-            canViewInternalTracks,
-            includeInvitationCodes: false,
-            cancellationToken);
-        if (tracks is null)
+        if (audience.State != ScoreboardAudienceState.Ready)
             return TypedResults.NotFound();
-        projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
-        projection = ScoreboardAudienceProjection.FilterTracks(
-            projection,
-            tracks,
-            canViewInternalTracks);
+        var projection = audience.Projection!;
         var column = projection.Schema.Columns.SingleOrDefault(item => item.Index == request.ColumnIndex);
         var team = projection.Snapshot.Teams.SingleOrDefault(item => item.TeamId == request.TeamId);
         var slot = team?.Slots.SingleOrDefault(item => item.ColumnIndex == request.ColumnIndex);

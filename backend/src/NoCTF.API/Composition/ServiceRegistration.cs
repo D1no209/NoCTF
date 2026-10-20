@@ -336,8 +336,8 @@ public static class ServiceRegistration
         {
             options.SizeLimit = 64 * 1024 * 1024;
             options.MaximumBodySize = 4 * 1024 * 1024;
-            options.AddPolicy(NoCTF.API.Endpoints.Competitions.PublicCtfLeaderboardCachePolicy.Name,
-                policy => policy.AddPolicy<NoCTF.API.Endpoints.Competitions.PublicCtfLeaderboardCachePolicy>(), true);
+            options.AddPolicy(NoCTF.API.Endpoints.Competitions.LeaderboardOutputCachePolicy.Name,
+                policy => policy.AddPolicy<NoCTF.API.Endpoints.Competitions.LeaderboardOutputCachePolicy>(), true);
         });
         return services;
     }

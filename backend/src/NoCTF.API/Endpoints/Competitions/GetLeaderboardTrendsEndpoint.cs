@@ -34,9 +34,7 @@ public sealed class GetLeaderboardTrendsRequest
 public sealed class GetLeaderboardTrendsEndpoint(
     ILeaderboardCache leaderboard,
     IBackendMessagePublisher messages,
-    ICompetitionVisibilityAccess access,
-    GetCompetitionTracks getTracks,
-    ICompetitionModerationAuthorizer authorizer,
+    ReadScoreboardAudience audiences,
     BuildScoreboardTrends buildTrends,
     IUserContext user,
     TimeProvider timeProvider)
@@ -47,7 +45,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/trends");
         AllowAnonymous();
-        Options(builder => builder.CacheOutput(PublicCtfLeaderboardCachePolicy.Name));
+        Options(builder => builder.CacheOutput(LeaderboardOutputCachePolicy.Name));
         Summary(summary => summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection.");
     }
 
@@ -56,16 +54,13 @@ public sealed class GetLeaderboardTrendsEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var prepared = PublicCtfLeaderboardCachePolicy.GetPrepared(HttpContext, request.CompetitionId);
-        var visibility = prepared?.Permission ?? await access.ResolveAsync(
-            user.UserId,
-            request.CompetitionId,
-            timeProvider.GetUtcNow(),
-            cancellationToken);
-        if (visibility is null || visibility.GameMode != GameMode.Ctf)
+        var audience = LeaderboardOutputCachePolicy.GetPrepared(HttpContext, request.CompetitionId)
+            ?? await audiences.ExecuteAsync(request.CompetitionId, user.UserId, null, cancellationToken);
+        if (audience.State == ScoreboardAudienceState.NotFound || audience.Visibility!.GameMode != GameMode.Ctf)
             return TypedResults.NotFound();
+        var visibility = audience.Visibility;
 
-        if (visibility.DataScope == LeaderboardDataScope.Hidden)
+        if (audience.State == ScoreboardAudienceState.Hidden)
         {
             var now = timeProvider.GetUtcNow();
             return TypedResults.Ok(new ScoreboardTrendsResponse(
@@ -76,10 +71,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
                 []));
         }
 
-        var projection = prepared?.Projection ?? (visibility.DataScope == LeaderboardDataScope.Frozen
-            ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
-            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken));
-        if (projection is null)
+        if (audience.State == ScoreboardAudienceState.Unavailable)
         {
             if (visibility.DataScope == LeaderboardDataScope.Frozen)
             {
@@ -106,28 +98,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
             return Processing(request.CompetitionId);
         }
 
-        var requiresTrackScope = visibility.TracksEnabled || projection.Snapshot.TracksEnabled
-            || projection.Snapshot.Tracks.Any(track => track.IsInternal);
-        var canViewInternalTracks = user.UserId != Guid.Empty
-            && requiresTrackScope
-            && await authorizer.CanJudgeAsync(
-                user.UserId,
-                request.CompetitionId,
-                cancellationToken);
-        var tracks = requiresTrackScope ? await getTracks.ExecuteAsync(
-            request.CompetitionId,
-            user.UserId == Guid.Empty ? null : user.UserId,
-            canViewInternalTracks,
-            includeInvitationCodes: false,
-            cancellationToken) : null;
-        if (requiresTrackScope && tracks is null)
-            return TypedResults.NotFound();
-
-        projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
-        if (tracks is not null) projection = ScoreboardAudienceProjection.FilterTracks(
-            projection,
-            tracks,
-            canViewInternalTracks);
+        var projection = audience.Projection!;
         projection = projection with
         {
             Snapshot = projection.Snapshot with
@@ -140,7 +111,13 @@ public sealed class GetLeaderboardTrendsEndpoint(
             }
         };
         var trends = await buildTrends.ExecuteAsync(projection, cancellationToken);
-        if (trends is not null) PublicCtfLeaderboardCachePolicy.SetResponseVersion(HttpContext, trends.Version);
+        if (trends is not null)
+        {
+            LeaderboardOutputCachePolicy.SetResponseVersion(HttpContext, trends.Version);
+            HttpContext.Response.Headers.ETag = LeaderboardOutputCachePolicy.EntityTag(
+                projection.Snapshot.Version, audience.CacheScope!, null);
+            HttpContext.Response.Headers.CacheControl = "private, no-cache";
+        }
         return trends is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(ToResponse(trends));

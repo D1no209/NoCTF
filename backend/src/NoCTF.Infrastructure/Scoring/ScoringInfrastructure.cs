@@ -22,6 +22,7 @@ internal static class ScoringInfrastructure
         services.AddScoped<IScoreboardDetailReader, ScoreboardDetailReader>();
         services.AddScoped<IScoreboardTrendFactReader, ScoreboardTrendFactReader>();
         services.AddScoped<BuildScoreboardTrends>();
+        services.AddScoped<ReadScoreboardAudience>();
         services.AddScoped<GetSpectatorScreen>();
         services.AddScoped<NoCTF.Application.Teams.Standings.GetMyTeamStanding>();
         if (!development)

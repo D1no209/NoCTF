@@ -325,11 +325,8 @@ public sealed class GetLeaderboardValidator : Validator<GetLeaderboardRequest>
 
 public sealed class GetLeaderboardEndpoint(
     ILeaderboardCache leaderboard,
-    ILeaderboardSnapshotFactory snapshots,
+    ReadScoreboardAudience audiences,
     IBackendMessagePublisher messages,
-    ICompetitionVisibilityAccess access,
-    GetCompetitionTracks getTracks,
-    ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<GetLeaderboardRequest, Results<Ok<ScoreboardSnapshotResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
@@ -338,7 +335,7 @@ public sealed class GetLeaderboardEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
-        Options(builder => builder.CacheOutput(PublicCtfLeaderboardCachePolicy.Name));
+        Options(builder => builder.CacheOutput(LeaderboardOutputCachePolicy.Name));
         Summary(summary => summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh.");
     }
 
@@ -347,73 +344,40 @@ public sealed class GetLeaderboardEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var prepared = PublicCtfLeaderboardCachePolicy.GetPrepared(HttpContext, request.CompetitionId);
-        var visibility = prepared?.Permission ?? await access.ResolveAsync(
-            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
-        if (visibility is null)
-            return TypedResults.NotFound();
-        if (visibility.DataScope == LeaderboardDataScope.Hidden)
+        // The output cache policy already resolved this viewer's audience to choose the shared cache entry.
+        var audience = LeaderboardOutputCachePolicy.GetPrepared(HttpContext, request.CompetitionId)
+            ?? await audiences.ExecuteAsync(request.CompetitionId, user.UserId, request.EndingRound, cancellationToken);
+        switch (audience.State)
         {
-            return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(new ScoreboardSnapshot(
-                request.CompetitionId, 0, 0, timeProvider.GetUtcNow(), null, [], [])
-            {
-                TracksEnabled = visibility.TracksEnabled,
-                Visibility = visibility.Visibility,
-                DataScope = LeaderboardDataScope.Hidden
-            }));
-        }
-
-        var projection = prepared?.Projection ?? (visibility.DataScope == LeaderboardDataScope.Frozen
-            ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
-            : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken));
-        if (projection is not null
-            && visibility.DataScope != LeaderboardDataScope.Frozen
-            && request.EndingRound is int endingRound
-            && visibility.GameMode is NoCTF.Domain.Competitions.GameMode.Awdp
-                or NoCTF.Domain.Competitions.GameMode.Awd)
-        {
-            var sourceSnapshot = projection.Snapshot;
-            var window = await snapshots.CreateScoreboardWindowAsync(
-                request.CompetitionId,
-                endingRound,
-                sourceSnapshot.DataAsOf ?? sourceSnapshot.GeneratedAt,
-                cancellationToken);
-            projection = window is null
-                ? null
-                : ScoreboardAudienceProjection.PreserveSnapshotScope(window, sourceSnapshot);
-        }
-        if (projection is not null)
-        {
-            var requiresTrackScope = visibility.TracksEnabled || projection.Snapshot.TracksEnabled
-                || projection.Snapshot.Tracks.Any(track => track.IsInternal);
-            var canViewInternalTracks = user.UserId != Guid.Empty
-                && requiresTrackScope && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
-            var tracks = requiresTrackScope ? await getTracks.ExecuteAsync(
-                request.CompetitionId,
-                user.UserId == Guid.Empty ? null : user.UserId,
-                canViewInternalTracks,
-                includeInvitationCodes: false,
-                cancellationToken) : null;
-            if (requiresTrackScope && tracks is null)
+            case ScoreboardAudienceState.NotFound:
                 return TypedResults.NotFound();
-            projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
-            if (tracks is not null) projection = ScoreboardAudienceProjection.FilterTracks(
-                projection,
-                tracks,
-                canViewInternalTracks);
-            var snapshot = projection.Snapshot with
-            {
-                Visibility = visibility.Visibility,
-                DataScope = visibility.DataScope,
-                DataAsOf = visibility.DataScope == LeaderboardDataScope.Frozen
-                    ? projection.Snapshot.DataAsOf
-                    : projection.Snapshot.GeneratedAt
-            };
-            PublicCtfLeaderboardCachePolicy.SetResponseVersion(HttpContext, snapshot.Version);
-            return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(snapshot));
+            case ScoreboardAudienceState.Hidden:
+                return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(new ScoreboardSnapshot(
+                    request.CompetitionId, 0, 0, timeProvider.GetUtcNow(), null, [], [])
+                {
+                    TracksEnabled = audience.Visibility!.TracksEnabled,
+                    Visibility = audience.Visibility.Visibility,
+                    DataScope = LeaderboardDataScope.Hidden
+                }));
+            case ScoreboardAudienceState.Ready:
+                var visibility = audience.Visibility!;
+                var projection = audience.Projection!;
+                var snapshot = projection.Snapshot with
+                {
+                    Visibility = visibility.Visibility,
+                    DataScope = visibility.DataScope,
+                    DataAsOf = visibility.DataScope == LeaderboardDataScope.Frozen
+                        ? projection.Snapshot.DataAsOf
+                        : projection.Snapshot.GeneratedAt
+                };
+                LeaderboardOutputCachePolicy.SetResponseVersion(HttpContext, snapshot.Version);
+                HttpContext.Response.Headers.ETag = LeaderboardOutputCachePolicy.EntityTag(
+                    snapshot.Version, audience.CacheScope!, request.EndingRound);
+                HttpContext.Response.Headers.CacheControl = "private, no-cache";
+                return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(snapshot));
         }
 
-        if (visibility.DataScope == LeaderboardDataScope.Frozen)
+        if (audience.Visibility!.DataScope == LeaderboardDataScope.Frozen)
         {
             await messages.ApplyCompetitionVisibilityAsync(
                 request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);

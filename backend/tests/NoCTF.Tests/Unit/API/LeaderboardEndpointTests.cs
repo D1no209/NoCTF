@@ -1127,6 +1127,89 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(secondResponse.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
+    [Test]
+    public async Task Leaderboard_responses_are_shared_per_audience_and_keyed_by_publication()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var publicTeamId = Guid.CreateVersion7();
+        var internalTeamId = Guid.CreateVersion7();
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
+            [new(0, challengeId, null)],
+            [
+                new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
+                new(internalTeamId, "Internal", "staff", null, ScoreboardRankingState.Disqualified, 1, 0, [], [])
+            ]);
+        var leaderboard = new CachedLeaderboard(projection: projection);
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            leaderboard,
+            new RecordingMessagePublisher(),
+            trackStore: new InternalTrackStore(competitionId),
+            authorizer: new StaffAccess(canJudge: true),
+            outputCache: true);
+        using var client = app.GetTestClient();
+        var path = $"/api/v1/competitions/{competitionId}/leaderboard";
+
+        using var first = await client.GetAsync(path);
+        using var second = await client.GetAsync(path);
+        using var staffRequest = new HttpRequestMessage(HttpMethod.Get, path);
+        staffRequest.Headers.Add("X-Test-User", Guid.CreateVersion7().ToString());
+        using var staff = await client.SendAsync(staffRequest);
+        using var conditional = new HttpRequestMessage(HttpMethod.Get, path);
+        conditional.Headers.IfNoneMatch.Add(first.Headers.ETag!);
+        using var notModified = await client.SendAsync(conditional);
+        leaderboard.Projection = projection with { Snapshot = projection.Snapshot with { Version = 18 } };
+        using var republished = await client.GetAsync(path);
+
+        var publicBody = await first.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        var staffBody = await staff.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(first.Headers.Age).IsNull();
+        await Assert.That(first.Headers.CacheControl!.Private).IsTrue();
+        await Assert.That(first.Headers.CacheControl.NoCache).IsTrue();
+        await Assert.That(second.Headers.Age).IsNotNull();
+        await Assert.That(second.Headers.ETag).IsEqualTo(first.Headers.ETag);
+        await Assert.That(publicBody!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
+        await Assert.That(staff.Headers.Age).IsNull();
+        await Assert.That(staff.Headers.ETag).IsNotEqualTo(first.Headers.ETag);
+        await Assert.That(staffBody!.Teams.Select(team => team.TeamId))
+            .IsEquivalentTo([publicTeamId, internalTeamId]);
+        await Assert.That(notModified.StatusCode).IsEqualTo(HttpStatusCode.NotModified);
+        await Assert.That(republished.Headers.Age).IsNull();
+        await Assert.That(republished.Headers.ETag).IsNotEqualTo(first.Headers.ETag);
+        await Assert.That((await republished.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>())!.Version)
+            .IsEqualTo("18");
+    }
+
+    [Test]
+    public async Task Participant_scope_is_shared_by_public_tracks_and_private_only_for_unlisted_viewer_tracks()
+    {
+        var competitionId = Guid.CreateVersion7();
+        CompetitionTracksView View(string? viewerTrack, Guid? viewerTeam) => new(
+            competitionId, GameMode.Ctf, CompetitionStatus.Running, true, true,
+            [
+                new("default", "Default", true, true, false, true, true, true, true, true, viewerTrack == "default"),
+                new("hidden", "Hidden", false, true, false, true, true, true, false, true, viewerTrack == "hidden"),
+                new("staff", "Staff", false, false, true, false, false, false, false, false, viewerTrack == "staff")
+            ],
+            viewerTeam);
+
+        var anonymous = ReadScoreboardAudience.ParticipantScope(View(null, null));
+        var publicA = ReadScoreboardAudience.ParticipantScope(View("default", Guid.CreateVersion7()));
+        var publicB = ReadScoreboardAudience.ParticipantScope(View("default", Guid.CreateVersion7()));
+        var hiddenA = ReadScoreboardAudience.ParticipantScope(View("hidden", Guid.CreateVersion7()));
+        var hiddenB = ReadScoreboardAudience.ParticipantScope(View("hidden", Guid.CreateVersion7()));
+        var internalViewer = ReadScoreboardAudience.ParticipantScope(View("staff", Guid.CreateVersion7()));
+
+        await Assert.That(publicA).IsEqualTo(publicB);
+        await Assert.That(publicA).IsNotEqualTo(anonymous);
+        await Assert.That(hiddenA).IsNotEqualTo(hiddenB);
+        await Assert.That(internalViewer).IsEqualTo(anonymous);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         Guid competitionId,
         ILeaderboardCache leaderboard,
@@ -1138,7 +1221,8 @@ public sealed class LeaderboardEndpointTests
         IScoreboardDetailReader? detailReader = null,
         ILeaderboardSnapshotFactory? snapshotFactory = null,
         ICompetitionModerationAuthorizer? authorizer = null,
-        IUserContext? userContext = null)
+        IUserContext? userContext = null,
+        bool outputCache = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -1173,10 +1257,18 @@ public sealed class LeaderboardEndpointTests
             trackStore ?? new DefaultTrackStore(competitionId));
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(
             authorizer ?? new NoStaffAccess());
-        builder.Services.AddSingleton<IUserContext>(userContext ?? new AnonymousUserContext());
+        if (outputCache)
+        {
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddNoCtfLeaderboardOutputCaching();
+            builder.Services.AddScoped<IUserContext, RequestUserContext>();
+        }
+        else
+            builder.Services.AddSingleton<IUserContext>(userContext ?? new AnonymousUserContext());
         builder.Services.AddSingleton(detailReader ?? new StaticScoreboardDetailReader());
         builder.Services.AddSingleton<IScoreboardTrendFactReader>(new StaticScoreboardTrendFactReader());
         builder.Services.AddSingleton<BuildScoreboardTrends>();
+        builder.Services.AddSingleton<ReadScoreboardAudience>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(Options.Create(new PaginationOptions
         {
@@ -1185,6 +1277,7 @@ public sealed class LeaderboardEndpointTests
         builder.Services.AddSingleton<SignedKeysetCursor>();
 
         var app = builder.Build();
+        if (outputCache) app.UseOutputCache();
         app.UseNoCtfEndpoints();
         await app.StartAsync();
         return app;
@@ -1215,6 +1308,15 @@ public sealed class LeaderboardEndpointTests
     private sealed class AnonymousUserContext : IUserContext
     {
         public Guid UserId => Guid.Empty;
+        public bool IsAdministrator => false;
+    }
+
+    /// <summary>Lets one test host serve several viewers: the user id comes from a test header.</summary>
+    private sealed class RequestUserContext(Microsoft.AspNetCore.Http.IHttpContextAccessor accessor) : IUserContext
+    {
+        public Guid UserId => Guid.TryParse(accessor.HttpContext?.Request.Headers["X-Test-User"], out var id)
+            ? id
+            : Guid.Empty;
         public bool IsAdministrator => false;
     }
 
@@ -1298,19 +1400,20 @@ public sealed class LeaderboardEndpointTests
         ScoreboardProjection? projection = null) : ILeaderboardCache
     {
         public List<Guid> InvalidatedCompetitionIds { get; } = [];
+        public ScoreboardProjection? Projection { get; set; } = projection;
 
         public Task<ScoreboardProjection?> GetScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
             Task.FromResult<ScoreboardProjection?>(missing
                 ? null
-                : EnsureParticipantView(projection ?? CreateScoreboard(competitionId, frozen: false)));
+                : EnsureParticipantView(Projection ?? CreateScoreboard(competitionId, frozen: false)));
 
         public Task<ScoreboardProjection?> GetFrozenScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
             Task.FromResult<ScoreboardProjection?>(frozen
-                ? EnsureParticipantView(projection ?? CreateScoreboard(competitionId, frozen: true))
+                ? EnsureParticipantView(Projection ?? CreateScoreboard(competitionId, frozen: true))
                 : null);
 
         public Task<LeaderboardCacheStatus> GetStatusAsync(
