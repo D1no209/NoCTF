@@ -1,0 +1,192 @@
+using System.Data.Common;
+using System.Diagnostics;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using NoCTF.Application.Notifications;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
+using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Notifications;
+using NoCTF.Infrastructure.Persistence;
+using Testcontainers.PostgreSql;
+
+namespace NoCTF.Tests.Integration.Persistence;
+
+// TEMPORARY performance probe; not part of the suite.
+[Category("PerfProbe")]
+[NotInParallel]
+public sealed class NotificationReaderPerfProbe
+{
+    [Test]
+    [Timeout(900_000)]
+    public async Task Probe(CancellationToken ct)
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+            .WithDatabase("noctf_probe").WithUsername("postgres").WithPassword("postgres").Build();
+        await postgres.StartAsync(ct);
+        var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+            .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+        var now = DateTimeOffset.Parse("2026-08-08T12:00:00Z");
+        var competitionId = Guid.CreateVersion7(now);
+        var ownerId = Guid.CreateVersion7(now);
+        var userIds = Enumerable.Range(0, 300).Select(i => Guid.CreateVersion7(now.AddMilliseconds(i))).ToArray();
+        var teamIds = Enumerable.Range(0, 300).Select(i => Guid.CreateVersion7(now.AddMilliseconds(i))).ToArray();
+        await using (var db = new NoCtfDbContext(options))
+        {
+            await db.Database.EnsureCreatedAsync(ct);
+            db.Users.Add(User(ownerId, "owner", UserRole.Organizer, now));
+            for (var i = 0; i < userIds.Length; i++) db.Users.Add(User(userIds[i], $"u{i}", UserRole.User, now));
+            db.Competitions.Add(new CtfCompetition
+            {
+                Id = competitionId, OwnerId = ownerId, Title = "probe",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
+                FlagDerivationSecret = new byte[32], StartAt = now.AddHours(-1), EndAt = now.AddHours(1),
+                Status = CompetitionStatus.Running, CreatedAt = now, UpdatedAt = now
+            });
+            for (var i = 0; i < teamIds.Length; i++)
+                db.Teams.Add(new Team
+                {
+                    Id = teamIds[i], CompetitionId = competitionId, Name = $"t{i}", CaptainId = userIds[i],
+                    MemberIds = [userIds[i]], InvitationToken = teamIds[i].ToString("N"),
+                    RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = now
+                });
+            await db.SaveChangesAsync(ct);
+        }
+        var log = Path.Combine(Path.GetTempPath(), "noctf-notification-probe-progress.txt");
+        var clock = Stopwatch.StartNew();
+        void Progress(string text) => File.AppendAllText(log, $"{clock.Elapsed.TotalSeconds:F1}s {text}{Environment.NewLine}");
+        File.WriteAllText(log, "");
+        Progress("base seeded");
+        var seq = 0;
+        DateTimeOffset At() => now.AddMilliseconds(++seq * 10);
+        var batch = new List<Notification>();
+        for (var i = 0; i < 1000; i++)
+            batch.Add(new ChallengePublishedNotification { Id = Guid.NewGuid(), SourceType = NotificationSourceType.Competition, SourceId = competitionId,
+                TargetType = NotificationTargetType.CompetitionParticipants, TargetId = competitionId,
+                RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, SentAt = At() });
+        for (var t = 0; t < teamIds.Length; t++)
+            for (var i = 0; i < 100; i++)
+                batch.Add(new GameplayFactAdjudicatedNotification { Id = Guid.NewGuid(), SourceType = NotificationSourceType.System,
+                    TargetType = NotificationTargetType.TeamMembers, TargetId = teamIds[t],
+                    RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, SentAt = At() });
+        for (var u = 0; u < userIds.Length; u++)
+            for (var i = 0; i < 30; i++)
+                batch.Add(new RuntimeStateChangedNotification { Id = Guid.NewGuid(), SourceType = NotificationSourceType.System,
+                    TargetType = NotificationTargetType.User, TargetId = userIds[u],
+                    RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, SentAt = At() });
+        for (var i = 0; i < 30; i++)
+            batch.Add(new CompetitionAnnouncementNotification { Id = Guid.NewGuid(), SourceType = NotificationSourceType.User, SourceId = ownerId,
+                TargetType = NotificationTargetType.CompetitionParticipants, TargetId = competitionId, Body = "a",
+                RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, SentAt = At() });
+        for (var q = 0; q < 300; q++)
+        {
+            var root = Guid.NewGuid();
+            batch.Add(new QuestionOpenedNotification { Id = root, SourceType = NotificationSourceType.User, SourceId = userIds[q],
+                TargetType = NotificationTargetType.CompetitionCollaborators, TargetId = competitionId, Title = "q",
+                RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, SentAt = At() });
+            for (var r = 0; r < 2; r++)
+                batch.Add(new MessageNotification { Id = Guid.NewGuid(), SourceType = NotificationSourceType.User, SourceId = ownerId,
+                    TargetType = NotificationTargetType.CompetitionCollaborators, TargetId = competitionId, Body = "r",
+                    RelatedType = EntityReferenceKind.Competition, RelatedId = competitionId, ThreadRootId = root, ReplyToId = root, SentAt = At() });
+        }
+        foreach (var chunk in batch.Chunk(5000))
+        {
+            await using var db = new NoCtfDbContext(options);
+            db.Notifications.AddRange(chunk);
+            await db.SaveChangesAsync(ct);
+            Progress($"chunk saved {chunk.Length}");
+        }
+        await using (var db = new NoCtfDbContext(options))
+            await db.Database.ExecuteSqlRawAsync("ANALYZE", ct);
+        Progress("analyzed");
+
+        var report = new StringBuilder();
+        report.AppendLine($"notifications seeded: {batch.Count}");
+        var explain = new ExplainInterceptor(report);
+        var probeOptions = new DbContextOptionsBuilder<NoCtfDbContext>(options).AddInterceptors(explain).Options;
+        foreach (var (label, cid, limit, user) in new (string, Guid?, int, Guid)[]
+                 {
+                     ("competition-inbox-200 participant", competitionId, 200, userIds[0]),
+                     ("shell-inbox-20 participant", null, 20, userIds[0]),
+                     ("shell-inbox-20 owner", null, 20, ownerId),
+                 })
+        {
+            for (var warm = 0; warm < 1; warm++)
+            {
+                await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(options)
+                    .AddInterceptors(new TimingInterceptor(Progress)).Options);
+                await new NotificationReader(db).ListPageAsync(user, cid, 0, limit, true, NotificationReadScope.Inbox, ct);
+                Progress($"{label} warm done");
+            }
+            var sw = Stopwatch.StartNew();
+            const int runs = 3;
+            for (var r = 0; r < runs; r++)
+            {
+                await using var db = new NoCtfDbContext(options);
+                await new NotificationReader(db).ListPageAsync(user, cid, 0, limit, true, NotificationReadScope.Inbox, ct);
+            }
+            report.AppendLine($"#### {label}: avg {sw.Elapsed.TotalMilliseconds / runs:F1} ms over {runs} runs");
+            Progress($"{label}: avg {sw.Elapsed.TotalMilliseconds / runs:F1} ms");
+            explain.Count = 0;
+            await using (var db = new NoCtfDbContext(probeOptions))
+            {
+                var page = await new NotificationReader(db).ListPageAsync(user, cid, 0, limit, true, NotificationReadScope.Inbox, ct);
+                Progress($"{label} explained");
+                report.AppendLine($"#### {label}: items {page.Items.Count} total {page.Total} roundtrips {explain.Count}");
+            }
+        }
+        Progress("done");
+        var path = Path.Combine(Path.GetTempPath(), "noctf-notification-probe.txt");
+        await File.WriteAllTextAsync(path, report.ToString(), ct);
+        Console.WriteLine("PROBE_REPORT " + path);
+    }
+
+    private sealed class TimingInterceptor(Action<string> progress) : DbCommandInterceptor
+    {
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken ct = default)
+        {
+            var text = command.CommandText.Replace("\r", "").Replace("\n", " ");
+            progress("  executing: " + text[..Math.Min(160, text.Length)]);
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command,
+            CommandExecutedEventData eventData, DbDataReader result, CancellationToken ct = default)
+        {
+            progress($"  executed in {eventData.Duration.TotalMilliseconds:F1} ms");
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class ExplainInterceptor(StringBuilder report) : DbCommandInterceptor
+    {
+        public int Count;
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken ct = default)
+        {
+            Count++;
+            await using var explain = command.Connection!.CreateCommand();
+            explain.CommandText = "EXPLAIN (ANALYZE, BUFFERS) " + command.CommandText;
+            explain.Transaction = command.Transaction;
+            foreach (DbParameter parameter in command.Parameters)
+                explain.Parameters.Add(((ICloneable)parameter).Clone());
+            report.AppendLine("=== SQL").AppendLine(command.CommandText).AppendLine("=== PLAN");
+            await using var reader = await explain.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) report.AppendLine(reader.GetString(0));
+            File.WriteAllText(Path.Combine(Path.GetTempPath(), "noctf-notification-probe.txt"), report.ToString());
+            return result;
+        }
+    }
+
+    private static User User(Guid id, string userName, UserRole role, DateTimeOffset now) => new()
+    {
+        Id = id, UserName = userName, NormalizedUserName = userName.ToUpperInvariant(),
+        Email = $"{userName}@example.test", PasswordHash = "test", Kind = UserKind.Human, Role = role,
+        AccountStatus = UserAccountStatus.Active, EmailVerifiedAt = now, CreatedAt = now, UpdatedAt = now
+    };
+}

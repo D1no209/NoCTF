@@ -25,13 +25,25 @@ internal static class CompetitionAnnouncementProjection
         && item.RelatedType == EntityReferenceKind.Notification && item.ThreadRootId != null && item.RelatedId == item.ThreadRootId
         && item.ActionValue is (int)CompetitionAnnouncementChangeAction.Edit or (int)CompetitionAnnouncementChangeAction.Withdraw;
 
-    public static IQueryable<Notification> ActiveMessages(NoCtfDbContext db, IQueryable<Notification> query)
-    {
-        var changes = Changes(db);
-        return query.Where(item => !changes.Any(change => change.Id == item.Id))
+    /// <summary>
+    /// Removes announcement change records and withdrawn announcements. The change test is evaluated on the row itself
+    /// and only probes the root by primary key; withdrawals are probed through the thread-root index.
+    /// </summary>
+    public static IQueryable<Notification> ActiveMessages(NoCtfDbContext db, IQueryable<Notification> query) =>
+        query.Where(item => !(item.Kind == NotificationKind.Message
+                && item.RelatedType == EntityReferenceKind.Notification
+                && item.ThreadRootId != null
+                && item.RelatedId == item.ThreadRootId
+                && (item.ActionValue == (int)CompetitionAnnouncementChangeAction.Edit
+                    || item.ActionValue == (int)CompetitionAnnouncementChangeAction.Withdraw)
+                && db.Notifications.Any(root => root.Id == item.ThreadRootId
+                    && root.Kind == NotificationKind.CompetitionAnnouncement)))
             .Where(item => item.Kind != NotificationKind.CompetitionAnnouncement
-                || !changes.Any(change => change.ThreadRootId == item.Id && change.ActionValue == (int)CompetitionAnnouncementChangeAction.Withdraw));
-    }
+                || !db.Notifications.Any(change => change.ThreadRootId == item.Id
+                    && change.Kind == NotificationKind.Message
+                    && change.RelatedType == EntityReferenceKind.Notification
+                    && change.RelatedId == item.Id
+                    && change.ActionValue == (int)CompetitionAnnouncementChangeAction.Withdraw));
 
     public static Task<Dictionary<Guid, Notification>> LatestAsync(NoCtfDbContext db, IReadOnlyList<Notification> roots, CancellationToken ct) =>
         LatestForIdsAsync(db, roots.Where(item => item.Kind == NotificationKind.CompetitionAnnouncement).Select(item => item.Id).ToArray(), ct);

@@ -186,8 +186,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(notification => notification.SourceId!.Value)
             .Distinct()
             .ToArray();
-        var sourceNames = sourceIds.Length == 0 ? new Dictionary<Guid, string>() : await db.Users.IgnoreQueryFilters().AsNoTracking()
+        var sourceNames = sourceIds.Length == 0 ? new Dictionary<Guid, string>() : await db.Users.IgnoreQueryFilters()
             .Where(user => sourceIds.Contains(user.Id))
+            .Select(user => new { user.Id, user.UserName })
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
         var changes = await CompetitionAnnouncementProjection.LatestAsync(db, notifications, ct);
         return notifications.Select(notification => new NotificationView(
@@ -214,74 +215,54 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
     {
         if (!db.Database.IsRelational())
             return CompetitionAnnouncementProjection.ActiveMessages(db, await VisibleToInMemoryAsync(userId, ct));
-        var activeAdministrator = await db.Users.IgnoreQueryFilters().AnyAsync(user =>
-            user.Id == userId
-            && user.Role == UserRole.Administrator
-            && user.AccountStatus == UserAccountStatus.Active, ct);
-        var inaccessibleStaffCompetitionIds = db.Competitions.IgnoreQueryFilters()
-            .Where(competition =>
-                competition.AccessMode == NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly
-                && !(activeAdministrator
-                    || competition.OwnerId == userId
-                    || competition.Collaborators.Any(collaborator => collaborator.UserId == userId)))
-            .Select(competition => competition.Id);
 
-        var audienceVisible = db.Notifications.AsNoTracking().Where(notification =>
-            !(notification.TargetType == NotificationTargetType.User
-                && notification.TargetId != userId)
-            && !(notification.RelatedType == EntityReferenceKind.Competition
-                && notification.RelatedId != null
-                && inaccessibleStaffCompetitionIds.Contains(notification.RelatedId.Value))
-            && !((notification.TargetType == NotificationTargetType.CompetitionCollaborators
-                    || notification.TargetType == NotificationTargetType.CompetitionParticipants)
-                && inaccessibleStaffCompetitionIds.Contains(notification.TargetId))
-            && !(notification.TargetType == NotificationTargetType.TeamMembers
-                && db.Teams.IgnoreQueryFilters().Any(team =>
-                    team.Id == notification.TargetId
-                    && inaccessibleStaffCompetitionIds.Contains(team.CompetitionId)))
-            && !(notification.ThreadRootId != null
-                && db.Notifications.Any(root =>
-                    root.Id == notification.ThreadRootId
-                    && root.RelatedType == EntityReferenceKind.Competition
-                    && root.RelatedId != null
-                    && inaccessibleStaffCompetitionIds.Contains(root.RelatedId.Value))));
+        // Resolve the caller's audience once so the notification predicates become sargable
+        // (target_type, target_id) / (source_type, source_id) / thread_root_id lookups instead of
+        // correlated membership subqueries repeated for every row.
+        var audience = await LoadAudienceAsync(userId, ct);
+        var audienceVisible = AudienceVisible(userId, audience);
 
-        audienceVisible = CompetitionAnnouncementProjection.ActiveMessages(db, audienceVisible);
-        var directlyVisibleRootIds = audienceVisible
+        // A thread is visible when any of its audience-visible messages is addressed to or sent by the
+        // caller. Only threaded messages and roots that actually have replies can widen visibility, so
+        // the root set is materialized from those rows; standalone messages are matched directly below.
+        var threadRootIds = await audienceVisible
             .Where(notification =>
                 notification.TargetType == NotificationTargetType.User
                     && notification.TargetId == userId
                 || notification.TargetType == NotificationTargetType.CompetitionCollaborators
-                    && db.Competitions.Any(competition =>
-                        competition.Id == notification.TargetId
-                        && competition.DeletedAt == null
-                        && (competition.OwnerId == userId
-                            || competition.Collaborators.Any(collaborator =>
-                                collaborator.UserId == userId)))
+                    && audience.CollaboratorCompetitionIds.Contains(notification.TargetId)
                 || notification.TargetType == NotificationTargetType.CompetitionParticipants
-                    && db.Teams.Any(team =>
-                        team.CompetitionId == notification.TargetId
-                        && team.DeletedAt == null
-                        && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                        && !team.IsBanned
-                        && team.Members.Any(member => member.UserId == userId))
+                    && audience.ParticipantCompetitionIds.Contains(notification.TargetId)
                 || notification.TargetType == NotificationTargetType.TeamMembers
-                    && db.Teams.Any(team =>
-                        team.Id == notification.TargetId
-                        && team.DeletedAt == null
-                        && team.Members.Any(member => member.UserId == userId))
+                    && audience.MemberTeamIds.Contains(notification.TargetId)
                 || notification.TargetType == NotificationTargetType.PlatformAdministrators
-                    && activeAdministrator)
-            .Select(notification => notification.ThreadRootId ?? notification.Id);
-        var participatedRootIds = audienceVisible
-            .Where(notification => notification.SourceType == NotificationSourceType.User
-                && notification.SourceId == userId)
-            .Select(notification => notification.ThreadRootId ?? notification.Id);
-        var visibleRootIds = directlyVisibleRootIds.Union(participatedRootIds);
+                    && audience.ActiveAdministrator
+                || notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == userId)
+            .Where(notification => notification.ThreadRootId != null
+                || db.Notifications.Any(reply => reply.ThreadRootId == notification.Id))
+            .Select(notification => notification.ThreadRootId ?? notification.Id)
+            .Distinct()
+            .ToArrayAsync(ct);
 
         var visible = audienceVisible
-            .Where(notification => visibleRootIds.Contains(
-                notification.ThreadRootId ?? notification.Id))
+            .Where(notification =>
+                notification.TargetType == NotificationTargetType.User
+                    && notification.TargetId == userId
+                || notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                    && audience.CollaboratorCompetitionIds.Contains(notification.TargetId)
+                || notification.TargetType == NotificationTargetType.CompetitionParticipants
+                    && audience.ParticipantCompetitionIds.Contains(notification.TargetId)
+                || notification.TargetType == NotificationTargetType.TeamMembers
+                    && audience.MemberTeamIds.Contains(notification.TargetId)
+                || notification.TargetType == NotificationTargetType.PlatformAdministrators
+                    && audience.ActiveAdministrator
+                || notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == userId
+                || notification.ThreadRootId == null
+                    && threadRootIds.Contains(notification.Id)
+                || notification.ThreadRootId != null
+                    && threadRootIds.Contains(notification.ThreadRootId.Value))
             .Where(item =>
                 item.Kind != NotificationKind.AuthenticationSecurityActivity
                 && item.Kind != NotificationKind.PlatformUserAccessTokenIssued
@@ -291,6 +272,107 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && item.Kind != NotificationKind.SsoExternalIdentityBindingChanged);
         return visible;
     }
+
+    private IQueryable<Notification> AudienceVisible(Guid userId, NotificationAudience audience)
+    {
+        var query = db.Notifications.AsNoTracking().Where(notification =>
+            !(notification.TargetType == NotificationTargetType.User
+                && notification.TargetId != userId));
+        if (audience.InaccessibleCompetitionIds.Length > 0)
+        {
+            var inaccessible = audience.InaccessibleCompetitionIds;
+            query = query.Where(notification =>
+                !(notification.RelatedType == EntityReferenceKind.Competition
+                    && notification.RelatedId != null
+                    && inaccessible.Contains(notification.RelatedId.Value))
+                && !((notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                        || notification.TargetType == NotificationTargetType.CompetitionParticipants)
+                    && inaccessible.Contains(notification.TargetId))
+                && !(notification.TargetType == NotificationTargetType.TeamMembers
+                    && db.Teams.IgnoreQueryFilters().Any(team =>
+                        team.Id == notification.TargetId
+                        && inaccessible.Contains(team.CompetitionId)))
+                && !(notification.ThreadRootId != null
+                    && db.Notifications.Any(root =>
+                        root.Id == notification.ThreadRootId
+                        && root.RelatedType == EntityReferenceKind.Competition
+                        && root.RelatedId != null
+                        && inaccessible.Contains(root.RelatedId.Value))));
+        }
+        return CompetitionAnnouncementProjection.ActiveMessages(db, query);
+    }
+
+    /// <summary>Loads every audience key of the caller in one round trip.</summary>
+    private async Task<NotificationAudience> LoadAudienceAsync(Guid userId, CancellationToken ct)
+    {
+        var activeAdministrator = db.Users.IgnoreQueryFilters().Where(user =>
+            user.Id == userId
+            && user.Role == UserRole.Administrator
+            && user.AccountStatus == UserAccountStatus.Active);
+        var keys = await activeAdministrator
+            .Select(user => new AudienceKey { Kind = AudienceKeyKind.ActiveAdministrator, Id = user.Id })
+            .Concat(db.Competitions.IgnoreQueryFilters()
+                .Where(competition =>
+                    competition.AccessMode == NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly
+                    && competition.OwnerId != userId
+                    && !competition.Collaborators.Any(collaborator => collaborator.UserId == userId)
+                    && !activeAdministrator.Any())
+                .Select(competition => new AudienceKey
+                    { Kind = AudienceKeyKind.InaccessibleCompetition, Id = competition.Id }))
+            .Concat(db.Competitions
+                .Where(competition =>
+                    competition.DeletedAt == null
+                    && (competition.OwnerId == userId
+                        || competition.Collaborators.Any(collaborator => collaborator.UserId == userId)))
+                .Select(competition => new AudienceKey
+                    { Kind = AudienceKeyKind.CollaboratorCompetition, Id = competition.Id }))
+            .Concat(db.Teams
+                .Where(team =>
+                    team.DeletedAt == null
+                    && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                    && !team.IsBanned
+                    && team.Members.Any(member => member.UserId == userId))
+                .Select(team => new AudienceKey
+                    { Kind = AudienceKeyKind.ParticipantCompetition, Id = team.CompetitionId }))
+            .Concat(db.Teams
+                .Where(team =>
+                    team.DeletedAt == null
+                    && team.Members.Any(member => member.UserId == userId))
+                .Select(team => new AudienceKey { Kind = AudienceKeyKind.MemberTeam, Id = team.Id }))
+            .ToArrayAsync(ct);
+        Guid[] Ids(AudienceKeyKind kind) => keys.Where(key => key.Kind == kind)
+            .Select(key => key.Id)
+            .Distinct()
+            .ToArray();
+        return new NotificationAudience(
+            keys.Any(key => key.Kind == AudienceKeyKind.ActiveAdministrator),
+            Ids(AudienceKeyKind.InaccessibleCompetition),
+            Ids(AudienceKeyKind.CollaboratorCompetition),
+            Ids(AudienceKeyKind.ParticipantCompetition),
+            Ids(AudienceKeyKind.MemberTeam));
+    }
+
+    private enum AudienceKeyKind : short
+    {
+        ActiveAdministrator,
+        InaccessibleCompetition,
+        CollaboratorCompetition,
+        ParticipantCompetition,
+        MemberTeam
+    }
+
+    private sealed class AudienceKey
+    {
+        public AudienceKeyKind Kind { get; init; }
+        public Guid Id { get; init; }
+    }
+
+    private sealed record NotificationAudience(
+        bool ActiveAdministrator,
+        Guid[] InaccessibleCompetitionIds,
+        Guid[] CollaboratorCompetitionIds,
+        Guid[] ParticipantCompetitionIds,
+        Guid[] MemberTeamIds);
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
         Guid userId,
