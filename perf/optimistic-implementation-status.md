@@ -125,7 +125,7 @@
 | Hub 事件 | 898K | 65K |
 | Host CPU 平均 | 约 4.5 核 | 约 2.7 核 |
 
-已知未通过的测试（均与本轮修改无关，见 `perf/results/round3-relational-*.log`）：`Flag_recheck_rejects_rules_changed_after_initial_admission` 仍期望 CTF 受理时复查次数（WIP 已改为 Worker 判定）；四个期望读取时同步重建排行榜的测试与事件驱动设计冲突；AWDP 投影查询数断言针对 WIP 已修改的投影读取。API 单元测试 8 项、Infrastructure 2 项在本轮前即失败。
+此前未通过的测试已在提交 `883510126` 中全部处理：过期断言按当前行为更新（Worker 判定次数规则、读取拒绝过期投影、AWDP/KoH 按提示单独读取、SignalR 新推送）；API 7 项暴露无基础设施注册缺少 MFA 依赖，Infrastructure 2 项暴露 Webhook/SSO 出站请求经环境代理绕过 SSRF 地址校验，均已修复产品代码。全部单元测试及 109 项相关 PostgreSQL/NATS 集成测试通过。
 
 ## 查询合并与临界区收缩（第 4、5 轮）
 
