@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NSubstitute;
@@ -137,9 +138,60 @@ public sealed class RoleReadinessHealthCheckTests
     }
 
     [Test]
+    public async Task Failures_before_first_readiness_are_startup_progress_until_the_grace_expires()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+        var state = new RoleReadinessLogState(clock);
+        var logger = new RecordingLogger();
+        var unhealthy = new RoleReadinessHealthCheck(
+        [
+            new StubDependency(
+                "runner-admission",
+                failureIsCritical: true,
+                new TimeoutException("waiting for first observation"))
+        ], state, logger);
+
+        var result = await unhealthy.CheckHealthAsync(new HealthCheckContext());
+        _ = await unhealthy.CheckHealthAsync(new HealthCheckContext());
+        clock.Advance(RoleReadinessLogState.StartupGrace);
+        _ = await unhealthy.CheckHealthAsync(new HealthCheckContext());
+
+        // The probe itself stays honest; only the log classification changes.
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
+        await Assert.That(logger.Levels).IsEquivalentTo([LogLevel.Information, LogLevel.Error]);
+    }
+
+    [Test]
+    public async Task Startup_completion_ends_the_grace_for_later_failures()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+        var state = new RoleReadinessLogState(clock);
+        var logger = new RecordingLogger();
+        var failing = new RoleReadinessHealthCheck(
+            [new StubDependency("runner-admission", failureIsCritical: true, new TimeoutException("stale"))],
+            state,
+            logger);
+
+        _ = await failing.CheckHealthAsync(new HealthCheckContext());
+        _ = await new RoleReadinessHealthCheck(
+                [new StubDependency("runner-admission", failureIsCritical: true)],
+                state,
+                logger)
+            .CheckHealthAsync(new HealthCheckContext());
+        _ = await failing.CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(logger.Levels)
+            .IsEquivalentTo([LogLevel.Information, LogLevel.Information, LogLevel.Error]);
+    }
+
+    [Test]
     public async Task Unchanged_failure_is_logged_once_and_recovery_is_logged_once()
     {
-        var state = new RoleReadinessLogState();
+        var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+        var state = new RoleReadinessLogState(clock);
+        // Start the role, then let the startup grace pass before the outage.
+        _ = state.TryTransition(HealthStatus.Healthy, []);
+        clock.Advance(RoleReadinessLogState.StartupGrace);
         var logger = new RecordingLogger();
         var unhealthy = new RoleReadinessHealthCheck(
         [

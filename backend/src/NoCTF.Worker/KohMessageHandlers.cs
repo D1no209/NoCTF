@@ -174,6 +174,7 @@ public sealed class KohPollingHandler(
                 && (candidate.ValidUntil == null || candidate.ValidUntil > observedAt))
             .Select(candidate => candidate.TeamId!.Value)
             .Distinct()
+            .OrderBy(teamId => teamId)
             .Take(2)
             .ToArrayAsync(cancellationToken);
         return matches.Length switch

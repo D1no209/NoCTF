@@ -38,8 +38,13 @@ public static class PostgreSqlPersistence
                     // Aggregate decisions keep one statement's snapshot; bounded read projections opt into splitting.
                     .UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery))
                 .UseSnakeCaseNamingConvention()
+                // One shared instance: EF caches its internal service provider per logger factory.
+                .UseLoggerFactory(provider.GetRequiredService<TransactionConflictLoggerFactory>())
                 .AddInterceptors(new NoCTF.Infrastructure.Observability.DatabaseCommandPerformanceInterceptor(),
                     new NoCTF.Infrastructure.Observability.DatabaseConnectionPerformanceInterceptor());
+        services.AddSingleton(provider => new TransactionConflictLoggerFactory(
+            provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance));
         services.AddScoped<NoCtfDbContext>();
         services.AddSingleton<IDatabaseConstraintClassifier, PostgreSqlConstraintClassifier>();
         services.AddDbContextFactory<NoCtfDbContext>(Configure);

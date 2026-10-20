@@ -26,16 +26,33 @@ public interface IReadinessDependency
         new Dictionary<string, object>();
 }
 
-public sealed class RoleReadinessLogState
+public sealed class RoleReadinessLogState(TimeProvider? clock = null)
 {
+    /// <summary>
+    /// Dependencies such as the Runner's first resource observation need a few sample intervals before they
+    /// can report ready. Until the role has been healthy once, failures inside this window are startup
+    /// progress rather than outages; a role still not ready afterwards is reported as unhealthy.
+    /// </summary>
+    public static readonly TimeSpan StartupGrace = TimeSpan.FromMinutes(2);
+
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly object gate = new();
     private string? fingerprint;
+    private DateTimeOffset? firstCheckedAt;
+    private bool becameReady;
 
-    public bool TryTransition(HealthStatus status, IReadOnlyList<string> failures)
+    public bool TryTransition(HealthStatus status, IReadOnlyList<string> failures) =>
+        TryTransition(status, failures, out _);
+
+    public bool TryTransition(HealthStatus status, IReadOnlyList<string> failures, out bool starting)
     {
-        var next = $"{status}:{string.Join(',', failures)}";
         lock (gate)
         {
+            var now = timeProvider.GetUtcNow();
+            firstCheckedAt ??= now;
+            starting = !becameReady && status != HealthStatus.Healthy && now - firstCheckedAt < StartupGrace;
+            if (status == HealthStatus.Healthy) becameReady = true;
+            var next = $"{(starting ? "starting" : "running")}:{status}:{string.Join(',', failures)}";
             if (string.Equals(fingerprint, next, StringComparison.Ordinal))
                 return false;
             fingerprint = next;
@@ -99,9 +116,15 @@ public sealed partial class RoleReadinessHealthCheck(
 
     private void ReportTransition(HealthStatus status, IReadOnlyList<string> failures)
     {
-        if (logger is null || logState?.TryTransition(status, failures) != true)
+        var starting = false;
+        if (logger is null || logState?.TryTransition(status, failures, out starting) != true)
             return;
         var names = string.Join(", ", failures);
+        if (starting)
+        {
+            LogStarting(logger, names);
+            return;
+        }
         switch (status)
         {
             case HealthStatus.Unhealthy:
@@ -133,6 +156,12 @@ public sealed partial class RoleReadinessHealthCheck(
         Level = LogLevel.Information,
         Message = "Role readiness recovered; all dependencies are available.")]
     private static partial void LogHealthy(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 4103,
+        Level = LogLevel.Information,
+        Message = "Role readiness is starting; waiting for dependencies: {Dependencies}.")]
+    private static partial void LogStarting(ILogger logger, string dependencies);
 
     private static async Task<DependencyResult> CheckAsync(
         IReadinessDependency dependency,

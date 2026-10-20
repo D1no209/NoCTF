@@ -23,7 +23,8 @@ public sealed class MfaPendingAgent(IServiceScopeFactory scopes, TimeProvider cl
                 var publisher = scope.ServiceProvider.GetRequiredService<IPostCommitMessagePublisher>();
                 foreach (var id in pending) await publisher.PublishAsync(new SendMfaMail(id));
                 var expiredSecrets = await db.MfaChallenges.Where(value => value.ExpiresAt <= clock.GetUtcNow()
-                    && (value.PendingSecretCiphertext != null || value.RecoveryGrantCiphertext != null)).Take(500).ToArrayAsync(stoppingToken);
+                    && (value.PendingSecretCiphertext != null || value.RecoveryGrantCiphertext != null))
+                    .OrderBy(value => value.ExpiresAt).ThenBy(value => value.Id).Take(500).ToArrayAsync(stoppingToken);
                 foreach (var challenge in expiredSecrets)
                 {
                     challenge.PendingSecretCiphertext = null;
@@ -31,11 +32,14 @@ public sealed class MfaPendingAgent(IServiceScopeFactory scopes, TimeProvider cl
                     if (challenge.Purpose == MfaChallengePurpose.RecoveryGrant) challenge.MailState = MfaMailState.Sent;
                     if (challenge.State is MfaChallengeState.Pending or MfaChallengeState.Verified) challenge.State = MfaChallengeState.Failed;
                 }
-                var expired = await db.MfaChallenges.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1) && value.MailState != MfaMailState.Pending && value.MailState != MfaMailState.Sending).Take(500).ToArrayAsync(stoppingToken);
+                var expired = await db.MfaChallenges.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1) && value.MailState != MfaMailState.Pending && value.MailState != MfaMailState.Sending)
+                    .OrderBy(value => value.ExpiresAt).ThenBy(value => value.Id).Take(500).ToArrayAsync(stoppingToken);
                 var expiredPasskeys = await db.PasskeyCeremonies.Where(value => value.ExpiresAt <= clock.GetUtcNow()
-                    && value.State == NoCTF.Domain.Identity.Passkeys.PasskeyCeremonyState.Pending).Take(500).ToArrayAsync(stoppingToken);
+                    && value.State == NoCTF.Domain.Identity.Passkeys.PasskeyCeremonyState.Pending)
+                    .OrderBy(value => value.ExpiresAt).ThenBy(value => value.Id).Take(500).ToArrayAsync(stoppingToken);
                 foreach (var ceremony in expiredPasskeys) { ceremony.State = NoCTF.Domain.Identity.Passkeys.PasskeyCeremonyState.Failed; ceremony.ProtectedProtocolState = []; }
-                var stalePasskeys = await db.PasskeyCeremonies.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1)).Take(500).ToArrayAsync(stoppingToken);
+                var stalePasskeys = await db.PasskeyCeremonies.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1))
+                    .OrderBy(value => value.ExpiresAt).ThenBy(value => value.Id).Take(500).ToArrayAsync(stoppingToken);
                 db.PasskeyCeremonies.RemoveRange(stalePasskeys);
                 db.MfaChallenges.RemoveRange(expired); await db.SaveChangesAsync(stoppingToken);
             }

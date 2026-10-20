@@ -324,7 +324,12 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
                 var result = await action(); if (!result.Succeeded) return result;
                 await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return result;
             }
-            catch (Exception exception) when (RelationalRetry.IsTransientConcurrency(exception)) { }
+            catch (Exception exception) when (RelationalRetry.IsTransientConcurrency(exception))
+            {
+                // Heartbeat scans and delivery completions touch the same target rows; jitter the
+                // bounded retry so the conflicting transactions do not collide again in lockstep.
+                if (attempt < 2) await Task.Delay(Random.Shared.Next(5, 31), ct);
+            }
         }
         return Fail<T>(StaffWebhookFailure.Conflict);
     }
