@@ -161,6 +161,46 @@ internal sealed class SwaggerAuthenticationStore
     public void DiscardChanges() { }
 }
 
+/// <summary>Infrastructure-free MFA dependency: every account is unavailable and no flow can start.</summary>
+internal sealed class SwaggerMfaAuthenticationStore : NoCTF.Application.Authentication.Mfa.IMfaAuthenticationStore
+{
+    private static OperationResult<T, NoCTF.Application.Authentication.Mfa.MfaFailure> Unavailable<T>() =>
+        OperationResult<T, NoCTF.Application.Authentication.Mfa.MfaFailure>.Failure(
+            NoCTF.Application.Authentication.Mfa.MfaFailure.AccountUnavailable, "Authentication is unavailable.");
+
+    public Task<NoCTF.Application.Authentication.Mfa.MfaAccountSnapshot?> ReadAccountAsync(Guid userId, CancellationToken ct) =>
+        Task.FromResult<NoCTF.Application.Authentication.Mfa.MfaAccountSnapshot?>(null);
+    public Task<NoCTF.Application.Authentication.Mfa.MfaFailure?> ValidateContextAsync(Guid userId, int tokenVersion,
+        NoCTF.Domain.Identity.Mfa.AuthenticationContext? context, CancellationToken ct) =>
+        Task.FromResult<NoCTF.Application.Authentication.Mfa.MfaFailure?>(NoCTF.Application.Authentication.Mfa.MfaFailure.AccountUnavailable);
+    public Task<bool> IsOidcProofCurrentAsync(NoCTF.Application.Authentication.Mfa.OidcMfaProof proof, CancellationToken ct) =>
+        Task.FromResult(false);
+    public Task<(NoCTF.Application.Authentication.Mfa.MfaFlowView Flow, NoCTF.Application.Authentication.Mfa.MfaBrowserCredential Browser)> CreateFlowAsync(
+        NoCTF.Application.Authentication.Mfa.PrimaryAuthentication primary, NoCTF.Domain.Identity.Mfa.MfaChallengePurpose purpose, CancellationToken ct) =>
+        throw new InvalidOperationException("Authentication is unavailable.");
+    public Task<OperationResult<NoCTF.Application.Authentication.Mfa.MfaFlowView, NoCTF.Application.Authentication.Mfa.MfaFailure>> ReadFlowAsync(
+        NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, CancellationToken ct) =>
+        Task.FromResult(Unavailable<NoCTF.Application.Authentication.Mfa.MfaFlowView>());
+    public Task CancelFlowAsync(NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, CancellationToken ct) => Task.CompletedTask;
+    public Task<OperationResult<NoCTF.Application.Authentication.Mfa.MfaAuthenticationResult, NoCTF.Application.Authentication.Mfa.MfaFailure>> VerifyAsync(
+        NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, NoCTF.Application.Authentication.Mfa.MfaVerification verification, CancellationToken ct) =>
+        Task.FromResult(Unavailable<NoCTF.Application.Authentication.Mfa.MfaAuthenticationResult>());
+    public Task<OperationResult<NoCTF.Application.Authentication.Mfa.MfaFlowView, NoCTF.Application.Authentication.Mfa.MfaFailure>> BeginEnrollmentAsync(
+        NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, CancellationToken ct) =>
+        Task.FromResult(Unavailable<NoCTF.Application.Authentication.Mfa.MfaFlowView>());
+    public Task<OperationResult<NoCTF.Application.Authentication.Mfa.MfaAuthenticationResult, NoCTF.Application.Authentication.Mfa.MfaFailure>> ConfirmEnrollmentAsync(
+        NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, string code, CancellationToken ct, bool accountManagement = false) =>
+        Task.FromResult(Unavailable<NoCTF.Application.Authentication.Mfa.MfaAuthenticationResult>());
+    public Task<OperationResult<NoCTF.Application.Authentication.Mfa.MfaFlowView, NoCTF.Application.Authentication.Mfa.MfaFailure>> ApplyRecoveryPrimaryAsync(
+        NoCTF.Application.Authentication.Mfa.MfaBrowserCredential browser, NoCTF.Application.Authentication.Mfa.PrimaryAuthentication primary, CancellationToken ct) =>
+        Task.FromResult(Unavailable<NoCTF.Application.Authentication.Mfa.MfaFlowView>());
+    public Task<IReadOnlyDictionary<string, NoCTF.Application.Authentication.Mfa.MfaFailure?>> ValidateContextsAsync(
+        IReadOnlyList<NoCTF.Application.Authentication.Mfa.MfaContextValidationRequest> requests, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<string, NoCTF.Application.Authentication.Mfa.MfaFailure?>>(
+            requests.ToDictionary(request => request.Key,
+                _ => (NoCTF.Application.Authentication.Mfa.MfaFailure?)NoCTF.Application.Authentication.Mfa.MfaFailure.AccountUnavailable));
+}
+
 internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader
 {
     public Task<bool> IsCurrentAsync(

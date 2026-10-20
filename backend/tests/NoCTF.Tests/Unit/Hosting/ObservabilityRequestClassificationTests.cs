@@ -30,7 +30,8 @@ public sealed class ObservabilityRequestClassificationTests
             if (instrument.Name == "noctf.api.request.duration" && value >= 0) Capture(durations, tags);
         });
         listener.Start();
-        var builder = WebApplication.CreateBuilder();
+        // Development hosts add the developer exception page, which would turn the thrown request into a 500.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = Microsoft.Extensions.Hosting.Environments.Production });
         builder.WebHost.UseTestServer();
         builder.Services.AddNoCtfObservability(builder.Configuration, "classification-test");
         await using var app = builder.Build();

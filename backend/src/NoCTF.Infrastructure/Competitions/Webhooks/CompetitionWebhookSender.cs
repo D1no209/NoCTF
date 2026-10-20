@@ -21,6 +21,9 @@ public sealed class CompetitionWebhookSender : ICompetitionWebhookSender, IDispo
             AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.None,
             UseCookies = false,
+            // ConnectCallback validates the address actually dialed. Through an ambient HTTP_PROXY or system proxy
+            // that would be the proxy, letting a receiver hostname resolve to a private address unchecked.
+            UseProxy = false,
             ConnectTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             MaxResponseHeadersLength = 32,

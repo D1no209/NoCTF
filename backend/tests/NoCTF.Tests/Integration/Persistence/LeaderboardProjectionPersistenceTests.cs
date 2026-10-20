@@ -1150,7 +1150,8 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                     .ToArray();
                 await Assert.That(factQueries.Length).IsGreaterThanOrEqualTo(1);
                 // KoH also reads the current observation, effective controller and bounded spectator history.
-                var maximumFactQueries = fixture.Competition.Mode == GameMode.Koh ? 5 : 2;
+                // AWDP and KoH add one individual hint-unlock read: their grouped reads cannot price each hint.
+                var maximumFactQueries = fixture.Competition.Mode switch { GameMode.Koh => 6, GameMode.Awdp => 3, _ => 2 };
                 await Assert.That(factQueries.Length).IsLessThanOrEqualTo(maximumFactQueries).Because($"Projection mode: {fixture.Competition.Mode}");
                 await Assert.That(factQueries.Any(command =>
                         command.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)))
@@ -1210,11 +1211,11 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(historical!.EntryAllocations
                     .Select(item => item.Entry.Id))
                 .DoesNotContain(futureFact.Id);
-            await Assert.That(historical.DetailActors
-                    .Where(item => item.UserId == owner.Id)
-                    .Select(item => item.DisplayName)
-                    .Distinct())
-                .IsEquivalentTo([owner.UserName]);
+            // Before the future solve the slot holds only failed attempts, which the summary omits; slot detail
+            // resolves their actors from the facts. The future solve's actor must not leak into the projection.
+            await Assert.That(historical.DetailActors.Any(item => item.UserId == owner.Id)).IsFalse();
+            await Assert.That(historical.Snapshot.Teams.SelectMany(team => team.Slots).Sum(slot => slot.EntryCount))
+                .IsGreaterThanOrEqualTo(250);
 
             var rejudgedFact = ctf.Facts.First(fact => fact.Result is not null);
             var originalState = rejudgedFact.State;

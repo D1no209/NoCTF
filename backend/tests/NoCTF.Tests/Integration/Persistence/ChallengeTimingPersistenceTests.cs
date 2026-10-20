@@ -75,8 +75,11 @@ public sealed class ChallengeTimingPersistenceTests
         else json.Remove("timingRevisions");
         var incomplete = JsonSerializer.Deserialize(json.ToJsonString(), CachedScoreboardJsonContext.Default.CachedScoreboardProjection)!;
         await provider.GetCache(NoCtfCacheNames.Leaderboards).SetAsync($"scoreboard:v3:{f.Competition.Id:N}", incomplete, token: ct);
-        var current = await cache.GetScoreboardAsync(f.Competition.Id, ct);
-        await Assert.That(current).IsNotNull();
+        // Reads never project: a payload without the current access revision is rejected, not served.
+        await Assert.That(await cache.GetScoreboardAsync(f.Competition.Id, ct)).IsNull();
+        // The background refresh rebuilds it with timing metadata.
+        await cache.RefreshAsync(f.Competition.Id, ct);
+        await Assert.That(await cache.GetScoreboardAsync(f.Competition.Id, ct)).IsNotNull();
         var rebuilt = await provider.GetCache(NoCtfCacheNames.Leaderboards).GetOrDefaultAsync<CachedScoreboardProjection?>($"scoreboard:v3:{f.Competition.Id:N}", null, token: ct);
         await Assert.That(rebuilt!.TimingRevisions.Count).IsEqualTo(1);
     });
@@ -213,10 +216,13 @@ public sealed class ChallengeTimingPersistenceTests
             Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>());
         var message = new BloodAwarded(f.Competition.Id, f.Challenge.Id, "Question", LeaderboardBloodRank.First, team.Id, team.Name, at);
         var delivery = new NoCTF.Infrastructure.Notifications.CompetitionNotificationDelivery(f.Db);
+        // Each timing change is followed by the event-driven background projection, as in production.
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at), f.Now), ct);
+        await cache.RefreshAsync(f.Competition.Id, ct);
         await NoCTF.Worker.CompetitionNotificationMessageHandlers.Handle(message, delivery, cache, TimeProvider.System, ct);
         await Assert.That(await f.Db.Notifications.CountAsync(ct)).IsEqualTo(0);
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, f.Now.AddMinutes(1)), f.Now), ct);
+        await cache.RefreshAsync(f.Competition.Id, ct);
         await NoCTF.Worker.CompetitionNotificationMessageHandlers.Handle(message, delivery, cache, TimeProvider.System, ct);
         await NoCTF.Worker.CompetitionNotificationMessageHandlers.Handle(message, delivery, cache, TimeProvider.System, ct);
         await Assert.That(await f.Db.Notifications.CountAsync(ct)).IsEqualTo(1);
@@ -485,6 +491,8 @@ public sealed class ChallengeTimingPersistenceTests
         await f.Store.ChangeAsync(candidate, ct);
         // No invalidation event is delivered in this fixture. A cached old-policy
         // projection must still be rejected before the background batch runs.
+        await Assert.That(await cache.GetScoreboardAsync(f.Competition.Id, ct)).IsNull();
+        await cache.RefreshAsync(f.Competition.Id, ct);
         await Assert.That((await cache.GetScoreboardAsync(f.Competition.Id, ct))!.Snapshot.Teams.Single().TotalScore).IsEqualTo(0);
         await f.Store.RecalculateAsync(new(f.Challenge.Id, f.Challenge.TimingRevision), f.Now, ct);
         var restore = candidate with { Timing = new(), Now = f.Now.AddSeconds(2) };

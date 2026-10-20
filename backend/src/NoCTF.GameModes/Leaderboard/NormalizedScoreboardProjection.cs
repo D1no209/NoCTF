@@ -263,7 +263,8 @@ internal static class NormalizedScoreboardProjection
             .OrderBy(row => row.Rank ?? int.MaxValue)
             .ThenBy(row => row.TeamId)
             .ToArray();
-        var compacted = CompactActors(actors, orderedRows);
+        var compacted = CompactActors(actors, orderedRows,
+            entryAllocations.Select(allocation => allocation.Entry.ActorIndex));
         int? MapCompactedActor(int? actorIndex) => actorIndex is int value
             && compacted.IndexMap.TryGetValue(value, out var mapped)
                 ? mapped
@@ -277,7 +278,7 @@ internal static class NormalizedScoreboardProjection
             schemaRevision,
             projectedAt,
             currentRoundId,
-            compacted.Actors,
+            compacted.SummaryActors,
             compacted.Teams)
         {
             DataScope = LeaderboardDataScope.Live,
@@ -343,13 +344,21 @@ internal static class NormalizedScoreboardProjection
 
     private static CompactedActors CompactActors(
         IReadOnlyList<ScoreboardActor> actors,
-        IReadOnlyList<ScoreboardTeam> teams)
+        IReadOnlyList<ScoreboardTeam> teams,
+        IEnumerable<int?> detailActorIndexes)
     {
-        var referencedIndexes = teams
+        // One index space for the summary and the cursor-paged slot detail. The summary keeps only
+        // score-bearing entries, so detail entries may reference actors the summary does not.
+        var summaryIndexes = teams
             .SelectMany(team => team.GlobalAdjustments.Select(adjustment => adjustment.ActorIndex)
                 .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
             .Where(index => index is not null)
             .Select(index => index!.Value)
+            .ToHashSet();
+        var referencedIndexes = detailActorIndexes
+            .Where(index => index is not null)
+            .Select(index => index!.Value)
+            .Concat(summaryIndexes)
             .ToHashSet();
         var actorPairs = actors
             .Where(actor => referencedIndexes.Contains(actor.Index))
@@ -377,7 +386,11 @@ internal static class NormalizedScoreboardProjection
         return new(
             actorPairs.Select(pair => pair.Actor).ToArray(),
             compactTeams,
-            indexMap);
+            indexMap)
+        {
+            SummaryActors = actorPairs.Where(pair => summaryIndexes.Contains(pair.OldIndex))
+                .Select(pair => pair.Actor).ToArray()
+        };
     }
 
     private static IReadOnlyList<ScoreboardColumn> BuildColumns(
@@ -1312,7 +1325,11 @@ internal static class NormalizedScoreboardProjection
     private sealed record CompactedActors(
         IReadOnlyList<ScoreboardActor> Actors,
         IReadOnlyList<ScoreboardTeam> Teams,
-        IReadOnlyDictionary<int, int> IndexMap);
+        IReadOnlyDictionary<int, int> IndexMap)
+    {
+        /// <summary>Actors referenced by the main snapshot; indexes share the detail index space.</summary>
+        public IReadOnlyList<ScoreboardActor> SummaryActors { get; init; } = [];
+    }
 
     private sealed record AllocationIdentity(
         ScoreboardEntryKind EntryKind,

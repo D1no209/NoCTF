@@ -31,6 +31,7 @@ public sealed class SignalRContractTests
                 "gameplayFactStateChanged",
                 "platformLogReceived",
                 "notificationChanged",
+                "navigationCapabilitiesChanged",
                 "theoryChanged"
             ]);
         await Assert.That(methods.All(method => method.ReturnType == typeof(Task))).IsTrue();

@@ -131,7 +131,8 @@ public sealed class CompetitionPracticeModePersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Flag_recheck_rejects_rules_changed_after_initial_admission(
+    // CTF intake no longer rechecks attempt rules; the Worker judges attempts against the rules current at evaluation.
+    public async Task Flag_rules_changed_after_admission_are_applied_at_evaluation(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -188,8 +189,17 @@ public sealed class CompetitionPracticeModePersistenceTests
                 fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.FlagAttempt,
                 fixture.Flag, SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag)), fixture.Now),
                 admission, maxAttempts: 1, cancellationToken);
-            await Assert.That(result.State).IsEqualTo(GameplayFactAcceptanceState.AdmissionRejected);
-            await Assert.That(await intakeDb.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(factCountBefore);
+            await Assert.That(result.State).IsEqualTo(GameplayFactAcceptanceState.Created);
+            await Assert.That(await intakeDb.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(factCountBefore + 1);
+
+            // The admission snapshot allowed one attempt and the team already used it; the current rules allow two.
+            await using var workerDb = new NoCtfDbContext(options);
+            await ProcessAsync(workerDb, new RecordingOutbox(), NullCompetitionEventRecorder.Instance,
+                result.GameplayFactId!.Value, cancellationToken);
+            var evaluated = await workerDb.GameplayFacts.AsNoTracking()
+                .SingleAsync(fact => fact.Id == result.GameplayFactId, cancellationToken);
+            await Assert.That(evaluated.State).IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(evaluated.Result).IsNotEqualTo(GameplayFactResult.AttemptsExhausted);
         });
     }
 

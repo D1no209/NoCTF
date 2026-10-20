@@ -176,6 +176,8 @@ public static class ServiceRegistration
             services.AddScoped<ICurrentUserProfilePatchStore, SwaggerAuthenticationStore>();
             services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
+            services.AddScoped<NoCTF.Application.Authentication.Mfa.IMfaAuthenticationStore, SwaggerMfaAuthenticationStore>();
+            services.AddScoped<NoCTF.Application.Authentication.Mfa.CompleteAuthentication>();
             services.AddScoped<SubmitFlag>();
             services.AddSingleton<IGameplayFactAdmissionModePolicy, SwaggerGameplayFactAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
@@ -231,7 +233,9 @@ public static class ServiceRegistration
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
         services.AddSingleton<ICompetitionHubAudienceCoordinator, CompetitionHubAudienceCoordinator>();
         services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
-        services.AddSingleton<LocalTheoryChangePublisher>();
+        // Consumed only by the infrastructure relays below; it depends on the Infrastructure audience resolver.
+        if (includeInfrastructure)
+            services.AddSingleton<LocalTheoryChangePublisher>();
         if (includeInfrastructure && development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher,

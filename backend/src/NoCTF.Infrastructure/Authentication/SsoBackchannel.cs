@@ -28,6 +28,9 @@ public sealed class SsoBackchannel(SsoNetworkOptions options) : ISsoBackchannel
         {
             AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            // ConnectCallback enforces the private-network policy on the address actually dialed; an ambient
+            // proxy would make that the proxy and bypass the policy.
+            UseProxy = false,
             ConnectTimeout = TimeSpan.FromSeconds(policy.TimeoutSeconds),
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             MaxResponseHeadersLength = 32,
