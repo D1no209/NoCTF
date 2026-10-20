@@ -46,11 +46,12 @@ public sealed class LeaderboardProjectionMergeQueueTests
     }
 
     [Test]
-    [Arguments(CompetitionEventKind.ScoringRecorded)]
-    [Arguments(CompetitionEventKind.TrackConfigurationUpdated)]
-    [Arguments(CompetitionEventKind.TeamTrackChanged)]
+    [Arguments(CompetitionEventKind.ScoringRecorded, false)]
+    // Track changes change who may see teams, so they also rotate the scoreboard access revision.
+    [Arguments(CompetitionEventKind.TrackConfigurationUpdated, true)]
+    [Arguments(CompetitionEventKind.TeamTrackChanged, true)]
     public async Task Relevant_event_invalidates_immediately_and_enters_merge_window(
-        CompetitionEventKind kind)
+        CompetitionEventKind kind, bool changesAccess)
     {
         var leaderboard = Substitute.For<ILeaderboardCache>();
         var queue = new LeaderboardProjectionMergeQueue();
@@ -67,7 +68,8 @@ public sealed class LeaderboardProjectionMergeQueueTests
             CreateEvent(competitionId, kind),
             CancellationToken.None);
 
-        await leaderboard.Received(1).InvalidateAsync(competitionId, CancellationToken.None);
+        await leaderboard.Received(changesAccess ? 0 : 1).InvalidateAsync(competitionId, CancellationToken.None);
+        await leaderboard.Received(changesAccess ? 1 : 0).InvalidateAccessAsync(competitionId, CancellationToken.None);
         await Assert.That(queue.TakeDue(now.AddMilliseconds(499))).IsEmpty();
         await Assert.That(queue.TakeDue(now.AddMilliseconds(500)))
             .IsEquivalentTo([competitionId]);
