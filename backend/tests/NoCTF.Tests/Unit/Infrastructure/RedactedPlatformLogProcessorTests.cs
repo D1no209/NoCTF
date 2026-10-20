@@ -81,7 +81,7 @@ public sealed class RedactedPlatformLogProcessorTests
         await Assert.That(stored!.View.Category)
             .IsEqualTo("Microsoft.EntityFrameworkCore.Database.Command");
         await Assert.That(stored.View.Message)
-            .IsEqualTo("Database command details were suppressed before log export.");
+            .StartsWith("Database command details were suppressed before log export.");
     }
 
     [Test]
@@ -142,6 +142,84 @@ public sealed class RedactedPlatformLogProcessorTests
         await Assert.That(exporter.Body!).DoesNotContain("super-secret");
         await Assert.That(stored.View.ExceptionType)
             .IsEqualTo(typeof(InvalidOperationException).FullName);
+    }
+
+    [Test]
+    public async Task Exception_logs_export_safe_chain_objects_frames_source_and_trace()
+    {
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                new PlatformLogBroadcastQueue(), PlatformLogService.Worker, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        using var activity = new Activity("message").SetIdFormat(ActivityIdFormat.W3C).Start();
+        activity.SetTag("messaging.message.type", "NoCTF.Worker.DeliverStaffWebhook");
+        var database = new TestDatabaseException("23505", "duplicate key value (secret-value)");
+        database.Data["TableName"] = "competition_staff_webhook_deliveries";
+        database.Data["ConstraintName"] = "pk_competition_staff_webhook_deliveries";
+        database.Data["Detail"] = "Key (event_id)=(secret-value) already exists.";
+        database.Data["MessageText"] = "duplicate key value (secret-value)";
+        database.Data["ColumnName"] = "x'; DROP TABLE users; --";
+        var exception = await ThrowFromApplicationAsync(database);
+
+        factory.CreateLogger("NoCTF.Worker.StaffWebhooks").LogError(exception, "Delivery failed.");
+
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        var message = stored!.View.Message;
+        await Assert.That(message).Contains("SQLSTATE: 23505.");
+        await Assert.That(message).Contains(
+            "Database objects: TableName=competition_staff_webhook_deliveries, " +
+            "ConstraintName=pk_competition_staff_webhook_deliveries.");
+        await Assert.That(message).Contains("Operation source: NoCTF.Worker.DeliverStaffWebhook.");
+        await Assert.That(message).Contains(
+            $"Exception chain: {typeof(InvalidOperationException).FullName} -> " +
+            $"{typeof(TestDatabaseException).FullName}.");
+        await Assert.That(message).Contains(
+            $"{typeof(RedactedPlatformLogProcessorTests).FullName}.{nameof(ThrowFromApplicationAsync)}");
+        await Assert.That(message).Contains($"Trace: {activity.TraceId.ToHexString()}.");
+        await Assert.That(exporter.Body!).DoesNotContain("secret-value");
+        await Assert.That(exporter.Body!).DoesNotContain("DROP TABLE");
+        await Assert.That(stored.View.ExceptionMessage).IsNull();
+    }
+
+    [Test]
+    public async Task Transaction_error_includes_operation_source()
+    {
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                new PlatformLogBroadcastQueue(), PlatformLogService.Worker, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        using var activity = new Activity("message").Start();
+        activity.SetTag("messaging.message.type", "NoCTF.Worker.RecomputeLeaderboard");
+
+        factory.CreateLogger("Microsoft.EntityFrameworkCore.Database.Transaction").LogError(
+            new EventId(20205), "An error occurred using a transaction.");
+
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Message)
+            .Contains("Operation source: NoCTF.Worker.RecomputeLeaderboard.");
+    }
+
+    private static async Task<Exception> ThrowFromApplicationAsync(Exception inner)
+    {
+        try
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("SELECT secret-value FROM accounts", inner);
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
     }
 
     [Test]
