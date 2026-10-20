@@ -492,6 +492,116 @@ public sealed class CompetitionTrackPersistenceTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Competition_updates_do_not_reindex_tracks_materialized_out_of_position_order(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_competition_track_order")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var ownerId = Guid.CreateVersion7(now);
+            var participantId = Guid.CreateVersion7(now.AddTicks(1));
+            var competitionId = Guid.CreateVersion7(now);
+
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
+                foreach (var (id, name, role) in new[]
+                         {
+                             (ownerId, "order-owner", UserRole.Organizer),
+                             (participantId, "order-participant", UserRole.User)
+                         })
+                {
+                    seed.Users.Add(new User
+                    {
+                        Id = id,
+                        UserName = name,
+                        NormalizedUserName = name.ToUpperInvariant(),
+                        Email = $"{name}@example.test",
+                        PasswordHash = "test",
+                        Role = role,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
+                seed.Competitions.Add(new CtfCompetition
+                {
+                    Id = competitionId,
+                    Title = "Track order persistence",
+                    OwnerId = ownerId,
+                    Status = CompetitionStatus.Published,
+                    TracksEnabled = true,
+                    Tracks = new[]
+                    {
+                        Track("default", "Official", isDefault: true),
+                        Track("track-2", "Second"),
+                        Track("track-3", "Third"),
+                        Track("track-4", "Fourth"),
+                        Track("track-6", "Sixth")
+                    }.Select((track, position) => track with
+                    {
+                        CompetitionId = competitionId,
+                        Position = position
+                    }).ToList(),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
+                    StartAt = now.AddHours(1),
+                    EndAt = now.AddHours(2),
+                    FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                });
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            // Owned rows have no guaranteed materialization order (production split queries return
+            // them in heap order). An unrelated Competition update must keep persisted positions
+            // instead of re-indexing them by list order and colliding on (competition_id, position).
+            await using (var reorder = new NoCtfDbContext(options))
+            {
+                var competition = await reorder.Competitions
+                    .SingleAsync(item => item.Id == competitionId, cancellationToken);
+                competition.Tracks.Reverse();
+                competition.ScoreboardAccessRevision = Guid.NewGuid();
+                await reorder.SaveChangesAsync(cancellationToken);
+            }
+
+            await using (var registerDb = new NoCtfDbContext(options))
+            {
+                var outbox = Substitute.For<IPostCommitMessagePublisher>();
+                var registration = await new CreateTeam(new TeamRegistrationStore(
+                        registerDb,
+                        outbox,
+                        eventRecorder: new CompetitionEventStore(registerDb, outbox)))
+                    .ExecuteAsync(new(
+                        competitionId,
+                        participantId,
+                        "Ordered",
+                        now.AddSeconds(1),
+                        TrackKey: "default"), cancellationToken);
+                await Assert.That(registration.FailureCode).IsNull();
+                await Assert.That(registration.Succeeded).IsTrue();
+            }
+
+            await using var verify = new NoCtfDbContext(options);
+            var persisted = await verify.Competitions.AsNoTracking()
+                .SingleAsync(item => item.Id == competitionId, cancellationToken);
+            await Assert.That(persisted.Tracks.OrderBy(track => track.Position).Select(track => track.Key)
+                    .SequenceEqual(["default", "track-2", "track-3", "track-4", "track-6"]))
+                .IsTrue();
+        });
+    }
+
     private static CompetitionTrackStore CreateStore(NoCtfDbContext db)
     {
         var outbox = Substitute.For<IPostCommitMessagePublisher>();

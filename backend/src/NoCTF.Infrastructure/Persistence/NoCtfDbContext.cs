@@ -436,12 +436,24 @@ public sealed class NoCtfDbContext(
             _ = CompetitionTrackConfiguration.FromPersisted(
                 entry.Entity.Mode,
                 entry.Entity.Tracks);
-            for (var position = 0; position < entry.Entity.Tracks.Count; position++)
-                entry.Entity.Tracks[position] = entry.Entity.Tracks[position] with
+            // Owned rows are materialized in physical order, not Position order. Re-index by the
+            // persisted/assigned Position (stable for ties) and only replace rows whose identity
+            // actually changes; otherwise an unrelated Competition update (for example the
+            // scoreboard access revision) permutes positions and violates the
+            // (competition_id, position) unique index.
+            var orderedTracks = entry.Entity.Tracks.OrderBy(track => track.Position).ToArray();
+            for (var position = 0; position < orderedTracks.Length; position++)
+            {
+                var track = orderedTracks[position];
+                if (track.CompetitionId == entry.Entity.Id && track.Position == position)
+                    continue;
+                var index = entry.Entity.Tracks.IndexOf(track);
+                entry.Entity.Tracks[index] = track with
                 {
                     CompetitionId = entry.Entity.Id,
                     Position = position
                 };
+            }
             var configuration = entry.Entity.ModeConfiguration
                 ?? throw new InvalidOperationException("Competition mode configuration is required.");
             if (configuration.Mode != entry.Entity.Mode)
