@@ -188,13 +188,12 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
         let teamAttack = false
         let teamDefense = false
         for (const column of columns) {
-          if (column.index === undefined) continue
           const slot = scoreboardSlot(team, column.index)
           if (!slot) continue
           teamSolved ||= (scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) > 0
           teamAttack ||= (scoreboardBreakdown(slot, 'Attack')?.successfulCount ?? 0) > 0
           teamDefense ||= (scoreboardBreakdown(slot, 'Defense')?.successfulCount ?? 0) > 0
-          const award = slot.entries?.find(entry => entry.award)?.award
+          const award = slot.award
           const bloodRank: BloodRank | null = award === 'FirstBlood' ? 'First'
             : award === 'SecondBlood' ? 'Second'
               : award === 'ThirdBlood' ? 'Third' : null

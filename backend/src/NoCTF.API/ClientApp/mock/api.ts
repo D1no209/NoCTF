@@ -5,7 +5,7 @@ import { createMockMfa } from './mfa'
 import { createMockChallengeWriteUps } from './challenge-writeups'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
-import { leaderboardRead } from './leaderboard'
+import { leaderboardRead, mockChallengeBenefits } from './leaderboard'
 import { questionActorRole, questionView } from './questions'
 import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
@@ -175,7 +175,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     gross: (competitionId, teamId, challengeId) => {
       const snapshot = leaderboardRead(state, '', competitionId)!
       const index = state.challenges.filter(x => x.competitionId === competitionId && x.isPublished && !x.deletedAt).findIndex(x => x.id === challengeId)
-      return snapshot.teams.find((x: Data) => x.teamId === teamId)?.slots[index]?.earnedPoints ?? 0
+      const slot = snapshot.teams.find((x: Data) => x.teamId === teamId)?.slots.find((x: Data) => x.challenge === index)
+      return Math.max(0, slot?.netPoints ?? 0)
     } })
   function challengeSummary(item: Data) {
     return {
@@ -616,7 +617,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         const projection = leaderboardRead(state, '', p.competitionId!)
         const row = projection?.teams?.find((item: Data) => item.teamId === myTeam.id)
         value = { teamId: myTeam.id, rank: row?.rank ?? null, totalScore: row?.totalScore ?? null,
-          challengeBenefits: row?.challengeBenefits ?? [], version: projection?.version ?? '0',
+          challengeBenefits: mockChallengeBenefits(projection, row), version: projection?.version ?? '0',
           generatedAt: projection?.generatedAt ?? now(), dataAsOf: projection?.dataAsOf ?? null,
           visibility: projection?.visibility ?? 'Normal', dataScope: projection?.dataScope ?? 'Live' }
       }

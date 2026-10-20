@@ -974,14 +974,13 @@ public sealed class CtfFullBoundaryTests
             .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
         var slots = entry.GetProperty("slots").EnumerateArray().ToArray();
         var solveCount = slots
-            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
+            .SelectMany(slot => slot.GetProperty("activity").EnumerateArray())
             .Where(item => item.GetProperty("kind").GetString() == "Solve")
             .Sum(item => item.GetProperty("successfulCount").GetInt32());
         await Assert.That(solveCount).IsEqualTo(expectedSolveCount);
         var bloodCount = slots
-            .SelectMany(slot => slot.GetProperty("entries").EnumerateArray())
-            .Count(item => item.GetProperty("award").ValueKind == JsonValueKind.String
-                && item.GetProperty("award").GetString() == "FirstBlood");
+            .Count(slot => slot.GetProperty("award").ValueKind == JsonValueKind.String
+                && slot.GetProperty("award").GetString() == "FirstBlood");
         await Assert.That(bloodCount).IsEqualTo(expectedBloodCount);
     }
 

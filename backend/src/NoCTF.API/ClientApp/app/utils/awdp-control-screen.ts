@@ -1,11 +1,9 @@
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '../api'
-import { scoreboardBreakdown } from './scoreboard'
+import { scoreboardBreakdown, scoreboardChallengeTotal } from './scoreboard'
+import type { ScoreboardLayout, ScoreboardSnapshot, ScoreboardTeam } from './scoreboard-board'
 import { directionLabel } from './directions'
 
 export type AwdpControlAction = 'attack' | 'defense'
@@ -58,7 +56,7 @@ export interface AwdpTeamChallengeState {
   defenseOutcome: AwdpControlOutcome | 'idle'
 }
 
-export interface AwdpRankedEntry extends NoCtfapiEndpointsCompetitionsScoreboardTeamResponse {
+export interface AwdpRankedEntry extends ScoreboardTeam {
   rank: number | null
   attackScore: number
   defenseScore: number
@@ -151,8 +149,8 @@ export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpO
 
 export function awdpCurrentRoundEvents(
   events: readonly AwdpControlEvent[],
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: ScoreboardSnapshot | null,
+  schema: ScoreboardLayout | null,
 ): AwdpControlEvent[] {
   const round = (schema?.rounds ?? []).find(item => item.id === snapshot?.currentRoundId)
   const startAt = round?.startAt ? new Date(round.startAt).getTime() : Number.NaN
@@ -165,13 +163,13 @@ export function awdpCurrentRoundEvents(
 }
 
 export function awdpCurrentRoundOperationMetrics(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: ScoreboardSnapshot | null,
+  schema: ScoreboardLayout | null,
   teamId?: string,
 ): AwdpOperationMetrics {
   const columnIndexes = new Set((schema?.columns ?? [])
-    .filter(column => column.roundId === snapshot?.currentRoundId && column.index !== undefined)
-    .map(column => column.index!))
+    .filter(column => column.roundId === snapshot?.currentRoundId)
+    .map(column => column.index))
   const metrics: AwdpOperationMetrics = {
     attack: { success: 0, total: 0 },
     defense: { success: 0, total: 0 },
@@ -179,8 +177,8 @@ export function awdpCurrentRoundOperationMetrics(
   if (!columnIndexes.size) return metrics
   const teams = awdpPublicEntries(snapshot).filter(entry => !teamId || entry.teamId === teamId)
   for (const entry of teams) {
-    for (const slot of entry.slots ?? []) {
-      if (slot.columnIndex === undefined || !columnIndexes.has(slot.columnIndex)) continue
+    for (const slot of entry.slots) {
+      if (!columnIndexes.has(slot.columnIndex)) continue
       const attack = scoreboardBreakdown(slot, 'Attack')
       const defense = scoreboardBreakdown(slot, 'Defense')
       metrics.attack.success += attack?.successfulCount ?? 0
@@ -193,8 +191,8 @@ export function awdpCurrentRoundOperationMetrics(
 }
 
 export function awdpRoundClock(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: ScoreboardSnapshot | null,
+  schema: ScoreboardLayout | null,
   now: number,
   advances: boolean,
 ): AwdpRoundClock {
@@ -215,8 +213,8 @@ export function awdpRoundClock(
 }
 
 export function awdpPublicEntries(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-): NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[] {
+  snapshot: ScoreboardSnapshot | null,
+): ScoreboardTeam[] {
   const publicTrackKeys = new Set(
     (snapshot?.tracks ?? [])
       .filter(track => track.isInternal !== true)
@@ -228,7 +226,7 @@ export function awdpPublicEntries(
 }
 
 export function awdpRankedEntries(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  snapshot: ScoreboardSnapshot | null,
   previousRanks: ReadonlyMap<string, number> = new Map(),
 ): AwdpRankedEntry[] {
   return awdpPublicEntries(snapshot)
@@ -265,14 +263,13 @@ function latestOutcome(
 
 export function awdpTeamChallengeStates(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  entry: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
+  entry: ScoreboardTeam | null,
   events: readonly AwdpControlEvent[],
 ): AwdpTeamChallengeState[] {
   if (!entry?.teamId) return []
   return (catalog?.items ?? []).filter(challenge => challenge.id && challenge.published).map((challenge) => {
     const challengeId = challenge.id!
-    const challengeScore = (entry.challengeScores ?? [])
-      .find(score => score.competitionChallengeId === challengeId)
+    const challengeScore = scoreboardChallengeTotal(entry, challengeId)
     const attackScore = challengeScore?.attackScore ?? 0
     const defenseScore = challengeScore?.defenseScore ?? 0
     const attackOutcome = latestOutcome(events, entry.teamId!, challengeId, 'attack')

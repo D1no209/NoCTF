@@ -10,12 +10,12 @@
 | 导航未读通知 | GET notifications，Inbox、20 条 | 初次读取、notificationChanged、每 5 分钟补查 | shell_notifications |
 | 比赛外层区域 | GET teams/me、teams/me/standing、notifications、events | 入场及相关事件 | my_team、standing、notifications、events |
 | 题目导航 | GET challenges、teams/me | 挂载导航；GameplayFactAdjudicated 等事件 | challenges、my_team |
-| 题目页记分板数据 | GET leaderboard/challenges、leaderboard/schema、leaderboard | 初始并行；后续按版本更新 | scoreboard_catalog、scoreboard_schema、leaderboard |
+| 题目页记分板数据 | GET leaderboard/challenges、leaderboard | 初始并行；后续按版本只读 leaderboard（自带轮次与列） | scoreboard_catalog、leaderboard |
 | 切换题目 | GET challenge、challenge/attachments | 并行；提示包含在 challenge 中 | challenge、attachments |
 | 下载附件 | POST attachment/browser-download → GET attachment | 用户点击；短期 HttpOnly Cookie | download_ticket、attachment_download |
 | 提交 Flag | POST flag-submissions → GET gameplay-fact | 事件优先刷新；350 ms 起步的后备查询 | submit、fact、evaluation_duration |
 | 打开本题提交记录 | GET gameplay-facts，按题目及 FlagAttempt 筛选 | 用户点击 | history |
-| 记分板页面 | 目录、结构、快照和 leaderboard/trends | 页面挂载及版本事件 | scoreboard_catalog、scoreboard_schema、leaderboard、trends |
+| 记分板页面 | 目录、排行榜和 leaderboard/trends | 页面挂载及版本事件 | scoreboard_catalog、leaderboard、trends |
 | 点击记分板的队伍详情 | 使用现有快照 | 点击时无额外 HTTP | 不虚构接口 |
 | 在线会话 | notifications、competitions negotiate + WebSocket | 登录后、进入比赛 | notifications_negotiate、competitions_negotiate、hub_connections |
 | 比赛在线状态 | JoinCompetition、HeartbeatCompetition | 加入后每 45 秒心跳 | hub_call_duration |

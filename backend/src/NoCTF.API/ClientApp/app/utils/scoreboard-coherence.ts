@@ -1,18 +1,12 @@
-import type {
-  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '../api'
+import type { NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse } from '../api'
+import type { ScoreboardSnapshot } from './scoreboard-board'
 
 export type ScoreboardRefreshOutcome = 'accepted' | 'retrying' | 'failed' | 'superseded'
 
 /** Anonymous viewers have no Hub; clock-driven settlement must still reach them. */
-export function needsAwdpRoundRefresh(
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-): boolean {
-  return schema?.mode === 'Awdp' && snapshot?.dataScope === 'Live'
-    && (schema.rounds ?? []).some(round => round.state === 'Running')
+export function needsAwdpRoundRefresh(snapshot: ScoreboardSnapshot | null): boolean {
+  return snapshot?.layout.mode === 'Awdp' && snapshot.dataScope === 'Live'
+    && snapshot.layout.rounds.some(round => round.state === 'Running')
 }
 
 function normalizeScoreboardVersion(value: string | null | undefined): string | null {
@@ -54,19 +48,18 @@ export function shouldRestoreRequestedRoundWindow(outcome: ScoreboardRefreshOutc
 }
 
 export function canReplaceScoreboardSnapshot(
-  candidate: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  current: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  candidate: ScoreboardSnapshot | null,
+  current: ScoreboardSnapshot | null,
 ): boolean {
   return candidate !== null && isScoreboardVersionAtLeast(candidate.version,
     candidate.dataScope === current?.dataScope ? current?.version : null)
 }
 
+/** The leaderboard carries its own columns; only the separately cached catalog titles must match it. */
 export function isCoherentScoreboardBundle(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  snapshot: ScoreboardSnapshot | null,
 ): boolean {
-  if (!catalog || !schema || !snapshot) return false
-  return schema.challengeCatalogRevision === catalog.revision
-    && snapshot.schemaRevision === schema.revision
+  if (!catalog || !snapshot) return false
+  return snapshot.challengeCatalogRevision === catalog.revision
 }

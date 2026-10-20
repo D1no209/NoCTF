@@ -33,7 +33,7 @@ describe('admin competition challenge navigation', () => {
     expect(source).not.toContain('query: { keyword: null, offset: 0, limit: 200, desc: false }')
     expect(source).toContain('adminListGameplayFacts')
     expect(source).toContain('getLeaderboardEndpoint')
-    expect(source).toContain('getScoreboardSchemaEndpoint')
+    expect(source).toContain('normalizeScoreboardSnapshot(leaderboardResult.data)')
     expect(source).toContain('do {')
     expect(source).toContain('} while (offset < total && offset > 0)')
     expect(source).toContain('query: { competitionChallengeId: ccId, offset, limit: 200, desc: true }')

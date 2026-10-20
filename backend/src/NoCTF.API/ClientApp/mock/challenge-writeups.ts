@@ -162,13 +162,18 @@ export function createMockChallengeWriteUps(context: {
   function decorateLeaderboard(snapshot: Data, competitionId: string) {
     const challenges = state.challenges.filter(x => x.competitionId === competitionId && x.isPublished && !x.deletedAt)
     for (const team of snapshot.teams ?? []) {
-      team.challengeBenefits = challenges.map((challenge, index) => {
-        const slot = team.slots[index], receipt = receipts.get(`${team.teamId}:${challenge.id}`)
-        const gross = slot?.earnedPoints ?? 0, deduction = Math.ceil(gross * (receipt?.deductionPercent ?? 0) / 100)
+      // A write-up unlock is the only reason a CTF challenge total is sent next to its slot.
+      challenges.forEach((challenge, index) => {
+        const receipt = receipts.get(`${team.teamId}:${challenge.id}`)
+        if (!receipt) return
+        const slot = team.slots.find((item: Data) => item.challenge === index)
+        const gross = Math.max(0, slot?.netPoints ?? 0), deduction = Math.ceil(gross * receipt.deductionPercent / 100)
         const net = (slot?.netPoints ?? 0) - deduction
-        if (slot && receipt) { slot.deductedPoints += deduction; slot.netPoints = net; team.totalScore -= deduction }
-        return { competitionChallengeId: challenge.id, grossPoints: gross, writeUpDeductionPoints: deduction,
-          netPoints: net, writeUpDeductionPercent: receipt?.deductionPercent ?? null, writeUpUnlockedAt: receipt?.unlockedAt ?? null }
+        if (slot) { slot.netPoints = net; team.totalScore -= deduction }
+        team.challengeTotals = [...team.challengeTotals.filter((total: Data) => total.challenge !== index), {
+          challenge: index, grossPoints: gross, netPoints: net, attackScore: null, defenseScore: null,
+          writeUp: { deductionPoints: deduction, deductionPercent: receipt.deductionPercent, unlockedAt: receipt.unlockedAt },
+        }]
       })
     }
     snapshot.teams.sort((a: Data, b: Data) => b.totalScore - a.totalScore).forEach((team: Data, index: number) => { team.rank = index + 1 })

@@ -11,8 +11,11 @@ import { markRaw } from 'vue'
 import SingleWriteUpSettingsComponent from '~/features/writeups/SingleWriteUpSettings.vue'
 import { Plus } from '@lucide/vue'
 import { toast } from '../../../../../../utils/message-toast'
-import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import { normalizeScoreboardSnapshot } from '../../../../../../utils/scoreboard-board'
+import type { ScoreboardSnapshot } from '../../../../../../utils/scoreboard-board'
+import { scoreboardChallengeTotal } from '../../../../../../utils/scoreboard'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
@@ -335,9 +338,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const scoringFacts = ref<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
 
-  const scoringSnapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
-
-  const scoringSchema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
+  const scoringSnapshot = shallowRef<ScoreboardSnapshot | null>(null)
 
   const scoringContextLoading = ref(true)
 
@@ -378,19 +379,15 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     scoringContextLoading.value = true
     scoringContextError.value = null
     try {
-      const [, facts, leaderboardResult, schemaResult] = await Promise.all([
+      const [, facts, leaderboardResult] = await Promise.all([
         scoringPagination.loadPage(scoringPagination.page.value),
         loadAllChallengeFacts(),
         getLeaderboardEndpoint({ path: { competitionId } }),
-        getScoreboardSchemaEndpoint({ path: { competitionId } }),
       ])
       if (generation !== scoringLoadGeneration) return
       scoringFacts.value = facts
       scoringSnapshot.value = leaderboardResult.data && 'teams' in leaderboardResult.data
-        ? leaderboardResult.data
-        : null
-      scoringSchema.value = schemaResult.data && 'columns' in schemaResult.data
-        ? schemaResult.data
+        ? normalizeScoreboardSnapshot(leaderboardResult.data)
         : null
     }
     catch (requestError) {
@@ -457,20 +454,16 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   function projectedChallengeScore(teamId?: string): number {
     if (!teamId) return 0
-    const snapshotTeam = scoringSnapshot.value?.teams?.find(team => team.teamId === teamId)
+    const snapshotTeam = scoringSnapshot.value?.teams.find(team => team.teamId === teamId)
     if (!snapshotTeam) return manualAdjustmentForTeam(teamId)
     const adjustment = manualAdjustmentForTeam(teamId)
     if (competition.value?.mode === 'Awdp') {
-      const score = snapshotTeam.challengeScores?.find(item => item.competitionChallengeId === ccId)
+      const score = scoreboardChallengeTotal(snapshotTeam, ccId)
       return (score?.attackScore ?? 0) + (score?.defenseScore ?? 0) + adjustment
     }
-    const indexes = new Set(scoringSchema.value?.columns
-      ?.filter(column => column.competitionChallengeId === ccId)
-      .map(column => column.index)
-      .filter((index): index is number => index !== undefined) ?? [])
     const slotScore = snapshotTeam.slots
-      ?.filter(slot => slot.columnIndex !== undefined && indexes.has(slot.columnIndex))
-      .reduce((total, slot) => total + (slot.netPoints ?? 0), 0) ?? 0
+      .filter(slot => slot.competitionChallengeId === ccId)
+      .reduce((total, slot) => total + (slot.netPoints ?? 0), 0)
     return slotScore + adjustment
   }
 

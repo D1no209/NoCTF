@@ -172,25 +172,25 @@ describe('isolated Mock API', () => {
     const { send } = await setup()
     const ctf = await (await send(`${competition}/leaderboard`)).json()
     const ctfTeam = ctf.teams.find((team: Data) => team.teamId === id(5))
-    expect(ctfTeam.slots[0].breakdown.find((item: Data) => item.kind === 'Solve').successfulCount).toBe(1)
-    expect(Object.fromEntries(ctf.teams.flatMap((team: Data) => team.slots[0].entries
-      .filter((entry: Data) => entry.award)
-      .map((entry: Data) => [entry.award, team.teamId])))).toEqual({
+    // Slots reference challenges by their position in `challenges`.
+    const slotFor = (team: Data, challenge: number) => team.slots.find((slot: Data) => slot.challenge === challenge)
+    expect(slotFor(ctfTeam, 0).activity.find((item: Data) => item.kind === 'Solve').successfulCount).toBe(1)
+    expect(Object.fromEntries(ctf.teams
+      .filter((team: Data) => slotFor(team, 0)?.award)
+      .map((team: Data) => [slotFor(team, 0).award, team.teamId]))).toEqual({
       FirstBlood: id(5),
       SecondBlood: id(5, 2),
       ThirdBlood: id(5, 3),
     })
-    for (let challengeIndex = 0; challengeIndex < ctf.teams[0].slots.length; challengeIndex++) {
-      const awards = ctf.teams.flatMap((team: Data) => team.slots[challengeIndex].entries
-        .map((entry: Data) => entry.award)
-        .filter(Boolean))
+    for (let challengeIndex = 0; challengeIndex < ctf.challenges.length; challengeIndex++) {
+      const awards = ctf.teams.map((team: Data) => slotFor(team, challengeIndex)?.award).filter(Boolean)
       const expected = ['FirstBlood', 'SecondBlood', 'ThirdBlood'].slice(0, awards.length)
       expect(new Set(awards), `challenge ${challengeIndex}`).toEqual(new Set(expected))
       expect(awards.length, `challenge ${challengeIndex}`).toBe(expected.length)
     }
-    expect(Object.fromEntries(ctf.teams.flatMap((team: Data) => team.slots[3].entries
-      .filter((entry: Data) => entry.award)
-      .map((entry: Data) => [entry.award, team.teamName])))).toEqual({
+    expect(Object.fromEntries(ctf.teams
+      .filter((team: Data) => slotFor(team, 3)?.award)
+      .map((team: Data) => [slotFor(team, 3).award, team.teamName]))).toEqual({
       FirstBlood: 'BlueShift',
       SecondBlood: 'ByteGarden',
       ThirdBlood: 'NullPointer',
@@ -199,8 +199,8 @@ describe('isolated Mock API', () => {
     const awdpCompetition = `/api/v1/competitions/${id(2, 3)}`
     const awdp = await (await send(`${awdpCompetition}/leaderboard`)).json()
     const awdpTeam = awdp.teams.find((team: Data) => team.teamId === id(5, 21))
-    const success = (slot: Data, kind: string) => slot.breakdown.find((item: Data) => item.kind === kind).successfulCount === 1
-    expect(awdpTeam.slots.slice(0, 3).map((slot: Data) => [success(slot, 'Attack'), success(slot, 'Defense')])).toEqual([
+    const success = (slot: Data, kind: string) => slot.activity.some((item: Data) => item.kind === kind && item.successfulCount === 1)
+    expect([0, 1, 2].map(index => slotFor(awdpTeam, index)).map((slot: Data) => [success(slot, 'Attack'), success(slot, 'Defense')])).toEqual([
       [true, false], [false, true], [true, true],
     ])
   })

@@ -1,8 +1,9 @@
 import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
-import { computed, ref, watch, hasInjectionContext, inject, provide } from 'vue'
+import { computed, ref, shallowRef, watch, hasInjectionContext, inject, provide } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import * as coherence from '../app/utils/scoreboard-coherence'
+import { normalizeScoreboardSnapshot } from '../app/utils/scoreboard-board'
 
 // Execute the actual composable with controlled REST/Hub/lifecycle boundaries.
 // No global module mocks: other tests retain the real SDK and Vue modules.
@@ -13,7 +14,6 @@ const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
 
 function harness() {
   let version = 1
-  let revision = 10
   let settled = false
   let processing = false
   let calls = 0
@@ -24,7 +24,8 @@ function harness() {
   let handlers: Record<string, (value?: unknown) => void> = {}
   const requests: Array<number | null> = []
   const deps = {
-    ref, computed, watch, hasInjectionContext, inject, provide, createTrailingRefresh, ...coherence,
+    ref, shallowRef, computed, watch, hasInjectionContext, inject, provide, createTrailingRefresh, ...coherence,
+    normalizeScoreboardSnapshot,
     useAuth: () => ({ user: ref(null) }),
     translate: (value: string) => value,
     parseApiError: (value: unknown) => ({ message: String(value) }),
@@ -37,19 +38,17 @@ function harness() {
     setTimeout: () => 1,
     clearTimeout: () => {},
     getScoreboardChallengeCatalogEndpoint: async () => ({ data: { revision: 'catalog', items: [{ id: 'challenge' }] } }),
-    getScoreboardSchemaEndpoint: async () => ({ data: {
-      mode: 'Awdp', revision: String(revision), challengeCatalogRevision: 'catalog',
-      rounds: [{ id: 'round', number: version, state: settled ? 'Settled' : 'Running', endAt: `2026-09-08T00:0${version}:00Z` }],
-      columns: [{ index: 0, competitionChallengeId: 'challenge', roundId: 'round' }],
-      roundWindowStart: 1, roundWindowEnd: version, latestRound: version,
-    } }),
+    // The leaderboard carries its own rounds and challenge columns; no schema request exists.
     getLeaderboardEndpoint: async (request: { query: { endingRound: number | null } }) => {
       calls++
       requests.push(request.query.endingRound)
       if (pendingRead) await pendingRead
       return processing ? { response: { status: 202 } } : { data: {
-        version: String(version), schemaRevision: String(revision), dataScope: 'Live', currentRoundId: 'round',
-        teams: [{ teamId: 'team', totalScore: 100, slots: [{ columnIndex: 0, netPoints: 100 }] }],
+        mode: 'Awdp', version: String(version), challengeCatalogRevision: 'catalog', dataScope: 'Live', currentRoundId: 'round',
+        rounds: [{ id: 'round', number: version, state: settled ? 'Settled' : 'Running', endAt: `2026-09-08T00:0${version}:00Z` }],
+        challenges: [{ competitionChallengeId: 'challenge', currentScore: null }],
+        roundWindowStart: 1, roundWindowEnd: version, latestRound: version,
+        teams: [{ teamId: 'team', totalScore: 100, slots: [{ challenge: 0, round: 0, netPoints: 100 }] }],
       } }
     },
   }
@@ -61,8 +60,8 @@ function harness() {
       return () => { pendingRead = null; release() }
     },
     board, mount: () => mount(), dispose: () => dispose(), tick: () => tick(),
-    notice: () => handlers.scoreboardUpdated?.({ competitionId: 'competition', version: String(version), schemaRevision: String(revision), challengeCatalogRevision: 'catalog' }),
-    update: (complete = false) => { version++; revision++; settled = complete },
+    notice: () => handlers.scoreboardUpdated?.({ competitionId: 'competition', version: String(version), challengeCatalogRevision: 'catalog' }),
+    update: (complete = false) => { version++; settled = complete },
     processing: (value: boolean) => { processing = value },
     calls: () => calls, requests,
   }
@@ -85,14 +84,16 @@ test('notice covered by an active response does not fetch the same publication a
 
 async function drain(milliseconds = 0) { await new Promise(resolve => setTimeout(resolve, milliseconds)) }
 
-test('duration update notification replaces schema and snapshot together without a page reload', async () => {
+test('duration update notification replaces rounds and slots in one leaderboard read without a page reload', async () => {
   const app = harness()
   app.mount(); await drain()
   expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:01:00Z')
+  const reads = app.calls()
   app.update(); app.notice(); await drain(550)
+  expect(app.calls()).toBe(reads + 1)
   expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:02:00Z')
-  expect(app.board.snapshot.value.schemaRevision).toBe(app.board.schema.value.revision)
-  expect(app.board.schema.value.columns).toHaveLength(1)
+  expect(app.board.schema.value.columns).toEqual([{ index: 0, competitionChallengeId: 'challenge', roundId: 'round' }])
+  expect(app.board.snapshot.value.teams[0].slots[0]).toMatchObject({ columnIndex: 0, competitionChallengeId: 'challenge', roundId: 'round' })
   app.dispose()
 })
 
@@ -113,7 +114,7 @@ test('processing refresh preserves the last coherent board and recovers on the n
   app.mount(); await drain()
   app.update(); app.processing(true); app.notice(); await drain(550)
   expect(app.board.snapshot.value.version).toBe('1')
-  expect(app.board.schema.value.revision).toBe('10')
+  expect(app.board.schema.value.rounds[0].number).toBe(1)
   expect(app.board.processing.value).toBeTrue()
   app.processing(false); await app.board.refresh()
   expect(app.board.snapshot.value.version).toBe('2')

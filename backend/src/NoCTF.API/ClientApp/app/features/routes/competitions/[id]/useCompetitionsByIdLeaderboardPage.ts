@@ -5,7 +5,8 @@ import { markRaw } from 'vue'
 
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy } from '@lucide/vue'
 import { getLeaderboardTrendsEndpoint, getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '../../../../api'
-import type { NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse, NoCtfapiEndpointsCompetitionsScoreboardColumnResponse, NoCtfapiEndpointsCompetitionsScoreboardEntryResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse, NoCtfapiEndpointsCompetitionsScoreboardEntryResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse } from '../../../../api'
+import type { ScoreboardColumn, ScoreboardSlot, ScoreboardTeam } from '../../../../utils/scoreboard-board'
 import { medalBloodRankClass, medalRankClass } from '../../../leaderboard/types'
 import type { TrendSeries } from '../../../leaderboard/types'
 import { scoreboardChallengeColumnGroupsByDirection, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
@@ -97,12 +98,12 @@ export function useCompetitionsByIdLeaderboardPage() {
     }))
   })
 
-  const displayRank = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
+  const displayRank = (team: ScoreboardTeam) =>
     displayRanks.value.get(team.teamId) ?? null
 
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
-  const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
+  const displayTeamName = (team: ScoreboardTeam) =>
     teamDisplayName(team, teamDisplayNames.value)
 
   const columnGroups = computed(() => scoreboardChallengeColumnGroupsByDirection(
@@ -225,11 +226,11 @@ export function useCompetitionsByIdLeaderboardPage() {
   let missingCatalogRefreshRevision: string | null = null
 
   watch(
-    [() => board.schema.value?.challengeCatalogRevision ?? null, missingChallengeIds],
+    [() => board.snapshot.value?.challengeCatalogRevision ?? null, missingChallengeIds],
     ([revision, challengeIds]) => {
       if (!revision || challengeIds.length === 0 || missingCatalogRefreshRevision === revision) return
       missingCatalogRefreshRevision = revision
-      void board.refresh({ catalog: true, schema: false, snapshot: false })
+      void board.refresh({ catalog: true, snapshot: false })
     },
     { flush: 'post' },
   )
@@ -243,19 +244,19 @@ export function useCompetitionsByIdLeaderboardPage() {
     return translate("leaderboard.label.rounds", { start, end })
   })
 
-  function roundLabel(column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): string {
+  function roundLabel(column: ScoreboardColumn): string {
     if (!column.roundId) return translate("leaderboard.label.total")
     const round = board.roundsById.value.get(column.roundId)
     return round?.number ? translate("leaderboard.label.round", { round: round.number }) : translate("leaderboard.label.round.idLeaderboardPage")
   }
 
-  function slotTitle(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse): string {
+  function slotTitle(slot: ScoreboardSlot | NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse): string {
     if (slot.scoreState === 'Pending') return translate("common.label.pendingRoundSettlement")
     if (slot.scoreState === 'Provisional') return translate("leaderboard.label.settling")
     return translate("common.label.settled")
   }
 
-  function ctfScore(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null): number | null {
+  function ctfScore(slot: ScoreboardSlot | null): number | null {
     if ((scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) < 1) return null
     return slot?.netPoints ?? 0
   }
@@ -281,7 +282,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       team.totalScore ?? 0,
       ...(theoryEnabled.value ? [team.theoryScore ?? 0] : []),
       ...flatColumns.value.map((column) => {
-        if (column.index === undefined) return ''
         const slot = scoreboardSlot(team, column.index)
         return slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''
       }),
@@ -300,7 +300,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const teamDetailOpen = ref(false)
 
-  const teamDetailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const teamDetailTeam = ref<ScoreboardTeam | null>(null)
 
   const teamDetailTrendSeries = computed(() => {
     const teamId = teamDetailTeam.value?.teamId
@@ -320,23 +320,23 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const detailActorNames = ref(new Map<string, string>())
 
-  const detailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const detailTeam = ref<ScoreboardTeam | null>(null)
 
-  const detailColumn = ref<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse | null>(null)
+  const detailColumn = ref<ScoreboardColumn | null>(null)
 
   let detailGeneration = 0
 
   async function loadDetailPage(cursor: string | null, append: boolean): Promise<void> {
     const teamId = detailTeam.value?.teamId
-    const columnIndex = detailColumn.value?.index
-    if (!teamId || columnIndex === undefined) return
+    const column = detailColumn.value
+    if (!teamId || !column) return
     const requestGeneration = detailGeneration
     if (append) detailLoadingMore.value = true
     else detailLoading.value = true
     try {
       const result = await getScoreboardSlotDetailEndpoint({
-        path: { competitionId, teamId, columnIndex },
-        query: { cursor, limit: 50, endingRound: board.detailEndingRound.value },
+        path: { competitionId, teamId, competitionChallengeId: column.competitionChallengeId },
+        query: { roundId: column.roundId, cursor, limit: 50, endingRound: board.detailEndingRound.value },
       })
       if (requestGeneration !== detailGeneration) return
       if (result.error) {
@@ -374,7 +374,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     }
   }
 
-  function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): void {
+  function openDetail(team: ScoreboardTeam, column: ScoreboardColumn): void {
     detailGeneration += 1
     detailTeam.value = team
     detailColumn.value = column
@@ -386,7 +386,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     void loadDetailPage(null, false)
   }
 
-  function openTeamDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse): void {
+  function openTeamDetail(team: ScoreboardTeam): void {
     teamDetailTeam.value = team
     teamDetailOpen.value = true
   }
@@ -430,7 +430,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const adjustmentActorNames = ref(new Map<string, string>())
 
-  const adjustmentTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const adjustmentTeam = ref<ScoreboardTeam | null>(null)
 
   let adjustmentGeneration = 0
 
@@ -481,7 +481,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     }
   }
 
-  function openAdjustments(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse): void {
+  function openAdjustments(team: ScoreboardTeam): void {
     adjustmentGeneration += 1
     adjustmentTeam.value = team
     adjustmentDetail.value = null

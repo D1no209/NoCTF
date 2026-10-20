@@ -537,11 +537,11 @@ public sealed class AwdpFullBoundaryTests
             minimumSettledRounds: 3,
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await AssertScoreboardArithmeticAsync(firstSettledScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(anonymous, competitionId, firstSettledScoreboard, cancellationToken);
         await AssertNoSyntheticGlobalAdjustmentsAsync(firstSettledScoreboard.Snapshot);
         await AssertCurrentRoundScoresPendingAsync(firstSettledScoreboard);
         var firstSettledSlots = CaptureSettledSlots(firstSettledScoreboard.Snapshot);
-        var firstSettledWindowEnd = firstSettledScoreboard.Schema
+        var firstSettledWindowEnd = firstSettledScoreboard.Snapshot
             .GetProperty("roundWindowEnd").GetInt32();
         var firstRedScore = Team(firstSettledScoreboard.Snapshot, red.TeamId)
             .GetProperty("totalScore").GetInt64();
@@ -569,16 +569,13 @@ public sealed class AwdpFullBoundaryTests
         var accumulatedScoreboard = await PollScoreboardAsync(
             anonymous,
             competitionId,
-            observation => observation.Schema.GetProperty("rounds").EnumerateArray()
-                    .Count(round => round.GetProperty("state").GetString() == "Settled")
-                    > firstSettledScoreboard.Schema.GetProperty("rounds").EnumerateArray()
-                        .Count(round => round.GetProperty("state").GetString() == "Settled")
+            observation => SettledRoundCount(observation) > SettledRoundCount(firstSettledScoreboard)
                 && Team(observation.Snapshot, red.TeamId).GetProperty("totalScore").GetInt64()
                     > firstRedScore,
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await AssertSettledSlotsUnchangedAsync(firstSettledSlots, accumulatedScoreboard.Snapshot);
-        await AssertScoreboardArithmeticAsync(accumulatedScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(anonymous, competitionId, accumulatedScoreboard, cancellationToken);
         await AssertNoSyntheticGlobalAdjustmentsAsync(accumulatedScoreboard.Snapshot);
         await AssertCurrentRoundScoresPendingAsync(accumulatedScoreboard);
 
@@ -641,7 +638,7 @@ public sealed class AwdpFullBoundaryTests
             },
             TimeSpan.FromSeconds(45),
             cancellationToken);
-        await AssertScoreboardArithmeticAsync(unbannedScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(anonymous, competitionId, unbannedScoreboard, cancellationToken);
 
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Paused", cancellationToken);
@@ -673,7 +670,7 @@ public sealed class AwdpFullBoundaryTests
                 > ReadProtocolInt64(accumulatedScoreboard.Snapshot, "version"),
             TimeSpan.FromSeconds(45),
             cancellationToken);
-        await AssertScoreboardArithmeticAsync(resumedScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(anonymous, competitionId, resumedScoreboard, cancellationToken);
         var resumedHistoricalWindow = await PollScoreboardAsync(
             anonymous,
             competitionId,
@@ -682,7 +679,7 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken,
             firstSettledWindowEnd);
         await AssertSettledSlotsUnchangedAsync(firstSettledSlots, resumedHistoricalWindow.Snapshot);
-        await AssertScoreboardArithmeticAsync(resumedHistoricalWindow.Snapshot);
+        await AssertScoreboardArithmeticAsync(anonymous, competitionId, resumedHistoricalWindow, cancellationToken);
 
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Finished", cancellationToken);
@@ -1252,15 +1249,12 @@ public sealed class AwdpFullBoundaryTests
         await PollScoreboardAsync(
             client,
             competitionId,
-            observation => observation.Schema.GetProperty("rounds").EnumerateArray()
-                    .Count(round => round.GetProperty("state").GetString() == "Settled")
-                    >= minimumSettledRounds
-                && SettledBreakdowns(observation.Snapshot, attackTeamId, "Attack")
-                    .Sum(item => item.GetProperty("earnedPoints").GetInt64()) > 0
-                && SettledBreakdowns(observation.Snapshot, defenseTeamId, "Defense")
-                    .Sum(item => item.GetProperty("earnedPoints").GetInt64()) > 0
-                && SettledBreakdowns(observation.Snapshot, penaltyTeamId, "Defense")
-                    .Sum(item => item.GetProperty("deductedPoints").GetInt64()) >= 37,
+            observation => SettledRoundCount(observation) >= minimumSettledRounds
+                && ChallengeTotal(observation.Snapshot, attackTeamId,
+                    total => total.GetProperty("attackScore").GetInt64()) > 0
+                && ChallengeTotal(observation.Snapshot, defenseTeamId,
+                    total => total.GetProperty("defenseScore").GetInt64()) > 0
+                && ChallengeTotal(observation.Snapshot, penaltyTeamId, Penalty) >= 37,
             timeout,
             cancellationToken);
 
@@ -1282,8 +1276,7 @@ public sealed class AwdpFullBoundaryTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
         throw new TimeoutException(
-            $"AWDP scoreboard did not reach the expected round state. Last schema: {last?.Schema}; "
-            + $"last snapshot: {last?.Snapshot}");
+            $"AWDP scoreboard did not reach the expected round state. Last snapshot: {last?.Snapshot}");
     }
 
     private static async Task<ScoreboardObservation?> TryReadScoreboardAsync(
@@ -1293,24 +1286,13 @@ public sealed class AwdpFullBoundaryTests
         int? endingRound = null)
     {
         var query = endingRound is int round ? $"?endingRound={round}" : string.Empty;
-        using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema{query}",
-            cancellationToken);
-        if (schemaResponse.StatusCode == HttpStatusCode.Accepted)
-            return null;
-        var schema = await ReadExpectedJsonAsync(schemaResponse, HttpStatusCode.OK, cancellationToken);
-
         using var snapshotResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard{query}",
             cancellationToken);
         if (snapshotResponse.StatusCode == HttpStatusCode.Accepted)
             return null;
         var snapshot = await ReadExpectedJsonAsync(snapshotResponse, HttpStatusCode.OK, cancellationToken);
-        if (!StringComparer.Ordinal.Equals(
-                snapshot.GetProperty("schemaRevision").GetString(),
-                schema.GetProperty("revision").GetString()))
-            return null;
-        return new(schema, snapshot);
+        return new(snapshot, endingRound);
     }
 
     private static long ReadProtocolInt64(JsonElement parent, string propertyName)
@@ -1327,33 +1309,28 @@ public sealed class AwdpFullBoundaryTests
         snapshot.GetProperty("teams").EnumerateArray()
             .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
 
-    private static IEnumerable<JsonElement> SettledBreakdowns(
-        JsonElement snapshot,
-        Guid teamId,
-        string kind) =>
-        Team(snapshot, teamId).GetProperty("slots").EnumerateArray()
-            .Where(slot => slot.GetProperty("scoreState").GetString() == "Settled")
-            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
-            .Where(item => item.GetProperty("kind").GetString() == kind);
+    private static int SettledRoundCount(ScoreboardObservation observation) =>
+        observation.Snapshot.GetProperty("rounds").EnumerateArray()
+            .Count(round => round.GetProperty("state").GetString() == "Settled");
 
-    private static bool HasPendingEntry(
-        ScoreboardObservation observation,
-        Guid teamId,
-        Guid entryId)
+    /// <summary>Sums one competition-wide AWDP total; penalty is attack + defense - net.</summary>
+    private static long ChallengeTotal(JsonElement snapshot, Guid teamId, Func<JsonElement, long> select) =>
+        Team(snapshot, teamId).GetProperty("challengeTotals").EnumerateArray().Sum(select);
+
+    private static long Penalty(JsonElement total) =>
+        total.GetProperty("attackScore").GetInt64()
+        + total.GetProperty("defenseScore").GetInt64()
+        - total.GetProperty("netPoints").GetInt64();
+
+    /// <summary>Identifies a slot by stable ids: round positions move with the visible window.</summary>
+    private static (Guid ChallengeId, Guid? RoundId) SlotIdentity(JsonElement snapshot, JsonElement slot)
     {
-        if (observation.Snapshot.GetProperty("currentRoundId").ValueKind != JsonValueKind.String)
-            return false;
-        var currentRoundId = observation.Snapshot.GetProperty("currentRoundId").GetGuid();
-        var currentColumns = observation.Schema.GetProperty("columns").EnumerateArray()
-            .Where(column => column.GetProperty("roundId").ValueKind == JsonValueKind.String
-                && column.GetProperty("roundId").GetGuid() == currentRoundId)
-            .Select(column => column.GetProperty("index").GetInt32())
-            .ToHashSet();
-        return Team(observation.Snapshot, teamId).GetProperty("slots").EnumerateArray()
-            .Where(slot => currentColumns.Contains(slot.GetProperty("columnIndex").GetInt32()))
-            .Any(slot => slot.GetProperty("scoreState").GetString() == "Pending"
-                && slot.GetProperty("entries").EnumerateArray()
-                    .Any(entry => entry.GetProperty("id").GetGuid() == entryId));
+        var challengeId = snapshot.GetProperty("challenges")[slot.GetProperty("challenge").GetInt32()]
+            .GetProperty("competitionChallengeId").GetGuid();
+        Guid? roundId = slot.GetProperty("round").ValueKind == JsonValueKind.Number
+            ? snapshot.GetProperty("rounds")[slot.GetProperty("round").GetInt32()].GetProperty("id").GetGuid()
+            : null;
+        return (challengeId, roundId);
     }
 
     private static async Task AssertCurrentRoundScoresPendingAsync(ScoreboardObservation observation)
@@ -1361,107 +1338,104 @@ public sealed class AwdpFullBoundaryTests
         if (observation.Snapshot.GetProperty("currentRoundId").ValueKind != JsonValueKind.String)
             return;
         var currentRoundId = observation.Snapshot.GetProperty("currentRoundId").GetGuid();
-        var currentColumns = observation.Schema.GetProperty("columns").EnumerateArray()
-            .Where(column => column.GetProperty("roundId").ValueKind == JsonValueKind.String
-                && column.GetProperty("roundId").GetGuid() == currentRoundId)
-            .Select(column => column.GetProperty("index").GetInt32())
-            .ToHashSet();
         foreach (var slot in observation.Snapshot.GetProperty("teams").EnumerateArray()
                      .SelectMany(team => team.GetProperty("slots").EnumerateArray())
-                     .Where(slot => currentColumns.Contains(slot.GetProperty("columnIndex").GetInt32())))
+                     .Where(slot => SlotIdentity(observation.Snapshot, slot).RoundId == currentRoundId))
         {
             await Assert.That(slot.GetProperty("scoreState").GetString()).IsEqualTo("Pending");
-            await Assert.That(slot.GetProperty("earnedPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
-            await Assert.That(slot.GetProperty("deductedPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
             await Assert.That(slot.GetProperty("netPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
-            await Assert.That(slot.GetProperty("entries").EnumerateArray().All(entry =>
-                    entry.GetProperty("earnedPoints").ValueKind == JsonValueKind.Null
-                    && entry.GetProperty("deductedPoints").ValueKind == JsonValueKind.Null
-                    && entry.GetProperty("netPoints").ValueKind == JsonValueKind.Null))
-                .IsTrue();
         }
     }
 
-    private static async Task AssertScoreboardArithmeticAsync(JsonElement snapshot)
+    /// <summary>
+    /// The summary only carries each slot's net points; slot detail carries the authoritative
+    /// earned/deducted split and per-kind breakdown, which must add up to the same net.
+    /// </summary>
+    private static async Task AssertScoreboardArithmeticAsync(
+        HttpClient client,
+        Guid competitionId,
+        ScoreboardObservation observation,
+        CancellationToken cancellationToken)
     {
-        foreach (var team in snapshot.GetProperty("teams").EnumerateArray())
+        foreach (var team in observation.Snapshot.GetProperty("teams").EnumerateArray())
         {
-            var slots = team.GetProperty("slots").EnumerateArray().ToArray();
-            foreach (var slot in slots.Where(slot => slot.GetProperty("scoreState").GetString() != "Pending"))
+            var teamId = team.GetProperty("teamId").GetGuid();
+            foreach (var slot in team.GetProperty("slots").EnumerateArray()
+                         .Where(slot => slot.GetProperty("scoreState").GetString() == "Settled"))
             {
-                var earned = slot.GetProperty("earnedPoints").GetInt64();
-                var deducted = slot.GetProperty("deductedPoints").GetInt64();
-                await Assert.That(slot.GetProperty("netPoints").GetInt64())
+                var (challengeId, roundId) = SlotIdentity(observation.Snapshot, slot);
+                var query = new List<string>();
+                if (roundId is Guid round) query.Add($"roundId={round}");
+                if (observation.EndingRound is int ending) query.Add($"endingRound={ending}");
+                var detail = await GetJsonAsync(client,
+                    $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{challengeId}"
+                    + (query.Count == 0 ? string.Empty : "?" + string.Join('&', query)),
+                    cancellationToken);
+                var earned = detail.GetProperty("earnedPoints").GetInt64();
+                var deducted = detail.GetProperty("deductedPoints").GetInt64();
+                await Assert.That(detail.GetProperty("netPoints").GetInt64())
+                    .IsEqualTo(slot.GetProperty("netPoints").GetInt64());
+                await Assert.That(detail.GetProperty("netPoints").GetInt64())
                     .IsEqualTo(checked(earned - deducted));
-                await Assert.That(slot.GetProperty("breakdown").EnumerateArray()
+                await Assert.That(detail.GetProperty("breakdown").EnumerateArray()
                         .Sum(item => item.GetProperty("earnedPoints").GetInt64()))
                     .IsEqualTo(earned);
-                await Assert.That(slot.GetProperty("breakdown").EnumerateArray()
+                await Assert.That(detail.GetProperty("breakdown").EnumerateArray()
                         .Sum(item => item.GetProperty("deductedPoints").GetInt64()))
                     .IsEqualTo(deducted);
             }
-            var slotNet = slots
-                .Where(slot => slot.GetProperty("netPoints").ValueKind == JsonValueKind.Number)
-                .Sum(slot => slot.GetProperty("netPoints").GetInt64());
-            var adjustments = team.GetProperty("globalAdjustments").EnumerateArray()
-                .Sum(item => item.GetProperty("netPoints").GetInt64());
-            await Assert.That(team.GetProperty("totalScore").GetInt64())
-                .IsEqualTo(checked(
-                    slotNet
-                    + adjustments
-                    + team.GetProperty("scoreOutsideWindow").GetInt64()));
         }
     }
 
     private static async Task AssertNoSyntheticGlobalAdjustmentsAsync(JsonElement snapshot)
     {
         foreach (var team in snapshot.GetProperty("teams").EnumerateArray())
-            await Assert.That(team.GetProperty("globalAdjustments").GetArrayLength()).IsEqualTo(0);
+            await Assert.That(team.GetProperty("globalAdjustmentCount").GetInt32()).IsEqualTo(0);
     }
 
-    private static IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> CaptureSettledSlots(
+    private static IReadOnlyDictionary<(Guid TeamId, Guid ChallengeId, Guid? RoundId), long> CaptureSettledSlots(
         JsonElement snapshot) =>
         snapshot.GetProperty("teams").EnumerateArray()
             .SelectMany(team => team.GetProperty("slots").EnumerateArray()
                 .Where(slot => slot.GetProperty("scoreState").GetString() == "Settled")
-                .Select(slot => new
+                .Select(slot =>
                 {
-                    TeamId = team.GetProperty("teamId").GetGuid(),
-                    ColumnIndex = slot.GetProperty("columnIndex").GetInt32(),
-                    Score = new SettledSlotScore(
-                        slot.GetProperty("earnedPoints").GetInt64(),
-                        slot.GetProperty("deductedPoints").GetInt64(),
-                        slot.GetProperty("netPoints").GetInt64())
+                    var (challengeId, roundId) = SlotIdentity(snapshot, slot);
+                    return new
+                    {
+                        Key = (team.GetProperty("teamId").GetGuid(), challengeId, roundId),
+                        NetPoints = slot.GetProperty("netPoints").GetInt64()
+                    };
                 }))
-            .ToDictionary(item => (item.TeamId, item.ColumnIndex), item => item.Score);
+            .ToDictionary(item => item.Key, item => item.NetPoints);
+
+    private static JsonElement? FindSlot(JsonElement snapshot, (Guid TeamId, Guid ChallengeId, Guid? RoundId) key)
+    {
+        foreach (var slot in Team(snapshot, key.TeamId).GetProperty("slots").EnumerateArray())
+            if (SlotIdentity(snapshot, slot) == (key.ChallengeId, key.RoundId))
+                return slot;
+        return null;
+    }
 
     private static async Task AssertSettledSlotsUnchangedAsync(
-        IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> expected,
+        IReadOnlyDictionary<(Guid TeamId, Guid ChallengeId, Guid? RoundId), long> expected,
         JsonElement snapshot)
     {
         foreach (var item in expected)
         {
-            var slot = Team(snapshot, item.Key.TeamId).GetProperty("slots").EnumerateArray()
-                .Single(candidate => candidate.GetProperty("columnIndex").GetInt32()
-                    == item.Key.ColumnIndex);
-            await Assert.That(slot.GetProperty("scoreState").GetString()).IsEqualTo("Settled");
-            await Assert.That(new SettledSlotScore(
-                    slot.GetProperty("earnedPoints").GetInt64(),
-                    slot.GetProperty("deductedPoints").GetInt64(),
-                    slot.GetProperty("netPoints").GetInt64()))
-                .IsEqualTo(item.Value);
+            var slot = FindSlot(snapshot, item.Key);
+            await Assert.That(slot).IsNotNull();
+            await Assert.That(slot!.Value.GetProperty("scoreState").GetString()).IsEqualTo("Settled");
+            await Assert.That(slot.Value.GetProperty("netPoints").GetInt64()).IsEqualTo(item.Value);
         }
     }
 
     private static bool ContainsSettledSlots(
-        IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> expected,
+        IReadOnlyDictionary<(Guid TeamId, Guid ChallengeId, Guid? RoundId), long> expected,
         JsonElement snapshot) =>
-        expected.All(item => Team(snapshot, item.Key.TeamId).GetProperty("slots").EnumerateArray()
-            .Any(slot => slot.GetProperty("columnIndex").GetInt32() == item.Key.ColumnIndex
-                && slot.GetProperty("scoreState").GetString() == "Settled"
-                && slot.GetProperty("earnedPoints").GetInt64() == item.Value.EarnedPoints
-                && slot.GetProperty("deductedPoints").GetInt64() == item.Value.DeductedPoints
-                && slot.GetProperty("netPoints").GetInt64() == item.Value.NetPoints));
+        expected.All(item => FindSlot(snapshot, item.Key) is { } slot
+            && slot.GetProperty("scoreState").GetString() == "Settled"
+            && slot.GetProperty("netPoints").GetInt64() == item.Value);
 
     private static async Task<IReadOnlyDictionary<Guid, long>> ReadScoresAsync(
         HttpClient client,
@@ -1662,6 +1636,5 @@ public sealed class AwdpFullBoundaryTests
         ?? throw new InvalidOperationException($"{name} is required for the external AWDP E2E test.");
 
     private sealed record TeamSession(HttpClient Client, Guid TeamId);
-    private sealed record ScoreboardObservation(JsonElement Schema, JsonElement Snapshot);
-    private sealed record SettledSlotScore(long EarnedPoints, long DeductedPoints, long NetPoints);
+    private sealed record ScoreboardObservation(JsonElement Snapshot, int? EndingRound);
 }

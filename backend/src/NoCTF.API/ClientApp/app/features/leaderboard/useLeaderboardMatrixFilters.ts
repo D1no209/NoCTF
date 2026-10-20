@@ -1,14 +1,14 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../../api'
+import type { ScoreboardTeam } from '../../utils/scoreboard-board'
 import type { ScoreboardChallengeColumnGroup } from '../../utils/scoreboard'
 import { directionKey, directionLabel } from '../../utils/directions'
 
 /** Filters presentation rows and columns without changing authoritative ranks or slot indices. */
 export function useLeaderboardMatrixFilters(
   groups: Readonly<Ref<ScoreboardChallengeColumnGroup[]>>,
-  teams: Readonly<Ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]>>,
-  displayTeamName: (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) => string,
+  teams: Readonly<Ref<ScoreboardTeam[]>>,
+  displayTeamName: (team: ScoreboardTeam) => string,
 ) {
   const allDirectionsKey = '__all_directions__'
   const allChallengesKey = '__all_challenges__'

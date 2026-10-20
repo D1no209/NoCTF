@@ -373,7 +373,7 @@ public sealed class AwdFullBoundaryTests
             .Single(item => item.GetProperty("teamId").GetGuid() == red.TeamId);
         await Assert.That(redEntry.GetProperty("rank").GetInt32()).IsEqualTo(1);
         var successfulAttacks = redEntry.GetProperty("slots").EnumerateArray()
-            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
+            .SelectMany(slot => slot.GetProperty("activity").EnumerateArray())
             .Where(item => item.GetProperty("kind").GetString() == "Attack")
             .Sum(item => item.GetProperty("successfulCount").GetInt32());
         await Assert.That(successfulAttacks).IsEqualTo(1);

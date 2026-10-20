@@ -8,6 +8,7 @@ import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, Monito
 import { getCompetitionEndpoint, getMyTeamStanding, getMyTeamEndpoint } from '../../../api'
 import { watchNotifications } from '~/composables/useNotificationHub'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsMyTeamStandingResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
+import { scoreboardChallengeBenefits } from '../../../utils/scoreboard'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
@@ -164,11 +165,11 @@ export function useCompetitionsByIdPage() {
       const snapshot = sharedBoard.snapshot.value
       if (!snapshot || snapshot.competitionId !== competitionId.value) return Promise.resolve(false)
       const teamId = myTeam.value.id
-      const row = snapshot.teams?.find(team => team.teamId === teamId)
+      const row = snapshot.teams.find(team => team.teamId === teamId)
       myStanding.value = { teamId, rank: row?.rank, totalScore: row?.totalScore,
-        challengeBenefits: row?.challengeBenefits ?? [], version: snapshot.version,
+        challengeBenefits: row ? scoreboardChallengeBenefits(row) : [], version: snapshot.version,
         generatedAt: snapshot.generatedAt, dataAsOf: snapshot.dataAsOf,
-        visibility: snapshot.visibility, dataScope: snapshot.dataScope }
+        visibility: snapshot.visibility ?? undefined, dataScope: snapshot.dataScope ?? undefined }
       standingLoading.value = false; standingError.value = null
       return Promise.resolve(true)
     }

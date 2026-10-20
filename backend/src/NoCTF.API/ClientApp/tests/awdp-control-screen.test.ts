@@ -3,9 +3,10 @@ import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
 } from '../app/api'
+import { normalizeScoreboardSnapshot } from '../app/utils/scoreboard-board'
+import type { ScoreboardLayout } from '../app/utils/scoreboard-board'
 import {
   awdpControlEvents,
   awdpCurrentRoundEvents,
@@ -26,12 +27,11 @@ const challengeId = '00000000-0000-0000-0000-000000000002'
 const teamId = '00000000-0000-0000-0000-000000000003'
 
 test('settled final round never shows a running countdown even with an older snapshot', () => {
-  const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
-    currentRoundId: 'final', generatedAt: '2026-09-08T00:00:00Z',
-  }
-  const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+  const snapshot = normalizeScoreboardSnapshot({
+    mode: 'Awdp', currentRoundId: 'final', generatedAt: '2026-09-08T00:00:00Z',
     rounds: [{ id: 'final', number: 2, state: 'Settled', endAt: '2026-09-08T00:01:00Z' }],
-  }
+  })
+  const schema = snapshot.layout
   expect(awdpRoundClock(snapshot, schema, Date.parse('2026-09-08T00:00:10Z'), false))
     .toEqual({ currentRound: 2, remainingSeconds: 0 })
 })
@@ -60,27 +60,22 @@ const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse =
   revision: 1,
   items: [{ id: challengeId, title: 'Pwn-02', direction: 'PWN', category: 'PWN', order: 1, published: true }],
 }
-const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+// Wire format: slots and challenge totals reference challenges and rounds by position.
+const wire: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
   competitionId,
   mode: 'Awdp',
-  revision: 1,
-  challengeCatalogRevision: 1,
+  version: '1',
+  challengeCatalogRevision: '1',
+  generatedAt: '2026-08-19T12:02:00Z',
+  currentRoundId: roundId,
   rounds: [{
     id: roundId,
     number: 12,
     startAt: '2026-08-19T11:57:00Z',
     endAt: '2026-08-19T12:02:00Z',
-    settledAt: '2026-08-19T12:02:00Z',
     state: 'Settled',
   }],
-  columns: [{ index: 0, competitionChallengeId: challengeId, roundId }],
-}
-const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
-  competitionId,
-  version: 1,
-  schemaRevision: 1,
-  generatedAt: '2026-08-19T12:02:00Z',
-  currentRoundId: roundId,
+  challenges: [{ competitionChallengeId: challengeId, currentScore: null }],
   tracks: [
     { key: 'open', name: 'Open', isInternal: false, visibleOnLeaderboard: true },
     { key: 'staff', name: 'Staff', isInternal: true, visibleOnLeaderboard: true },
@@ -95,17 +90,17 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
       totalScore: 900,
       attackScore: 5_500,
       defenseScore: 4_400,
-      challengeScores: [{ competitionChallengeId: challengeId, attackScore: 3_300, defenseScore: 2_200 }],
+      challengeTotals: [{ challenge: 0, grossPoints: 5_500, netPoints: 5_500, attackScore: 3_300, defenseScore: 2_200 }],
       slots: [{
-        columnIndex: 0,
+        challenge: 0,
+        round: 0,
         scoreState: 'Settled',
-        earnedPoints: 900,
-        deductedPoints: 0,
         netPoints: 900,
-        entryCount: 2,
-        breakdown: [
-          { kind: 'Attack', successfulCount: 1, attemptCount: 1, earnedPoints: 500, deductedPoints: 0, netPoints: 500 },
-          { kind: 'Defense', successfulCount: 1, attemptCount: 1, earnedPoints: 400, deductedPoints: 0, netPoints: 400 },
+        offenseState: 'Succeeded',
+        defenseState: 'Succeeded',
+        activity: [
+          { kind: 'Attack', successfulCount: 1, attemptCount: 1 },
+          { kind: 'Defense', successfulCount: 1, attemptCount: 1 },
         ],
       }],
     },
@@ -119,10 +114,12 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     },
   ],
 }
+const snapshot = normalizeScoreboardSnapshot(wire)
+const schema = snapshot.layout
 
 describe('AWDP control screen data adapter', () => {
   test('uses the shared direction display convention for challenge cards', () => {
-    const challenges = awdpTeamChallengeStates(catalog, snapshot.teams?.[0] ?? null, [])
+    const challenges = awdpTeamChallengeStates(catalog, snapshot.teams[0] ?? null, [])
     expect(challenges.map(challenge => challenge.direction)).toEqual(['Pwn'])
   })
 
@@ -213,10 +210,10 @@ describe('AWDP control screen data adapter', () => {
 
   test('preserves null ranks for banned or disqualified teams instead of inventing public places', () => {
     const ineligibleTeamId = '00000000-0000-0000-0000-000000000006'
-    const ineligibleSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
-      ...snapshot,
+    const ineligibleSnapshot = normalizeScoreboardSnapshot({
+      ...wire,
       teams: [
-        ...(snapshot.teams ?? []),
+        ...(wire.teams ?? []),
         {
           rank: null,
           teamId: ineligibleTeamId,
@@ -227,7 +224,7 @@ describe('AWDP control screen data adapter', () => {
           slots: [],
         },
       ],
-    }
+    })
 
     expect(awdpRankedEntries(ineligibleSnapshot, new Map([[ineligibleTeamId, 1]])).at(-1))
       .toMatchObject({ rank: null, rankingState: 'Banned', trend: 'steady' })
@@ -261,56 +258,47 @@ describe('AWDP control screen data adapter', () => {
 
   test('reads current-round operation metrics from the authoritative matrix', () => {
     const previousRoundId = '00000000-0000-0000-0000-000000000006'
-    const twoRoundSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
-      ...schema,
+    const currentSnapshot = normalizeScoreboardSnapshot({
+      ...wire,
       rounds: [
         {
           id: previousRoundId,
           number: 11,
           startAt: '2026-08-19T11:52:00Z',
           endAt: '2026-08-19T11:57:00Z',
-          settledAt: '2026-08-19T11:57:00Z',
           state: 'Settled',
         },
-        ...schema.rounds!,
+        ...wire.rounds!,
       ],
-      columns: [
-        { index: 1, competitionChallengeId: challengeId, roundId: previousRoundId },
-        ...schema.columns!,
-      ],
-    }
-    const currentSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
-      ...snapshot,
       teams: [{
-        ...snapshot.teams![0]!,
+        ...wire.teams![0]!,
         slots: [
           {
-            columnIndex: 1,
+            challenge: 0,
+            round: 0,
             scoreState: 'Settled',
-            earnedPoints: 10_000,
-            deductedPoints: 0,
             netPoints: 10_000,
-            entryCount: 40,
-            breakdown: [
-              { kind: 'Attack', successfulCount: 10, attemptCount: 20, earnedPoints: 5_000, deductedPoints: 0, netPoints: 5_000 },
-              { kind: 'Defense', successfulCount: 10, attemptCount: 20, earnedPoints: 5_000, deductedPoints: 0, netPoints: 5_000 },
+            activity: [
+              { kind: 'Attack', successfulCount: 10, attemptCount: 20 },
+              { kind: 'Defense', successfulCount: 10, attemptCount: 20 },
             ],
           },
           {
-            columnIndex: 0,
+            challenge: 0,
+            round: 1,
             scoreState: 'Pending',
-            earnedPoints: null,
-            deductedPoints: null,
             netPoints: null,
-            entryCount: 3,
-            breakdown: [
-              { kind: 'Attack', successfulCount: 1, attemptCount: 2, earnedPoints: 0, deductedPoints: 0, netPoints: 0 },
-              { kind: 'Defense', successfulCount: 0, attemptCount: 1, earnedPoints: 0, deductedPoints: 0, netPoints: 0 },
+            activity: [
+              { kind: 'Attack', successfulCount: 1, attemptCount: 2 },
+              { kind: 'Defense', successfulCount: 0, attemptCount: 1 },
             ],
           },
         ],
       }],
-    }
+    })
+    const twoRoundSchema = currentSnapshot.layout
+    expect(twoRoundSchema.columns.map(column => [column.index, column.roundId]))
+      .toEqual([[0, previousRoundId], [1, roundId]])
 
     expect(awdpCurrentRoundOperationMetrics(currentSnapshot, twoRoundSchema)).toEqual({
       attack: { success: 1, total: 2 },
@@ -360,14 +348,13 @@ describe('AWDP control screen data adapter', () => {
   })
 
   test('advances the displayed round clock from the generated leaderboard snapshot', () => {
-    const timedSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    const timedSchema: ScoreboardLayout = {
       ...schema,
       rounds: [{
         id: roundId,
         number: 12,
         startAt: '2026-08-19T11:57:00Z',
         endAt: '2026-08-19T12:02:00Z',
-        settledAt: null,
         state: 'Running',
       }],
     }
@@ -395,7 +382,7 @@ describe('AWDP control screen implementation contract', () => {
       const items = Array.from({ length: count }, (_, index) => ({
         id: crypto.randomUUID(), title: `Challenge ${index + 1}`, direction: 'PWN', published: true,
       }))
-      const states = awdpTeamChallengeStates({ ...catalog, items }, snapshot.teams![0]!, [])
+      const states = awdpTeamChallengeStates({ ...catalog, items }, snapshot.teams[0]!, [])
       expect(states.map(state => state.competitionChallengeId)).toEqual(items.map(item => item.id))
     }
     const page = await sourceFile(new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url)).text()
@@ -433,7 +420,7 @@ describe('AWDP control screen implementation contract', () => {
 
     expect(page).toContain('definePageMeta({ layout: false })')
     expect(page).toContain('useScoreboardMatrix(competitionId, { pollRounds: false })')
-    expect(page).toContain('board.refresh({ catalog: true, schema: true, snapshot: true })')
+    expect(page).toContain('board.refresh({ catalog: true, snapshot: true })')
     expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')

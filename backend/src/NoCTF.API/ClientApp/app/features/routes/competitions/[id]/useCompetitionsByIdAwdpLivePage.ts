@@ -269,7 +269,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     const from = new Date(Math.max(knownStart, now - 31 * 24 * 60 * 60 * 1000)).toISOString()
     const to = new Date(now).toISOString()
     const [, eventResult] = await Promise.all([
-      board.refresh({ catalog: true, schema: true, snapshot: true }),
+      board.refresh({ catalog: true, snapshot: true }),
       loadAllAwdpEvents(from, to),
     ])
     loading.value = false

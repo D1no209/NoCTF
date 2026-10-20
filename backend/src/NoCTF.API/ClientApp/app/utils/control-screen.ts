@@ -1,11 +1,6 @@
-import type {
-  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
-} from '../api'
+import type { NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse } from '../api'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
+import type { ScoreboardChallenge, ScoreboardLayout, ScoreboardSnapshot, ScoreboardTeam } from './scoreboard-board'
 import { directionLabel } from './directions'
 
 export type ControlScreenBloodRank = 'First' | 'Second' | 'Third'
@@ -39,8 +34,8 @@ export interface ControlScreenSolveReconciliation {
 }
 
 export function controlScreenPublicEntries(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
-): NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[] {
+  snapshot: ScoreboardSnapshot | null,
+): ScoreboardTeam[] {
   const publicTracks = new Set((snapshot?.tracks ?? [])
     .filter(track => !track.isInternal && track.key)
     .map(track => track.key!))
@@ -49,13 +44,13 @@ export function controlScreenPublicEntries(
 
 export function controlScreenChallenges(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
-  entries: readonly NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[],
-  currentScores: readonly NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse[] = [],
+  schema: ScoreboardLayout | null,
+  entries: readonly ScoreboardTeam[],
+  currentScores: readonly ScoreboardChallenge[] = [],
 ): ControlScreenChallenge[] {
   const currentScoreByChallenge = new Map(currentScores
-    .filter(score => score.competitionChallengeId)
-    .map(score => [score.competitionChallengeId!, score.score ?? 0]))
+    .filter(score => score.currentScore !== null)
+    .map(score => [score.competitionChallengeId, score.currentScore!]))
   const provisional = (catalog?.items ?? []).filter(challenge => challenge.id && challenge.published).map((challenge) => {
     const columns = scoreboardColumnsForChallenge(schema, challenge.id!)
     let solveCount = 0
@@ -63,7 +58,6 @@ export function controlScreenChallenges(
     for (const team of entries) {
       let solved = false
       for (const column of columns) {
-        if (column.index === undefined) continue
         const slot = scoreboardSlot(team, column.index)
         solved ||= (scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) > 0
         if (slot?.scoreState === 'Settled' || slot?.scoreState === 'Provisional')
@@ -90,34 +84,35 @@ export function controlScreenChallenges(
 
 export function controlScreenSolveFeed(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
-  entries: readonly NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[],
+  schema: ScoreboardLayout | null,
+  entries: readonly ScoreboardTeam[],
 ): ControlScreenSolve[] {
   const challengeMap = new Map((catalog?.items ?? []).filter(item => item.id).map(item => [item.id!, item]))
+  const columnsByChallenge = new Map((schema?.columns ?? []).map(column => [column.competitionChallengeId, column]))
   const solves: ControlScreenSolve[] = []
   for (const team of entries) {
     if (!team.teamId || !team.teamName) continue
-    for (const column of schema?.columns ?? []) {
-      if (column.index === undefined || !column.competitionChallengeId) continue
+    // A team solves a CTF challenge once: its first Solve achievement is the feed item and its cell
+    // carries the published score and blood award.
+    for (const achievement of team.achievements ?? []) {
+      const column = columnsByChallenge.get(achievement.competitionChallengeId)
+      if (achievement.kind !== 'Solve' || !column || !achievement.occurredAt) continue
       const slot = scoreboardSlot(team, column.index)
-      const challenge = challengeMap.get(column.competitionChallengeId)
-      for (const entry of slot?.entries ?? []) {
-        if (entry.kind !== 'Solve' || entry.outcome !== 'Succeeded' || !entry.id || !entry.occurredAt) continue
-        const bloodRank: ControlScreenBloodRank | null = entry.award === 'FirstBlood'
-          ? 'First' : entry.award === 'SecondBlood' ? 'Second' : entry.award === 'ThirdBlood' ? 'Third' : null
-        solves.push({
-          key: entry.id,
-          teamId: team.teamId,
-          teamName: team.teamName,
-          competitionChallengeId: column.competitionChallengeId,
-          challengeTitle: challenge?.title ?? '',
-          direction: directionLabel(challenge?.direction),
-          score: entry.netPoints ?? 0,
-          bloodRank,
-          awardPoints: entry.awardPoints ?? 0,
-          solvedAt: entry.occurredAt,
-        })
-      }
+      const challenge = challengeMap.get(achievement.competitionChallengeId)
+      const bloodRank: ControlScreenBloodRank | null = slot?.award === 'FirstBlood'
+        ? 'First' : slot?.award === 'SecondBlood' ? 'Second' : slot?.award === 'ThirdBlood' ? 'Third' : null
+      solves.push({
+        key: `${team.teamId}:${achievement.competitionChallengeId}`,
+        teamId: team.teamId,
+        teamName: team.teamName,
+        competitionChallengeId: achievement.competitionChallengeId,
+        challengeTitle: challenge?.title ?? '',
+        direction: directionLabel(challenge?.direction),
+        score: slot?.netPoints ?? 0,
+        bloodRank,
+        awardPoints: slot?.awardPoints ?? 0,
+        solvedAt: achievement.occurredAt,
+      })
     }
   }
   return solves.sort((left, right) => right.solvedAt.localeCompare(left.solvedAt) || right.key.localeCompare(left.key))

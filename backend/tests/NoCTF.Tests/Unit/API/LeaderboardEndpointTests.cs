@@ -48,24 +48,18 @@ public sealed class LeaderboardEndpointTests
 
         using var catalogResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/challenges");
-        using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
         using var snapshotResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
         using var catalog = JsonDocument.Parse(await catalogResponse.Content.ReadAsStringAsync());
-        using var schema = JsonDocument.Parse(await schemaResponse.Content.ReadAsStringAsync());
         using var snapshot = JsonDocument.Parse(await snapshotResponse.Content.ReadAsStringAsync());
 
         await Assert.That(catalog.RootElement.GetProperty("revision").ValueKind)
             .IsEqualTo(JsonValueKind.String);
-        await Assert.That(schema.RootElement.GetProperty("revision").ValueKind)
-            .IsEqualTo(JsonValueKind.String);
-        await Assert.That(schema.RootElement.GetProperty("challengeCatalogRevision").ValueKind)
-            .IsEqualTo(JsonValueKind.String);
+        await Assert.That(snapshot.RootElement.GetProperty("challengeCatalogRevision").GetString())
+            .IsEqualTo(catalogRevision.ToString(System.Globalization.CultureInfo.InvariantCulture));
         await Assert.That(snapshot.RootElement.GetProperty("version").GetString())
             .IsEqualTo(version.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        await Assert.That(snapshot.RootElement.GetProperty("schemaRevision").ValueKind)
-            .IsEqualTo(JsonValueKind.String);
+        await Assert.That(snapshot.RootElement.TryGetProperty("schemaRevision", out _)).IsFalse();
 
         var realtime = ScoreboardUpdated.From(projection);
         await Assert.That(realtime.Version)
@@ -210,12 +204,8 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Frozen);
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
 
-        using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema?endingRound=1");
-        await Assert.That(schemaResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-
         using var slotResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{Guid.CreateVersion7()}/columns/0?endingRound=1");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{Guid.CreateVersion7()}/challenges/{Guid.CreateVersion7()}?endingRound=1");
         await Assert.That(slotResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
 
         _ = snapshots.DidNotReceive().CreateScoreboardWindowAsync(
@@ -226,7 +216,7 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Catalog_and_schema_hide_unpublished_challenges_and_remap_columns()
+    public async Task Catalog_and_leaderboard_hide_unpublished_challenges()
     {
         var competitionId = Guid.CreateVersion7();
         var publishedId = Guid.CreateVersion7();
@@ -256,21 +246,20 @@ public sealed class LeaderboardEndpointTests
 
         using var catalogResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/challenges");
-        using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
+        using var snapshotResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
         var catalog = await catalogResponse.Content
             .ReadFromJsonAsync<ScoreboardChallengeCatalogResponse>();
-        var schema = await schemaResponse.Content
-            .ReadFromJsonAsync<ScoreboardSchemaResponse>();
+        var snapshot = await snapshotResponse.Content
+            .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
 
         await Assert.That(catalogResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(schemaResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(snapshotResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(catalog!.Items.Select(item => item.Id))
             .IsEquivalentTo([publishedId]);
-        await Assert.That(schema!.Columns).Count().IsEqualTo(1);
-        await Assert.That(schema.Columns[0].Index).IsEqualTo(0);
-        await Assert.That(schema.Columns[0].CompetitionChallengeId).IsEqualTo(publishedId);
-        await Assert.That(schema.ChallengeCatalogRevision).IsEqualTo(catalog.Revision);
+        await Assert.That(snapshot!.Challenges.Select(item => item.CompetitionChallengeId))
+            .IsEquivalentTo([publishedId]);
+        await Assert.That(snapshot.ChallengeCatalogRevision).IsEqualTo(catalog.Revision);
     }
 
     [Test]
@@ -311,24 +300,19 @@ public sealed class LeaderboardEndpointTests
 
         using var catalogResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/challenges");
-        using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
         using var snapshotResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
         var catalog = await catalogResponse.Content
             .ReadFromJsonAsync<ScoreboardChallengeCatalogResponse>();
-        var schema = await schemaResponse.Content
-            .ReadFromJsonAsync<ScoreboardSchemaResponse>();
         var snapshot = await snapshotResponse.Content
             .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
 
         await Assert.That(catalogResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(schemaResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(snapshotResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(catalog!.Items.Select(item => item.Id)).IsEquivalentTo([publishedId]);
-        await Assert.That(schema!.Columns.Select(column => column.CompetitionChallengeId))
+        await Assert.That(snapshot!.Challenges.Select(item => item.CompetitionChallengeId))
             .IsEquivalentTo([publishedId]);
-        await Assert.That(snapshot!.Teams.Single().TotalScore).IsEqualTo(10);
+        await Assert.That(snapshot.Teams.Single().TotalScore).IsEqualTo(10);
         await Assert.That(snapshot.Teams.Single().Slots).HasSingleItem();
     }
 
@@ -396,7 +380,7 @@ public sealed class LeaderboardEndpointTests
         using var client = app.GetTestClient();
 
         using var response = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{publishedId}");
         using var leaderboardResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
         var detail = await response.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
@@ -405,7 +389,8 @@ public sealed class LeaderboardEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(detail!.ColumnIndex).IsEqualTo(0);
+        await Assert.That(detail!.CompetitionChallengeId).IsEqualTo(publishedId);
+        await Assert.That(detail.RoundId).IsNull();
         await Assert.That(detail.Items.Select(item => item.Id)).IsEquivalentTo([publishedEntryId]);
         await Assert.That(detail.Items.Select(item => item.Id)).DoesNotContain(unpublishedEntryId);
         await Assert.That(leaderboard!.Teams).HasSingleItem();
@@ -414,7 +399,7 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Hidden_schema_preserves_the_real_game_mode_without_exposing_columns()
+    public async Task Hidden_leaderboard_preserves_the_real_game_mode_without_exposing_columns()
     {
         var competitionId = Guid.CreateVersion7();
         await using var app = await CreateApplicationAsync(
@@ -427,13 +412,178 @@ public sealed class LeaderboardEndpointTests
         using var client = app.GetTestClient();
 
         using var response = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
-        var schema = await response.Content.ReadFromJsonAsync<ScoreboardSchemaResponse>();
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var snapshot = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(schema!.Mode).IsEqualTo(GameModeProtocol.Awdp);
-        await Assert.That(schema.Columns).IsEmpty();
-        await Assert.That(schema.Rounds).IsEmpty();
+        await Assert.That(snapshot!.Mode).IsEqualTo(GameModeProtocol.Awdp);
+        await Assert.That(snapshot.Challenges).IsEmpty();
+        await Assert.That(snapshot.Rounds).IsEmpty();
+        await Assert.That(snapshot.Teams).IsEmpty();
+    }
+
+    [Test]
+    public async Task Ctf_leaderboard_references_challenges_by_index_and_sends_each_identity_once()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var firstChallengeId = Guid.CreateVersion7();
+        var secondChallengeId = Guid.CreateVersion7();
+        var thirdChallengeId = Guid.CreateVersion7();
+        var contributorId = Guid.CreateVersion7();
+        var achieverId = Guid.CreateVersion7();
+        var occurredAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var hinted = new ScoreboardSlot(2, ScoreboardScoreState.Settled, 200, 50, 150, 1, [], [])
+        {
+            OffenseState = ScoreboardOperationState.Succeeded
+        };
+        var solve = new ScoreboardSlot(1, ScoreboardScoreState.Settled, 350, 0, 350, 2,
+            [
+                new(ScoreboardBreakdownKind.Solve, 1, 2, 350, 0, 350),
+                new(ScoreboardBreakdownKind.Hint, 0, 0, 0, 0, 0)
+            ],
+            [
+                new(Guid.CreateVersion7(), ScoreboardEntryKind.Solve, ScoreboardEntryOutcome.Succeeded, 0, null,
+                    occurredAt, null, 350, 0, 350, ScoreboardAward.FirstBlood, 50)
+            ]) { OffenseState = ScoreboardOperationState.Succeeded };
+        var team = new ScoreboardTeam(Guid.CreateVersion7(), "Alpha", "default", 1, ScoreboardRankingState.Eligible,
+            500, 2, [], [solve, hinted])
+        {
+            MemberContributions = [new(contributorId, "Alice", 350)],
+            Achievements =
+            [
+                new(secondChallengeId, ScoreboardEntryKind.Solve, contributorId, "Alice", occurredAt),
+                new(firstChallengeId, ScoreboardEntryKind.Solve, achieverId, "Bob", occurredAt.AddMinutes(1))
+            ],
+            ChallengeBenefits =
+            [
+                new(firstChallengeId, 0, 0, 20, occurredAt) { NetPoints = 0 },
+                new(secondChallengeId, 350, 0, null, null) { NetPoints = 350 },
+                new(thirdChallengeId, 200, 0, null, null) { NetPoints = 150 }
+            ]
+        };
+        var projection = CreateProjection(
+            competitionId,
+            [
+                new(firstChallengeId, "First", "PWN", "PWN", 1, true),
+                new(secondChallengeId, "Second", "WEB", "WEB", 2, true),
+                new(thirdChallengeId, "Third", "MISC", "MISC", 3, true)
+            ],
+            [new(0, firstChallengeId, null), new(1, secondChallengeId, null), new(2, thirdChallengeId, null)],
+            [team]);
+        projection = projection with
+        {
+            Snapshot = projection.Snapshot with
+            {
+                CurrentChallengeScores = [new(secondChallengeId, 300, null, null)]
+            }
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher());
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync($"/api/v1/competitions/{competitionId}/leaderboard");
+        var json = await response.Content.ReadAsStringAsync();
+        var body = System.Text.Json.JsonSerializer.Deserialize<ScoreboardSnapshotResponse>(
+            json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        var row = body.Teams.Single();
+        var slot = row.Slots.Single(item => item.Challenge == 1);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(body.Mode).IsEqualTo(GameModeProtocol.Ctf);
+        await Assert.That(body.Rounds).IsEmpty();
+        await Assert.That(body.Challenges.Select(item => (item.CompetitionChallengeId, item.CurrentScore)))
+            .IsEquivalentTo([(firstChallengeId, (long?)null), (secondChallengeId, (long?)300), (thirdChallengeId, (long?)null)]);
+        await Assert.That((slot.Challenge, slot.Round, slot.NetPoints)).IsEqualTo((1, (int?)null, (long?)350));
+        await Assert.That(slot.OffenseState).IsEqualTo(ScoreboardOperationStateProtocol.Succeeded);
+        await Assert.That(slot.Activity.Select(item => (item.Kind, item.SuccessfulCount, item.AttemptCount)))
+            .IsEquivalentTo([(ScoreboardBreakdownKindProtocol.Solve, 1, 2)]);
+        await Assert.That((slot.Award, slot.AwardPoints)).IsEqualTo(((ScoreboardAwardProtocol?)ScoreboardAwardProtocol.FirstBlood, 50L));
+        await Assert.That(row.GlobalAdjustmentCount).IsEqualTo(2);
+        await Assert.That(row.Members.Select(member => (member.UserId, member.DisplayName, member.EarnedPoints)))
+            .IsEquivalentTo([(contributorId, "Alice", 350L), (achieverId, "Bob", 0L)]);
+        await Assert.That(row.Achievements!.Select(item => (item.Challenge, item.Member)))
+            .IsEquivalentTo([(1, (int?)0), (0, (int?)1)]);
+        // A plain solve equals its slot and is not repeated; the unlocked write-up and the hinted
+        // challenge (gross differs from the slot's net) still send their totals.
+        await Assert.That(row.ChallengeTotals.Select(item => (item.Challenge, item.GrossPoints, item.NetPoints)))
+            .IsEquivalentTo([(0, 0L, 0L), (2, 200L, 150L)]);
+        var writeUp = row.ChallengeTotals.Single(item => item.Challenge == 0).WriteUp!;
+        await Assert.That((writeUp.DeductionPercent, writeUp.UnlockedAt)).IsEqualTo(((int?)20, occurredAt));
+        await Assert.That(row.ChallengeTotals.Single(item => item.Challenge == 2).WriteUp).IsNull();
+        foreach (var removed in new[] { "\"actors\"", "\"entries\"", "\"breakdown\"", "\"columnIndex\"", "\"schemaRevision\"",
+                     "\"memberContributions\"", "\"challengeBenefits\"", "\"globalAdjustments\"", "\"userId\":null" })
+            await Assert.That(json).DoesNotContain(removed);
+    }
+
+    [Test]
+    public async Task Awdp_leaderboard_references_rounds_by_index_and_always_sends_competition_totals()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var firstRoundId = Guid.CreateVersion7();
+        var secondRoundId = Guid.CreateVersion7();
+        var start = DateTimeOffset.UtcNow.AddMinutes(-20);
+        var carried = new ScoreboardSlot(1, ScoreboardScoreState.Pending, null, null, null, 0, [], [])
+        {
+            OffenseState = ScoreboardOperationState.Succeeded
+        };
+        var team = new ScoreboardTeam(Guid.CreateVersion7(), "Alpha", "default", 1, ScoreboardRankingState.Eligible,
+            50, 0, [], [carried])
+        {
+            AttackScore = 40,
+            DefenseScore = 10,
+            ChallengeScores = [new(challengeId, 40, 10)]
+        };
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
+            [new(0, challengeId, firstRoundId), new(1, challengeId, secondRoundId)],
+            [team]);
+        projection = projection with
+        {
+            Schema = projection.Schema with
+            {
+                Mode = GameMode.Awdp,
+                Rounds =
+                [
+                    new(firstRoundId, 1, start, start.AddMinutes(10), start.AddMinutes(10), ScoreboardRoundState.Settled),
+                    new(secondRoundId, 2, start.AddMinutes(10), start.AddMinutes(20), null, ScoreboardRoundState.Running)
+                ],
+                RoundWindowStart = 1,
+                RoundWindowEnd = 2,
+                LatestRound = 2
+            },
+            Snapshot = projection.Snapshot with { CurrentRoundId = secondRoundId }
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher(),
+            gameMode: GameMode.Awdp);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync($"/api/v1/competitions/{competitionId}/leaderboard");
+        var body = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        var row = body!.Teams.Single();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(body.Mode).IsEqualTo(GameModeProtocol.Awdp);
+        await Assert.That(body.Rounds.Select(round => (round.Id, round.Number, round.State)))
+            .IsEquivalentTo([
+                (firstRoundId, 1, ScoreboardRoundStateProtocol.Settled),
+                (secondRoundId, 2, ScoreboardRoundStateProtocol.Running)
+            ]);
+        await Assert.That((body.CurrentRoundId, body.RoundWindowStart, body.RoundWindowEnd, body.LatestRound))
+            .IsEqualTo(((Guid?)secondRoundId, (int?)1, (int?)2, (int?)2));
+        await Assert.That(row.Slots.Select(slot => (slot.Challenge, slot.Round, slot.NetPoints, slot.ScoreState)))
+            .IsEquivalentTo([(0, (int?)1, (long?)null, ScoreboardScoreStateProtocol.Pending)]);
+        await Assert.That(row.Slots.Single().Activity).IsEmpty();
+        var total = row.ChallengeTotals.Single();
+        await Assert.That((total.Challenge, total.GrossPoints, total.NetPoints, total.AttackScore, total.DefenseScore))
+            .IsEqualTo((0, 50L, 50L, (long?)40, (long?)10));
+        await Assert.That(total.WriteUp).IsNull();
     }
 
     [Test]
@@ -491,7 +641,7 @@ public sealed class LeaderboardEndpointTests
             new CachedLeaderboard(projection: projection),
             new RecordingMessagePublisher());
         using var client = app.GetTestClient();
-        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{firstTeamId}/columns/0?limit=2";
+        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{firstTeamId}/challenges/{challengeId}?limit=2";
 
         using var first = await client.GetAsync(route);
         var page = await first.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
@@ -515,7 +665,7 @@ public sealed class LeaderboardEndpointTests
 
         var cursor = Uri.EscapeDataString(page.NextCursor!);
         using var otherTeam = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{secondTeamId}/columns/0?limit=2&cursor={cursor}");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{secondTeamId}/challenges/{challengeId}?limit=2&cursor={cursor}");
         var tampered = Uri.EscapeDataString(page.NextCursor![..^1]
             + (page.NextCursor[^1] == 'A' ? "B" : "A"));
         using var tamperedResponse = await client.GetAsync($"{route}&cursor={tampered}");
@@ -664,7 +814,7 @@ public sealed class LeaderboardEndpointTests
             new RecordingMessagePublisher(),
             detailReader: new StaticScoreboardDetailReader(slotFacts: facts));
         using var client = app.GetTestClient();
-        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0?limit=2";
+        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{challengeId}?limit=2";
 
         using var first = await client.GetAsync(route);
         var firstPage = await first.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
@@ -746,7 +896,7 @@ public sealed class LeaderboardEndpointTests
             gameMode: GameMode.Awdp,
             detailReader: new StaticScoreboardDetailReader(slotFacts: [fact]));
         using var response = await app.GetTestClient().GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{challengeId}?roundId={roundId}");
         var page = await response.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -875,17 +1025,16 @@ public sealed class LeaderboardEndpointTests
             $"/api/v1/competitions/{competitionId}/leaderboard/trends");
         var trends = await trendsResponse.Content.ReadFromJsonAsync<ScoreboardTrendsResponse>();
         using var detailResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{publicTeamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{publicTeamId}/challenges/{challengeId}");
         var detail = await detailResponse.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
         using var internalDetailResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/challenges/{challengeId}");
 
         await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(trendsResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(leaderboard!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
         await Assert.That(trends!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
-        await Assert.That(leaderboard.Actors.Select(actor => actor.UserId)).IsEquivalentTo([publicActorId]);
-        await Assert.That(leaderboard.Teams.Single().Slots.Single().Entries.Single().TargetTeamId).IsNull();
+        await Assert.That(leaderboard.Teams.Single().Slots).HasSingleItem();
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(detail!.Items.Single().TargetTeamId).IsNull();
         await Assert.That(internalDetailResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
@@ -934,7 +1083,7 @@ public sealed class LeaderboardEndpointTests
         var observerSnapshot = await observerResponse.Content
             .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
         using var observerSlotResponse = await observerApp.GetTestClient().GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/challenges/{challengeId}");
         using var observerAdjustmentResponse = await observerApp.GetTestClient().GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/adjustments");
 
@@ -950,7 +1099,7 @@ public sealed class LeaderboardEndpointTests
         var judgeSnapshot = await judgeResponse.Content
             .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
         using var judgeSlotResponse = await judgeApp.GetTestClient().GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/challenges/{challengeId}");
         using var judgeAdjustmentResponse = await judgeApp.GetTestClient().GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/adjustments");
 
@@ -1061,7 +1210,7 @@ public sealed class LeaderboardEndpointTests
             $"/api/v1/competitions/{competitionId}/leaderboard");
         var snapshot = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
         using var detailResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{viewerTeamId}/columns/0");
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{viewerTeamId}/challenges/{challengeId}");
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(snapshot!.Teams.Select(team => team.TeamId))
@@ -1115,7 +1264,7 @@ public sealed class LeaderboardEndpointTests
             CompetitionLeaderboardVisibility.Frozen,
             LeaderboardDataScope.Frozen);
         using var client = app.GetTestClient();
-        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0?limit=1";
+        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{challengeId}?limit=1";
 
         using var firstResponse = await client.GetAsync(route);
         var page = await firstResponse.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
@@ -1238,9 +1387,7 @@ public sealed class LeaderboardEndpointTests
             options.Filter = type => type == typeof(GetLeaderboardEndpoint)
                 || type == typeof(GetLeaderboardTrendsEndpoint)
                 || type == typeof(GetScoreboardChallengeCatalogEndpoint)
-                || type == typeof(GetScoreboardSchemaEndpoint)
                 || type == typeof(GetLeaderboardValidator)
-                || type == typeof(GetScoreboardSchemaValidator)
                 || type == typeof(GetScoreboardSlotDetailEndpoint)
                 || type == typeof(GetScoreboardSlotDetailValidator)
                 || type == typeof(GetScoreboardAdjustmentDetailEndpoint)

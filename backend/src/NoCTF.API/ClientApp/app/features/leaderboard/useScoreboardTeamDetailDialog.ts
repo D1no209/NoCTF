@@ -3,18 +3,19 @@ import { defineAsyncComponent } from 'vue'
 import { markRaw, toRefs } from 'vue'
 import type { Ref } from 'vue'
 import { ChartSpline, Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../../api'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import type { ScoreboardTeam } from '../../utils/scoreboard-board'
 import type { echarts } from '../../utils/echarts'
 import { chartGuideColor } from '../../utils/chart-theme'
-import { scoreboardDirectionGroups, scoreboardMemberContributionSlices, scoreboardRankingStateLabel, scoreboardTeamChallengeScore, scoreboardTeamChallengeSignals, scoreboardTeamAchievements, scoreboardTeamDirectionScore } from '../../utils/scoreboard'
+import { scoreboardChallengeTotal, scoreboardDirectionGroups, scoreboardMemberContributionSlices, scoreboardRankingStateLabel, scoreboardTeamChallengeScore, scoreboardTeamChallengeSignals, scoreboardTeamAchievements, scoreboardTeamDirectionScore } from '../../utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '../../utils/scoreboard'
 import type { TrendSeries } from './types'
 
 /** Owns state, effects and commands for ScoreboardTeamDetailDialog. */
 export function useScoreboardTeamDetailDialog(props: Readonly<{
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
-  teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
+  team: ScoreboardTeam | null
+  teams: ScoreboardTeam[]
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean
@@ -68,24 +69,33 @@ open: Ref<boolean>) {
   }))
 
   function challengeSplitScore(
-    team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+    team: ScoreboardTeam,
     competitionChallengeId: string,
   ): { attack: number; defense: number } {
-    const score = (team.challengeScores ?? []).find(
-      item => item.competitionChallengeId === competitionChallengeId,
-    )
+    const score = scoreboardChallengeTotal(team, competitionChallengeId)
     return { attack: score?.attackScore ?? 0, defense: score?.defenseScore ?? 0 }
+  }
+
+  /** Gross/deduction of one challenge; a challenge without a sent total is exactly its visible score. */
+  function challengeBenefit(team: ScoreboardTeam, group: ScoreboardChallengeColumnGroup, score: number) {
+    const total = scoreboardChallengeTotal(team, group.competitionChallengeId)
+    return {
+      grossPoints: total?.grossPoints ?? Math.max(0, score),
+      writeUpDeductionPoints: total?.writeUp?.deductionPoints ?? 0,
+      writeUpUnlockedAt: total?.writeUp?.unlockedAt ?? null,
+    }
   }
 
   const rows = computed(() => props.columnGroups.map((group) => {
     const split = props.team
       ? challengeSplitScore(props.team, group.competitionChallengeId)
       : { attack: 0, defense: 0 }
+    const score = props.team ? scoreboardTeamChallengeScore(props.team, group, props.mode) : 0
     return {
       group,
-      benefit: props.team?.challengeBenefits?.find(x => x.competitionChallengeId === group.competitionChallengeId),
+      benefit: props.team ? challengeBenefit(props.team, group, score) : null,
       title: group.challenge?.title ?? translate("common.label.unknownQuestion"),
-      score: props.team ? scoreboardTeamChallengeScore(props.team, group, props.mode) : 0,
+      score,
       attackScore: split.attack,
       defenseScore: split.defense,
       signals: props.team

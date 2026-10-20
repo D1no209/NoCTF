@@ -15,7 +15,7 @@ const vus = Number(__ENV.K6_VUS || config.vus);
 if (!Number.isInteger(vus) || vus < 1 || data.users.length < vus) throw new Error('VU 数量无效或测试账号不足。');
 if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(data.baseUrl)) throw new Error('测试地址必须是本机独立环境。');
 const endpoints = ['competitions', 'competition', 'challenges', 'challenge', 'leaderboard', 'fact',
-  'my_team', 'standing', 'scoreboard_catalog', 'scoreboard_schema', 'trends', 'events',
+  'my_team', 'standing', 'scoreboard_catalog', 'trends', 'events',
   'notifications', 'attachments', 'download_ticket', 'attachment_download', 'history',
   'competitions_negotiate', 'notifications_negotiate', 'shell_notifications',
   ...(fixedWorkload ? ['theory_navigation', 'managed_competitions'] : ['navigation_capabilities'])];
@@ -185,7 +185,6 @@ export function setup() {
       [`${root}/teams/me`, 'warmup_team', sessions[0].token],
       [`${root}/teams/me/standing`, 'standing', sessions[0].token],
       [`${root}/leaderboard/challenges`, 'warmup_catalog', sessions[0].token],
-      [`${root}/leaderboard/schema`, 'warmup_schema', sessions[0].token],
       [`${root}/leaderboard/trends`, 'trends', sessions[0].token],
       [warmupEvents, 'warmup_events', sessions[0].token],
       [`/api/v1/notifications?scope=Inbox&offset=0&limit=20&desc=true`, 'warmup_notifications', sessions[0].token],
@@ -274,7 +273,7 @@ async function runJourney(prepared) {
   await pause(index / vus * (config.entrySpreadSeconds ?? 30) * 1000);
   let token = ensureSession(prepared, index);
   const root = `/api/v1/competitions/${data.competitionId}`;
-  const journey = { page: 'challenges', challengeIndex: 0, board: null, catalog: null, schema: null,
+  const journey = { page: 'challenges', challengeIndex: 0, board: null, catalog: null,
     dirty: new Set(), nextBoardRetry: Infinity, nextStandingRetry: Infinity, nextNoticeAt: Infinity,
     pendingFact: null, factChanged: false, requiredVersion: null, pendingNotices: [], coherenceRetries: 0 };
   const read = async (path, name, validate, statuses = [200]) => {
@@ -313,7 +312,6 @@ async function runJourney(prepared) {
     await Promise.all([
       ...(all ? [
         read(`${root}/leaderboard/challenges`, 'scoreboard_catalog', value => value.competitionId === data.competitionId).then(result => { journey.catalog = result.value; }),
-        read(`${root}/leaderboard/schema`, 'scoreboard_schema', value => value.competitionId === data.competitionId).then(result => { journey.schema = result.value; }),
       ] : []),
       (async () => {
         const { response, value } = await read(`${root}/leaderboard`, 'leaderboard', value => value.competitionId === data.competitionId && Array.isArray(value.teams), [200, 202]);
@@ -325,8 +323,8 @@ async function runJourney(prepared) {
       })(),
     ]);
     if (candidate) {
-      const coherent = journey.schema?.challengeCatalogRevision === journey.catalog?.revision
-        && candidate.schemaRevision === journey.schema?.revision
+      // The leaderboard carries its own rounds and columns; only the cached catalog titles must match.
+      const coherent = candidate.challengeCatalogRevision === journey.catalog?.revision
         && !newer(journey.board?.version, candidate.version);
       if (coherent) {
         journey.board = candidate;
@@ -397,7 +395,7 @@ async function runJourney(prepared) {
         }
         journey.dirty.add('board');
       }
-      if (payload?.schemaRevision !== journey.schema?.revision || payload?.challengeCatalogRevision !== journey.catalog?.revision) journey.dirty.add('board_all');
+      if (payload?.challengeCatalogRevision !== journey.catalog?.revision) journey.dirty.add('board_all');
       if (journey.page === 'leaderboard') journey.dirty.add('trends');
     }
     if (name === 'competitionEventChanged') {

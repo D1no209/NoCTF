@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { computed, effectScope, markRaw, nextTick, reactive, ref, toRefs, watch } from 'vue'
+import { normalizeScoreboardSnapshot } from '../app/utils/scoreboard-board'
+import { scoreboardChallengeBenefits } from '../app/utils/scoreboard'
+import { computed, effectScope, markRaw, nextTick, reactive, ref, shallowRef, toRefs, watch } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import { hasInjectionContext, inject as vueInject, provide as vueProvide } from 'vue'
 import * as coherence from '../app/utils/scoreboard-coherence'
@@ -10,7 +12,8 @@ async function factory(path: string, name: string, additional: Record<string, un
   const input = await Bun.file(new URL(`../app/${path}`, import.meta.url)).text()
   const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(input)
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export /g, '')
-  const deps: Record<string, unknown> = { ref, computed, watch, markRaw, toRefs, createTrailingRefresh,
+  const deps: Record<string, unknown> = { ref, shallowRef, computed, watch, markRaw, toRefs, createTrailingRefresh,
+    normalizeScoreboardSnapshot, scoreboardChallengeBenefits,
     translate: (key: string) => key, describeMessage: (key: string) => key, parseApiError: () => ({ displayMessage: 'failed' }), ...additional }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
   for (const icon of ['ArrowLeft', 'ClipboardCheck', 'FileText', 'GitBranch', 'LayoutDashboard', 'MessageCircleQuestion', 'Puzzle', 'Trophy', 'UserRound', 'Megaphone']) deps[icon] = {}

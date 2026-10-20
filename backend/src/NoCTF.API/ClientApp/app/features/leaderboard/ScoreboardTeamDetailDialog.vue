@@ -2,7 +2,8 @@
 
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '~/api'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '~/api'
+import type { ScoreboardTeam } from '~/utils/scoreboard-board'
 
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
 import type { TrendSeries } from '~/features/leaderboard/types'
@@ -11,8 +12,8 @@ import View from '~/components/views/leaderboard/ScoreboardTeamDetailDialogView.
 
 const props = defineProps<{
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
-  teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
+  team: ScoreboardTeam | null
+  teams: ScoreboardTeam[]
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean

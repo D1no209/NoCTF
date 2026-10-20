@@ -68,7 +68,7 @@ export function useCompetitionsByIdLivePage() {
     board.catalog.value,
     board.schema.value,
     entries.value,
-    board.snapshot.value?.currentChallengeScores,
+    board.snapshot.value?.challenges,
   ))
 
   const allSolves = computed(() => controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value))
@@ -233,7 +233,7 @@ export function useCompetitionsByIdLivePage() {
       error.value = t("competitions.competitionsBy.description.dLiveScreenCurrently")
       return
     }
-    await board.refresh({ catalog: true, schema: true, snapshot: true })
+    await board.refresh({ catalog: true, snapshot: true })
     if (board.processing.value) {
       error.value = null
       projectionPending.value = true

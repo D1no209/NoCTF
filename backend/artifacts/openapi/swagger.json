@@ -11697,7 +11697,7 @@
         "tags": [
           "Competitions"
         ],
-        "summary": "Get the sparse scoreboard snapshot or queue a refresh.",
+        "summary": "Get the complete sparse scoreboard matrix or queue a refresh.",
         "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard.",
         "operationId": "GetLeaderboardEndpoint",
         "parameters": [
@@ -11978,78 +11978,13 @@
         }
       }
     },
-    "/api/v1/competitions/{competitionId}/leaderboard/schema": {
-      "get": {
-        "tags": [
-          "Competitions"
-        ],
-        "summary": "Get the low-frequency scoreboard matrix schema.",
-        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/schema.",
-        "operationId": "GetScoreboardSchemaEndpoint",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "endingRound",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "nullable": true
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}": {
+    "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{competitionChallengeId}": {
       "get": {
         "tags": [
           "Competitions"
         ],
         "summary": "Get one sparse scoreboard slot with signed cursor pagination.",
-        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{competitionChallengeId}.",
         "operationId": "GetScoreboardSlotDetailEndpoint",
         "parameters": [
           {
@@ -12071,12 +12006,21 @@
             }
           },
           {
-            "name": "columnIndex",
+            "name": "competitionChallengeId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
             }
           },
           {
@@ -39628,10 +39572,13 @@
             "type": "string",
             "format": "guid"
           },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
           "version": {
             "type": "string"
           },
-          "schemaRevision": {
+          "challengeCatalogRevision": {
             "type": "string"
           },
           "generatedAt": {
@@ -39643,10 +39590,16 @@
             "format": "guid",
             "nullable": true
           },
-          "actors": {
+          "rounds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardActorResponse"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardRoundResponse"
+            }
+          },
+          "challenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeResponse"
             }
           },
           "teams": {
@@ -39667,12 +39620,6 @@
           "tracksEnabled": {
             "type": "boolean"
           },
-          "currentChallengeScores": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse"
-            }
-          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
@@ -39683,23 +39630,77 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "roundWindowStart": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "roundWindowEnd": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "latestRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardActorResponse": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardRoundResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "index": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "userId": {
+          "id": {
             "type": "string",
             "format": "guid"
           },
-          "displayName": {
-            "type": "string"
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardRoundStateProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardRoundStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Running",
+          "Settling",
+          "Settled"
+        ],
+        "enum": [
+          "Pending",
+          "Running",
+          "Settling",
+          "Settled"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "currentScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -39729,10 +39730,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "scoreOutsideWindow": {
-            "type": "integer",
-            "format": "int64"
-          },
           "attackScore": {
             "type": "integer",
             "format": "int64",
@@ -39743,26 +39740,27 @@
             "format": "int64",
             "nullable": true
           },
-          "challengeScores": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeScoreResponse"
-            }
-          },
-          "memberContributions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardMemberContributionResponse"
-            }
-          },
           "globalAdjustmentCount": {
             "type": "integer",
             "format": "int32"
           },
-          "globalAdjustments": {
+          "members": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentResponse"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardMemberResponse"
+            }
+          },
+          "achievements": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAchievementResponse"
+            }
+          },
+          "challengeTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeTotalResponse"
             }
           },
           "slots": {
@@ -39777,19 +39775,6 @@
           },
           "hasTheorySubmission": {
             "type": "boolean"
-          },
-          "achievements": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeAchievementResponse"
-            }
-          },
-          "challengeBenefits": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardScoreboardChallengeBenefit"
-            }
           }
         }
       },
@@ -39807,25 +39792,7 @@
           "Disqualified"
         ]
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeScoreResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "attackScore": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "defenseScore": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardMemberContributionResponse": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardMemberResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -39842,242 +39809,25 @@
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentResponse": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardAchievementResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentKindProtocol"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "actorIndex": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "earnedPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "deductedPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "netPoints": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "ManualAdjustment",
-          "CompetitionPenalty",
-          "BanRecalculation",
-          "ScoreFloor"
-        ],
-        "enum": [
-          "ManualAdjustment",
-          "CompetitionPenalty",
-          "BanRecalculation",
-          "ScoreFloor"
-        ]
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "columnIndex": {
+          "challenge": {
             "type": "integer",
             "format": "int32"
-          },
-          "scoreState": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardScoreStateProtocol"
-          },
-          "earnedPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "deductedPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "netPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "entryCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "breakdown": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardBreakdownResponse"
-            }
-          },
-          "entries": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryResponse"
-            }
-          },
-          "offenseState": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
-          },
-          "defenseState": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
-          },
-          "awdComponents": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardScoreStateProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Pending",
-          "Provisional",
-          "Settled"
-        ],
-        "enum": [
-          "Pending",
-          "Provisional",
-          "Settled"
-        ]
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardBreakdownResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardBreakdownKindProtocol"
-          },
-          "successfulCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "attemptCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "earnedPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "deductedPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "netPoints": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardBreakdownKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Solve",
-          "Attack",
-          "Defense",
-          "Availability",
-          "Control",
-          "Penalty",
-          "BloodAward",
-          "Hint",
-          "ManualAdjustment",
-          "WriteUp"
-        ],
-        "enum": [
-          "Solve",
-          "Attack",
-          "Defense",
-          "Availability",
-          "Control",
-          "Penalty",
-          "BloodAward",
-          "Hint",
-          "ManualAdjustment",
-          "WriteUp"
-        ]
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardEntryResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
           },
           "kind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryKindProtocol"
           },
-          "outcome": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryOutcomeProtocol"
-          },
-          "actorIndex": {
+          "member": {
             "type": "integer",
             "format": "int32",
-            "nullable": true
-          },
-          "targetTeamId": {
-            "type": "string",
-            "format": "guid",
             "nullable": true
           },
           "occurredAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "settledAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "earnedPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "deductedPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "netPoints": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "award": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAwardProtocol"
-              }
-            ]
-          },
-          "awardPoints": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },
@@ -40109,34 +39859,120 @@
           "WriteUp"
         ]
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardEntryOutcomeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Pending",
-          "Succeeded",
-          "Failed",
-          "Rejected"
-        ],
-        "enum": [
-          "Pending",
-          "Succeeded",
-          "Failed",
-          "Rejected"
-        ]
+      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeTotalResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challenge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "grossPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attackScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "writeUp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardWriteUpResponse"
+              }
+            ]
+          }
+        }
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardAwardProtocol": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardWriteUpResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deductionPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deductionPercent": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "unlockedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challenge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "round": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "scoreState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardScoreStateProtocol"
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "offenseState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
+          },
+          "defenseState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardActivityResponse"
+            }
+          },
+          "award": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAwardProtocol"
+              }
+            ]
+          },
+          "awardPoints": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardScoreStateProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "FirstBlood",
-          "SecondBlood",
-          "ThirdBlood"
+          "Pending",
+          "Provisional",
+          "Settled"
         ],
         "enum": [
-          "FirstBlood",
-          "SecondBlood",
-          "ThirdBlood"
+          "Pending",
+          "Provisional",
+          "Settled"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol": {
@@ -40153,76 +39989,64 @@
           "Succeeded"
         ]
       },
-      "NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardActivityResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "component": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardAwdScoreComponent"
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardBreakdownKindProtocol"
           },
-          "points": {
+          "successfulCount": {
             "type": "integer",
-            "format": "int64",
-            "nullable": true
+            "format": "int32"
           },
-          "unroundedPoints": {
-            "type": "number",
-            "format": "decimal",
-            "nullable": true
-          },
-          "roundingDifference": {
-            "type": "number",
-            "format": "decimal",
-            "nullable": true
-          },
-          "settlement": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardAwdScoreComponent": {
+      "NoCTFAPIEndpointsCompetitionsScoreboardBreakdownKindProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
+          "Solve",
           "Attack",
-          "DefenseReward",
-          "DefenseLoss",
+          "Defense",
           "Availability",
-          "ExtraPenalty"
+          "Control",
+          "Penalty",
+          "BloodAward",
+          "Hint",
+          "ManualAdjustment",
+          "WriteUp"
         ],
         "enum": [
+          "Solve",
           "Attack",
-          "DefenseReward",
-          "DefenseLoss",
+          "Defense",
           "Availability",
-          "ExtraPenalty"
+          "Control",
+          "Penalty",
+          "BloodAward",
+          "Hint",
+          "ManualAdjustment",
+          "WriteUp"
         ]
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeAchievementResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryKindProtocol"
-          },
-          "userId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "displayName": {
-            "type": "string",
-            "nullable": true
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
+      "NoCTFAPIEndpointsCompetitionsScoreboardAwardProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FirstBlood",
+          "SecondBlood",
+          "ThirdBlood"
+        ],
+        "enum": [
+          "FirstBlood",
+          "SecondBlood",
+          "ThirdBlood"
+        ]
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse": {
         "type": "object",
@@ -40242,31 +40066,6 @@
           },
           "isViewerTrack": {
             "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "score": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "breakScore": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "fixScore": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
           }
         }
       },
@@ -40526,6 +40325,73 @@
           }
         }
       },
+      "NoCTFAPIEndpointsCompetitionsScoreboardActorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentKindProtocol"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorIndex": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "earnedPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deductedPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ManualAdjustment",
+          "CompetitionPenalty",
+          "BanRecalculation",
+          "ScoreFloor"
+        ],
+        "enum": [
+          "ManualAdjustment",
+          "CompetitionPenalty",
+          "BanRecalculation",
+          "ScoreFloor"
+        ]
+      },
       "NoCTFAPIEndpointsCompetitionsGetScoreboardAdjustmentDetailRequest": {
         "type": "object",
         "additionalProperties": false
@@ -40583,121 +40449,6 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "mode": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
-          },
-          "revision": {
-            "type": "string"
-          },
-          "challengeCatalogRevision": {
-            "type": "string"
-          },
-          "rounds": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardRoundResponse"
-            }
-          },
-          "columns": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardColumnResponse"
-            }
-          },
-          "roundWindowStart": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "roundWindowEnd": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "latestRound": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardRoundResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "startAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "endAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "settledAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardRoundStateProtocol"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardRoundStateProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Pending",
-          "Running",
-          "Settling",
-          "Settled"
-        ],
-        "enum": [
-          "Pending",
-          "Running",
-          "Settling",
-          "Settled"
-        ]
-      },
-      "NoCTFAPIEndpointsCompetitionsScoreboardColumnResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "index": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "roundId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsGetScoreboardSchemaRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
       "NoCTFAPIEndpointsCompetitionsScoreboardSlotDetailResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -40710,9 +40461,14 @@
             "type": "string",
             "format": "guid"
           },
-          "columnIndex": {
-            "type": "integer",
-            "format": "int32"
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           },
           "scoreState": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardScoreStateProtocol"
@@ -40765,6 +40521,158 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardBreakdownResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardBreakdownKindProtocol"
+          },
+          "successfulCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "earnedPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deductedPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardEntryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryKindProtocol"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryOutcomeProtocol"
+          },
+          "actorIndex": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "targetTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "earnedPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "deductedPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "award": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardAwardProtocol"
+              }
+            ]
+          },
+          "awardPoints": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardEntryOutcomeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Succeeded",
+          "Failed",
+          "Rejected"
+        ],
+        "enum": [
+          "Pending",
+          "Succeeded",
+          "Failed",
+          "Rejected"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdScoreComponentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardAwdScoreComponent"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "unroundedPoints": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "roundingDifference": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardAwdScoreComponent": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attack",
+          "DefenseReward",
+          "DefenseLoss",
+          "Availability",
+          "ExtraPenalty"
+        ],
+        "enum": [
+          "Attack",
+          "DefenseReward",
+          "DefenseLoss",
+          "Availability",
+          "ExtraPenalty"
+        ]
       },
       "NoCTFAPIEndpointsCompetitionsGetScoreboardSlotDetailRequest": {
         "type": "object",
@@ -41005,7 +40913,13 @@
           "ChallengeWriteUpWithdrawn",
           "ChallengeWriteUpRejected",
           "ChallengeWriteUpUnlocked",
-          "AwdScoringRulesChanged"
+          "AwdScoringRulesChanged",
+          "FirstBloodCorrected",
+          "SecondBloodCorrected",
+          "ThirdBloodCorrected",
+          "FirstBloodWithdrawn",
+          "SecondBloodWithdrawn",
+          "ThirdBloodWithdrawn"
         ],
         "enum": [
           "CompetitionCreated",
@@ -41076,7 +40990,13 @@
           "ChallengeWriteUpWithdrawn",
           "ChallengeWriteUpRejected",
           "ChallengeWriteUpUnlocked",
-          "AwdScoringRulesChanged"
+          "AwdScoringRulesChanged",
+          "FirstBloodCorrected",
+          "SecondBloodCorrected",
+          "ThirdBloodCorrected",
+          "FirstBloodWithdrawn",
+          "SecondBloodWithdrawn",
+          "ThirdBloodWithdrawn"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {

@@ -1,26 +1,30 @@
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol,
-  NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse,
   NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit,
 } from '../api'
+import type {
+  ScoreboardActivity,
+  ScoreboardChallengeTotal,
+  ScoreboardColumn,
+  ScoreboardLayout,
+  ScoreboardSlot,
+  ScoreboardSnapshot,
+  ScoreboardTeam,
+} from './scoreboard-board'
 import { translate } from './i18n'
 import { directionKey, directionLabel } from './directions'
 
 export interface ScoreboardChallengeColumnGroup {
   competitionChallengeId: string
   challenge: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse | null
-  columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
+  columns: ScoreboardColumn[]
 }
 
 export interface ScoreboardDirectionGroup {
@@ -48,7 +52,7 @@ export interface ScoreboardSlotSignals {
 
 /** Completed achievements are independent of score sign, compact entries and round windows. */
 export function scoreboardTeamAchievements(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
+  team: ScoreboardTeam | null,
   competitionChallengeId: string,
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
 ) {
@@ -97,14 +101,14 @@ export function scoreboardRankingStateLabel(
 }
 
 export function scoreboardMemberContributionSlices(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null | undefined,
+  team: ScoreboardTeam | null | undefined,
 ): ScoreboardMemberContributionSlice[] {
-  const members = (team?.memberContributions ?? [])
-    .filter(contribution => (contribution.earnedPoints ?? 0) > 0)
-    .map(contribution => ({
-      name: contribution.displayName ?? translate("common.label.unknownUser"),
-      value: contribution.earnedPoints ?? 0,
-      userId: contribution.userId ?? '',
+  const members = (team?.members ?? [])
+    .filter(member => member.earnedPoints > 0)
+    .map(member => ({
+      name: member.displayName || translate("common.label.unknownUser"),
+      value: member.earnedPoints,
+      userId: member.userId,
     }))
   const attributed = members.reduce((total, contribution) => total + contribution.value, 0)
   const unattributed = Math.max(0, (team?.totalScore ?? 0) - attributed)
@@ -127,25 +131,77 @@ export function scoreboardEntryOutcomeLabel(
   return translate(entryOutcomeLabels[outcome])
 }
 
+// Normalized teams are immutable, so each one indexes its sparse slots once instead of per cell lookup.
+const slotsByTeam = new WeakMap<ScoreboardTeam, Map<number, ScoreboardSlot>>()
+
 export function scoreboardSlot(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  team: ScoreboardTeam,
   columnIndex: number,
-): NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null {
-  return (team.slots ?? []).find(slot => slot.columnIndex === columnIndex) ?? null
+): ScoreboardSlot | null {
+  let slots = slotsByTeam.get(team)
+  if (!slots) {
+    slots = new Map(team.slots.map(slot => [slot.columnIndex, slot]))
+    slotsByTeam.set(team, slots)
+  }
+  return slots.get(columnIndex) ?? null
 }
 
 export function scoreboardBreakdown(
-  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  slot: ScoreboardSlot | null | undefined,
   kind: NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol,
-): NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse | null {
-  return (slot?.breakdown ?? []).find(item => item.kind === kind) ?? null
+): ScoreboardActivity | null {
+  return (slot?.activity ?? []).find(item => item.kind === kind) ?? null
 }
 
+/**
+ * Rebuilds the per-challenge benefit list of the team-standing contract. Challenges without a sent
+ * total are CTF/KoH cells whose gross and net equal the slot's net points.
+ */
+export function scoreboardChallengeBenefits(team: ScoreboardTeam): NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit[] {
+  const totals = new Map(team.challengeTotals.map(total => [total.competitionChallengeId, total]))
+  const slotNet = new Map<string, number>()
+  for (const slot of team.slots) {
+    if (slot.netPoints !== null)
+      slotNet.set(slot.competitionChallengeId, (slotNet.get(slot.competitionChallengeId) ?? 0) + slot.netPoints)
+  }
+  const benefits = team.challengeTotals.map(total => ({
+    competitionChallengeId: total.competitionChallengeId,
+    grossPoints: total.grossPoints,
+    writeUpDeductionPoints: total.writeUp?.deductionPoints ?? 0,
+    writeUpDeductionPercent: total.writeUp?.deductionPercent ?? null,
+    writeUpUnlockedAt: total.writeUp?.unlockedAt ?? null,
+    netPoints: total.netPoints,
+  }))
+  for (const [competitionChallengeId, netPoints] of slotNet) {
+    if (totals.has(competitionChallengeId)) continue
+    benefits.push({
+      competitionChallengeId,
+      grossPoints: Math.max(0, netPoints),
+      writeUpDeductionPoints: 0,
+      writeUpDeductionPercent: null,
+      writeUpUnlockedAt: null,
+      netPoints,
+    })
+  }
+  return benefits.sort((left, right) => left.competitionChallengeId.localeCompare(right.competitionChallengeId))
+}
+
+/** Challenge total that overrides the visible slots (round-window totals and write-up deductions). */
+export function scoreboardChallengeTotal(
+  team: ScoreboardTeam | null | undefined,
+  competitionChallengeId: string,
+): ScoreboardChallengeTotal | null {
+  return team?.challengeTotals.find(item => item.competitionChallengeId === competitionChallengeId) ?? null
+}
+
+/** Signals only need activity; offense/defense states fall back to it when a slot omits them. */
+type ScoreboardSignalSlot = Pick<ScoreboardSlot, 'activity'> & Partial<Pick<ScoreboardSlot, 'offenseState' | 'defenseState'>>
+
 function scoreboardActivity(
-  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  slot: ScoreboardSignalSlot | null | undefined,
   kinds: NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol[],
 ): { attempted: boolean; succeeded: boolean } {
-  const items = slot?.breakdown?.filter(item => item.kind && kinds.includes(item.kind)) ?? []
+  const items = slot?.activity.filter(item => item.kind && kinds.includes(item.kind)) ?? []
   return {
     attempted: items.some(item => (item.attemptCount ?? 0) > 0),
     succeeded: items.some(item => (item.successfulCount ?? 0) > 0),
@@ -153,7 +209,7 @@ function scoreboardActivity(
 }
 
 export function scoreboardSlotSignals(
-  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  slot: ScoreboardSignalSlot | null | undefined,
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
 ): ScoreboardSlotSignals {
   const flag = mode === 'Ctf'
@@ -184,16 +240,16 @@ export function scoreboardSlotSignals(
 }
 
 export function scoreboardColumnsForChallenge(
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
+  schema: ScoreboardLayout | null | undefined,
   competitionChallengeId: string,
-): NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[] {
+): ScoreboardColumn[] {
   return (schema?.columns ?? []).filter(column =>
     column.competitionChallengeId === competitionChallengeId,
   )
 }
 
 export function scoreboardChallengeColumnGroups(
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
+  schema: ScoreboardLayout | null | undefined,
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse[] | null | undefined,
 ): ScoreboardChallengeColumnGroup[] {
   const catalogById = new Map<string, NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse>()
@@ -221,21 +277,14 @@ export function scoreboardChallengeColumnGroups(
 }
 
 export function scoreboardTeamChallengeScore(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  team: ScoreboardTeam,
   group: ScoreboardChallengeColumnGroup,
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null,
 ): number {
-  const benefit = team.challengeBenefits?.find(x => x.competitionChallengeId === group.competitionChallengeId)
-  if (benefit) return benefit.netPoints ?? 0
-  if (mode === 'Awdp') {
-    const aggregate = (team.challengeScores ?? []).find(
-      item => item.competitionChallengeId === group.competitionChallengeId,
-    )
-    if (aggregate) return (aggregate.attackScore ?? 0) + (aggregate.defenseScore ?? 0)
-  }
+  const challengeTotal = scoreboardChallengeTotal(team, group.competitionChallengeId)
+  if (challengeTotal) return challengeTotal.netPoints
 
   return group.columns.reduce((total, column) => {
-    if (column.index === undefined) return total
     const slot = scoreboardSlot(team, column.index)
     const countsTowardChallengeScore = mode === 'Ctf' || mode === 'Koh'
       ? slot?.scoreState === 'Provisional' || slot?.scoreState === 'Settled'
@@ -260,7 +309,7 @@ export function scoreboardDirectionGroups(
 
 /** Reorder only the presentation groups; each schema column keeps its authoritative index. */
 export function scoreboardChallengeColumnGroupsByDirection(
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
+  schema: ScoreboardLayout | null | undefined,
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse[] | null | undefined,
 ): ScoreboardChallengeColumnGroup[] {
   return scoreboardDirectionGroups(scoreboardChallengeColumnGroups(schema, catalog))
@@ -268,7 +317,7 @@ export function scoreboardChallengeColumnGroupsByDirection(
 }
 
 export function scoreboardTeamDirectionScore(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  team: ScoreboardTeam,
   direction: ScoreboardDirectionGroup,
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
 ): ScoreboardDirectionScore {
@@ -277,9 +326,7 @@ export function scoreboardTeamDirectionScore(
   let total = 0
   for (const group of direction.groups) {
     if (mode === 'Awdp') {
-      const aggregate = (team.challengeScores ?? []).find(
-        item => item.competitionChallengeId === group.competitionChallengeId,
-      )
+      const aggregate = scoreboardChallengeTotal(team, group.competitionChallengeId)
       attack += Math.max(0, aggregate?.attackScore ?? 0)
       defense += Math.max(0, aggregate?.defenseScore ?? 0)
     }
@@ -291,41 +338,37 @@ export function scoreboardTeamDirectionScore(
 }
 
 export function scoreboardCurrentChallengeScore(
-  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null | undefined,
+  snapshot: ScoreboardSnapshot | null | undefined,
   competitionChallengeId: string | null | undefined,
 ): number | null {
   if (!competitionChallengeId) return null
-  const score = (snapshot?.currentChallengeScores ?? []).find(
-    item => item.competitionChallengeId === competitionChallengeId,
-  )?.score
-  return score ?? null
+  return snapshot?.challenges.find(item => item.competitionChallengeId === competitionChallengeId)
+    ?.currentScore ?? null
 }
 
 export function scoreboardBloodAward(
-  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  slot: Pick<ScoreboardSlot, 'award' | 'awardPoints'> | null | undefined,
 ): { award: NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol; label: string; points: number } | null {
-  const entry = slot?.entries?.find(item => item.award)
-  if (!entry?.award) return null
+  if (!slot?.award) return null
   const labels = {
     FirstBlood: "common.label.firstBlood",
     SecondBlood: "common.label.secondBlood",
     ThirdBlood: "common.label.thirdBlood",
   } as const
   return {
-    award: entry.award,
-    label: translate(labels[entry.award]),
-    points: entry.awardPoints ?? 0,
+    award: slot.award,
+    label: translate(labels[slot.award]),
+    points: slot.awardPoints,
   }
 }
 
 export function scoreboardTeamChallengeSignals(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  team: ScoreboardTeam,
   group: ScoreboardChallengeColumnGroup,
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
 ): ScoreboardSlotSignals {
   const signals = group.columns
-    .filter(column => column.index !== undefined)
-    .map(column => scoreboardSlotSignals(scoreboardSlot(team, column.index!), mode))
+    .map(column => scoreboardSlotSignals(scoreboardSlot(team, column.index), mode))
   return {
     showFlag: signals.some(signal => signal.showFlag),
     flagState: signals.some(signal => signal.flagState === 'Succeeded')
@@ -343,13 +386,13 @@ export function scoreboardTeamChallengeSignals(
 }
 
 export function latestSettledScore(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
-  columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[],
+  team: ScoreboardTeam,
+  columns: ScoreboardColumn[],
 ): number | null {
   for (let index = columns.length - 1; index >= 0; index -= 1) {
-    const columnIndex = columns[index]?.index
-    if (columnIndex === undefined) continue
-    const slot = scoreboardSlot(team, columnIndex)
+    const column = columns[index]
+    if (!column) continue
+    const slot = scoreboardSlot(team, column.index)
     if (slot?.scoreState === 'Settled' && slot.netPoints !== null && slot.netPoints !== undefined)
       return slot.netPoints
   }
@@ -357,9 +400,9 @@ export function latestSettledScore(
 }
 
 export function scoreboardTeamSolveCount(
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  team: ScoreboardTeam,
 ): number {
-  return (team.slots ?? []).reduce((total, slot) => {
+  return team.slots.reduce((total, slot) => {
     const solve = scoreboardBreakdown(slot, 'Solve')
     return total + (solve?.successfulCount ?? 0)
   }, 0)

@@ -60,7 +60,6 @@ describe('participant challenge progress', () => {
     expect(navigator).toContain('{{ currentScore(item.challenge.id) }}')
     expect(navigator).toContain("{{ $t('common.label.pts.scoreTrendChart') }}")
     expect(navigator).toContain('v-else-if="board.error.value"')
-    expect(navigator).toContain('slot.entries?.find(entry => entry.award)?.award')
     expect(navigator).toContain('teamName: team.teamName?.trim() || null')
     expect(navigator).toContain('earnedByMyTeam: team.teamId === myTeamId.value')
     expect(navigator).toContain('<BloodMark :rank="blood.rank"')

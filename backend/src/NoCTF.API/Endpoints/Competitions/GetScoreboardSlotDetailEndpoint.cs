@@ -12,7 +12,11 @@ public sealed class GetScoreboardSlotDetailRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public int ColumnIndex { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+
+    /// <summary>Required for AWD/AWDP round cells; omitted for CTF/KoH challenge cells.</summary>
+    [QueryParam]
+    public Guid? RoundId { get; set; }
 
     [QueryParam]
     public string? Cursor { get; set; }
@@ -36,7 +40,8 @@ public sealed class GetScoreboardSlotDetailValidator : Validator<GetScoreboardSl
 public sealed record ScoreboardSlotDetailResponse(
     Guid CompetitionId,
     Guid TeamId,
-    int ColumnIndex,
+    Guid CompetitionChallengeId,
+    Guid? RoundId,
     ScoreboardScoreStateProtocol ScoreState,
     long? EarnedPoints,
     long? DeductedPoints,
@@ -62,7 +67,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
 
     public override void Configure()
     {
-        Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}");
+        Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{competitionChallengeId}");
         AllowAnonymous();
         Summary(summary => summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination.");
     }
@@ -73,7 +78,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
-        request.ColumnIndex = Route<int>("columnIndex");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         var audience = await audiences.ExecuteAsync(
             request.CompetitionId, user.UserId, request.EndingRound, cancellationToken);
         if (audience.State == ScoreboardAudienceState.Unavailable)
@@ -81,9 +86,10 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         if (audience.State != ScoreboardAudienceState.Ready)
             return TypedResults.NotFound();
         var projection = audience.Projection!;
-        var column = projection.Schema.Columns.SingleOrDefault(item => item.Index == request.ColumnIndex);
+        var column = projection.Schema.Columns.SingleOrDefault(item =>
+            item.CompetitionChallengeId == request.CompetitionChallengeId && item.RoundId == request.RoundId);
         var team = projection.Snapshot.Teams.SingleOrDefault(item => item.TeamId == request.TeamId);
-        var slot = team?.Slots.SingleOrDefault(item => item.ColumnIndex == request.ColumnIndex);
+        var slot = column is null ? null : team?.Slots.SingleOrDefault(item => item.ColumnIndex == column.Index);
         if (column is null || team is null || slot is null)
             return TypedResults.NotFound();
 
@@ -92,7 +98,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             request.CompetitionId.ToString("N"),
             user.UserId.ToString("N"),
             request.TeamId.ToString("N"),
-            request.ColumnIndex,
+            column.Index,
             projection.Schema.Revision,
             projection.Snapshot.Version,
             projection.Schema.RoundWindowStart,
@@ -123,7 +129,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         var detailPage = ScoreboardSlotDetailProjection.Project(
             projection,
             request.TeamId,
-            request.ColumnIndex,
+            column.Index,
             slot.ScoreState,
             round?.SettledAt,
             facts,
@@ -147,7 +153,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         return TypedResults.Ok(new ScoreboardSlotDetailResponse(
             request.CompetitionId,
             request.TeamId,
-            request.ColumnIndex,
+            column.CompetitionChallengeId,
+            column.RoundId,
             ScoreboardProtocolMapper.ToProtocol(slot.ScoreState),
             slot.EarnedPoints,
             slot.DeductedPoints,
