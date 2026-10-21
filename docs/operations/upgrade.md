@@ -62,6 +62,12 @@ pwsh -File deploy/k8s/scripts/Verify.ps1 -Context YOUR_CONTEXT -Environment prod
 
 保留恢复点镜像，先在隔离目标恢复验证再切入口。新版本产生的写入如何处理需按赛事运维决策明确，不能自动丢弃。
 
-## 维护结束
+## 0.4.14 操作复核
+
+升级到当前版本后，确认平台信息中的公开地址正确，重新测试邮件、SSO 回调和 Webhook 链接。核对 Runtime 回收后的外部资源与额度，验证理论活动开始/继续、自动保存和交卷结果。外部榜单集成使用当前 OpenAPI 的统一榜单与题目/轮次详情契约。
+
+角色启动期间同时检查 readiness 实际响应与日志级别，短期 Information 启动记录仍需等待健康检查通过。详细说明见 [平台日志](../platform/maintenance/logs.md)。
+
+## 维护记录
 
 记录通过/失败/未运行的验收、升级时间、digest、迁移结果和异常处置。确认只有一套目标接受正式写入，再通知恢复比赛。

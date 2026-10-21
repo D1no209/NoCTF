@@ -20,6 +20,8 @@ LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于�
 
 ## 命令与示例约定
 
+编写比赛介绍、题目说明或公告前，可阅读 [Markdown 编辑与预览](./markdown.md)，了解实时预览、代码表格、受限 HTML 和图片授权。
+
 - Bash 代码默认在 Linux/WSL 中执行；PowerShell 代码默认使用 PowerShell 7。
 - 普通安装的部署脚本在发布配置包解压目录执行，例如 `/opt/noctf-release`；写有“安装目录”的命令在 `/opt/noctf` 等真实配置与数据目录执行。只有开发者章节使用源码仓库。
 - `YOUR_CONTEXT`、`YOUR_REGISTRY`、`YOUR_DIGEST` 等大写文本是必须替换的占位符。

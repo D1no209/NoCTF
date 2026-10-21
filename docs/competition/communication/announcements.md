@@ -2,6 +2,8 @@
 
 入口：比赛管理 → 公告，`/admin/competitions/比赛ID/announcements`。当前页面以可裁判/管理权限控制写动作，Observer 只读，服务端最终校验操作资格。
 
+Administrator、Owner、Manager 和 Judge 可按当前权限进入公告管理并执行发布、编辑与撤回；Judge 的公告能力不包含比赛配置或协作者管理。正文写法与预览见 [Markdown 编辑说明](../../guide/markdown.md)。
+
 ## 选择受众
 
 | 受众 | 使用场景 |

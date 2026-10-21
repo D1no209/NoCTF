@@ -49,4 +49,4 @@ features:
 
 本手册面向仓库当前版本。安装步骤以 `deploy/` 中的模板和脚本为依据，界面入口以当前 ClientApp 为依据；安装旧版本时，应读取对应 Git revision 的手册。开发者领域契约仍由仓库 `specs/` 维护。
 
-最近内容核对：2026-10-14。新增及修正见 [更新说明](./reference/updates.md)；LiveSolo 的局部验证不代表完整生产投产验收。
+最近内容核对：2026-10-22，对应平台 0.4.14。新增及修正见 [更新说明](./reference/updates.md)，编辑正文见 [Markdown 编辑与预览](./guide/markdown.md)。LiveSolo 正式部署按就绪清单另行验收。

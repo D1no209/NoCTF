@@ -19,11 +19,13 @@ curl -f https://noctf.example.com/health/ready
 ## 2. 管理员与普通账号
 
 1. 从 HTTPS 平台域名登录 seed 管理员。
-2. 打开平台管理页面，确认具有 Administrator 权限。
+2. 打开平台管理页面，确认具有 Administrator 权限，并在平台信息保存真实公开地址。
 3. 刷新浏览器页面，确认会话恢复。
 4. 保持页面超过普通 Access Token 生命周期，再执行查询，确认 Refresh Cookie 流程正常。
 5. 注册测试普通账号；若启用邮箱验证，完成邮件收取和验证。
 6. 用普通账号登录，确认无法进入平台管理。
+
+启用邮件、SSO 或 Webhook 后，分别检查新生成链接使用正确平台域名。统一公开地址的操作见 [平台信息](../platform/branding.md#平台公开地址)。
 
 如果首次登录成功、刷新后掉线，检查 HTTPS、Secure Cookie、精确 Refresh Origin 和可信代理，而不是延长 Access Token 掩盖配置问题。
 

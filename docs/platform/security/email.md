@@ -7,7 +7,6 @@
 | 字段 | 作用 |
 | --- | --- |
 | 邮箱验证启用 | 是否要求新 Human 完成邮箱验证才能登录 |
-| Public Base URL | 邮件中的平台链接，使用真实 HTTPS 入口 |
 | 验证有效期分钟 | 邮箱验证链接的时间预算 |
 | 重发冷却秒 | 同账号请求的间隔 |
 | 密码重置有效期分钟 | 找回链接期限，区别于注册验证 |
@@ -18,6 +17,8 @@
 | SMTP 超时秒 | 单次发送执行预算 |
 
 选择 StartTls 与 SslOnConnect 不只是换端口，按自己的 SMTP 服务契约填写。实际默认从已保存配置读取，不用旧教程里的固定限额覆盖当前值。
+
+邮件链接统一读取 [平台信息中的公开地址](../branding.md#平台公开地址)。先在那里保存真实 HTTPS 入口，再测试发信；本页只维护邮件发送和验证策略。
 
 ## 配置步骤
 
@@ -42,6 +43,6 @@
 
 ## 部署前置与错误
 
-所有相关角色需要稳定的 EmailVerification 加密 key；Kubernetes 还要精确 SMTP egress。域名改变更新邮件 PublicBaseUrl，不能只改反代。
+所有相关角色需要稳定的 EmailVerification 加密 key；Kubernetes 还要精确 SMTP egress。域名改变时更新平台信息中的公开地址，并同步部署来源与反代配置。
 
 EmailDeliveryNotConfigured 检查配置完整；SmtpPasswordInvalid 检查 secret；SmtpDeliveryFailed 查认证、TLS、DNS/egress和实际日志。启用验证后邮件故障会影响新用户进入，先测试再开启。

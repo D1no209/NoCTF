@@ -13,6 +13,10 @@ const groups: DefaultTheme.SidebarItem[] = [
         "link": "/guide/concepts"
       },
       {
+        "text": "Markdown 编辑与预览",
+        "link": "/guide/markdown"
+      },
+      {
         "text": "角色与界面权限",
         "link": "/guide/roles"
       },

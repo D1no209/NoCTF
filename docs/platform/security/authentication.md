@@ -8,7 +8,7 @@
 
 ## 全局配置
 
-开启 SSO 并填写真实 Public Base URL，保存后重新读取。URL 用来生成回调，域名改变需同步外部客户端登记、proxy Origin、Cookie 和允许网络。
+开启 SSO 并保存后重新读取。回调地址统一来自 [平台信息中的公开地址](../branding.md#平台公开地址)，本页不单独填写 Public Base URL。域名改变需同步平台公开地址、外部客户端登记、代理来源、Cookie 和允许网络。
 
 ## Provider 通用字段
 

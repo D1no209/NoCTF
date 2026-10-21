@@ -41,6 +41,8 @@
 
 ## 本地文件存储
 
+邮件、SSO 和 Webhook 中的平台链接统一在 [平台信息](../platform/branding.md#平台公开地址)配置。部署中的 Refresh/CORS/人机验证来源仍承担各自的访问校验，文件存储的 PublicBaseUrl 仍承担文件地址生成；更换域名需要分别核对。
+
 默认 Docker 配置：
 
 ```dotenv

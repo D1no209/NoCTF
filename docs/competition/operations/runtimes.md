@@ -39,6 +39,8 @@ KoH 共享 Hill 不为每队创建一份；AWD 平台调度和手工运行不能
 
 强制终止用于普通回收无法完成的受控管理动作，需要理由和确认。它仍交由业务流程处理，不保证请求返回瞬间所有外部资源消失。保留 ID 和故障原因，核对容器/Pod、端口及 owned bridge。
 
+强制操作要求平台管理员资格，适用于已分配 Runner 的 Provisioning、Stopping、Failed 实例，无需等待五分钟。原因去除首尾空白后为 1–512 字符。普通比赛协作权限不自动授予强制回收能力；详细步骤见 [平台回收操作](../../platform/maintenance/runtimes.md#强制回收与释放确认)。
+
 不删除共享 challenge/callback bridge，不清空 runtime namespace，不用全局 prune 或手动改状态字段代替回收。
 
 ## 排障顺序
