@@ -77,9 +77,9 @@ const headings = [1, 2, 3, 4, 5, 6].map(level => Decoration.line({ class: `cm-md
 
 type Range = { from: number, to: number, deco: Decoration }
 
-function scan(state: EditorState, composing: boolean): DecorationSet {
+function scan(state: EditorState, composing: boolean, focused: boolean): DecorationSet {
   const cursorLines = new Set<number>()
-  for (const range of state.selection.ranges) {
+  for (const range of focused ? state.selection.ranges : []) {
     cursorLines.add(state.doc.lineAt(range.head).number)
     cursorLines.add(state.doc.lineAt(range.from).number)
     cursorLines.add(state.doc.lineAt(range.to).number)
@@ -208,14 +208,21 @@ function scan(state: EditorState, composing: boolean): DecorationSet {
 }
 
 const compositionChanged = StateEffect.define<boolean>()
-const previewDecorations = StateField.define<{ composing: boolean; decorations: DecorationSet }>({
-  create: state => ({ composing: false, decorations: scan(state, false) }),
+const focusChanged = StateEffect.define<boolean>()
+const previewDecorations = StateField.define<{ composing: boolean; focused: boolean; decorations: DecorationSet }>({
+  create: state => ({ composing: false, focused: false, decorations: scan(state, false, false) }),
   update(value, transaction) {
     let composing = value.composing
-    for (const effect of transaction.effects)
+    let focused = value.focused
+    for (const effect of transaction.effects) {
       if (effect.is(compositionChanged)) composing = effect.value
-    if (!transaction.docChanged && !transaction.selection && composing === value.composing) return value
-    return { composing, decorations: scan(transaction.state, composing) }
+      if (effect.is(focusChanged)) {
+        focused = effect.value
+        if (!focused) composing = false
+      }
+    }
+    if (!transaction.docChanged && !transaction.selection && composing === value.composing && focused === value.focused) return value
+    return { composing, focused, decorations: scan(transaction.state, composing, focused) }
   },
   // 多行替换会改变布局,必须在计算视口之前直接提供,不能从 ViewPlugin 返回。
   provide: field => EditorView.decorations.from(field, value => value.decorations),
@@ -244,4 +251,8 @@ const compositionEvents = ViewPlugin.fromClass(class {
   },
 })
 
-export const livePreview = [previewDecorations, compositionEvents]
+export const livePreview = [
+  previewDecorations,
+  EditorView.focusChangeEffect.of((_state, focused) => focusChanged.of(focused)),
+  compositionEvents,
+]

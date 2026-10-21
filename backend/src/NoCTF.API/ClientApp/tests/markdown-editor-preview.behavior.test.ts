@@ -34,19 +34,64 @@ afterAll(async () => {
   }
 })
 
-function editor(doc: string) {
+function editor(doc: string, focused = true) {
   const view = new EditorView({ parent: document.body, state: EditorState.create({ doc, extensions: [livePreview] }) })
   editors.push(view)
+  if (focused) view.focus()
   return view
 }
 
 async function settle() {
-  await new Promise(resolve => setTimeout(resolve, 10))
+  await new Promise(resolve => setTimeout(resolve, 30))
 }
 
-test('fenced blocks mount, reveal their source at the caret and survive text updates', () => {
+test('unfocused mixed documents preview their first HTML block and Markdown together', async () => {
+  const source = '<div style="font-weight:700;text-align:right">出题人：PaperPlane</div>\n\n## Description\n\nRead **carefully** and use `libpaper.so`.\n\n- Download the attachment'
+  const view = editor(source, false)
+  await settle()
+  const author = view.dom.querySelector<HTMLDivElement>('.cm-md-block > div')
+  expect(author?.textContent).toBe('出题人：PaperPlane')
+  expect(author?.style.textAlign).toBe('right')
+  expect(view.dom.querySelector('.cm-md-strong')?.textContent).toBe('carefully')
+  expect(view.dom.querySelector('.cm-md-code')?.textContent).toBe('libpaper.so')
+  expect(view.state.doc.toString()).toBe(source)
+})
+
+test('focus and blur restore mixed previews without moving the caret or changing the document', async () => {
+  const source = '<div style="text-align:right" onclick="bad()">Author<script>bad()</script></div>\n\nRead **carefully** with `libpaper.so`.'
+  const view = editor(source, false)
+  await settle()
+  view.focus()
+  await settle()
+  expect(view.hasFocus).toBe(true)
+  expect(view.dom.querySelector('.cm-md-block')).toBeNull()
+  expect(view.dom.querySelector('.cm-md-strong')?.textContent).toBe('carefully')
+  view.contentDOM.blur()
+  await settle()
+  expect(view.hasFocus).toBe(false)
+  expect(view.dom.querySelector('.cm-md-block > div')?.textContent).toBe('Author')
+  expect(view.dom.querySelector('.cm-md-strong')?.textContent).toBe('carefully')
+  expect(view.dom.querySelector('script, [onclick]')).toBeNull()
+
+  const caret = source.indexOf('carefully')
+  view.dispatch({ selection: { anchor: caret } })
+  expect(view.dom.querySelector('.cm-md-strong')?.textContent).toBe('carefully')
+  view.focus()
+  await settle()
+  expect(view.dom.querySelector('.cm-md-strong')).toBeNull()
+  expect(view.dom.querySelector('.cm-md-block > div')?.textContent).toBe('Author')
+  view.contentDOM.blur()
+  await settle()
+  expect(view.dom.querySelector('.cm-md-strong')?.textContent).toBe('carefully')
+  expect(view.dom.querySelector('.cm-md-code')?.textContent).toBe('libpaper.so')
+  expect(view.state.selection.main.head).toBe(caret)
+  expect(view.state.doc.toString()).toBe(source)
+})
+
+test('fenced blocks mount, reveal their source at the caret and survive text updates', async () => {
   const source = 'Intro\n\n```js\nconsole.log(1)\n```\nEnd'
   const view = editor(source)
+  await settle()
   expect(view.dom.querySelector('.cm-md-block code')?.textContent).toBe('console.log(1)')
   view.dispatch({ selection: { anchor: view.state.doc.line(4).from } })
   expect(view.dom.querySelector('.cm-md-block')).toBeNull()
