@@ -180,7 +180,7 @@ export function useAdminCompetitionsByIdPage() {
           : competition.value?.mode === 'Awd' || competition.value?.mode === 'Koh'
             ? [{ to: `/competitions/${competitionId}/${competition.value.mode === 'Awd' ? 'awd' : 'koh'}-live`, label: translate("administration.label.controlScreen"), icon: Orbit }]
           : competition.value?.mode === 'Ctf' ? [{ to: `/competitions/${competitionId}/live`, label: translate("leaderboard.ctf.liveTitle"), icon: Orbit }] : []),
-        { to: `/competitions/${competitionId}/events`, label: translate("administration.label.activity"), icon: Activity },
+        { to: `${base}/events`, label: translate("administration.label.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("common.label.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("administration.label.runtime"), icon: Container },
         ...(canJudge.value ? [

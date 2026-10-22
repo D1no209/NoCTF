@@ -12,7 +12,7 @@ import { competitionEventHistoryRange } from '../../../../lib/competition-event-
 type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
 /** Owns state, effects and commands for CompetitionsByIdEventsPage. */
-export function useCompetitionsByIdEventsPage() {
+export function useCompetitionsByIdEventsPage(options: { embedded?: boolean } = {}) {
   const route = useRoute()
 
   const competitionId = route.params.id as string
@@ -137,6 +137,7 @@ export function useCompetitionsByIdEventsPage() {
   }
 
   return {
+      embedded: options.embedded ?? false,
       initialize,
       ArrowLeft,
       competitionReturnPath,

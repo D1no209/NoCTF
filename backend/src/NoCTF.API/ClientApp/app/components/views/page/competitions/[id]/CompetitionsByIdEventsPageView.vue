@@ -3,22 +3,23 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdEventsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdEventsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdEventsPageViewState }>()
-const { ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
+const { embedded, ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div>
+  <section class="flex min-w-0 flex-col gap-6">
+    <h2 v-if="embedded" class="text-display text-xl">{{ $t('administration.label.activity') }}</h2>
+    <div v-else>
       <Button variant="ghost" size="sm" as-child>
         <NuxtLink :to="competitionReturnPath">
           <ArrowLeft data-icon="inline-start" />{{ $t(competitionReturnLabel) }}
         </NuxtLink>
       </Button>
     </div>
-    <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <Select v-model="kind">
-          <SelectTrigger class="w-40">
+          <SelectTrigger class="w-40" :aria-label="$t('competitions.label.updates')">
             <SelectValue :placeholder="$t('competitions.label.updates')" />
           </SelectTrigger>
           <SelectContent>
@@ -33,7 +34,7 @@ const { ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistor
           {{ $t(hasStaffHistory ? 'common.label.fullHistory' : 'common.label.lastDays') }}
         </Badge>
       </div>
-      <Button variant="outline" size="sm" @click="reload">{{ $t('common.label.refresh') }}</Button>
+      <Button variant="outline" size="sm" :disabled="loading" @click="reload"><Spinner v-if="loading" data-icon="inline-start" />{{ $t('common.label.refresh') }}</Button>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -55,21 +56,22 @@ const { ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistor
       </EmptyHeader>
     </Empty>
 
-    <ul v-else class="flex flex-col gap-2">
-      <li
-        v-for="event in items"
-        :key="event.id"
-        class="flex items-start gap-3 rounded-md border px-3 py-2"
-      >
-        <Badge :variant="levelVariant(event.level)" class="mt-0.5 shrink-0">
-          {{ levelLabel(event.level) }}
-        </Badge>
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <p class="text-sm">{{ competitionEventText(event) }}</p>
-          <p class="font-mono text-xs text-muted-foreground tabular-nums">{{ formatDateTime(event.occurredAt) }}</p>
-        </div>
-      </li>
-    </ul>
+    <Table v-else class="min-w-[640px] [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+      <TableHeader class="bg-muted/30">
+        <TableRow>
+          <TableHead class="w-48">{{ $t('administration.label.time') }}</TableHead>
+          <TableHead class="w-24">{{ $t('administration.label.level') }}</TableHead>
+          <TableHead>{{ $t('common.label.content') }}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow v-for="event in items" :key="event.id">
+          <TableCell class="font-mono text-xs tabular-nums">{{ formatDateTime(event.occurredAt) }}</TableCell>
+          <TableCell><Badge :variant="levelVariant(event.level)">{{ levelLabel(event.level) }}</Badge></TableCell>
+          <TableCell class="whitespace-normal [overflow-wrap:anywhere]">{{ competitionEventText(event) }}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
 
     <OffsetPagination
       v-if="initialized"
@@ -81,5 +83,5 @@ const { ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistor
       @update:page="loadPage"
       @update:limit="setPageSize"
     />
-  </div>
+  </section>
 </template>

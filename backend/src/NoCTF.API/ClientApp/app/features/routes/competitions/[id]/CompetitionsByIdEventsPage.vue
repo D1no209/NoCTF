@@ -4,7 +4,8 @@ import { bindViewState } from '~/features/shared/view-state'
 import { useCompetitionsByIdEventsPage } from './useCompetitionsByIdEventsPage'
 import View from '~/components/views/page/competitions/[id]/CompetitionsByIdEventsPageView.vue'
 
-const state = bindViewState(useCompetitionsByIdEventsPage())
+const props = defineProps<{ embedded?: boolean }>()
+const state = bindViewState(useCompetitionsByIdEventsPage({ embedded: props.embedded }))
 await state.initialize()
 
 </script>
