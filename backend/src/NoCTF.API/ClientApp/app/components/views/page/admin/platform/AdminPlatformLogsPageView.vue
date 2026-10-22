@@ -7,12 +7,12 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-end gap-4">
-      <Field>
+  <div class="flex min-w-0 flex-col gap-6">
+    <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Field class="min-w-0">
         <FieldLabel for="log-level">{{ $t('administration.label.lowestLevel') }}</FieldLabel>
         <Select v-model="minimumLevel">
-          <SelectTrigger id="log-level" class="w-32">
+          <SelectTrigger id="log-level" class="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -27,10 +27,10 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
           </SelectContent>
         </Select>
       </Field>
-      <Field>
+      <Field class="min-w-0">
         <FieldLabel for="log-service">{{ $t('administration.label.service') }}</FieldLabel>
         <Select v-model="service">
-          <SelectTrigger id="log-service" class="w-32">
+          <SelectTrigger id="log-service" class="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -44,19 +44,19 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
           </SelectContent>
         </Select>
       </Field>
-      <Field>
+      <Field class="min-w-0">
         <FieldLabel for="log-from">{{ $t('administration.label.startTime') }}</FieldLabel>
         <DateTimePicker id="log-from" v-model="from"  />
       </Field>
-      <Field>
+      <Field class="min-w-0">
         <FieldLabel for="log-to">{{ $t('common.label.endTime') }}</FieldLabel>
         <DateTimePicker id="log-to" v-model="to"  />
       </Field>
-      <Field class="min-w-56 flex-1">
+      <Field class="min-w-0 sm:col-span-2 xl:col-span-3">
         <FieldLabel for="log-search">{{ $t('administration.label.search') }}</FieldLabel>
         <Input id="log-search" v-model="search" :placeholder="$t('administration.label.messageCategoryKeyword')" @keyup.enter="applyFilters" />
       </Field>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2 xl:justify-end">
         <Button @click="applyFilters">{{ $t('administration.label.query') }}</Button>
         <Button variant="outline" :disabled="exporting" @click="exportLogs">
           <Spinner v-if="exporting" data-icon="inline-start" />
@@ -89,7 +89,7 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
         <TableHead class="w-20">{{ $t('administration.label.level') }}</TableHead>
         <TableHead class="w-20">{{ $t('administration.label.service') }}</TableHead>
         <TableHead class="w-56">{{ $t('administration.label.category.logsPageView') }}</TableHead>
-        <TableHead>{{ $t('common.label.news') }}</TableHead>
+        <TableHead class="min-w-64">{{ $t('common.label.news') }}</TableHead>
       </template>
       <template #rows>
         <TableRow v-for="log in items" :key="log.cursor">
@@ -102,10 +102,10 @@ const { Download, Radio, levelLabel, serviceLabel, levelOrdinal, minimumLevel, s
             </Badge>
           </TableCell>
           <TableCell class="text-muted-foreground">{{ serviceLabel(log.service) }}</TableCell>
-          <Hint :content="log.category" ><TableCell tabindex="0" class="max-w-56 truncate font-mono text-xs text-muted-foreground" >
+          <TableCell class="font-mono text-xs text-muted-foreground"><Hint :content="log.category"><div tabindex="0" class="truncate">
             {{ log.category }}
-          </TableCell></Hint>
-          <TableCell class="max-w-xl">
+          </div></Hint></TableCell>
+          <TableCell>
             <Hint :content="log.message" ><div tabindex="0" class="truncate" >{{ $message(log.message) }}</div></Hint>
             <Hint :content="log.exceptionMessage ?? ''" v-if="log.exceptionType"><div tabindex="0"  class="truncate text-xs text-destructive" >
               {{ log.exceptionType }}: {{ log.exceptionMessage }}

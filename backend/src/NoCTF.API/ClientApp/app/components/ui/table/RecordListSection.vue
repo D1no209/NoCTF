@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { MessageKey } from '../../../locales/en'
 import { Alert, AlertDescription } from '../alert'
-import { Card, CardContent } from '../card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../empty'
 import AdminLoadMore from '../load-more/AdminLoadMore.vue'
 import { Skeleton } from '../skeleton'
@@ -35,16 +34,14 @@ const emit = defineEmits<{ loadMore: [] }>()
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex min-w-0 flex-col gap-6">
     <Alert v-if="errorMessage" variant="destructive">
       <AlertDescription>{{ $message(errorMessage) }}</AlertDescription>
     </Alert>
 
-    <Card v-if="loading && itemCount === 0">
-      <CardContent class="flex flex-col gap-3 pt-6">
-        <Skeleton v-for="i in skeletonCount" :key="i" :class="skeletonClass" />
-      </CardContent>
-    </Card>
+    <div v-if="loading && itemCount === 0" class="flex flex-col gap-3">
+      <Skeleton v-for="i in skeletonCount" :key="i" :class="skeletonClass" />
+    </div>
 
     <Empty v-else-if="!errorMessage && initialized && itemCount === 0" class="border border-dashed py-12">
       <EmptyHeader>
@@ -53,12 +50,12 @@ const emit = defineEmits<{ loadMore: [] }>()
       </EmptyHeader>
     </Empty>
 
-    <Card v-else-if="itemCount > 0">
-      <Table>
-        <TableHeader><TableRow><slot name="header" /></TableRow></TableHeader>
+    <template v-else-if="itemCount > 0">
+      <Table class="table-fixed [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+        <TableHeader class="bg-muted/30"><TableRow><slot name="header" /></TableRow></TableHeader>
         <TableBody><slot name="rows" /></TableBody>
       </Table>
-    </Card>
+    </template>
 
     <AdminLoadMore :loading="loading" :has-more="hasMore" @load="emit('loadMore')" />
   </div>

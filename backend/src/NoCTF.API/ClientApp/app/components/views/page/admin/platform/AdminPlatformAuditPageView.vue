@@ -7,13 +7,13 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex min-w-0 flex-col gap-6">
     <div class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-end gap-4">
-        <Field>
+      <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Field class="min-w-0">
           <FieldLabel for="audit-kind">{{ $t('common.label.type') }}</FieldLabel>
           <Select v-model="kind">
-            <SelectTrigger id="audit-kind" class="w-40">
+            <SelectTrigger id="audit-kind" class="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -29,27 +29,29 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
             </SelectContent>
           </Select>
         </Field>
-        <Field>
+        <Field class="min-w-0">
           <FieldLabel for="audit-actor">{{ $t('administration.label.operatorId') }}</FieldLabel>
-          <Input id="audit-actor" v-model="actorId" class="w-64 font-mono text-sm" :placeholder="$t('common.label.optional')" />
+          <Input id="audit-actor" v-model="actorId" class="font-mono text-sm" :placeholder="$t('common.label.optional')" />
         </Field>
-        <Field>
+        <Field class="min-w-0">
           <FieldLabel for="audit-competition">{{ $t('administration.label.contestId') }}</FieldLabel>
-          <Input id="audit-competition" v-model="competitionId" class="w-64 font-mono text-sm" :placeholder="$t('common.label.optional')" />
+          <Input id="audit-competition" v-model="competitionId" class="font-mono text-sm" :placeholder="$t('common.label.optional')" />
         </Field>
-        <Field>
+        <Field class="min-w-0">
           <FieldLabel for="audit-from">{{ $t('administration.label.startTime') }}</FieldLabel>
           <DateTimePicker id="audit-from" v-model="from"  />
         </Field>
-        <Field>
+        <Field class="min-w-0">
           <FieldLabel for="audit-to">{{ $t('common.label.endTime') }}</FieldLabel>
           <DateTimePicker id="audit-to" v-model="to"  />
         </Field>
+        <div class="flex flex-wrap items-center gap-2 xl:justify-end">
         <Button @click="applyFilters">{{ $t('administration.label.query') }}</Button>
         <Button variant="outline" :disabled="exportingArchive" @click="exportArchive">
           <Spinner v-if="exportingArchive" data-icon="inline-start" />
           <Download v-else data-icon="inline-start" />{{ $t('administration.label.downloadAuditArchive') }}
         </Button>
+        </div>
       </div>
 
       <RecordListSection
@@ -84,7 +86,7 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
               <Hint :content="log.subjectId" ><NuxtLink v-if="adminAuditSubjectPath(log)" :to="adminAuditSubjectPath(log)" class="block truncate hover:underline">{{ log.subjectDisplayName ?? log.subjectId }}</NuxtLink><div v-else tabindex="0" class="truncate">{{ log.subjectDisplayName ?? log.subjectId }}</div></Hint>
             </TableCell>
             <TableCell class="max-w-md">
-              <Hint :content="platformAuditActionText(log)" ><div tabindex="0" class="font-medium" >{{ platformAuditActionText(log) }}</div></Hint>
+              <Hint :content="platformAuditActionText(log)" ><div tabindex="0" class="whitespace-normal [overflow-wrap:anywhere] font-medium" >{{ platformAuditActionText(log) }}</div></Hint>
               <div v-if="log.fileId" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
                 <span>{{ $t('administration.label.fileId') }}: {{ log.fileId }}</span>
                 <span>{{ $t('common.label.submissionId') }}: {{ log.gameplayFactId }}</span>
