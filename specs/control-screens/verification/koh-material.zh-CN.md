@@ -15,7 +15,7 @@
 
 ## 贴图来源与提示词
 
-使用内置 `image_gen` 生成，未使用 CLI/API 后备路径。实际输出为 1254×1254 PNG，已复制进项目：[koh-stratified-rock.png](../../../backend/src/NoCTF.API/ClientApp/app/assets/images/spectator/koh-stratified-rock.png)。参考图用于指导岩石材质，不是网页背景或山体模型的替代图片。
+使用内置 `image_gen` 生成，未使用 CLI/API 后备路径。原始输出为 1254×1254 PNG，仓库中的运行时资源已转换为 [koh-stratified-rock.webp](../../../backend/src/NoCTF.API/ClientApp/app/assets/images/spectator/koh-stratified-rock.webp)。该贴图用于山体岩石材质。
 
 生成提示词原文：
 
