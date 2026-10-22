@@ -11,10 +11,9 @@ const { canJudge, includeWithdrawn, editingId, title, body, audience, saving, fo
       <h2 class="text-display text-xl">{{ $t('announcements.title') }}</h2>
       <Button variant="outline" size="sm" :disabled="loading" @click="refresh"><Spinner v-if="loading" data-icon="inline-start" />{{ $t('common.label.refresh') }}</Button>
     </div>
-    <Card class="gap-0">
+    <section class="flex min-w-0 flex-col gap-6">
       <template v-if="canJudge">
-        <CardHeader id="competition-announcement-editor"><CardTitle>{{ editingId ? $t('announcements.edit') : $t('administration.label.publishCompetitionNotice') }}</CardTitle></CardHeader>
-        <CardContent>
+        <header id="competition-announcement-editor"><h3 class="text-base font-semibold">{{ editingId ? $t('announcements.edit') : $t('administration.label.publishCompetitionNotice') }}</h3></header>
           <UiForm validation="feature" @submit.prevent="save">
             <FieldGroup>
               <Field>
@@ -40,19 +39,17 @@ const { canJudge, includeWithdrawn, editingId, title, body, audience, saving, fo
               </Field>
             </FieldGroup>
           </UiForm>
-        </CardContent>
-        <Separator class="my-6" />
+        <Separator />
       </template>
-      <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3">
-        <CardTitle>{{ $t('announcements.history') }}</CardTitle>
+      <header class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-base font-semibold">{{ $t('announcements.history') }}</h3>
         <Field orientation="horizontal"><Switch v-model="includeWithdrawn" :aria-label="$t('announcements.includeWithdrawn')" /><span class="text-sm">{{ $t('announcements.includeWithdrawn') }}</span></Field>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
+      </header>
         <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
         <Skeleton v-if="loading && !initialized" class="h-40 w-full" />
         <Empty v-else-if="initialized && !items.length && !error" class="py-10"><EmptyHeader><EmptyTitle>{{ $t('announcements.empty') }}</EmptyTitle></EmptyHeader></Empty>
-        <Table v-else-if="items.length">
-          <TableHeader><TableRow><TableHead>{{ $t('common.label.title') }}</TableHead><TableHead>{{ $t('administration.label.notificationObject') }}</TableHead><TableHead>{{ $t('announcements.author') }}</TableHead><TableHead>{{ $t('announcements.publishedAt') }}</TableHead><TableHead>{{ $t('common.label.status') }}</TableHead><TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead></TableRow></TableHeader>
+        <Table v-else-if="items.length" class="[&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+          <TableHeader class="bg-muted/30"><TableRow><TableHead>{{ $t('common.label.title') }}</TableHead><TableHead>{{ $t('administration.label.notificationObject') }}</TableHead><TableHead>{{ $t('announcements.author') }}</TableHead><TableHead>{{ $t('announcements.publishedAt') }}</TableHead><TableHead>{{ $t('common.label.status') }}</TableHead><TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead></TableRow></TableHeader>
           <TableBody>
             <TableRow v-for="item in items" :key="item.id">
               <TableCell class="max-w-64 whitespace-normal break-words font-medium">{{ item.title }}</TableCell>
@@ -65,8 +62,7 @@ const { canJudge, includeWithdrawn, editingId, title, body, audience, saving, fo
           </TableBody>
         </Table>
         <OffsetPagination v-if="initialized" :page="page" :page-count="pageCount" :total="total" :limit="pageLimit" :loading="loading" @update:page="loadPage" @update:limit="setPageSize" />
-      </CardContent>
-    </Card>
+    </section>
     <Sheet :open="previewTarget !== null" @update:open="setPreviewOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto sm:max-w-xl">
         <SheetHeader><SheetTitle>{{ previewTarget?.title }}</SheetTitle><SheetDescription>{{ $t(audienceKey(previewTarget?.audience)) }}</SheetDescription></SheetHeader>
