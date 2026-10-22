@@ -452,6 +452,11 @@
 :is([data-slot='select-item'], [data-slot='dropdown-menu-item']):is(:focus, [data-highlighted]) { background: var(--control-hover); outline: none; box-shadow: 0 0 12px color-mix(in oklch, var(--ring) 22%, transparent); }
 [data-slot='select-item'] { min-height: 32px; border-radius: var(--control-radius); }
 [data-slot='tooltip-content'] { background: var(--popover); color: var(--popover-foreground); border: 0; box-shadow: var(--panel-shadow); border-radius: var(--control-radius); }
+[data-slot='tooltip-content'] {
+  max-width: min(24rem, calc(100vw - 24px));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 [data-slot='file-upload'] { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 0; background: var(--control); border-radius: var(--control-radius); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--input) 70%, transparent); }
 [data-slot='file-upload'][data-dragging] { background: var(--accent); box-shadow: 0 0 14px color-mix(in oklch, var(--primary) 28%, transparent); }
 [data-slot='number-input'] { min-width: 0; }

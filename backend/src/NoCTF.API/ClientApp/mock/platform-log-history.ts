@@ -4,7 +4,10 @@ export function createMockPlatformLogHistory() {
   const logs = Array.from({ length: 125 }, (_, index) => ({
     cursor: `mock-log-${index}`, timestamp: new Date(seedTime - (index + 1) * 60_000).toISOString(),
     level: 'Warning', service: index % 2 ? 'Worker' : 'Runner', category: 'NoCTF.Mock.Pagination',
-    message: `Local pagination sample ${125 - index}`, exceptionType: null, exceptionMessage: null,
+    message: index === 0
+      ? `Local pagination sample 125\nOperation source: /api/v1/platform/configuration\nApplication frames: NoCTF.Mock.${'LongDiagnosticPathWithoutSpaces.'.repeat(12)}ReadAsync:41`
+      : `Local pagination sample ${125 - index}`,
+    exceptionType: null, exceptionMessage: null,
   }))
   return (url: URL) => {
     const from = url.searchParams.get('from'), to = url.searchParams.get('to')
