@@ -7,12 +7,11 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
 </script>
 
 <template>
-  <Card class="gap-0">
-    <CardHeader>
+  <section class="flex min-w-0 flex-col gap-6">
+    <header>
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <CardTitle>{{ $t('runtime.trafficCaptures') }}</CardTitle>
-          <CardDescription>{{ $t('runtime.trafficCapturesDescription') }}</CardDescription>
+          <h2 class="text-display text-xl">{{ $t('runtime.trafficCaptures') }}</h2>
         </div>
         <Button variant="outline" :disabled="selectedRuntimeIds.length === 0 || exporting" @click="exportSelected">
           <Spinner v-if="exporting" data-icon="inline-start" />
@@ -20,8 +19,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
           {{ $t('runtime.exportSelectedCaptures') }}
         </Button>
       </div>
-    </CardHeader>
-    <CardContent class="grid gap-5">
+    </header>
       <Alert v-if="competition?.runtimeAccessMode === 'DirectAndWsrx' && competition.trafficCaptureEnabled">
         <AlertDescription>{{ $t('runtime.captureDirectBypassWarning') }}</AlertDescription>
       </Alert>
@@ -40,7 +38,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
             <SelectItem v-for="option in teamOptions" :key="option.id" :value="option.id">{{ option.name }}</SelectItem>
           </SelectContent>
         </Select>
-        <Input v-model="filterRuntime" :placeholder="$t('runtime.runtimeId')" />
+        <Input v-model="filterRuntime" :placeholder="$t('runtime.runtimeId')" :aria-label="$t('runtime.runtimeId')" />
         <Select v-model="filterTruncated">
           <SelectTrigger :aria-label="$t('runtime.captureState')"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -56,8 +54,8 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
         </Button>
       </div>
       <Alert v-if="listError" variant="destructive"><AlertDescription>{{ listError }}</AlertDescription></Alert>
-      <Table v-else>
-        <TableHeader>
+      <Table v-else class="[&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+        <TableHeader class="bg-muted/30">
           <TableRow>
             <TableHead class="w-10"><span class="sr-only">{{ $t('runtime.selectCapture') }}</span></TableHead>
             <TableHead>{{ $t('common.label.challenge.pageTitle') }}</TableHead>
@@ -73,7 +71,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
         <TableBody>
           <TableRow v-for="item in items" :key="item.runtimeInstanceId">
             <TableCell>
-              <Checkbox :model-value="isSelected(item.runtimeInstanceId)" @update:model-value="onToggleSelected(item, $event)" />
+              <Checkbox :aria-label="$t('runtime.selectCapture')" :model-value="isSelected(item.runtimeInstanceId)" @update:model-value="onToggleSelected(item, $event)" />
             </TableCell>
             <TableCell><NuxtLink v-if="item.competitionChallengeId" :to="adminChallengePath(competitionId, item.competitionChallengeId)" class="hover:underline">{{ challengeTitle(item) }}</NuxtLink><span v-else>{{ challengeTitle(item) }}</span></TableCell>
             <TableCell><NuxtLink v-if="item.teamId" :to="adminTeamPath(competitionId, item.teamId)" class="hover:underline">{{ teamName(item) }}</NuxtLink><span v-else>{{ teamName(item) }}</span></TableCell>
@@ -103,8 +101,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
         </TableBody>
       </Table>
       <OffsetPagination :page="page" :page-count="pageCount" :total="total" :limit="pageLimit" :loading="loading" @update:page="loadPage" @update:limit="setPageSize" />
-    </CardContent>
-  </Card>
+  </section>
 
   <AlertDialog :open="!!deleteTarget" @update:open="setDeleteOpen">
     <AlertDialogContent>
