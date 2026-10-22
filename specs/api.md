@@ -1,6 +1,10 @@
 # API v1 清单
 
-本文列出目标资源面。每个路由对应一个 StronglyTyped FastEndpoint 文件；请求/响应/Validator 放在该文件。业务码和精确 result union 依 [API 通用规范](api-conventions.md)。
+本文列出当前 v1 资源面。每个路由对应一个 StronglyTyped FastEndpoint 文件；请求/响应/Validator 放在该文件。业务码和精确 result union 依 [API 通用规范](api-conventions.md)。
+
+路由清单与 `backend/artifacts/openapi/swagger.json` 对照，并由
+`OpenApiRouteDriftTests.ExportedOpenApi_ExactlyMatchesDocumentedV1Routes` 验证。修改 Endpoint 后
+重新导出 OpenAPI，同步本清单与前端 SDK；不要把历史路由作为仍可调用的兼容入口。
 
 聚合 PATCH 使用可空 section：省略 section 不修改，出现的 section 必须提交完整字段，其中 nullable 字段可用显式 null 清空。服务端先验证所有请求 section 的权限，再以有界 flags 选择权限专属 Mapperly existing-target mapper；多 section 写入共享一个事务，任一规则失败会整体回滚并清理跟踪状态。
 
@@ -39,6 +43,7 @@ POST /api/v1/auth/email-verification/resend
 POST /api/v1/auth/password-reset/request
 POST /api/v1/auth/password-reset/complete
 GET  /api/v1/auth/me
+GET  /api/v1/auth/navigation-capabilities
 GET  /api/v1/auth/me/profile
 PATCH /api/v1/auth/me/profile
 PUT  /api/v1/auth/me/avatar
@@ -79,8 +84,7 @@ GET  /api/v1/competitions/{competitionId}/poster
 GET  /api/v1/competitions/{competitionId}/leaderboard
 GET  /api/v1/competitions/{competitionId}/leaderboard/trends
 GET  /api/v1/competitions/{competitionId}/leaderboard/challenges
-GET  /api/v1/competitions/{competitionId}/leaderboard/schema
-GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}
+GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{competitionChallengeId}
 GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments
 GET  /api/v1/competitions/{competitionId}/tracks
 
@@ -129,18 +133,22 @@ Observer 保持只读。
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
-Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返回仅含 competitionId/state/statusUrl 的 202；Dirty 且有旧快照仍返回 200 完整旧快照；无快照且最后投影失败返回 503 ProblemDetails。响应不创建 ProjectionOperation。
-排行榜拆分为低频题目目录、低频列结构和高频稀疏快照。`leaderboard/challenges` 返回稳定题目标识；
-`leaderboard/schema` 返回模式、轮次和 `columnIndex` 定义；`leaderboard` 返回 actors、teams、tracks
-以及队伍的非空 `slots[]`。每个 slot 明确区分 `Pending`/`Settled`，并提供 earned、deducted、net、
-breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标的 team/column 明细路由读取；
-超出主快照上限的全局调分历史通过 team/adjustments 签名游标路由读取。
+Leaderboard GET 的 `statusUrl` 指回自身。没有可用投影时返回仅含 `competitionId/state/statusUrl`
+的 202，`state=Processing`、`Retry-After=2`，并请求重建；最近一次投影失败时返回 503
+`LeaderboardProjectionFailed`。已经失效的旧快照不会作为正常结果返回，也不创建 ProjectionOperation。
+排行榜拆分为低频题目目录和完整稀疏快照。`leaderboard/challenges` 返回题目标题等目录资料；
+`leaderboard` 同时返回 `mode`、`rounds`、`challenges`、`teams` 与 `tracks`，不再单独请求列结构。
+队伍的非空 `slots[]` 通过 `challenge`、可空 `round` 索引快照数组，`scoreState` 区分
+`Pending`、`Provisional`、`Settled`，主响应携带净分、攻防状态、次数统计和血奖等矩阵展示数据。
+earned、deducted、breakdown、actors 与事实明细通过 `teams/{teamId}/challenges/{competitionChallengeId}`
+读取；AWD/AWDP 轮次格使用 `roundId` 查询参数，历史使用绑定读取范围的签名游标。
+全局调分明细通过 `teams/{teamId}/adjustments` 签名游标路由读取。
 CTF 的 `leaderboard/trends` 返回与当前调用者、赛道权限和冻结截止时间一致的队伍累计分值序列；
 曲线由完整权威计分分配和已应用人工调分生成，最终点始终与同版本排行榜总分一致。其他模式不使用该接口。
 CTF 按题目列，AWD/AWDP 按题目×轮次列，KoH 按控制结算列；AWDP 当前未结算轮次只暴露操作
 状态，所有分数字段为 null，轮次结算后才进入累计分数。前端不得重算、预估或重新排序。
 AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore` 和按题目的
-`challengeScores`；这些累计字段不受主快照有界轮次窗口影响，前端不得从可见 Slot 重新求和。
+`challengeTotals`；这些累计字段不受主快照有界轮次窗口影响，前端不得从可见 Slot 重新求和。
 排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化
 快照；Blackout 对参赛者和 Bot 返回 `Hidden` 与空集合，但不关闭题目、Runtime、提交或本人
 提交结果。比赛结束时自动恢复最终实时榜单。人工 Administrator/Owner/Manager/Judge/Observer
@@ -267,9 +275,9 @@ GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/aw
 
 变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `accesses`。
 
-CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP schema v4 的玩家 `Player/AwdpAttack` Runtime 是长期攻击靶机，可通过统一 Runtime 路由启停、重置和续期；一次性 `AwdpTarget` 防御验证环境只通过申请与 Fix 上传路由管理，不通过普通玩家 Runtime 动作暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
+CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP 的玩家 `Player/AwdpAttack` Runtime 是长期攻击靶机，可通过统一 Runtime 路由启停、重置和续期；一次性 `AwdpTarget` 防御验证环境只通过申请与 Fix 上传路由管理，不通过普通玩家 Runtime 动作暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
 
-`awdp-state` 仅用于 AWDP schema v4 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最近一次防御 Target 的 TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
+`awdp-state` 仅用于 AWDP 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最近一次防御 Target 的 TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
 
 `targets` 只用于 AWD：加固期只返回本队 TeamId/Name/Running urls；加固期结束后返回所有 Approved、未 Ban、未删除队伍的 TeamId/Name 与其 Running `Exposure=Participants` urls，未 Running 的目标保留 Team 条目但 urls 为空。本队仍可从 Runtime GET 取得 OwnerOnly urls。排序 Team.RegisteredAt/TeamId。targets 永不返回 Flag、服务状态、Provider receipt 或内部地址；其他模式返回 404。
 
@@ -586,17 +594,18 @@ RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界
 业务代码也不得为调试目的主动打印 Flag。Loki 文档中的 UserId 使用由现有
 `RunnerScoring:SigningKey` 派生的独立用途密钥加密；管理员日志读取时解密，故 User 筛选及响应保持不变，
 Grafana 原始日志不含明文 UserId。数据库异常的原始文本与 SQL 命令不导出至 Loki。
-管理审计使用签名 keyset 分页，从用户账号生命周期
-审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
-审计业务表。`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
+管理审计使用签名 keyset 分页，从平台管理员可见的强类型 `notifications` 及工作人员可见的
+PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增审计业务表。
+账号生命周期、平台管理和强制删除审计保存在相应管理员通知中。
+`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
 比赛结束、队伍解散和用户匿名化注销不会清理事件关系。唯一显式例外是平台 Administrator 的强制
 级联删除：仅非 Running/Paused 且无活动或待处理 Runtime 资源的比赛可执行，并要求完整标题、原因和
 二次确认。该操作删除比赛作用域事件及引用数据，但在平台管理员审计投影中永久保留独立删除事实。
 
 删除用户前必须读取影响预览。没有任何业务引用时可物理删除；存在比赛、题目、队伍、
-提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人
+提交、计分、通知等引用时，只允许不可逆匿名化并停用。匿名化会清除个人
 资料、认证信息和资源协作权限，使所有现有 Token 失效，但保留所有权、队伍成员关系和
-历史事实。两种删除方式都要求管理员原因，并记录独立账号生命周期审计，不级联删除业务数据。
+历史事实。两种删除方式都要求管理员原因，并记录管理员可见的账号生命周期通知，不级联删除业务数据。
 
 平台配置以 revision fence 更新名称、简介和对象存储 Logo；Logo 上传只接受内容签名与 MIME
 一致的 PNG/JPEG/WebP。平台信息从运行中的 API 程序集读取版本，并返回已核验的仓库贡献者

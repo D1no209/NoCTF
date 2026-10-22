@@ -29,7 +29,8 @@ an independent source of requirements.
 - **Team ban** is a moderation fact, not a GameplayFact. Changing it publishes a leaderboard invalidation.
 - **Fix attempt** is consumed only by a team-controlled failed validation. Platform, Runner, storage,
   and checker failures do not consume an attempt.
-- **Runtime instance** is the durable scheduling and lifecycle fact for one concrete generation. Its
+- **Runtime instance** is the durable scheduling and lifecycle fact for one Runtime UUID; a reset creates
+  a new UUID without a generation chain or definition snapshot. Its
   provider receipt is a typed Container or OVA receipt persisted through a TPH one-to-one.
 - **Checker** is a trusted, administrator-controlled one-shot workload with a minimum-permission
   internal JWT. Challenge service input and network traffic remain untrusted.
@@ -50,8 +51,10 @@ an independent source of requirements.
 - Competition, Challenge, CompetitionChallenge, GameplayFact, RuntimeInstance, ChallengeFlag,
   CompetitionEvent, Notification and receipts use stable-discriminator TPH hierarchies. Collections are
   relational child/association tables; structural value objects use EF Complex Types and ordinary columns.
-- CTF, AWD, AWDP, and KoH are built-in modes. Penetration is ordinary CTF content, not a mode, and
-  dynamic game-mode plugins are not a target-architecture seam.
+- CTF, AWD, AWDP, KoH, and LiveSolo are built-in modes. LiveSolo has independent Match/Round,
+  material and media workflows; its current acceptance limits are recorded in
+  [the LiveSolo status](specs/live-solo-status.md). Penetration is ordinary CTF content, not a mode,
+  and dynamic game-mode plugins are not a target-architecture seam.
 - A deployment selects one active container provider (`Docker` or `Kubernetes`) and its Runner pool.
   Challenge and Competition data never select either value.
 - Docker Runtime public access uses the challenge service's declared TCP port mapping with requested

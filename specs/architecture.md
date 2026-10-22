@@ -2,21 +2,20 @@
 
 ## 角色与进程拓扑
 
-```text
-Browser/Client
-     |
-     v
-NoCTF.Host [Api]  ---- Redis (FusionCache L2/backplane only)
-     |
-     +---- PostgreSQL (business facts)
-     +---- NATS JetStream/KV (durable messages and short coordination leases)
-     +---- Loki (redacted OTLP platform logs)
-                         |
-              +----------+----------+
-              v                     v
-        NoCTF.Host [Worker]   NoCTF.Host [Runner] (N/pools)
-                                      |
-                         Docker / Kubernetes / Libvirt
+```mermaid
+flowchart LR
+    Browser["浏览器 / API 客户端"] --> Api["NoCTF.Host · Api"]
+    Api --> Database[("PostgreSQL · 业务事实")]
+    Api <--> Nats[("NATS JetStream / KV")]
+    Api <--> Cache[("Redis · FusionCache L2 / backplane")]
+    Nats <--> Worker["NoCTF.Host · Worker"]
+    Nats <--> Runner["NoCTF.Host · Runner"]
+    Worker --> Database
+    Worker <--> Cache
+    Runner --> Provider["Docker / Kubernetes / Libvirt"]
+    Api --> Logs[("Loki · 脱敏日志")]
+    Worker --> Logs
+    Runner --> Logs
 ```
 
 唯一可执行文件 `NoCTF.Host.dll` 包含三个运行角色；下列名称表示功能类库，不是独立进程入口：

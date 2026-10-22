@@ -1,9 +1,5 @@
 # Product
 
-## Register
-
-product
-
 ## Users
 
 NoCTF serves two equally important user groups.
@@ -51,7 +47,7 @@ Avoid design choices that hide operational truth. Health, logs, scoring, audit t
    Participant screens can be more energetic and event-focused. Admin screens should stay denser, calmer, and more operational.
 
 4. Show the system's moving parts.
-   Containers, plugins, checkers, patches, and health checks are part of the product promise. Surface them clearly instead of burying them.
+   Runtime services, checkers, patches, and health checks are part of the product promise. Surface their state clearly.
 
 5. Keep intensity useful.
    Visual energy should help users understand urgency, not decorate the interface or reduce readability.

@@ -19,11 +19,16 @@
 - CancellationToken 传到 EF、Redis、对象存储和消息调用；
 - Domain Entity 不直接序列化。
 
-实现前核对仓库 FastEndpoints 8.2.0 和官方文档：[FastEndpoints documentation](https://fast-endpoints.com/docs/get-started)。
+实现前核对 `backend/Directory.Packages.props` 中的 FastEndpoints 版本及其
+[官方文档](https://fast-endpoints.com/docs/get-started)，不要按历史文档中的固定版本假定 API 可用。
 
 ## ProblemDetails
 
-所有错误使用 RFC 9457 `application/problem+json`：type、title、status、code、traceId、errors。code 在应用内是 enum/value object，只在协议边界为文本。
+ProblemDetails 错误使用 RFC 9457 `application/problem+json`，按具体错误提供 type、title、status、
+code、traceId、errors 及本地化资源信息。code 在应用内是 enum/value object，只在协议边界为文本。
+Endpoint 声明的 `NotFound`、`UnauthorizedHttpResult`、`ForbidHttpResult` 可以没有正文；
+成员加入等操作也可以返回自己的强类型 `Conflict<TFailure>`。调用方应按实际 result union 和
+Content-Type 解析，空正文按 HTTP 状态提供反馈，不能假设所有 4xx 都带 ProblemDetails。
 
 | 状态 | 用途 |
 |---|---|
@@ -39,13 +44,14 @@
 
 ## 分页
 
-公共 `Pagination` 功能小工具提供无业务字段的 `KeysetPageRequest`、`KeysetPage<T>` 和签名基础设施；这是“model 就近放 Endpoint”规则的唯一例外。每个 Endpoint 仍在自己的文件定义筛选 DTO 与 cursor payload，并调用公共 codec。
+公共 `Pagination` 功能目录集中维护 `PaginationRequest`、`SearchRequest`、`ArrayResult<T>` 和
+签名游标基础设施；筛选 DTO 与游标的业务作用域仍由具体 Endpoint 定义。
 
-- limit 默认 50，范围 1..200；
-- cursor 为签名 Base64url，绑定 Endpoint、排序、筛选；
-- items、nextCursor、hasMore；默认不计算 total；
-- 无效/跨筛选 cursor 返回 400；
-- 排行榜 cursor 不绑定 revision，每页使用最新快照，响应携带 revision。
+- 普通列表采用 `offset/limit/desc`，公共请求的 limit 默认 10、范围 1..200，响应为 items/total；
+- 历史、日志和排行榜明细按各自契约采用 cursor，默认 limit 与响应字段以 Endpoint 为准；
+- cursor 是签名 Base64url，绑定 Endpoint 及该接口定义的读取范围，无效或跨范围使用返回 400；
+- 排行榜格子明细的作用域还包含调用者、比赛/队伍/题目、轮次窗口、结构修订、快照版本和数据截止时间。
+  投影变化后旧 cursor 可失效，调用方重新开始该明细读取，不拼接不同快照的页面。
 
 ## 上传与下载
 
@@ -57,17 +63,31 @@
 
 ## 并发
 
-可变资源采用 last-write-wins，管理请求和响应不携带 `ExpectedRevision`/Revision 并发协议。
-业务唯一约束、状态机合法迁移、不可变记录、幂等业务键以及 transactional Inbox/Outbox 分别保护
-真正的不变量。409 只表示强类型业务冲突，不得映射为通用“内容已被其他人修改”。
+普通聚合 PATCH 不要求通用 `ExpectedRevision` 协议；省略 section 不修改，出现的 section
+按该端点约定更新。数据库使用应用生成的 `Guid ConcurrencyStamp` 乐观并发令牌，集合不变量由
+唯一约束和 Serializable 事务保护；可安全重放的事务进行有界重试，外部副作用不自动重放。
+
+LiveSolo、单题题解等明确提供 expected stamp/版本的专用接口，调用方必须传入最新详情中的
+对应值；题目时间变更的短时预览凭据也必须按专用流程读取和提交。不能把普通 PATCH 的规则推广到
+所有管理操作。409 的业务含义以具体稳定失败码为准。
 
 ## 限流
 
-Redis 分布式策略：认证按 IP；普通 API 按 User；Flag 按 Team+题；AWD 批量按一次 HTTP 请求；Patch 上传/触发分开；Runtime 按 Team+题；管理批量按 Actor+Competition。429 不写 GameplayFact、不引用 PatchUpload、不写事件。
+分布式准入和配额由 EF Core 的请求窗口、租约及关系事务维护；Redis 只供 FusionCache 使用。
+认证/SSO、提交、Patch、Runtime 等入口按 `ProtectedEntryMetadata` 和当前准入配置执行各自的
+IP、用户、目标或并发额度。Flag 的业务受理准入位于 Application；Runtime 释放有独立入口额度，
+避免资源释放被新的启动请求堵塞。429 不表示业务事实已经受理，调用方应遵守 Retry-After。
 
 ## 幂等
 
-普通 Flag/Fix 受理仍各自产生新尝试，不使用公开 Idempotency-Key。理论开卷与逐题保存使用强类型请求中的 RequestId 和关系化回执；整卷提交幂等返回同一结果，每份正式试卷只有一个 TheoryPaperSubmission 事实。Patch 上传替换未引用对象；Runtime 以全新 UUID、状态和 MessageId 幂等处理重复；配置后写覆盖。
+标记为 FlagSubmission、PatchUpload、RuntimeCommand、RuntimeRelease、ManualAdjustment 的入口
+要求非空 UUID 格式的 `Idempotency-Key` 请求头；缺失或非法返回 400 `IdempotencyKeyRequired`。
+同一操作作用域、请求键和负载重放已提交结果，同键不同负载返回 409 `IdempotencyPayloadMismatch`。
+新的主动提交使用新键；网络重试复用原键，避免重复产生尝试、扣分或资源操作。
+
+理论开卷与逐题保存使用强类型请求中的 RequestId 和关系化回执；整卷提交幂等返回同一结果，
+每份正式试卷只有一个 TheoryPaperSubmission 事实。Runtime 重置创建新 UUID，消息消费者仍按
+Runtime 身份、状态和消息作用域处理至少一次投递；HTTP 请求回执与消息幂等是不同边界。
 
 内部消息通过 NATS JetStream 持久投递，数据库提交后发布并从关系化待处理状态恢复；不引入数据库 Inbox 或通用 Outbox。Competition Webhook 的专用事务 Outbox 保持现有例外。
 

@@ -71,8 +71,9 @@ Points、Penalty、Hint Cost、ManualAdjustment 与总分使用 checked signed I
 
 ## 赛道和可见性
 
-响应包含 `tracksEnabled`、可见 `tracks[]`、`challenges[]` 与排序后的 `entries[]` 稀疏矩阵。开启赛道时，
-Entry 带 TrackKey，名次按赛道独立计算。普通访问者和 Observer 只读取公开且非内部赛道；即使普通用户
+HTTP 主响应包含 `tracksEnabled`、可见 `tracks[]`、`rounds[]`、`challenges[]` 与排序后的
+`teams[]`；每个队伍的 `slots[]` 用题目和轮次数组索引表示稀疏矩阵，详细事实按题目单独读取。
+开启赛道时，队伍行带 `trackKey`，名次按赛道独立计算。普通访问者和 Observer 只读取公开且非内部赛道；即使普通用户
 被误分配到内部赛道，公开协议也不会回显该赛道或其中队伍。平台 Administrator 与比赛 Owner、Manager、Judge 可查看全部赛道。
 前端提供“所有赛道”视图，在一个矩阵中列出调用者获授权的全部赛道，同时保留服务端按赛道计算的名次，
 不得重算跨赛道综合排名。`EarnsScore=false` 不产生竞争性排名；内部测试事实保留在 PostgreSQL，但不改变

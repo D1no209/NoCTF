@@ -49,12 +49,12 @@ The three production roles can run in one composable host or as independent proc
 flowchart LR
     Browser["Browser / API client"] --> API["Api role"]
     API --> PostgreSQL[("PostgreSQL business DB")]
-    API --> NATS[("NATS JetStream / KV")]
+    API <--> NATS[("NATS JetStream / KV")]
     API --> Redis[("Redis")]
-    NATS --> Worker["Worker role"]
-    NATS --> Runner["Runner role"]
+    NATS <--> Worker["Worker role"]
+    NATS <--> Runner["Runner role"]
+    Worker --> PostgreSQL
     Worker --> Redis
-    Runner --> Redis
     Runner --> Providers["Docker / Kubernetes / Libvirt"]
 ```
 
@@ -108,7 +108,8 @@ docker compose config --quiet
 docker compose up -d
 ```
 
-Migration runs inside NoCTF at startup; image health checks are in the Dockerfile.
+Deployment templates enable `Database__AutoMigrate`, so the Host applies pending
+migrations before readiness. Image health checks are in the Dockerfile.
 Telemetry/exporters and proxy configuration are not part of the core deployment.
 Use the independent [Prometheus/Grafana stack](deploy/docker/observability/README.md) when
 operational monitoring is required. Read [Docker deployment](deploy/docker/README.md)

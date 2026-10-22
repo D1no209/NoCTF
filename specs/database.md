@@ -8,7 +8,8 @@
   `NoCTF.Persistence.PostgreSql`。隔离的 SQLite 项目仅供模型测试，Host 不引用它。
 - 新增 SQL Server、MySQL 或其他关系 provider 时，必须增加独立 provider 与 migration assembly，
   不得修改领域模型来保存方言兼容分支。
-- 未知 `Database:Provider` 在启动时失败。生产数据不由应用自动升级或猜测旧结构。
+- 未知 `Database:Provider` 在启动时失败。启用 `Database:AutoMigrate` 时，Host 在就绪前应用
+  当前迁移链；应用不猜测旧模型结构，也不自动导入旧模型数据。
 
 ## 可移植映射规则
 
@@ -32,8 +33,10 @@
 - 所有可变聚合使用应用生成的 `Guid ConcurrencyStamp`，配置为 EF concurrency token；保存时自动轮换。
 - 集合不变量使用普通唯一约束和 `IsolationLevel.Serializable`。可安全重放的幂等命令最多重试三次，
   使用短随机退避；包含外部副作用的非幂等操作不得自动重试。
-- Competition collaborator 的 `(CompetitionId, UserId)` 唯一并携带 Role。Team member 的
-  `(CompetitionId, UserId)` 唯一；TeamCaptain 以 `(TeamId, CaptainId)` 外键指向 TeamMember。
+- Competition collaborator 的 `(CompetitionId, UserId)` 唯一并携带 Role。`team_members` 的
+  主键是 `(TeamId, UserId)`；`active_team_memberships` 以 `(CompetitionId, UserId)` 为主键，
+  保证同一比赛只有一个活动成员归属，并保留归档队伍的成员关系。`team_captains` 通过
+  `(TeamId, UserId)` 外键引用同队的 `team_members`。
 - 可选唯一邮箱、外部身份、活跃 Runtime 和可空一对一分别使用唯一实体或显式关联表，不依赖
   filtered unique index。
 - 不使用 `FOR UPDATE`、`FOR SHARE`、`SKIP LOCKED`、PostgreSQL advisory lock 或长连接锁。

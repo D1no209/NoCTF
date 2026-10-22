@@ -39,8 +39,13 @@ host metrics.
 
 Provisioning failure, cancellation and confirmed resource removal release the
 reservation idempotently. Primary and auxiliary work use the same resource formula.
-They retain separate startup concurrency limits (`MainStartupConcurrency=2` and
-`AuxiliaryConcurrency=1` by default); no fixed Checker/Patch resource reserve exists.
+They retain separate, configurable startup concurrency limits
+(`Runner:Admission:MainStartupConcurrency=2` and
+`Runner:Admission:AuxiliaryConcurrency=1` by default). These are positive startup-slot
+limits, not a cap on the number of running Runtimes. A running workload stops counting
+as starting after its completion has been covered by a fresh observation; cleanup keeps
+its physical resource reservation until absence is confirmed without holding a startup
+slot. No fixed Checker/Patch resource reserve exists.
 
 `RuntimeResourceLimits` remain provider hard limits. Kubernetes Requests equal Limits
 for new work. EF Core allocation rows and provider-effective budgets are the current
