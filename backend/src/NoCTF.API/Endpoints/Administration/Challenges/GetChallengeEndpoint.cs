@@ -28,7 +28,7 @@ public sealed record AdminCompetitionChallengeResponse(
         CompetitionChallengeRulesContractMapper.FromDomain(configuration.Rules))
     {
         ScorePreset = configuration.ScorePreset is { } preset ? new(preset.Id, preset.Name,
-            CompetitionScorePresetResponses.Curve(preset.ScoreCurve), configuration.ScorePresetChallengeCount) : null,
+            preset.ScoreCurve is { } curve ? CompetitionScorePresetResponses.Curve(curve) : null, configuration.ScorePresetChallengeCount) : null,
         EffectiveScoring = configuration.Rules is CtfCompetitionChallengeRules rules
             && configuration.CompetitionConfiguration is CtfCompetitionModeConfiguration competition
             ? EffectiveCtfScoringResponse.Create(rules, configuration.ScorePreset, competition) : null

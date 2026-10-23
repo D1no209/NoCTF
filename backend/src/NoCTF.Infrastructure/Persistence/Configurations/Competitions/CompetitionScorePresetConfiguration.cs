@@ -14,6 +14,6 @@ internal sealed class CompetitionScorePresetConfiguration : IEntityTypeConfigura
         builder.HasIndex(item => new { item.CompetitionId, item.NormalizedName }).IsUnique();
         builder.HasOne<Competition>().WithMany().HasForeignKey(item => item.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         builder.OwnsOne(item => item.ScoreCurve);
-        builder.Navigation(item => item.ScoreCurve).IsRequired();
+        builder.Navigation(item => item.ScoreCurve).IsRequired(false);
     }
 }

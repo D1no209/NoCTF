@@ -152,6 +152,14 @@ public sealed class CompetitionChallengeTagPersistenceTests
                 Tags: ["Easy", "Hard", "Plain"]), TestConfigurations.Rules(GameMode.Ctf), ct)).Challenge!;
             await challenges.SoftDeleteAsync(competitions[0], second.Id, now, ct);
             var curve = new ScoreCurveValue { InitialPoints = 1000, MinimumPoints = 100, DecayTeamCount = 10 };
+            var ordinary = await presets.SaveAsync(competitions[0], null, "Web", null, now, ct);
+            var unused = await presets.SaveAsync(competitions[0], null, "Unused", null, now, ct);
+            await Assert.That(ordinary.Failure).IsNull();
+            await Assert.That(unused.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var catalog = (await presets.ListAsync(competitions[0], ct)).Items!;
+            await Assert.That(catalog.Single(item => item.Preset.Name == "Unused").Preset.ScoreCurve).IsNull();
+            await Assert.That(catalog.Single(item => item.Preset.Name == "Unused").ChallengeCount).IsEqualTo(0);
             var hard = await presets.SaveAsync(competitions[0], null, "Hard", curve, now, ct);
             await Assert.That(hard.Failure).IsNull();
             var easy = await presets.SaveAsync(competitions[0], null, "Easy", new() { InitialPoints = 500, MinimumPoints = 100, DecayTeamCount = 10 }, now, ct);
@@ -196,6 +204,12 @@ public sealed class CompetitionChallengeTagPersistenceTests
             var inherited = await configurationStore.FindAsync(competitions[0], first.Id, ct);
             await Assert.That(inherited!.Rules.HasScoreCurve).IsFalse();
             await Assert.That(inherited.ScorePreset!.Name).IsEqualTo("Hard");
+            var ordinaryHard = await presets.SaveAsync(competitions[0], hard.Item!.Preset.Id, "Hard", null, now, ct);
+            await Assert.That(ordinaryHard.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            inherited = await configurationStore.FindAsync(competitions[0], first.Id, ct);
+            await Assert.That(inherited!.ScorePreset).IsNull();
+            await Assert.That((await challenges.FindAsync(competitions[0], first.Id, true, true, ct))!.Tags.SequenceEqual(["Web", "Hard"])).IsTrue();
             await Assert.That((await presets.ListAsync(competitions[1], ct)).Items!.Count).IsEqualTo(0);
             await host.StopAsync(ct);
         }, ct);

@@ -5540,7 +5540,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetMut
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse = {
     id?: string;
     name?: string;
-    scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
+    scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
     challengeCount?: number;
 };
 
@@ -5567,7 +5567,7 @@ export type NoCtfApplicationCompetitionsScoringCompetitionScorePresetFailure = '
 
 export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest = {
     name: string;
-    scoreCurve: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
+    scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookCreatedResponse = {

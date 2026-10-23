@@ -17,8 +17,9 @@ type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
 export function useAdminCompetitionsByIdChallengesIndexPage() {
   const { competitionId, competition, canWrite } = useCompetitionAdmin()
   const scorePresets = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse[]>([])
-  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
-  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name
+  const catalogNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
+  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name && preset.scoreCurve ? [preset.name] : []))
+  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name && preset.scoreCurve
     ? [[tagKey(preset.name), translate('scorePresets.tagDetails', { initial: preset.scoreCurve?.initialPoints ?? '', minimum: preset.scoreCurve?.minimumPoints ?? '' })]] : [])))
 
   const items = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
@@ -157,7 +158,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   })
 
   const newTags = ref<string[]>([])
-  const tagOptions = computed(() => uniqueTags([...challengeTagOptions(items.value.filter(item => !item.deletedAt)), ...scoreNames.value]))
+  const tagOptions = computed(() => uniqueTags([...challengeTagOptions(items.value.filter(item => !item.deletedAt)), ...catalogNames.value]))
   function updateNewTags(tags: string[]) {
     const next = replaceScorePresetTag(newTags.value, tags, scoreNames.value)
     if (!validChallengeTags(next)) { toast.error(describeMessage('challengeTags.invalid')); return }

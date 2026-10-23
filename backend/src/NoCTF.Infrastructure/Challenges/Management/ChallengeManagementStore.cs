@@ -31,7 +31,7 @@ public sealed class ChallengeManagementStore(
         if (names is null || names.Count == 0) return null;
         var keys = names.Select(CompetitionChallengeTags.NormalizeName).Distinct().ToArray();
         var presets = await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId && keys.Contains(item.NormalizedName)).ToArrayAsync(ct);
+            .Where(item => item.CompetitionId == competitionId && item.ScoreCurve != null && keys.Contains(item.NormalizedName)).ToArrayAsync(ct);
         if (presets.Length > 1) return ChallengeMutationFailure.MultipleScorePresetTags;
         if (presets.Length == 0 || rules is not CtfCompetitionChallengeRules { HasScoreCurve: false } ctf) return null;
         var competition = (CtfCompetitionModeConfiguration)await db.Competitions.AsNoTracking()

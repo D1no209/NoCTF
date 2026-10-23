@@ -11,7 +11,7 @@ using System.ComponentModel.DataAnnotations;
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed class GetCompetitionScorePresetsRequest { public Guid CompetitionId { get; set; } }
-public sealed record CompetitionScorePresetResponse(Guid Id, string Name, ScoreCurveContract ScoreCurve, int ChallengeCount);
+public sealed record CompetitionScorePresetResponse(Guid Id, string Name, ScoreCurveContract? ScoreCurve, int ChallengeCount);
 public sealed record CompetitionScorePresetsResponse(IReadOnlyList<CompetitionScorePresetResponse> Items);
 public sealed record CompetitionScorePresetMutationResponse(CompetitionScorePresetResponse? Preset,
     int AffectedChallengeCount, int ReplacedChallengeCount);
@@ -27,7 +27,7 @@ public sealed record CompetitionScorePresetFailureResponse(
 internal static class CompetitionScorePresetResponses
 {
     public static CompetitionScorePresetResponse Map(CompetitionScorePresetView item) =>
-        new(item.Preset.Id, item.Preset.Name, Curve(item.Preset.ScoreCurve), item.ChallengeCount);
+        new(item.Preset.Id, item.Preset.Name, item.Preset.ScoreCurve is { } curve ? Curve(curve) : null, item.ChallengeCount);
     public static ScoreCurveContract Curve(ScoreCurveValue curve) => new(curve.InitialPoints, curve.MinimumPoints,
         curve.DecayTeamCount, (ScoreDecayModeProtocol)curve.DecayMode, curve.CustomExpression);
     public static ScoreCurveValue Curve(ScoreCurveContract curve) => new() { InitialPoints = curve.InitialPoints,

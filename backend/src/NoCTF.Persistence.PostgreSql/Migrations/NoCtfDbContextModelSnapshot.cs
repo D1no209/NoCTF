@@ -12506,8 +12506,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasConstraintName("fk_competition_score_presets_competition_score_presets_id");
                         });
 
-                    b.Navigation("ScoreCurve")
-                        .IsRequired();
+                    b.Navigation("ScoreCurve");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>

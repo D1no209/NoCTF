@@ -29,7 +29,7 @@ public sealed class UpdateCompetitionScorePresetEndpoint(ManageCompetitionScoreP
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct)) return TypedResults.Forbid();
         var result = await presets.SaveAsync(competitionId, Route<Guid>("presetId"), request.Name,
-            CompetitionScorePresetResponses.Curve(request.ScoreCurve), clock.GetUtcNow(), ct);
+            request.ScoreCurve is { } curve ? CompetitionScorePresetResponses.Curve(curve) : null, clock.GetUtcNow(), ct);
         if (result.Failure == CompetitionScorePresetFailure.NameConflict)
             return TypedResults.Conflict(new CompetitionScorePresetFailureResponse(result.Failure.Value));
         return result.Failure is { } failure ? CompetitionScorePresetResponses.Failure(failure)

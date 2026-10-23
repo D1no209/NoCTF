@@ -30,6 +30,21 @@ export function challengeTagOptions(items: readonly { tags?: readonly string[] }
     .sort((left, right) => tagKey(left).localeCompare(tagKey(right)))
 }
 
+export function competitionTagCatalog<T extends { name?: string }>(presets: readonly T[], challenges: readonly { tags?: readonly string[] }[]) {
+  const tags = new Map<string, { name: string; challengeCount: number; preset?: T }>()
+  for (const preset of presets)
+    if (preset.name) tags.set(tagKey(preset.name), { name: preset.name, challengeCount: 0, preset })
+  for (const challenge of challenges) {
+    for (const name of uniqueTags(challenge.tags ?? [])) {
+      const key = tagKey(name)
+      const tag = tags.get(key) ?? { name, challengeCount: 0 }
+      tag.challengeCount += 1
+      tags.set(key, tag)
+    }
+  }
+  return [...tags.values()].sort((a, b) => tagKey(a.name).localeCompare(tagKey(b.name)))
+}
+
 export function matchesAllTags(tags: readonly string[], selected: readonly string[]): boolean {
   const keys = new Set(tags.map(tagKey))
   return selected.every(tag => keys.has(tagKey(tag)))

@@ -44,8 +44,9 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const { competitionId, competition, canWrite, canJudge, read: readAdminCompetition } = useCompetitionAdmin()
   const scorePresets = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse[]>([])
-  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
-  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name
+  const catalogNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
+  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name && preset.scoreCurve ? [preset.name] : []))
+  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name && preset.scoreCurve
     ? [[tagKey(preset.name), translate('scorePresets.tagDetails', { initial: preset.scoreCurve?.initialPoints ?? '', minimum: preset.scoreCurve?.minimumPoints ?? '' })]] : [])))
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
@@ -98,7 +99,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const editCustomTitle = ref('')
   const editTags = ref<string[]>([])
   const tagSuggestions = ref<string[]>([])
-  const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? []), ...scoreNames.value]))
+  const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? []), ...catalogNames.value]))
   function updateEditTags(tags: string[]) {
     const next = replaceScorePresetTag(editTags.value, tags, scoreNames.value)
     if (!validChallengeTags(next)) { toast.error(describeMessage('challengeTags.invalid')); return }

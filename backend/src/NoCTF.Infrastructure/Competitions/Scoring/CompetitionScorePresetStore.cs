@@ -29,7 +29,7 @@ public sealed class CompetitionScorePresetStore(NoCtfDbContext db, IChallengeCon
     }
 
     public async Task<CompetitionScorePresetMutationResult> SaveAsync(Guid competitionId, Guid? presetId,
-        string name, ScoreCurveValue curve, DateTimeOffset now, CancellationToken ct)
+        string name, ScoreCurveValue? curve, DateTimeOffset now, CancellationToken ct)
     {
         try { return await RetryAsync(() => SaveOnceAsync(competitionId, presetId, name, curve, now, ct), ct); }
         catch (DbUpdateException)
@@ -45,7 +45,7 @@ public sealed class CompetitionScorePresetStore(NoCtfDbContext db, IChallengeCon
     }
 
     private async Task<CompetitionScorePresetMutationResult> SaveOnceAsync(Guid competitionId, Guid? presetId,
-        string name, ScoreCurveValue curve, DateTimeOffset now, CancellationToken ct)
+        string name, ScoreCurveValue? curve, DateTimeOffset now, CancellationToken ct)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         var competition = await db.Competitions.AsSplitQuery().SingleOrDefaultAsync(item => item.Id == competitionId, ct);
@@ -62,19 +62,23 @@ public sealed class CompetitionScorePresetStore(NoCtfDbContext db, IChallengeCon
             .Where(item => item.CompetitionId == competitionId
                 && item.Tags.Any(tag => tag.NormalizedName == normalized || tag.NormalizedName == oldName))
             .ToArrayAsync(ct);
-        var eligibleTeams = await db.Teams.CountAsync(item => item.CompetitionId == competitionId
-            && item.RegistrationStatus == TeamRegistrationStatus.Approved && !item.IsBanned, ct);
-        var validationRules = challenges.Select(item => item.Rules).OfType<CtfCompetitionChallengeRules>()
-            .Select(item => item.ScoreSettlementMode).Append(null).Distinct();
-        foreach (var settlement in validationRules)
+        if (curve is not null)
         {
-            var errors = configurations.Validate(GameMode.Ctf,
-                new CtfCompetitionChallengeRules { HasScoreCurve = true, ScoreCurve = curve, ScoreSettlementMode = settlement },
-                competition.ModeConfiguration!, eligibleTeams);
-            if (errors.Count > 0) return new(Failure: CompetitionScorePresetFailure.InvalidCurve, Detail: string.Join(" ", errors));
+            var eligibleTeams = await db.Teams.CountAsync(item => item.CompetitionId == competitionId
+                && item.RegistrationStatus == TeamRegistrationStatus.Approved && !item.IsBanned, ct);
+            var validationRules = challenges.Select(item => item.Rules).OfType<CtfCompetitionChallengeRules>()
+                .Select(item => item.ScoreSettlementMode).Append(null).Distinct();
+            foreach (var settlement in validationRules)
+            {
+                var errors = configurations.Validate(GameMode.Ctf,
+                    new CtfCompetitionChallengeRules { HasScoreCurve = true, ScoreCurve = curve, ScoreSettlementMode = settlement },
+                    competition.ModeConfiguration!, eligibleTeams);
+                if (errors.Count > 0) return new(Failure: CompetitionScorePresetFailure.InvalidCurve, Detail: string.Join(" ", errors));
+            }
         }
         current ??= new CompetitionScorePreset { Id = Guid.NewGuid(), CompetitionId = competitionId, Name = name, NormalizedName = normalized };
-        var otherNames = presets.Where(item => item.Id != current.Id).Select(item => item.NormalizedName).ToHashSet(StringComparer.Ordinal);
+        var otherNames = presets.Where(item => curve is not null && item.ScoreCurve is not null && item.Id != current.Id)
+            .Select(item => item.NormalizedName).ToHashSet(StringComparer.Ordinal);
         var replaced = 0;
         foreach (var challenge in challenges)
         {

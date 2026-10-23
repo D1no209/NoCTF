@@ -19,7 +19,7 @@ public interface ICompetitionScorePresetStore
 {
     Task<CompetitionScorePresetsResult> ListAsync(Guid competitionId, CancellationToken ct);
     Task<CompetitionScorePresetMutationResult> SaveAsync(Guid competitionId, Guid? presetId,
-        string name, ScoreCurveValue curve, DateTimeOffset now, CancellationToken ct);
+        string name, ScoreCurveValue? curve, DateTimeOffset now, CancellationToken ct);
     Task<CompetitionScorePresetMutationResult> DeleteAsync(Guid competitionId, Guid presetId,
         DateTimeOffset now, CancellationToken ct);
 }
@@ -28,7 +28,7 @@ public sealed class ManageCompetitionScorePresets(ICompetitionScorePresetStore s
 {
     public Task<CompetitionScorePresetsResult> ListAsync(Guid competitionId, CancellationToken ct) => store.ListAsync(competitionId, ct);
     public Task<CompetitionScorePresetMutationResult> SaveAsync(Guid competitionId, Guid? presetId,
-        string name, ScoreCurveValue curve, DateTimeOffset now, CancellationToken ct)
+        string name, ScoreCurveValue? curve, DateTimeOffset now, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > CompetitionChallengeTags.MaximumNameLength)
             return Task.FromResult(new CompetitionScorePresetMutationResult(Failure: CompetitionScorePresetFailure.InvalidName));

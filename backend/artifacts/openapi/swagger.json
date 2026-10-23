@@ -49654,7 +49654,12 @@
             "type": "string"
           },
           "scoreCurve": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+              }
+            ]
           },
           "challengeCount": {
             "type": "integer",
@@ -49753,8 +49758,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "name",
-          "scoreCurve"
+          "name"
         ],
         "properties": {
           "name": {
@@ -49763,8 +49767,12 @@
             "nullable": false
           },
           "scoreCurve": {
-            "nullable": false,
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+              }
+            ]
           }
         }
       },
