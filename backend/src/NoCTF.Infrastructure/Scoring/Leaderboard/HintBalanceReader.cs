@@ -30,14 +30,22 @@ internal sealed class HintBalanceReader(NoCtfDbContext db)
                 track.Key, track.EarnsScore, track.EarnsBlood, track.AffectsDynamicChallengeScore,
                 track.VisibleOnLeaderboard, track.AffectsCompetitiveResults);
         }).ToArray();
-        var challenges = await db.CompetitionChallenges.AsNoTracking()
+        var scorePresets = competition.Mode == GameMode.Ctf
+            ? await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+                .Where(item => item.CompetitionId == fact.CompetitionId).ToArrayAsync(ct) : [];
+        var challengeRows = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == fact.CompetitionId)
-            .Select(item => new LeaderboardChallengeFact(item.Id, "", "", false, item.Rules, item.Order,
+            .Select(item => new { Fact = new LeaderboardChallengeFact(item.Id, "", "", false, item.Rules, item.Order,
                 item.IsPublished, null,
                 db.Set<CtfChallengeDefinition>().Where(definition => definition.ChallengeId == item.ChallengeId)
                     .Select(definition => definition.InteractionKind).FirstOrDefault(), null,
-                new ChallengeTiming(item.AutoOpenAt, item.ScoringEndsAt, item.SubmissionDeadlineAt)))
+                new ChallengeTiming(item.AutoOpenAt, item.ScoringEndsAt, item.SubmissionDeadlineAt)),
+                Tags = item.Tags.Select(tag => tag.Name).ToArray() })
             .AsSplitQuery().ToArrayAsync(ct);
+        var challenges = challengeRows.Select(row => row.Fact with
+        {
+            ScorePreset = NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(row.Tags, scorePresets)
+        }).ToArray();
         var costs = await db.CompetitionChallenges.AsNoTracking().Where(item => item.CompetitionId == fact.CompetitionId)
             .SelectMany(item => item.Hints.Select(hint => new { hint.Id, hint.Cost })).ToDictionaryAsync(item => item.Id, item => item.Cost, ct);
         var lifecycle = await db.CompetitionEvents.AsNoTracking().Where(item => item.CompetitionId == fact.CompetitionId

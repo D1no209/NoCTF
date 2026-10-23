@@ -3353,6 +3353,48 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("user_badge_transitions", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_score_presets");
+
+                    b.HasIndex("CompetitionId", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_score_presets_competition_id_normalized_name");
+
+                    b.ToTable("competition_score_presets", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12418,6 +12460,54 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_badge_transitions_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_score_presets_competitions_competition_id");
+
+                    b.OwnsOne("NoCTF.Domain.Competitions.ScoreCurveValue", "ScoreCurve", b1 =>
+                        {
+                            b1.Property<Guid>("CompetitionScorePresetId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("CustomExpression")
+                                .HasColumnType("text")
+                                .HasColumnName("score_curve_custom_expression");
+
+                            b1.Property<short>("DecayMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("score_curve_decay_mode");
+
+                            b1.Property<int>("DecayTeamCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("score_curve_decay_team_count");
+
+                            b1.Property<long>("InitialPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("score_curve_initial_points");
+
+                            b1.Property<long>("MinimumPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("score_curve_minimum_points");
+
+                            b1.HasKey("CompetitionScorePresetId");
+
+                            b1.ToTable("competition_score_presets");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionScorePresetId")
+                                .HasConstraintName("fk_competition_score_presets_competition_score_presets_id");
+                        });
+
+                    b.Navigation("ScoreCurve")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>

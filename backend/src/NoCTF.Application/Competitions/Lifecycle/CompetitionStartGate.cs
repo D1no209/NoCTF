@@ -15,7 +15,8 @@ public sealed record StartGateChallenge(
     CompetitionChallengeRules Rules,
     ChallengeDefinition Definition,
     bool Published,
-    IReadOnlyList<long> HintCosts);
+    IReadOnlyList<long> HintCosts,
+    NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? ScorePreset = null);
 
 public sealed record CompetitionStartGateSnapshot(
     Guid CompetitionId,
@@ -92,7 +93,7 @@ public sealed class CompetitionStartGate(
         }
         var publishedChallengeConfigurations = startChallenges
             .Select(challenge => new ChallengeConfigurationSections(
-                challenge.Rules,
+                NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(challenge.Rules, challenge.ScorePreset),
                 challenge.Definition))
             .ToArray();
         foreach (var message in competitionConfigurations.ValidateForStart(
@@ -169,7 +170,7 @@ public sealed class CompetitionStartGate(
             }
             foreach (var message in challengeConfigurations.ValidateRules(
                          snapshot.Mode,
-                         challenge.Rules,
+                         NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(challenge.Rules, challenge.ScorePreset),
                          snapshot.Configuration,
                          snapshot.ApprovedTeamCount))
                 errors.Add(new(

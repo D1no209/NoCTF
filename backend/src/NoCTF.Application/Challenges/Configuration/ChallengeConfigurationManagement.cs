@@ -14,7 +14,11 @@ public sealed record ChallengeConfigurationView(
     CompetitionStatus CompetitionStatus,
     int EligibleTeamCount,
     DateTimeOffset UpdatedAt,
-    ChallengeDefinition Definition);
+    ChallengeDefinition Definition)
+{
+    public NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? ScorePreset { get; init; }
+    public int ScorePresetChallengeCount { get; init; }
+}
 
 public interface IChallengeConfigurationCatalog
 {
@@ -48,7 +52,8 @@ public interface IChallengeConfigurationCatalog
         CompetitionChallengeRules rules,
         ChallengeDefinition definition,
         CompetitionModeConfiguration competitionConfiguration,
-        int eligibleTeamCount) =>
+        int eligibleTeamCount,
+        NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? scorePreset = null) =>
         ValidateRules(mode, rules, competitionConfiguration, eligibleTeamCount);
 }
 
@@ -122,7 +127,7 @@ public sealed class UpdateChallengeConfiguration(
             rules,
             current.Definition,
             current.CompetitionConfiguration,
-            current.EligibleTeamCount);
+            current.EligibleTeamCount, current.ScorePreset);
         if (errors.Count > 0)
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
                 ChallengeConfigurationFailureCode.InvalidConfiguration,

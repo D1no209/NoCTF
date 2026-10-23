@@ -13,6 +13,7 @@ import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 /** Owns state, effects and commands for ChallengeRulesEditor. */
 export function useChallengeRulesEditor(props: Readonly<{
   mode: GameModeValue
+  scorePreset: import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse | null
   awdStores?: NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse[]
   competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
   rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
@@ -28,13 +29,18 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
 
   const overridden = ref<Record<string, boolean>>({})
 
-  const inheritedValues = computed(() =>
-    readConfigValues(
+  const inheritedValues = computed(() => {
+    const values = readConfigValues(
       props.inheritedConfiguration as Record<string, unknown> | null,
       fields.value,
       { rules: false },
-    )?.values ?? {},
-  )
+    )?.values ?? {}
+    if (props.mode === 'Ctf' && props.scorePreset?.scoreCurve) values.scoreCurve = { ...props.scorePreset.scoreCurve }
+    return values
+  })
+  const scoreCurveSource = computed(() => overridden.value.scoreCurve ? translate('scorePresets.source.challenge')
+    : props.scorePreset ? translate('scorePresets.source.tag', { name: props.scorePreset.name ?? '' }) : translate('scorePresets.source.competition'))
+  const hasScorePreset = computed(() => props.mode === 'Ctf' && !!props.scorePreset)
 
   const { values, parseFailed, serialized, dirty } = useConfigDraft<NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract>({
     mode: () => props.mode,
@@ -119,6 +125,7 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
   return {
       ...toRefs(props),
       ...awdEditor,
+      scoreCurveSource, hasScorePreset,
       canSaveRules: computed(() => awdEditor.canSaveRules.value && storeRulesValid.value),
       storeRows, storeRulesValid, updateStoreRule, presetControlled,
       fields,

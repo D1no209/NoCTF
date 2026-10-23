@@ -54,7 +54,8 @@ public sealed record LeaderboardChallengeFact(
     ChallengeDefinition? Definition = null,
     CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission,
     string? DirectionIcon = null,
-    ChallengeTiming? Timing = null);
+    ChallengeTiming? Timing = null,
+    NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? ScorePreset = null);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,

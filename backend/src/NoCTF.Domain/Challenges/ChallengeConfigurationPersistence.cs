@@ -201,6 +201,13 @@ public abstract class CompetitionChallengeRules
 public sealed class CtfCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Ctf)
 {
     public CtfScoreSettlementMode? ScoreSettlementMode { get; set; }
+    internal CtfCompetitionChallengeRules WithInheritedScoreCurve(NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset preset)
+    {
+        var copy = (CtfCompetitionChallengeRules)MemberwiseClone();
+        copy.ScoreCurve = NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.Override(this, preset)!;
+        copy.HasScoreCurve = true;
+        return copy;
+    }
 }
 [PersistentDiscriminator("awd")]
 public sealed class AwdCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Awd)

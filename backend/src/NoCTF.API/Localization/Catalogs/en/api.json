@@ -1,4 +1,11 @@
 {
+  "api.scorePresets.competitionNotFound": "Competition was not found.",
+  "api.scorePresets.notFound": "Score preset was not found.",
+  "api.scorePresets.unsupportedMode": "Score presets are available in CTF competitions.",
+  "api.scorePresets.invalidName": "Enter a nonblank tag name of at most 40 characters.",
+  "api.scorePresets.invalidCurve": "The score curve is invalid. Check its points, decay count and custom expression.",
+  "api.scorePresets.nameConflict": "A score preset already uses this tag name.",
+  "api.scorePresets.multipleTags": "A challenge can have only one score preset tag.",
   "api.accessCompetition.title.invalidFlagAccess": "Invalid Flag access request.",
   "api.addCompetition.title.competitionQuestionMessageWas": "Competition question message was rejected.",
   "api.administration.issuePlatformUserToken.accountInactive": "Account Inactive.",

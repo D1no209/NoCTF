@@ -4,6 +4,7 @@ import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/featur
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
 const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pageItems, page, pageLimit, pageCount, total, loadPage, setPageSize, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newTags, tagOptions, updateNewTags, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
+const { scoreTagDetails } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -222,7 +223,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           </Field>
           <Field>
             <FieldLabel>{{ $t('challengeTags.label') }}</FieldLabel>
-            <TagPicker :model-value="newTags" :options="tagOptions" :label="$t('challengeTags.edit')" allow-create :disabled="adding" @update:model-value="updateNewTags" />
+            <TagPicker :model-value="newTags" :options="tagOptions" :option-details="scoreTagDetails" :label="$t('challengeTags.edit')" allow-create :disabled="adding" @update:model-value="updateNewTags" />
           </Field>
           <Field>
             <FieldLabel for="new-order">{{ $t('administration.label.order') }}</FieldLabel>

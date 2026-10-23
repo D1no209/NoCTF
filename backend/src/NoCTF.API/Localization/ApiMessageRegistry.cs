@@ -2,6 +2,13 @@ namespace NoCTF.API.Localization;
 
 public enum ApiMessageId
 {
+    ScorePresetCompetitionNotFound,
+    ScorePresetNotFound,
+    ScorePresetUnsupportedMode,
+    ScorePresetInvalidName,
+    ScorePresetInvalidCurve,
+    ScorePresetNameConflict,
+    MultipleScorePresetTags,
     TheoryActivityErrorNotFoundOrForbidden,
     TheoryActivityErrorInvalidConfiguration,
     TheoryActivityErrorPublishedConfigurationLocked,
@@ -846,6 +853,13 @@ public static partial class ApiMessages
 {
     public static string Key(ApiMessageId id) => id switch
     {
+        ApiMessageId.ScorePresetCompetitionNotFound => "api.scorePresets.competitionNotFound",
+        ApiMessageId.ScorePresetNotFound => "api.scorePresets.notFound",
+        ApiMessageId.ScorePresetUnsupportedMode => "api.scorePresets.unsupportedMode",
+        ApiMessageId.ScorePresetInvalidName => "api.scorePresets.invalidName",
+        ApiMessageId.ScorePresetInvalidCurve => "api.scorePresets.invalidCurve",
+        ApiMessageId.ScorePresetNameConflict => "api.scorePresets.nameConflict",
+        ApiMessageId.MultipleScorePresetTags => "api.scorePresets.multipleTags",
         ApiMessageId.TheoryActivityErrorNotFoundOrForbidden => "api.theory.theoryActivityError.notFoundOrForbidden",
         ApiMessageId.TheoryActivityErrorInvalidConfiguration => "api.theory.theoryActivityError.invalidConfiguration",
         ApiMessageId.TheoryActivityErrorPublishedConfigurationLocked => "api.theory.theoryActivityError.publishedConfigurationLocked",
@@ -1687,6 +1701,14 @@ public static partial class ApiMessages
 
     public static ApiMessage For(Enum? code) => Get(code switch
     {
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.CompetitionNotFound => ApiMessageId.ScorePresetCompetitionNotFound,
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.PresetNotFound => ApiMessageId.ScorePresetNotFound,
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.UnsupportedMode => ApiMessageId.ScorePresetUnsupportedMode,
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.InvalidName => ApiMessageId.ScorePresetInvalidName,
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.InvalidCurve => ApiMessageId.ScorePresetInvalidCurve,
+        NoCTF.Application.Competitions.Scoring.CompetitionScorePresetFailure.NameConflict => ApiMessageId.ScorePresetNameConflict,
+        NoCTF.Application.Challenges.Management.ChallengeMutationFailure.MultipleScorePresetTags => ApiMessageId.MultipleScorePresetTags,
+        NoCTF.Application.Challenges.Management.ChallengeMutationFailure.InvalidScorePresetCurve => ApiMessageId.ScorePresetInvalidCurve,
         NoCTF.Application.Theory.Activities.TheoryActivityError.NotFoundOrForbidden => ApiMessageId.TheoryActivityErrorNotFoundOrForbidden,
         NoCTF.Application.Theory.Activities.TheoryActivityError.InvalidConfiguration => ApiMessageId.TheoryActivityErrorInvalidConfiguration,
         NoCTF.Application.Theory.Activities.TheoryActivityError.PublishedConfigurationLocked => ApiMessageId.TheoryActivityErrorPublishedConfigurationLocked,

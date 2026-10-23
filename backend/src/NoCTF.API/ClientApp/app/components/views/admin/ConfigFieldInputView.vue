@@ -101,7 +101,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, emitValue, parseNullableNumber
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('administration.label.teamsMinimumScore') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('scorePresets.minimumTeamCount') }}</span>
         <NumberInput
 
           min="2"

@@ -120,10 +120,13 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         CompetitionChallengeRules rules,
         ChallengeDefinition definition,
         CompetitionModeConfiguration competitionConfiguration,
-        int eligibleTeamCount)
+        int eligibleTeamCount,
+        NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? scorePreset = null)
     {
-        var errors = Validate(
-            mode, rules, competitionConfiguration, eligibleTeamCount).ToList();
+        var errors = (rules is CtfCompetitionChallengeRules ctf && competitionConfiguration is CtfCompetitionModeConfiguration competition
+            ? CtfConfigurationValidator.Validate(TypedGameModeConfiguration.Ctf(ctf, scorePreset),
+                TypedGameModeConfiguration.Ctf(competition), eligibleTeamCount)
+            : Validate(mode, rules, competitionConfiguration, eligibleTeamCount)).ToList();
         errors.AddRange(ValidateDefinition(mode, definition));
         if (errors.Count > 0) return errors;
         if (mode == GameMode.Awdp

@@ -4,6 +4,7 @@ import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/featu
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
 const { AwdScoringRuleChanges, ccId, SingleWriteUpSettings, ChallengeTimingSettings, adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, awdStores, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentReason, adjustmentReasonRequired, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { scoreTagDetails } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -68,7 +69,7 @@ const { AwdScoringRuleChanges, ccId, SingleWriteUpSettings, ChallengeTimingSetti
                   </Field>
                   <Field>
                     <FieldLabel>{{ $t('challengeTags.label') }}</FieldLabel>
-                    <TagPicker :model-value="editTags" :options="tagOptions" :label="$t('challengeTags.edit')" allow-create :disabled="!canWrite || savingEdit" @update:model-value="updateEditTags" />
+                    <TagPicker :model-value="editTags" :options="tagOptions" :option-details="scoreTagDetails" :label="$t('challengeTags.edit')" allow-create :disabled="!canWrite || savingEdit" @update:model-value="updateEditTags" />
                   </Field>
                   <Field>
                     <FieldLabel for="cc-order">{{ $t('administration.label.order') }}</FieldLabel>
@@ -106,6 +107,7 @@ const { AwdScoringRuleChanges, ccId, SingleWriteUpSettings, ChallengeTimingSetti
                 :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
                 :rules="config?.rules"
                 :inherited-configuration="inheritedConfiguration"
+                :score-preset="config?.scorePreset"
                   :awd-stores="awdStores"
                 :readonly="!canWrite"
                 :loading="configLoading"

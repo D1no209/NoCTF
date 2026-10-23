@@ -5531,6 +5531,45 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     accessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse = {
+    preset?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse | null;
+    affectedChallengeCount?: number;
+    replacedChallengeCount?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse = {
+    id?: string;
+    name?: string;
+    scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
+    challengeCount?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract = {
+    initialPoints?: number;
+    minimumPoints?: number;
+    decayTeamCount?: number;
+    decayMode?: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol;
+    customExpression?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol = 'Fixed' | 'Linear' | 'Quadratic' | 'Exponential' | 'Logarithmic' | 'Custom';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse = {
+    code: NoCtfApplicationCompetitionsScoringCompetitionScorePresetFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
+
+export type NoCtfApplicationCompetitionsScoringCompetitionScorePresetFailure = 'CompetitionNotFound' | 'PresetNotFound' | 'UnsupportedMode' | 'InvalidName' | 'InvalidCurve' | 'NameConflict';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest = {
+    name: string;
+    scoreCurve: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookCreatedResponse = {
     target?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse;
     signingSecret?: string;
@@ -5597,6 +5636,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictR
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictCode = 'BadgeInUse' | 'ConcurrencyConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionBadgeRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionScorePresetRequest = {
     [key: string]: never;
 };
 
@@ -5690,16 +5733,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCtfCompetitionModeConfigu
     wrongSubmissionPenalty?: number;
     scoreSettlementMode?: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol;
 };
-
-export type NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract = {
-    initialPoints?: number;
-    minimumPoints?: number;
-    decayTeamCount?: number;
-    decayMode?: NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol;
-    customExpression?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol = 'Fixed' | 'Linear' | 'Quadratic' | 'Exponential' | 'Logarithmic' | 'Custom';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract = {
     policy?: NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol;
@@ -5845,6 +5878,14 @@ export type NoCtfapiEndpointsAdministrationCompetitionsProgressionBadgeNodeContr
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsGetCompetitionProgressionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetsResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsGetCompetitionScorePresetsRequest = {
     [key: string]: never;
 };
 
@@ -6303,6 +6344,8 @@ export type NoCtfapiEndpointsAdministrationChallengesAdminCompetitionChallengeRe
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract;
+    scorePreset?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse | null;
+    effectiveScoring?: NoCtfapiEndpointsAdministrationChallengesEffectiveCtfScoringResponse | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract = {
@@ -6364,6 +6407,13 @@ export type NoCtfapiEndpointsAdministrationChallengesLiveSoloCompetitionChalleng
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengesEffectiveCtfScoringResponse = {
+    source?: NoCtfapiEndpointsAdministrationChallengesCtfScoreCurveSourceProtocol;
+    scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesCtfScoreCurveSourceProtocol = 'CompetitionDefault' | 'TagPreset' | 'ChallengeOverride';
+
 export type NoCtfapiEndpointsAdministrationChallengesGetAdminChallengeRequest = {
     [key: string]: never;
 };
@@ -6374,6 +6424,13 @@ export type NoCtfapiEndpointsAdministrationChallengesGetCompetitionChallengeFlag
 
 export type NoCtfapiEndpointsAdministrationChallengesGetChallengeHintRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesAdminChallengeListResponse = {
+    items?: Array<NoCtfapiEndpointsChallengesChallengeSummaryResponse>;
+    scorePresets?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse>;
+    leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesListAdminChallengesRequest = {
@@ -18546,6 +18603,81 @@ export type AdminCreateCompetitionResponses = {
 
 export type AdminCreateCompetitionResponse = AdminCreateCompetitionResponses[keyof AdminCreateCompetitionResponses];
 
+export type AdminGetCompetitionScorePresetsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/score-presets';
+};
+
+export type AdminGetCompetitionScorePresetsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AdminGetCompetitionScorePresetsError = AdminGetCompetitionScorePresetsErrors[keyof AdminGetCompetitionScorePresetsErrors];
+
+export type AdminGetCompetitionScorePresetsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetsResponse;
+};
+
+export type AdminGetCompetitionScorePresetsResponse = AdminGetCompetitionScorePresetsResponses[keyof AdminGetCompetitionScorePresetsResponses];
+
+export type AdminCreateCompetitionScorePresetData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/score-presets';
+};
+
+export type AdminCreateCompetitionScorePresetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: MicrosoftAspNetCoreMvcProblemDetails;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse;
+};
+
+export type AdminCreateCompetitionScorePresetError = AdminCreateCompetitionScorePresetErrors[keyof AdminCreateCompetitionScorePresetErrors];
+
+export type AdminCreateCompetitionScorePresetResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse;
+};
+
+export type AdminCreateCompetitionScorePresetResponse = AdminCreateCompetitionScorePresetResponses[keyof AdminCreateCompetitionScorePresetResponses];
+
 export type AdminListCompetitionWebhooksData = {
     body?: never;
     path: {
@@ -18925,6 +19057,83 @@ export type AdminPatchCompetitionResponses = {
 };
 
 export type AdminPatchCompetitionResponse = AdminPatchCompetitionResponses[keyof AdminPatchCompetitionResponses];
+
+export type AdminDeleteCompetitionScorePresetData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        presetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/score-presets/{presetId}';
+};
+
+export type AdminDeleteCompetitionScorePresetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AdminDeleteCompetitionScorePresetError = AdminDeleteCompetitionScorePresetErrors[keyof AdminDeleteCompetitionScorePresetErrors];
+
+export type AdminDeleteCompetitionScorePresetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse;
+};
+
+export type AdminDeleteCompetitionScorePresetResponse = AdminDeleteCompetitionScorePresetResponses[keyof AdminDeleteCompetitionScorePresetResponses];
+
+export type AdminUpdateCompetitionScorePresetData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest;
+    path: {
+        competitionId: string;
+        presetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/score-presets/{presetId}';
+};
+
+export type AdminUpdateCompetitionScorePresetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: MicrosoftAspNetCoreMvcProblemDetails;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse;
+};
+
+export type AdminUpdateCompetitionScorePresetError = AdminUpdateCompetitionScorePresetErrors[keyof AdminUpdateCompetitionScorePresetErrors];
+
+export type AdminUpdateCompetitionScorePresetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse;
+};
+
+export type AdminUpdateCompetitionScorePresetResponse = AdminUpdateCompetitionScorePresetResponses[keyof AdminUpdateCompetitionScorePresetResponses];
 
 export type AdminDeleteCompetitionWebhookData = {
     body?: never;
@@ -19771,7 +19980,7 @@ export type AdminListCompetitionChallengesResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsChallengesChallengeListResponse;
+    200: NoCtfapiEndpointsAdministrationChallengesAdminChallengeListResponse;
 };
 
 export type AdminListCompetitionChallengesResponse = AdminListCompetitionChallengesResponses[keyof AdminListCompetitionChallengesResponses];

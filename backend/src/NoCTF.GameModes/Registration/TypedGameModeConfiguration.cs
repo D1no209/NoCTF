@@ -22,8 +22,9 @@ public static class TypedGameModeConfiguration
         Flag(value.FlagTemplate),
         value.ScoreSettlementMode);
 
-    public static CtfChallengeConfiguration Ctf(CtfCompetitionChallengeRules value) => new(
-        value.HasScoreCurve ? Curve(value.ScoreCurve) : null,
+    public static CtfChallengeConfiguration Ctf(CtfCompetitionChallengeRules value,
+        NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? preset = null) => new(
+        NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.Override(value, preset) is { } curve ? Curve(curve) : null,
         value.BloodRewards.Count == 0 ? null : value.BloodRewards.OrderBy(item => item.Position)
             .Select(item => new BloodReward((BloodRewardPolicy)item.Policy, item.Value)).ToArray(),
         value.MaxFlagAttempts,

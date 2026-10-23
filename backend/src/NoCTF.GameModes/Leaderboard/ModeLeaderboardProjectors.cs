@@ -54,7 +54,7 @@ internal static class CtfLeaderboardProjection
         var defaults = ParseCompetition(input.CompetitionConfiguration);
         var challengeConfigurations = challenges.ToDictionary(
             pair => pair.Key,
-            pair => ParseChallenge(pair.Value.Rules));
+            pair => ParseChallenge(pair.Value.Rules, pair.Value.ScorePreset));
         var defaultChallengeConfiguration = ParseChallenge(null);
         var solves = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && activeTeams.ContainsKey(teamId)
@@ -250,10 +250,11 @@ internal static class CtfLeaderboardProjection
         return CtfCompletionEligibility.Matches(fact.Kind, interaction);
     }
 
-    private static CtfChallengeConfiguration ParseChallenge(CompetitionChallengeRules? value) =>
+    private static CtfChallengeConfiguration ParseChallenge(CompetitionChallengeRules? value,
+        NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? preset = null) =>
         value is CtfCompetitionChallengeRules ctf
-            ? TypedGameModeConfiguration.Ctf(ctf)
-            : new(null, null);
+            ? TypedGameModeConfiguration.Ctf(ctf, preset)
+            : TypedGameModeConfiguration.Ctf(new CtfCompetitionChallengeRules(), preset);
 
     private sealed record CtfRankedEntry(
         LeaderboardEntry Entry,

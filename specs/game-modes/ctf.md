@@ -2,7 +2,7 @@
 
 ## 配置契约
 
-Competition 的强类型配置提供 `DefaultScoreCurve`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 的强类型规则可用 nullable `ScoreCurve` 整体覆盖，并另外定义：
+Competition 的强类型配置提供 `DefaultScoreCurve`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 的有效曲线依次使用题目 nullable `ScoreCurve` 整体覆盖、标签分数预设、竞赛 `DefaultScoreCurve`，并另外定义：
 
 ```text
 MaxFlagAttempts: int?                   // null 无限；配置时必须 >0
@@ -15,6 +15,28 @@ ScoreSettlementMode?                   // null 继承比赛；DynamicRecalculati
 
 CTF 还可在平台实验开关允许时使用独立的 [PatchVerification](../ctf-patch-verification-experiment.md)
 交互；下文 FlagAttempt 描述适用于 Flag 解题，Patch 模式以 FixAttempt 的当前结果判定完成。
+
+## 标签分数预设
+
+每场 CTF 竞赛通过 `competition_score_presets` 保存带有 `ScoreCurveValue` 的标签名称，
+`(CompetitionId, NormalizedName)` 唯一。题目使用现有标签集合，按本竞赛归一化名称匹配预设。
+每题至多使用一个分数标签，普通标签可多选；预设之间分别使用各题的有效解题数量计算。
+
+创建预设时，已有同名普通标签直接获得曲线，并从这些题目移除其他分数标签。
+重命名同步修改已挂载标签，与目标同名普通标签合并；与其他分数预设重名返回冲突。
+处理范围包含软删除题目。删除预设保留题目标签，其分数来源恢复为题目覆盖或竞赛默认。
+题目绑定、替换或移除分数标签均保留已有题目覆盖；关闭覆盖才会重新跟随标签。
+
+管理接口位于 `/admin/competitions/{competitionId}/score-presets`，提供 GET/POST 及按 presetId 的 PUT/DELETE。
+写入使用完整 `ScoreCurveContract`，返回关联与替换的题目数量。题目写入包含多个分数标签时，
+返回 400 与 `MultipleScorePresetTags`；普通标签数量、长度和省略字段语义继续适用。
+绑定后曲线无法用于该题结算时，返回 400 与 `InvalidScorePresetCurve`，保留原有题目配置。
+管理详情的 `scorePreset` 标识当前标签预设，`effectiveScoring` 返回有效曲线与
+`CompetitionDefault / TagPreset / ChallengeOverride` 来源；原始 Rules 仅表达题目覆盖。
+
+预设及其标签操作使用 Serializable 事务，提交后按竞赛发布一次现有配置变更事件。
+排行榜、分数明细、趋势、血奖与提示购买余额统一读取有效曲线。预设修改不重判 GameplayFact，
+`AtSolve` 也会基于新配置与当前完成顺序重新计算。
 
 ## 题目形态
 

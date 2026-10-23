@@ -7,7 +7,8 @@ namespace NoCTF.Application.Competitions.Configuration;
 
 public sealed record CompetitionChallengeConfigurationSnapshot(
     Guid Id,
-    CompetitionChallengeRules Rules);
+    CompetitionChallengeRules Rules,
+    NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? ScorePreset = null);
 
 public sealed record ChallengeConfigurationSections(
     CompetitionChallengeRules Rules,
@@ -107,7 +108,8 @@ public sealed class UpdateCompetitionConfiguration(
             current.Mode,
             configuration,
             current.EligibleTeamCount,
-            current.ChallengeConfigurations.Select(challenge => challenge.Rules).ToArray());
+            current.ChallengeConfigurations.Select(challenge => NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver
+                .ForValidation(challenge.Rules, challenge.ScorePreset)).ToArray());
         if (errors.Count > 0)
             return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
                 CompetitionConfigurationFailureCode.InvalidConfiguration,

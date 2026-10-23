@@ -4,6 +4,7 @@ import type { ChallengeRulesEditorViewState } from '~/features/admin/useChalleng
 
 const viewProps = defineProps<{ state: ChallengeRulesEditorViewState }>()
 const { storeRows, storeRulesValid, updateStoreRule, presetControlled, isAwd, changeReason, reasonRequired, invalidFields, canSaveRules, groups, DefinitionSection, presetOpen, presetChanges, applyPreset, closePreset, overridden, parseFailed, updateField, setOverride, displayedValue, dirty, save, ConfigFieldInput, readonly, loading, saving } = toRefs(viewProps.state)
+const { scoreCurveSource, hasScorePreset } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -29,10 +30,11 @@ const { storeRows, storeRulesValid, updateStoreRule, presetControlled, isAwd, ch
               :disabled="readonly"
               @update:model-value="setOverride(field, $event === true)"
             />
-            <span class="text-xs text-muted-foreground">{{ $t('administration.label.cover') }}</span>
+            <span class="text-xs text-muted-foreground">{{ $t(field.key === 'scoreCurve' && hasScorePreset ? 'scorePresets.override' : 'administration.label.cover') }}</span>
             <span v-if="isAwd && presetControlled(field)" class="text-xs text-muted-foreground">{{ $t('administration.awd.presetControlled') }}</span>
-            <span v-else-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('administration.label.inheritContestDefaults') }}</span>
+            <span v-else-if="field.key !== 'scoreCurve' && !(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('administration.label.inheritContestDefaults') }}</span>
           </div>
+          <FieldDescription v-if="field.key === 'scoreCurve'">{{ scoreCurveSource }}</FieldDescription>
           <component :is="ConfigFieldInput"
             :field="field"
             :model-value="displayedValue(field)"

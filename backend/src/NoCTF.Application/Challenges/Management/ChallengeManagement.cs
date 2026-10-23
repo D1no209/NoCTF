@@ -77,6 +77,8 @@ public enum ChallengeMutationFailure
     InvalidOrder,
     InvalidDirection,
     InvalidTags,
+    MultipleScorePresetTags,
+    InvalidScorePresetCurve,
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,

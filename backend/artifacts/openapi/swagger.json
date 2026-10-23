@@ -23249,6 +23249,145 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/score-presets": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Create Competition Score Preset",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/score-presets.",
+        "operationId": "AdminCreateCompetitionScorePreset",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveCompetitionScorePresetRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Get Competition Score Presets",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/score-presets.",
+        "operationId": "AdminGetCompetitionScorePresets",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/webhooks": {
       "post": {
         "tags": [
@@ -23885,6 +24024,162 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/score-presets/{presetId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Delete Competition Score Preset",
+        "description": "Executes DELETE /api/v1/admin/competitions/{competitionId}/score-presets/{presetId}.",
+        "operationId": "AdminDeleteCompetitionScorePreset",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "presetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Update Competition Score Preset",
+        "description": "Executes PUT /api/v1/admin/competitions/{competitionId}/score-presets/{presetId}.",
+        "operationId": "AdminUpdateCompetitionScorePreset",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "presetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveCompetitionScorePresetRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -25463,7 +25758,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeListResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAdminChallengeListResponse"
                 }
               }
             }
@@ -49325,6 +49620,154 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetMutationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "preset": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetResponse"
+              }
+            ]
+          },
+          "affectedChallengeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replacedChallengeCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scoreCurve": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          },
+          "challengeCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "initialPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decayTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "decayMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol"
+          },
+          "customExpression": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Fixed",
+          "Linear",
+          "Quadratic",
+          "Exponential",
+          "Logarithmic",
+          "Custom"
+        ],
+        "enum": [
+          "Fixed",
+          "Linear",
+          "Quadratic",
+          "Exponential",
+          "Logarithmic",
+          "Custom"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsScoringCompetitionScorePresetFailure"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsScoringCompetitionScorePresetFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotFound",
+          "PresetNotFound",
+          "UnsupportedMode",
+          "InvalidName",
+          "InvalidCurve",
+          "NameConflict"
+        ],
+        "enum": [
+          "CompetitionNotFound",
+          "PresetNotFound",
+          "UnsupportedMode",
+          "InvalidName",
+          "InvalidCurve",
+          "NameConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionScorePresetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "scoreCurve"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
+          },
+          "scoreCurve": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookCreatedResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -49527,6 +49970,10 @@
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionBadgeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionScorePresetRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -49889,51 +50336,6 @@
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol"
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "initialPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "minimumPoints": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "decayTeamCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "decayMode": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol"
-          },
-          "customExpression": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Fixed",
-          "Linear",
-          "Quadratic",
-          "Exponential",
-          "Logarithmic",
-          "Custom"
-        ],
-        "enum": [
-          "Fixed",
-          "Linear",
-          "Quadratic",
-          "Exponential",
-          "Logarithmic",
-          "Custom"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardContract": {
         "type": "object",
@@ -50416,6 +50818,22 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsGetCompetitionProgressionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsGetCompetitionScorePresetsRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -52128,6 +52546,22 @@
           },
           "rules": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
+          },
+          "scorePreset": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetResponse"
+              }
+            ]
+          },
+          "effectiveScoring": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesEffectiveCtfScoringResponse"
+              }
+            ]
           }
         }
       },
@@ -52402,6 +52836,32 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengesEffectiveCtfScoringResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCtfScoreCurveSourceProtocol"
+          },
+          "scoreCurve": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCtfScoreCurveSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionDefault",
+          "TagPreset",
+          "ChallengeOverride"
+        ],
+        "enum": [
+          "CompetitionDefault",
+          "TagPreset",
+          "ChallengeOverride"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationChallengesGetAdminChallengeRequest": {
         "type": "object",
         "additionalProperties": false
@@ -52413,6 +52873,30 @@
       "NoCTFAPIEndpointsAdministrationChallengesGetChallengeHintRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAdminChallengeListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeSummaryResponse"
+            }
+          },
+          "scorePresets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionScorePresetResponse"
+            }
+          },
+          "leaderboardVisibility": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
+          },
+          "dataScope": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationChallengesListAdminChallengesRequest": {
         "type": "object",

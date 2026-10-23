@@ -11,6 +11,15 @@ export function uniqueTags(names: readonly string[]): string[] {
   return [...tags.values()]
 }
 
+export function replaceScorePresetTag(previous: readonly string[], next: readonly string[], presetNames: readonly string[]): string[] {
+  const keys = new Set(presetNames.map(tagKey))
+  const old = new Set(previous.map(tagKey))
+  const tags = uniqueTags(next)
+  const selected = tags.filter(name => keys.has(tagKey(name)))
+  const chosen = selected.filter(name => !old.has(tagKey(name))).at(-1) ?? selected.at(-1)
+  return tags.filter(name => !keys.has(tagKey(name)) || tagKey(name) === tagKey(chosen ?? ''))
+}
+
 export function validChallengeTags(names: readonly string[]): boolean {
   return names.every(name => !!name.trim() && name.trim().length <= 40)
     && uniqueTags(names).length <= 20

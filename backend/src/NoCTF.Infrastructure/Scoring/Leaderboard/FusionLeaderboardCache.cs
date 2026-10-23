@@ -241,6 +241,10 @@ public sealed class FusionLeaderboardCache(
             .ThenBy(instance => instance.Id)
             .AsSplitQuery()
             .ToListAsync(ct);
+        var scorePresets = competition.Mode == GameMode.Ctf
+            ? await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+                .Where(item => item.CompetitionId == competitionId).ToArrayAsync(ct)
+            : [];
         var templateIds = challengeEntities.Select(instance => instance.ChallengeId).ToArray();
         var templates = await db.Challenges.AsNoTracking()
             .Where(template => templateIds.Contains(template.Id))
@@ -261,7 +265,8 @@ public sealed class FusionLeaderboardCache(
                     ? ctf.InteractionKind
                     : CtfInteractionKind.FlagSubmission,
                 instance.Direction?.Icon, timingOverride != null && instance.Id == timingOverride.CompetitionChallengeId
-                    ? timingOverride.Timing : ChallengeTiming.From(instance)))
+                    ? timingOverride.Timing : ChallengeTiming.From(instance),
+                NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(instance.Tags.Select(tag => tag.Name), scorePresets)))
             .ToList();
 
         var hintCosts = challengeEntities

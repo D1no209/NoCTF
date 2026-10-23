@@ -392,13 +392,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
                 ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,
                 ProblemHttpResult> response = refreshed is null || refreshedConfiguration is null
                     ? TypedResults.NotFound()
-                    : TypedResults.Ok(new AdminCompetitionChallengeResponse(
-                        ChallengeMapper.ToResponse(refreshed),
-                        CompetitionProtocolMapper.ToProtocol(refreshedConfiguration.Mode),
-                        CompetitionProtocolMapper.ToProtocol(
-                            refreshedConfiguration.CompetitionStatus),
-                        CompetitionChallengeRulesContractMapper.FromDomain(
-                            refreshedConfiguration.Rules)));
+                    : TypedResults.Ok(AdminCompetitionChallengeResponse.Create(ChallengeMapper.ToResponse(refreshed), refreshedConfiguration));
             return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>,
                 NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,
                 ProblemHttpResult>>.Commit(response);

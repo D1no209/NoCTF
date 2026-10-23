@@ -1,12 +1,19 @@
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, onScopeDispose, reactive, ref, toRefs, watch } from 'vue'
-import { challengeTagOptions, matchesAllTags, tagKey, tagsFromQuery, uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
+import { challengeTagOptions, matchesAllTags, tagKey, tagsFromQuery, uniqueTags, validChallengeTags, replaceScorePresetTag } from '../app/lib/challenge-tags'
 import { compileChallengeTitleSearch, isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
 
 const source = await Bun.file(new URL('../app/features/competition/useCompetitionChallengeNavigator.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
+test('score tag selection replaces its predecessor while preserving ordinary tags and filter choices', () => {
+  expect(replaceScorePresetTag(['Web', 'Hard', 'SQL'], ['Web', 'Hard', 'SQL', 'Easy'], ['Hard', 'Easy']))
+    .toEqual(['Web', 'SQL', 'Easy'])
+  expect(replaceScorePresetTag(['Easy'], ['Easy', ' research '], ['Hard', 'Easy'])).toEqual(['Easy', 'research'])
+  expect(replaceScorePresetTag(['Easy'], [], ['Hard', 'Easy'])).toEqual([])
+  expect(matchesAllTags(['Hard', 'Easy'], ['Hard', 'Easy'])).toBe(true)
+})
 const challenge = (id: string, tags: string[], published = true) => ({ id, title: id, direction: 'Web', order: 1, isPublished: published, tags })
 
 function harness(query: Record<string, any> = {}) {

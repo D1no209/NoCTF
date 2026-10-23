@@ -1,6 +1,6 @@
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
-import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
+import { challengeTagOptions, uniqueTags, validChallengeTags, replaceScorePresetTag, tagKey } from '~/lib/challenge-tags'
 import { proxyRefs } from 'vue'
 
 import { Plus } from '@lucide/vue'
@@ -16,6 +16,10 @@ type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesIndexPage. */
 export function useAdminCompetitionsByIdChallengesIndexPage() {
   const { competitionId, competition, canWrite } = useCompetitionAdmin()
+  const scorePresets = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse[]>([])
+  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
+  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name
+    ? [[tagKey(preset.name), translate('scorePresets.tagDetails', { initial: preset.scoreCurve?.initialPoints ?? '', minimum: preset.scoreCurve?.minimumPoints ?? '' })]] : [])))
 
   const items = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
@@ -87,7 +91,10 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       query: { includeDeleted: includeDeleted.value },
     })
     if (e) error.value = parseApiError(e).displayMessage
-    else items.value = [...(data?.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    else {
+      items.value = [...(data?.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      scorePresets.value = data?.scorePresets ?? []
+    }
     loading.value = false
   }
 
@@ -150,10 +157,11 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   })
 
   const newTags = ref<string[]>([])
-  const tagOptions = computed(() => challengeTagOptions(items.value.filter(item => !item.deletedAt)))
+  const tagOptions = computed(() => uniqueTags([...challengeTagOptions(items.value.filter(item => !item.deletedAt)), ...scoreNames.value]))
   function updateNewTags(tags: string[]) {
-    if (!validChallengeTags(tags)) { toast.error(describeMessage('challengeTags.invalid')); return }
-    newTags.value = uniqueTags(tags)
+    const next = replaceScorePresetTag(newTags.value, tags, scoreNames.value)
+    if (!validChallengeTags(next)) { toast.error(describeMessage('challengeTags.invalid')); return }
+    newTags.value = next
   }
 
   async function openAdd() {
@@ -175,6 +183,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       if (failure) addError.value = parseApiError(failure).displayMessage
       else {
         templates.value = templateResult.data?.items ?? []
+        scorePresets.value = challengeResult.data?.scorePresets ?? []
         newOrder.value = nextCompetitionChallengeOrder(challengeResult.data?.items ?? [])
       }
     } catch (failure) {
@@ -345,7 +354,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       templateSearch,
       hideAddedTemplates,
       newCustomTitle,
-      newTags, tagOptions, updateNewTags,
+      newTags, tagOptions, scoreTagDetails, updateNewTags,
       newOrder,
       adding,
       addError,

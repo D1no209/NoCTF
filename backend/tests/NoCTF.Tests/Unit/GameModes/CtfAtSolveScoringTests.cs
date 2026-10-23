@@ -128,6 +128,40 @@ public sealed class CtfAtSolveScoringTests
         await Assert.That(second.AwardPoints).IsEqualTo(40);
     }
 
+    [Test, Arguments(CtfScoreSettlementMode.DynamicRecalculation), Arguments(CtfScoreSettlementMode.AtSolve)]
+    public async Task Tag_presets_reprice_scores_and_blood_with_challenge_override_precedence(CtfScoreSettlementMode mode)
+    {
+        var input = Input([Fact(0, 1), Fact(1, 2)], mode);
+        var competition = (CtfCompetitionModeConfiguration)input.CompetitionConfiguration!;
+        competition.BloodRewards = [new() { Position = 0, Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage, Value = 10 }];
+        var rules = new CtfCompetitionChallengeRules();
+        var preset = new NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset
+        {
+            Id = Guid.NewGuid(), CompetitionId = input.CompetitionId, Name = "Hard", NormalizedName = "HARD",
+            ScoreCurve = new() { InitialPoints = 1000, MinimumPoints = 100, DecayTeamCount = 10, DecayMode = PersistedScoreDecayMode.Linear }
+        };
+        input = input with { Challenges = [input.Challenges!.Single() with { Rules = rules, ScorePreset = preset }] };
+        await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 1100 : 990);
+        await Assert.That(Score(Project(input), 1)).IsEqualTo(900);
+        preset.ScoreCurve.InitialPoints = 2000;
+        preset.ScoreCurve.MinimumPoints = 200;
+        var projected = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
+        var award = projected.Snapshot.Teams.Single(team => team.TeamId == Teams[0]).Slots.SelectMany(slot => slot.Entries).Single();
+        await Assert.That(award.AwardPoints).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 200 : 180);
+        await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 2200 : 1980);
+        rules.HasScoreCurve = true;
+        rules.ScoreCurve = new() { InitialPoints = 700, MinimumPoints = 70, DecayTeamCount = 10, DecayMode = PersistedScoreDecayMode.Linear };
+        await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 770 : 693);
+        rules.HasScoreCurve = false;
+        var validationRules = NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(rules, preset);
+        await Assert.That(validationRules.HasScoreCurve).IsTrue();
+        await Assert.That(validationRules.ScoreCurve.InitialPoints).IsEqualTo(2000);
+        await Assert.That(rules.HasScoreCurve).IsFalse();
+        await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 2200 : 1980);
+        input = input with { Challenges = [input.Challenges.Single() with { ScorePreset = null }] };
+        await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 550 : 440);
+    }
+
     private static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input) => new CtfLeaderboardProjector().Project(input);
     private static long Score(GameModeLeaderboardProjection projection, int team) => projection.Entries.Single(entry => entry.TeamId == Teams[team]).Score;
     private static LeaderboardGameplayFact Fact(int team, int seconds, CtfInteractionKind interaction = CtfInteractionKind.FlagSubmission) =>

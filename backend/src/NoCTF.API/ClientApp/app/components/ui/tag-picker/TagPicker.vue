@@ -5,6 +5,7 @@ import { X } from '@lucide/vue'
 const props = withDefaults(defineProps<{
   modelValue: string[]
   options: string[]
+  optionDetails?: Record<string, string>
   label: string
   allowCreate?: boolean
   disabled?: boolean
@@ -51,7 +52,7 @@ function clear() { emit('update:modelValue', []) }
         <ScrollSurface class="max-h-56">
           <div class="flex flex-col gap-1">
             <Button v-for="name in options" :key="key(name)" type="button" variant="ghost" class="h-auto min-h-10 justify-start whitespace-normal text-left" :disabled="disabled" :aria-pressed="selected(name)" @click="toggle(name)">
-              <span class="min-w-0 flex-1 break-words">{{ name }}</span>
+              <span class="min-w-0 flex-1 break-words">{{ name }}<span v-if="optionDetails?.[key(name)]" class="block text-xs text-muted-foreground">{{ optionDetails[key(name)] }}</span></span>
               <span v-if="selected(name)" aria-hidden="true">✓</span>
             </Button>
             <p v-if="!options.length" class="p-2 text-sm text-muted-foreground">{{ $t('challengeTags.noOptions') }}</p>
@@ -61,7 +62,8 @@ function clear() { emit('update:modelValue', []) }
     </Popover>
     <div v-if="modelValue.length" class="flex flex-wrap items-center gap-1">
       <Button v-for="name in modelValue" :key="key(name)" type="button" variant="secondary" size="sm" class="h-auto min-h-8 max-w-full" :disabled="disabled" :aria-label="$t('challengeTags.remove', { name })" @click="remove(name)">
-        <span class="min-w-0 break-words whitespace-normal">{{ name }}</span><X class="size-3 shrink-0" />
+        <span class="min-w-0 break-words whitespace-normal">{{ name }}</span>
+        <span v-if="optionDetails?.[key(name)]" class="text-xs text-muted-foreground">{{ optionDetails[key(name)] }}</span><X class="size-3 shrink-0" />
       </Button>
       <Button type="button" variant="ghost" size="sm" :disabled="disabled" @click="clear">{{ $t('challengeTags.clear') }}</Button>
     </div>

@@ -30,6 +30,8 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                 (item, template) => new { Instance = item, Template = template })
             .AsSplitQuery()
             .ToArrayAsync(ct);
+        var presets = await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId).ToArrayAsync(ct);
         var challenges = challengeRows.Select(row => new StartGateChallenge(
             row.Instance.Id,
             row.Template.Mode,
@@ -38,7 +40,8 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             row.Template.Definition ?? throw new InvalidOperationException(
                 $"Challenge {row.Template.Id} has no definition."),
             row.Instance.IsPublished,
-            row.Instance.Hints.Select(hint => hint.Cost).ToArray())).ToArray();
+            row.Instance.Hints.Select(hint => hint.Cost).ToArray(),
+            NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(row.Instance.Tags.Select(tag => tag.Name), presets))).ToArray();
         var teamTracks = await db.Teams.AsNoTracking()
             .Where(
             team => team.CompetitionId == competitionId

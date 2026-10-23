@@ -3,7 +3,7 @@ import { getAwdRules } from '~/api'
 import ChallengeTimingSettingsComponent from '~/features/challenges/timing/ChallengeTimingSettings.vue'
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
-import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
+import { challengeTagOptions, uniqueTags, validChallengeTags, replaceScorePresetTag, tagKey } from '~/lib/challenge-tags'
 import { adminTeamPath, adminTemplatePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
@@ -32,6 +32,8 @@ interface ChallengeTeamScoringRow {
 interface ChallengeConfiguration {
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol
   rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract
+  scorePreset?: import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse | null
+  effectiveScoring?: import('~/api').NoCtfapiEndpointsAdministrationChallengesEffectiveCtfScoringResponse | null
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesByCcIdPage. */
@@ -41,6 +43,10 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const ccId = route.params.ccId as string
 
   const { competitionId, competition, canWrite, canJudge, read: readAdminCompetition } = useCompetitionAdmin()
+  const scorePresets = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse[]>([])
+  const scoreNames = computed(() => scorePresets.value.flatMap(preset => preset.name ? [preset.name] : []))
+  const scoreTagDetails = computed(() => Object.fromEntries(scorePresets.value.flatMap(preset => preset.name
+    ? [[tagKey(preset.name), translate('scorePresets.tagDetails', { initial: preset.scoreCurve?.initialPoints ?? '', minimum: preset.scoreCurve?.minimumPoints ?? '' })]] : [])))
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
@@ -92,10 +98,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const editCustomTitle = ref('')
   const editTags = ref<string[]>([])
   const tagSuggestions = ref<string[]>([])
-  const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? [])]))
+  const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? []), ...scoreNames.value]))
   function updateEditTags(tags: string[]) {
-    if (!validChallengeTags(tags)) { toast.error(describeMessage('challengeTags.invalid')); return }
-    editTags.value = uniqueTags(tags)
+    const next = replaceScorePresetTag(editTags.value, tags, scoreNames.value)
+    if (!validChallengeTags(next)) { toast.error(describeMessage('challengeTags.invalid')); return }
+    editTags.value = next
   }
   async function loadTagSuggestions() {
     const { data, error } = await adminListCompetitionChallenges({
@@ -103,7 +110,10 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     })
     if (directionRequest.signal.aborted) return
     if (error) toast.error(parseApiError(error).displayMessage)
-    else tagSuggestions.value = challengeTagOptions(data?.items ?? [])
+    else {
+      tagSuggestions.value = challengeTagOptions(data?.items ?? [])
+      scorePresets.value = data?.scorePresets ?? []
+    }
   }
 
   const editOrder = ref(0)
@@ -137,6 +147,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       })
       if (error) throw error
       challenge.value = data?.challenge ?? challenge.value
+      if (data) config.value = data
       void loadTagSuggestions()
       toast.success(describeMessage("administration.label.questionSettingsSaved"))
     }
@@ -171,6 +182,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       config.value = {
         mode: challengeResult.data.mode,
         rules: challengeResult.data.rules,
+        scorePreset: challengeResult.data.scorePreset,
+        effectiveScoring: challengeResult.data.effectiveScoring,
       }
     }
     if (!competitionResult.error && competitionResult.data) {
@@ -194,7 +207,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       })
       if (error) throw error
       config.value = data
-        ? { mode: data.mode, rules: data.rules }
+        ? { mode: data.mode, rules: data.rules, scorePreset: data.scorePreset, effectiveScoring: data.effectiveScoring }
         : config.value
       toast.success(describeMessage("administration.competitionsBy.label.questionConfigurationSaved"))
     }
@@ -561,7 +574,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       sectionOptions,
       directions, directionLoading, directionError, editDirectionId, loadDirections,
       editCustomTitle,
-      editTags, tagOptions, updateEditTags,
+      editTags, tagOptions, scoreTagDetails, updateEditTags,
       editOrder,
       editPublished,
       savingEdit,

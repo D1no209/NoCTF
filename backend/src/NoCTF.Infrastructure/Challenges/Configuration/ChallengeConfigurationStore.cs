@@ -42,6 +42,13 @@ public sealed class ChallengeConfigurationStore(
             && team.RegistrationStatus == TeamRegistrationStatus.Approved
             && !team.IsBanned
             && team.DeletedAt == null, ct);
+        var presets = await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+            .Where(preset => preset.CompetitionId == competitionId).ToArrayAsync(ct);
+        var matched = NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(
+            item.Configuration.Tags.Select(tag => tag.Name), presets);
+        var presetChallengeCount = matched is null ? 0 : await db.CompetitionChallenges.IgnoreQueryFilters()
+            .CountAsync(challenge => challenge.CompetitionId == competitionId
+                && challenge.Tags.Any(tag => tag.NormalizedName == matched.NormalizedName), ct);
         return new(
             item.Competition.Id,
             item.Configuration.Id,
@@ -51,7 +58,11 @@ public sealed class ChallengeConfigurationStore(
             item.Competition.Status,
             eligibleTeamCount,
             item.Configuration.UpdatedAt,
-            item.Challenge.Definition);
+            item.Challenge.Definition)
+        {
+            ScorePreset = matched,
+            ScorePresetChallengeCount = presetChallengeCount
+        };
     }
 
     public async Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(

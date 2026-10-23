@@ -18,7 +18,33 @@ public sealed record AdminCompetitionChallengeResponse(
     ChallengeResponse Challenge,
     GameModeProtocol Mode,
     CompetitionStatusProtocol CompetitionStatus,
-    CompetitionChallengeRulesContract Rules);
+    CompetitionChallengeRulesContract Rules)
+{
+    public CompetitionScorePresetResponse? ScorePreset { get; init; }
+    public EffectiveCtfScoringResponse? EffectiveScoring { get; init; }
+    public static AdminCompetitionChallengeResponse Create(ChallengeResponse challenge, ChallengeConfigurationView configuration) => new(
+        challenge, CompetitionProtocolMapper.ToProtocol(configuration.Mode),
+        CompetitionProtocolMapper.ToProtocol(configuration.CompetitionStatus),
+        CompetitionChallengeRulesContractMapper.FromDomain(configuration.Rules))
+    {
+        ScorePreset = configuration.ScorePreset is { } preset ? new(preset.Id, preset.Name,
+            CompetitionScorePresetResponses.Curve(preset.ScoreCurve), configuration.ScorePresetChallengeCount) : null,
+        EffectiveScoring = configuration.Rules is CtfCompetitionChallengeRules rules
+            && configuration.CompetitionConfiguration is CtfCompetitionModeConfiguration competition
+            ? EffectiveCtfScoringResponse.Create(rules, configuration.ScorePreset, competition) : null
+    };
+}
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CtfScoreCurveSourceProtocol>))]
+public enum CtfScoreCurveSourceProtocol { CompetitionDefault, TagPreset, ChallengeOverride }
+public sealed record EffectiveCtfScoringResponse(CtfScoreCurveSourceProtocol Source, ScoreCurveContract ScoreCurve)
+{
+    internal static EffectiveCtfScoringResponse Create(CtfCompetitionChallengeRules rules,
+        NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? preset, CtfCompetitionModeConfiguration competition)
+    {
+        var effective = NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.Resolve(rules, preset, competition);
+        return new((CtfScoreCurveSourceProtocol)effective.Source, CompetitionScorePresetResponses.Curve(effective.ScoreCurve));
+    }
+}
 
 public sealed class CompetitionChallengeRulesContract
 {
@@ -457,10 +483,6 @@ public sealed class GetChallengeEndpoint(
             ct);
         return item is null || configuration is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(new AdminCompetitionChallengeResponse(
-                ChallengeMapper.ToResponse(item),
-                CompetitionProtocolMapper.ToProtocol(configuration.Mode),
-                CompetitionProtocolMapper.ToProtocol(configuration.CompetitionStatus),
-                CompetitionChallengeRulesContractMapper.FromDomain(configuration.Rules)));
+            : TypedResults.Ok(AdminCompetitionChallengeResponse.Create(ChallengeMapper.ToResponse(item), configuration));
     }
 }

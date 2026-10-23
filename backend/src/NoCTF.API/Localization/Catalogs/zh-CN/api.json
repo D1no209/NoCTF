@@ -1,4 +1,11 @@
 {
+  "api.scorePresets.competitionNotFound": "竞赛不存在。",
+  "api.scorePresets.notFound": "分数预设不存在。",
+  "api.scorePresets.unsupportedMode": "分数预设适用于 CTF 竞赛。",
+  "api.scorePresets.invalidName": "请输入不超过 40 个字符的非空标签名称。",
+  "api.scorePresets.invalidCurve": "分数曲线无效，请检查分数、衰减队伍数和自定义表达式。",
+  "api.scorePresets.nameConflict": "已有分数预设使用此标签名称。",
+  "api.scorePresets.multipleTags": "一道题目只能选择一个分数预设标签。",
   "api.accessCompetition.title.invalidFlagAccess": "Flag 访问请求不合法。",
   "api.addCompetition.title.competitionQuestionMessageWas": "比赛咨询消息被拒绝。",
   "api.administration.issuePlatformUserToken.accountInactive": "账号未处于正常状态。",

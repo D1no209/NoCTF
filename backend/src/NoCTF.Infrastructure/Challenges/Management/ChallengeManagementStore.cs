@@ -25,6 +25,24 @@ public sealed class ChallengeManagementStore(
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
+    private async Task<ChallengeMutationFailure?> ValidateScorePresetTagsAsync(Guid competitionId, IReadOnlyList<string>? names,
+        CompetitionChallengeRules rules, CancellationToken ct)
+    {
+        if (names is null || names.Count == 0) return null;
+        var keys = names.Select(CompetitionChallengeTags.NormalizeName).Distinct().ToArray();
+        var presets = await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId && keys.Contains(item.NormalizedName)).ToArrayAsync(ct);
+        if (presets.Length > 1) return ChallengeMutationFailure.MultipleScorePresetTags;
+        if (presets.Length == 0 || rules is not CtfCompetitionChallengeRules { HasScoreCurve: false } ctf) return null;
+        var competition = (CtfCompetitionModeConfiguration)await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId).Select(item => item.ModeConfiguration!).SingleAsync(ct);
+        var eligibleTeams = await db.Teams.CountAsync(item => item.CompetitionId == competitionId
+            && item.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved && !item.IsBanned, ct);
+        return CtfConfigurationValidator.Validate(TypedGameModeConfiguration.Ctf(ctf, presets[0]),
+            TypedGameModeConfiguration.Ctf(competition), eligibleTeams).Count == 0
+            ? null : ChallengeMutationFailure.InvalidScorePresetCurve;
+    }
+
     public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
@@ -66,6 +84,8 @@ public sealed class ChallengeManagementStore(
             .Where(competition => competition.Id == command.CompetitionId)
             .Select(competition => competition.Mode)
             .SingleAsync(ct);
+        if (competitionMode == GameMode.Ctf && await ValidateScorePresetTagsAsync(command.CompetitionId, command.Tags, rules, ct) is { } tagFailure)
+            return new(null, tagFailure);
         if (command.CompetitionChallengeId is Guid requestedId
             && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item => item.Id == requestedId, ct))
@@ -226,6 +246,8 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
+        if (entity.Mode == GameMode.Ctf && await ValidateScorePresetTagsAsync(command.CompetitionId, command.Tags, entity.Rules!, ct) is { } tagFailure)
+            return new(null, tagFailure);
         var capabilities = NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(entity.Mode);
         if (!capabilities.ChallengePublication && command.HasPublicationChange) return new(null, ChallengeMutationFailure.PublicationUnsupported);
         if (capabilities.ScopedExecution && command.CustomTitle != entity.CustomTitle) return new(null, ChallengeMutationFailure.MaterialEditRequired);

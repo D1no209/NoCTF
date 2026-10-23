@@ -35,6 +35,8 @@ public sealed class CompetitionConfigurationStore(
                 && challenge.DeletedAt == null)
             .OrderBy(challenge => challenge.Id)
             .ToArrayAsync(ct);
+        var presets = await db.Set<NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset>().AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId).ToArrayAsync(ct);
         return new(
             competition.Id,
             competition.Mode,
@@ -45,7 +47,8 @@ public sealed class CompetitionConfigurationStore(
                 new CompetitionChallengeConfigurationSnapshot(
                     challenge.Id,
                     challenge.Rules ?? throw new InvalidOperationException(
-                        $"Competition challenge {challenge.Id} has no rules."))).ToArray(),
+                        $"Competition challenge {challenge.Id} has no rules."),
+                    NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(challenge.Tags.Select(tag => tag.Name), presets))).ToArray(),
             competition.UpdatedAt);
     }
 

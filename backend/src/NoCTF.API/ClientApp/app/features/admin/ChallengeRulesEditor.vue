@@ -10,6 +10,7 @@ import View from '~/components/views/admin/ChallengeRulesEditorView.vue'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
+  scorePreset?: import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionScorePresetResponse | null
   awdStores?: NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse[]
   competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
   rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<{
   hiddenKeys?: string[]
 }>(), {
   rules: null,
+  scorePreset: null,
   awdStores: () => [],
   inheritedConfiguration: null,
   readonly: false,

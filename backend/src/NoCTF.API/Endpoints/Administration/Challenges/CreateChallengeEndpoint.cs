@@ -99,6 +99,9 @@ public sealed class CreateChallengeEndpoint(
                 or ChallengeMutationFailure.ExperimentalFeatureDisabled =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
+            ChallengeMutationFailure.MultipleScorePresetTags or ChallengeMutationFailure.InvalidScorePresetCurve => ApiProblems.Problem(statusCode: 400,
+                detail: ApiMessages.For(result.Failure),
+                extensions: new Dictionary<string, object?> { ["code"] = result.Failure.Value.ToString() }),
             ChallengeMutationFailure.InvalidChallengeId
                 or ChallengeMutationFailure.InvalidTitle
                 or ChallengeMutationFailure.InvalidTags
