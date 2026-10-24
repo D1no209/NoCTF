@@ -84,6 +84,11 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             or CompetitionEventKind.AwdpFixAttempted
             or CompetitionEventKind.AwdpBreakResolved
             or CompetitionEventKind.AwdpFixResolved => true,
+        // Blood announcements are derived after publication. Refresh once more so
+        // webhook readiness can observe their newly committed outbox sequence.
+        CompetitionEventKind.FirstBloodAwarded
+            or CompetitionEventKind.SecondBloodAwarded
+            or CompetitionEventKind.ThirdBloodAwarded => true,
         _ => false
     };
 }
