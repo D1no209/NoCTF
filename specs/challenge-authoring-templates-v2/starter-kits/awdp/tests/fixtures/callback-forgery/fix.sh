@@ -32,6 +32,8 @@ if probe:
     try:
         with urllib.request.urlopen('http://' + probe + ':8081/result', timeout=3):
             pass
+    except urllib.error.HTTPError as error:
+        raise RuntimeError('Untrusted Fix reached the callback network') from error
     except urllib.error.URLError:
         print('callback-network-isolated')
     else:
