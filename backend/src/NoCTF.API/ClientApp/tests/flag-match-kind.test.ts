@@ -18,7 +18,7 @@ describe('challenge flag match kind editor', () => {
     expect(templatePage).toContain('value="RegularExpression"')
     expect(templatePage).not.toContain("common.description.regularExpressionMatchesEntire")
     expect(templatePage).toContain('usesRuntimeFlagInjection')
-    expect(templatePage).toContain("administration.challengesBy.description.challengeUsesRuntimeManaged")
+    expect(templatePage).toContain("challengeDelivery.runtimeManagedHint")
     expect(templatePage).not.toContain('flagForm.teamId')
     expect(templatePage).not.toContain('flagForm.specificationKind')
     expect(templatePage).not.toContain('flagForm.specificationId')
