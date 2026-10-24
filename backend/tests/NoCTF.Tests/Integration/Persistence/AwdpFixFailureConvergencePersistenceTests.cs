@@ -31,6 +31,36 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Trusted_checker_failure_is_applied_and_a_later_success_cannot_replace_it(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedBaseAsync(options, cancellationToken);
+            var operation = await AddFixAsync(options, fixture, RuntimeState.Running, cancellationToken);
+            await using var db = new NoCtfDbContext(options);
+            var outbox = new RecordingOutbox();
+            var store = new InternalResultStore(db, outbox, new CompetitionEventStore(db, outbox));
+            var failure = await store.RecordAwdpAsync(AwdpFixResult.Create(
+                operation.GameplayFactId, operation.RuntimeInstanceId, AwdpFixOutcome.ExploitSucceeded,
+                fixture.Now.AddSeconds(1)), cancellationToken);
+            var replay = await store.RecordAwdpAsync(AwdpFixResult.Create(
+                operation.GameplayFactId, operation.RuntimeInstanceId, AwdpFixOutcome.DefenseSucceeded,
+                fixture.Now.AddSeconds(2)), cancellationToken);
+
+            await Assert.That(failure).IsEqualTo(InternalResultDisposition.Applied);
+            await Assert.That(replay).IsEqualTo(InternalResultDisposition.Duplicate);
+            db.ChangeTracker.Clear();
+            var fact = await db.GameplayFacts.SingleAsync(item => item.Id == operation.GameplayFactId, cancellationToken);
+            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Wrong);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Successful_Fix_events_expose_the_current_result(
         CancellationToken cancellationToken)
     {

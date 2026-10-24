@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""只读取 Fix 输入或 Checker 重放副本的元数据，不执行内容、不输出原文。"""
+# 只读取 Fix 输入元数据，不执行内容或输出原文。
 import argparse
 import hashlib
 import json
@@ -7,7 +7,7 @@ import stat
 import sys
 from pathlib import Path, PurePosixPath
 
-ROOTS = {"input": Path("/noctf/fix"), "replay": Path("/tmp/noctf-fix-work")}
+ROOTS = {"input": Path("/noctf/fix")}
 MAX_BYTES = 16 * 1024 * 1024
 
 
@@ -42,8 +42,8 @@ def inspect_file(root: Path, relative: str, max_bytes: int = MAX_BYTES) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=ROOTS, required=True, help="input 为上传包，replay 为重放副本")
+    parser = argparse.ArgumentParser(description="检查 Fix 输入的普通文件元数据")
+    parser.add_argument("--source", choices=ROOTS, required=True, help="input 为上传包")
     parser.add_argument("--path", required=True, help="包内或工作目录中的相对文件路径")
     args = parser.parse_args()
     try:
