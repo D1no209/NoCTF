@@ -11,7 +11,7 @@ public sealed class UpdateChallengeFlagEndpoint(
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<SaveChallengeFlagRequest, Results<
-        Ok<ChallengeFlagResponse>,
+        Ok<TemplateChallengeFlagResponse>,
         NotFound,
         Conflict<ChallengeFlagFailureResponse>>>
 {
@@ -23,12 +23,12 @@ public sealed class UpdateChallengeFlagEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates a template-level static flag.";
-            summary.Description = "Replaces protected flag material and validity metadata within the template scope.";
+            summary.Description = "Updates protected static Flag content and its match rule within the template scope.";
         });
     }
 
     public override async Task<Results<
-        Ok<ChallengeFlagResponse>,
+        Ok<TemplateChallengeFlagResponse>,
         NotFound,
         Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         SaveChallengeFlagRequest request,
@@ -47,7 +47,7 @@ public sealed class UpdateChallengeFlagEndpoint(
         if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         if (result.Succeeded)
-            return TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!));
+            return TypedResults.Ok(ChallengeFlagMapping.ToTemplateResponse(result.Value!));
         var failure = ChallengeFlagFailureMapping.ToResponse(result.FailureCode!.Value, result.ErrorMessage);
         return TypedResults.Conflict(failure);
     }

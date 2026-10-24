@@ -107,7 +107,7 @@ public sealed class CreateChallengeFlagEndpoint(
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<SaveChallengeFlagRequest, Results<
-        Created<ChallengeFlagResponse>,
+        Created<TemplateChallengeFlagResponse>,
         NotFound,
         Conflict<ChallengeFlagFailureResponse>>>
 {
@@ -124,7 +124,7 @@ public sealed class CreateChallengeFlagEndpoint(
     }
 
     public override async Task<Results<
-        Created<ChallengeFlagResponse>,
+        Created<TemplateChallengeFlagResponse>,
         NotFound,
         Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         SaveChallengeFlagRequest request,
@@ -148,7 +148,7 @@ public sealed class CreateChallengeFlagEndpoint(
             var failure = ChallengeFlagFailureMapping.ToResponse(result.FailureCode!.Value, result.ErrorMessage);
             return TypedResults.Conflict(failure);
         }
-        var response = ChallengeFlagMapping.ToResponse(result.Value!);
+        var response = ChallengeFlagMapping.ToTemplateResponse(result.Value!);
         return TypedResults.Created($"/api/v1/admin/challenges/{challengeId}/flags/{response.Id}", response);
     }
 }

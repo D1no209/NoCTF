@@ -16,7 +16,7 @@ public sealed class GetChallengeFlagRequest
 public sealed class GetChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : Endpoint<GetChallengeFlagRequest, Results<Ok<ChallengeFlagResponse>, NotFound>>
+    : Endpoint<GetChallengeFlagRequest, Results<Ok<TemplateChallengeFlagResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -30,7 +30,7 @@ public sealed class GetChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<TemplateChallengeFlagResponse>, NotFound>> ExecuteAsync(
         GetChallengeFlagRequest request,
         CancellationToken ct)
     {
@@ -43,6 +43,6 @@ public sealed class GetChallengeFlagEndpoint(
             ct);
         return result is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(ChallengeFlagMapping.ToResponse(result));
+            : TypedResults.Ok(ChallengeFlagMapping.ToTemplateResponse(result));
     }
 }

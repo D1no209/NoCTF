@@ -184,6 +184,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: `${base}/events`, label: translate("administration.label.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("common.label.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("administration.label.runtime"), icon: Container },
+        { to: `${base}/deliveries`, label: translate('challengeDelivery.title'), icon: Download },
         ...(canJudge.value ? [
           { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
           { to: `${base}/cheats`, label: translate("administration.label.cheating"), icon: ShieldAlert },

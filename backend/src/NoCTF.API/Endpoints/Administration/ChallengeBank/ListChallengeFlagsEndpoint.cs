@@ -25,8 +25,25 @@ public sealed record ChallengeFlagListResponse(
     IReadOnlyList<ChallengeFlagResponse> Items,
     bool SupportsRegularExpression);
 
+public sealed record TemplateChallengeFlagResponse(Guid Id, Guid ChallengeId, string Flag,
+    ChallengeFlagMatchKindProtocol MatchKind, Guid? AttachmentId, DateTimeOffset? DeletedAt,
+    DateTimeOffset CreatedAt, bool SystemManaged);
+public sealed record TemplateChallengeFlagListResponse(IReadOnlyList<TemplateChallengeFlagResponse> Items,
+    bool SupportsRegularExpression);
+
 internal static class ChallengeFlagMapping
 {
+    public static TemplateChallengeFlagResponse ToTemplateResponse(ChallengeFlagView view) => new(
+        view.Id, view.ChallengeId ?? throw new InvalidOperationException("A template Flag must target a Challenge."),
+        view.Flag, view.MatchKind switch
+        {
+            ChallengeFlagMatchKind.Exact => ChallengeFlagMatchKindProtocol.Exact,
+            ChallengeFlagMatchKind.RegularExpression => ChallengeFlagMatchKindProtocol.RegularExpression,
+            _ => throw new ArgumentOutOfRangeException(nameof(view.MatchKind))
+        },
+        view.SpecificationKind == SpecificationKind.Attachment ? view.SpecificationId : null,
+        view.DeletedAt, view.CreatedAt, view.SpecificationKind == SpecificationKind.Attachment);
+
     public static ChallengeFlagResponse ToResponse(ChallengeFlagView view) =>
         new(
             view.Id, view.ChallengeId, view.CompetitionChallengeId, view.TeamId,
@@ -58,7 +75,7 @@ public sealed class ListChallengeFlagsRequest
 public sealed class ListChallengeFlagsEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : Endpoint<ListChallengeFlagsRequest, Results<Ok<ChallengeFlagListResponse>, NotFound>>
+    : Endpoint<ListChallengeFlagsRequest, Results<Ok<TemplateChallengeFlagListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -72,7 +89,7 @@ public sealed class ListChallengeFlagsEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeFlagListResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<TemplateChallengeFlagListResponse>, NotFound>> ExecuteAsync(
         ListChallengeFlagsRequest request,
         CancellationToken ct)
     {
@@ -89,8 +106,8 @@ public sealed class ListChallengeFlagsEndpoint(
             user.UserId,
             user.IsAdministrator,
             ct) == true;
-        return TypedResults.Ok(new ChallengeFlagListResponse(
-            items.Select(ChallengeFlagMapping.ToResponse).ToArray(),
+        return TypedResults.Ok(new TemplateChallengeFlagListResponse(
+            items.Select(ChallengeFlagMapping.ToTemplateResponse).ToArray(),
             supportsRegularExpression));
     }
 }

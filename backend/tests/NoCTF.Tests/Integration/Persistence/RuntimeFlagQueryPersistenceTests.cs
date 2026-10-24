@@ -167,6 +167,89 @@ public sealed class RuntimeFlagQueryPersistenceTests
         }, ct);
     }
 
+    [Test, Arguments(GameMode.Ctf), Arguments(GameMode.Awdp), Timeout(300_000)]
+    public Task Delivery_keeps_team_scope_and_runtime_flag_lifetime(GameMode mode, CancellationToken ct) => Run(mode, async (db, fixture) =>
+    {
+        if (mode == GameMode.Ctf)
+        {
+            var definition = await db.Set<CtfChallengeDefinition>().SingleAsync(item => item.ChallengeId == fixture.ChallengeId, ct);
+            definition.Runtime = new ContainerChallengeRuntimeTemplate { ChallengeId = fixture.ChallengeId,
+                FlagSource = PersistedRuntimeFlagSource.PerTeam, Allocation = PersistedRuntimeAllocation.PerTeam,
+                Services = [new() { Name = "main", Image = "alpine", FlagEnvironmentVariableName = "FLAG" }] };
+        }
+        var current = Flag(fixture, fixture.TeamId, fixture.RuntimeId, fixture.Now.AddMinutes(-1), mode);
+        var foreign = Flag(fixture, fixture.OtherTeamId, Guid.NewGuid(), fixture.Now.AddMinutes(-1), mode);
+        db.ChallengeFlags.AddRange(current, foreign);
+        await db.SaveChangesAsync(ct);
+        var reader = new NoCTF.Infrastructure.Competitions.Delivery.CompetitionDeliveryReader(db,
+            new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog());
+        var query = new NoCTF.Application.Competitions.Delivery.CompetitionDeliveryQuery(fixture.CompetitionId,
+            fixture.CompetitionChallengeId, fixture.TeamId, false, 0, 10, false, fixture.Now);
+        var page = await reader.ReadAsync(query, ct);
+        await Assert.That(page!.Total).IsEqualTo(1);
+        await Assert.That(page.Items.Single().Flags.Single().Id).IsEqualTo(current.Id);
+        await Assert.That(page.Items.Single().TeamName).IsEqualTo("Team");
+        var runtime = await db.RuntimeInstances.SingleAsync(item => item.Id == fixture.RuntimeId, ct);
+        runtime.State = RuntimeState.Stopped;
+        await db.SaveChangesAsync(ct);
+        page = await reader.ReadAsync(query, ct);
+        await Assert.That(page!.Items.Single().Flags.Count).IsEqualTo(mode == GameMode.Ctf ? 1 : 0);
+        if (mode == GameMode.Awdp)
+            await Assert.That((await reader.ReadAsync(query with { IncludeHistory = true }, ct))!.Items.Single().Flags.Single().State).IsEqualTo(RuntimeFlagState.Expired);
+        await Assert.That((await reader.ReadAsync(query with { TeamId = Guid.NewGuid() }, ct))!.Total).IsEqualTo(0);
+    }, ct);
+
+    [Test, Timeout(300_000)]
+    public Task Delivery_reads_random_attachments_without_assigning_them_and_bank_flags_remain_template_scoped(CancellationToken ct) =>
+        Run(GameMode.Ctf, async (db, fixture) =>
+        {
+            var attachments = Enumerable.Range(1, 2).Select(index => new ChallengeAttachment
+            {
+                Id = Guid.NewGuid(), ChallengeId = fixture.ChallengeId, CreatedAt = fixture.Now,
+                File = new NoCTF.Domain.Storage.StoredFile { Id = Guid.NewGuid(), ObjectKey = $"delivery/{Guid.NewGuid():N}",
+                    FileName = $"challenge-{index}.zip", ByteLength = 20, Sha256 = new byte[32], CreatedAt = fixture.Now }
+            }).ToArray();
+            db.AddRange(attachments);
+            foreach (var attachment in attachments)
+                db.ChallengeFlags.Add(new TemplateChallengeFlag { Id = Guid.NewGuid(), ChallengeId = fixture.ChallengeId,
+                    Flag = attachment.FileName, FlagSha256 = ManageChallengeFlags.Hash(attachment.FileName),
+                    SpecificationKind = SpecificationKind.Attachment, SpecificationId = attachment.Id, CreatedAt = fixture.Now });
+            var assigned = new TeamChallengeFlag { Id = Guid.NewGuid(), CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = fixture.TeamId, Flag = "team-attachment-flag", FlagSha256 = ManageChallengeFlags.Hash("team-attachment-flag"),
+                SpecificationKind = SpecificationKind.Attachment, SpecificationId = attachments[0].Id, CreatedAt = fixture.Now };
+            db.ChallengeFlags.Add(assigned);
+            await db.SaveChangesAsync(ct);
+            var reader = new NoCTF.Infrastructure.Competitions.Delivery.CompetitionDeliveryReader(db,
+                new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog());
+            var query = new NoCTF.Application.Competitions.Delivery.CompetitionDeliveryQuery(fixture.CompetitionId, null, null,
+                false, 0, 10, false, fixture.Now);
+            var countBefore = await db.ChallengeFlags.CountAsync(ct);
+            var page = await reader.ReadAsync(query, ct);
+            await Assert.That(page!.Total).IsEqualTo(2);
+            var team = page.Items.Single(item => item.TeamId == fixture.TeamId);
+            await Assert.That(team.Attachments.Single().Id).IsEqualTo(attachments[0].Id);
+            await Assert.That(team.Flags.Single().Flag).IsEqualTo(assigned.Flag);
+            await Assert.That(team.Flags.Single().AttachmentId).IsEqualTo(team.Attachments.Single().Id);
+            var unassigned = page.Items.Single(item => item.TeamId == fixture.OtherTeamId);
+            await Assert.That(unassigned.RandomAttachment).IsTrue();
+            await Assert.That(unassigned.Attachments.Count).IsEqualTo(0);
+            await Assert.That(unassigned.Flags.Count).IsEqualTo(0);
+            var next = await reader.ReadAsync(query with { Offset = 1, Limit = 1 }, ct);
+            await Assert.That(next!.Total).IsEqualTo(2);
+            await Assert.That(next.Items.Count).IsEqualTo(1);
+            await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(countBefore);
+            var bank = await new NoCTF.Infrastructure.Challenges.Flags.ChallengeFlagManagementStore(db)
+                .ListAsync(ChallengeFlagScope.Template(fixture.ChallengeId), fixture.OwnerId, false, false, ct);
+            await Assert.That(bank!.Count).IsEqualTo(2);
+            await Assert.That(bank.All(flag => flag.TeamId == null && flag.CompetitionChallengeId == null)).IsTrue();
+            assigned.DeletedAt = fixture.Now;
+            await db.SaveChangesAsync(ct);
+            var current = await reader.ReadAsync(query with { TeamId = fixture.TeamId }, ct);
+            await Assert.That(current!.Items.Single().Flags.Count).IsEqualTo(0);
+            var history = await reader.ReadAsync(query with { TeamId = fixture.TeamId, IncludeHistory = true }, ct);
+            await Assert.That(history!.Items.Single().Flags.Single().State).IsEqualTo(RuntimeFlagState.Deleted);
+        }, ct);
+
     private static ChallengeFlag Flag(Fixture fixture, Guid teamId, Guid runtimeId, DateTimeOffset createdAt, GameMode mode)
     {
         ChallengeFlag flag = mode switch { GameMode.Ctf => new TeamChallengeFlag(), GameMode.Awd => new AwdRoundChallengeFlag(), _ => new RuntimeInstanceChallengeFlag() };

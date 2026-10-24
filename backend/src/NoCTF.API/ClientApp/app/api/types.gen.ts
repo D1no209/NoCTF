@@ -5940,6 +5940,41 @@ export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionBadgesRequ
     [key: string]: never;
 };
 
+export type NoCtfapiPaginationArrayResultOfCompetitionDeliveryResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryResponse = {
+    teamId?: string;
+    teamName?: string;
+    competitionChallengeId?: string;
+    challengeTitle?: string;
+    randomAttachment?: boolean;
+    attachments?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryAttachmentResponse>;
+    flags?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryFlagResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryAttachmentResponse = {
+    id?: string;
+    fileName?: string;
+    deleted?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDeliveryFlagResponse = {
+    id?: string;
+    flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+    state?: NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagStateProtocol;
+    attachmentId?: string | null;
+    runtimeInstanceId?: string | null;
+    createdAt?: string;
+    validStart?: string | null;
+    validUntil?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionDeliveryRequest = NoCtfapiPaginationPaginationRequest & {};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse>;
 };
@@ -6542,6 +6577,17 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequ
     expectedSourceStamp: string;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse = {
+    id?: string;
+    challengeId?: string;
+    flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+    attachmentId?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+    systemManaged?: boolean;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
     message?: string;
@@ -6636,6 +6682,11 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProt
 
 export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeAttachmentsRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse>;
+    supportsRegularExpression?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeFlagsRequest = {
@@ -19553,6 +19604,52 @@ export type AdminHardDeleteCompetitionResponses = {
 
 export type AdminHardDeleteCompetitionResponse = AdminHardDeleteCompetitionResponses[keyof AdminHardDeleteCompetitionResponses];
 
+export type AdminListCompetitionDeliveriesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        competitionChallengeId?: string | null;
+        teamId?: string | null;
+        includeHistory: boolean;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/deliveries';
+};
+
+export type AdminListCompetitionDeliveriesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionDeliveriesError = AdminListCompetitionDeliveriesErrors[keyof AdminListCompetitionDeliveriesErrors];
+
+export type AdminListCompetitionDeliveriesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfCompetitionDeliveryResponse;
+};
+
+export type AdminListCompetitionDeliveriesResponse = AdminListCompetitionDeliveriesResponses[keyof AdminListCompetitionDeliveriesResponses];
+
 export type AdminListCompetitionPermissionCandidatesData = {
     body?: never;
     path: {
@@ -20633,7 +20730,7 @@ export type AdminChallengeBankListFlagsResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagListResponse;
+    200: NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagListResponse;
 };
 
 export type AdminChallengeBankListFlagsResponse = AdminChallengeBankListFlagsResponses[keyof AdminChallengeBankListFlagsResponses];
@@ -20673,7 +20770,7 @@ export type AdminChallengeBankCreateFlagResponses = {
     /**
      * Created
      */
-    201: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
+    201: NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse;
 };
 
 export type AdminChallengeBankCreateFlagResponse = AdminChallengeBankCreateFlagResponses[keyof AdminChallengeBankCreateFlagResponses];
@@ -20893,7 +20990,7 @@ export type AdminChallengeBankGetFlagResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
+    200: NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse;
 };
 
 export type AdminChallengeBankGetFlagResponse = AdminChallengeBankGetFlagResponses[keyof AdminChallengeBankGetFlagResponses];
@@ -20934,7 +21031,7 @@ export type AdminChallengeBankUpdateFlagResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
+    200: NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse;
 };
 
 export type AdminChallengeBankUpdateFlagResponse = AdminChallengeBankUpdateFlagResponses[keyof AdminChallengeBankUpdateFlagResponses];

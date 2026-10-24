@@ -4,6 +4,7 @@ import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/c
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
 const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { templateFlagAttachmentName } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -471,7 +472,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                 <Separator v-if="!usesRuntimeFlagInjection" class="mb-6" />
                 <Alert v-if="usesRuntimeFlagInjection" class="mb-4">
                   <AlertDescription>
-                    {{ $t('administration.challengesBy.description.challengeUsesRuntimeManaged') }}
+                    {{ $t('challengeDelivery.runtimeManagedHint') }}
                   </AlertDescription>
                 </Alert>
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
@@ -481,11 +482,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <EmptyHeader>
                     <EmptyTitle>{{ $t('administration.label.flagYet') }}</EmptyTitle>
                     <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('administration.challengesBy.label.addTemplateLevelStatic') }}</EmptyDescription>
-                    <EmptyDescription v-else>{{ $t('administration.challengesBy.description.dynamicFlagGeneratedAutomatically') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
-                <div v-else class="space-y-6">
-                  <section v-if="staticFlags.length > 0" class="space-y-2">
+                <div v-else class="flex flex-col gap-6">
+                  <section v-if="staticFlags.length > 0" class="flex flex-col gap-2">
                     <h3 class="text-sm font-semibold">{{ $t('administration.label.staticFlags') }}</h3>
                     <Table>
                   <TableHeader>
@@ -524,36 +524,25 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     </Table>
                   </section>
 
-                  <section v-if="systemFlags.length > 0" class="space-y-2">
+                  <section v-if="systemFlags.length > 0" class="flex flex-col gap-2">
                     <div>
-                      <h3 class="text-sm font-semibold">{{ $t('administration.label.systemGeneratedDynamicFlags') }}</h3>
+                      <h3 class="text-sm font-semibold">{{ $t('challengeDelivery.templateAttachmentFlags') }}</h3>
                     </div>
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>{{ $t('common.label.flag.flagSubmitView') }}</TableHead>
-                          <TableHead>{{ $t('common.label.team') }}</TableHead>
-                          <TableHead>{{ $t('administration.label.internalLink') }}</TableHead>
-                          <TableHead>{{ $t('administration.label.validityPeriod') }}</TableHead>
+                          <TableHead>{{ $t('challengeDelivery.attachment') }}</TableHead>
                           <TableHead>{{ $t('common.label.status') }}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         <TableRow v-for="flag in systemFlags" :key="flag.id">
                           <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md truncate font-mono text-sm" >{{ flag.flag }}</TableCell></Hint>
-                          <TableCell class="font-mono text-xs">{{ flag.teamId ?? $t('common.label.symbol') }}</TableCell>
-                          <TableCell class="font-mono text-xs">
-                            {{ flag.specificationKind ?? $t('common.label.symbol') }}<span v-if="flag.specificationId"> · {{ flag.specificationId }}</span>
-                          </TableCell>
-                          <TableCell class="text-sm text-muted-foreground">
-                            <template v-if="flag.validStart || flag.validUntil">
-                              <component :is="AdminDateTime" :value="flag.validStart" /> {{ $t('administration.label.byId') }} <component :is="AdminDateTime" :value="flag.validUntil" />
-                            </template>
-                            <span v-else>{{ $t('administration.challengesBy.label.effectiveLongTime') }}</span>
-                          </TableCell>
+                          <TableCell class="text-sm">{{ templateFlagAttachmentName(flag) }}</TableCell>
                           <TableCell>
                             <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('administration.label.expired') }}</Badge>
-                            <Badge v-else variant="secondary">{{ $t('common.label.injected') }}</Badge>
+                            <Badge v-else variant="secondary">{{ $t('administration.label.normal') }}</Badge>
                           </TableCell>
                         </TableRow>
                       </TableBody>

@@ -6,7 +6,7 @@ import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
@@ -27,7 +27,7 @@ type Template = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRes
 
 type Attachment = NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse
 
-type Flag = NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse
+type Flag = import('../../../../api').NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse
 
 /** Owns state, effects and commands for AdminChallengesByIdPage. */
 export function useAdminChallengesByIdPage() {
@@ -583,6 +583,10 @@ export function useAdminChallengesByIdPage() {
   const staticFlags = computed(() => flags.value.filter(flag => !flag.systemManaged))
 
   const systemFlags = computed(() => flags.value.filter(flag => flag.systemManaged))
+  function templateFlagAttachmentName(flag: Flag) {
+    return attachments.value.find(item => item.id === flag.attachmentId)?.fileName
+      ?? translate('challengeDelivery.attachmentUnavailable')
+  }
 
   async function loadFlags(): Promise<void> {
     flagsLoading.value = true
@@ -844,6 +848,7 @@ export function useAdminChallengesByIdPage() {
       flagActionPending,
       staticFlags,
       systemFlags,
+      templateFlagAttachmentName,
       createFlag,
       confirmDeleteFlag,
       restoreFlag,

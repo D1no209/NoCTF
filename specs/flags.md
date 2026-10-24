@@ -34,6 +34,12 @@ ChallengeFlag 必须二选一：
 
 模板 Flag 不允许 TeamId。判题同时加载实例 Flag与关联模板 Flag，再按模式/选择策略筛选。
 
+题库 Flag API 使用 `TemplateChallengeFlagResponse`，仅返回模板 ID、静态内容、匹配方式、附件关联和创建/删除信息，
+不返回 TeamId、CompetitionChallengeId 或比赛有效期。TemplateTest Flag 不进入题库列表。
+竞赛监控通过 `GET /admin/competitions/{competitionId}/deliveries` 按队伍与比赛题目分页读取实际 Flag 和附件关联，
+支持题目、队伍及历史筛选，响应设置 `Cache-Control: no-store, no-cache`。沿用 `CanObserveAsync` 竞赛权限，
+纯查询不调用生成、附件分配或下载记录流程。未分配队伍不会展示题库附件候选 Flag。
+
 ## SpecificationKind / SpecificationId
 
 首版 Kind：

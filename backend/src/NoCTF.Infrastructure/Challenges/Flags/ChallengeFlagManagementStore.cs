@@ -209,7 +209,8 @@ public sealed class ChallengeFlagManagementStore(
             flag.ChallengeId == scope.ChallengeId &&
             flag.CompetitionChallengeId == scope.CompetitionChallengeId
             && (scope.ChallengeId == null
-                || flag.SpecificationKind != SpecificationKind.RuntimeInstance));
+                || flag.Type == ChallengeFlagType.Template && flag.TeamId == null
+                    && (flag.SpecificationKind == null || flag.SpecificationKind == SpecificationKind.Attachment)));
     }
 
     private Task<bool> ScopeExistsAsync(

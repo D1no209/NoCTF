@@ -43,6 +43,8 @@ internal static class CompetitionInfrastructure
     {
         services.AddScoped<NoCTF.Application.Competitions.Directions.ICompetitionDirectionStore, Directions.CompetitionDirectionStore>();
         services.AddScoped<NoCTF.Application.Competitions.Directions.ManageCompetitionDirections>();
+        services.AddScoped<NoCTF.Application.Competitions.Delivery.ICompetitionDeliveryReader, Delivery.CompetitionDeliveryReader>();
+        services.AddScoped<NoCTF.Application.Competitions.Delivery.QueryCompetitionDelivery>();
         services.AddScoped<NoCTF.Application.Competitions.Scoring.ICompetitionScorePresetStore, Scoring.CompetitionScorePresetStore>();
         services.AddScoped<NoCTF.Application.Competitions.Scoring.ManageCompetitionScorePresets>();
         services.AddScoped<ICompetitionFeatureReader, CompetitionFeatureReader>();
