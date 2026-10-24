@@ -561,6 +561,11 @@ DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 ```text
 GET    /api/v1/admin/competitions/{competitionId}/webhooks
 GET    /api/v1/admin/competitions/{competitionId}/webhook-deliveries
+POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry
+GET    /api/v1/admin/competitions/{competitionId}/score-presets
+POST   /api/v1/admin/competitions/{competitionId}/score-presets
+PUT    /api/v1/admin/competitions/{competitionId}/score-presets/{presetId}
+DELETE /api/v1/admin/competitions/{competitionId}/score-presets/{presetId}
 GET    /api/v1/admin/competitions/{competitionId}/progression
 PUT    /api/v1/admin/competitions/{competitionId}/progression
 GET    /api/v1/admin/competitions/{competitionId}/badges
