@@ -24,20 +24,21 @@ const { RefreshCw, Copy, competitionId, challengeOptions, teamOptions, filterCha
     <Table v-else-if="items.length"><TableHeader><TableRow>
       <TableHead>{{ $t('common.label.team') }}</TableHead><TableHead>{{ $t('common.label.challenge.pageTitle') }}</TableHead>
       <TableHead>{{ $t('challengeDelivery.attachment') }}</TableHead><TableHead>{{ $t('common.label.flag.flagSubmitView') }}</TableHead>
-    </TableRow></TableHeader><TableBody><TableRow v-for="item in items" :key="`${item.teamId}:${item.competitionChallengeId}`">
-      <TableCell class="align-top font-medium"><NuxtLink :to="adminTeamPath(competitionId, item.teamId)" class="hover:underline">{{ item.teamName }}</NuxtLink></TableCell>
-      <TableCell class="align-top"><NuxtLink :to="adminChallengePath(competitionId, item.competitionChallengeId)" class="hover:underline">{{ item.challengeTitle }}</NuxtLink></TableCell>
-      <TableCell class="align-top"><div v-if="item.attachments?.length" class="flex flex-col gap-2"><div v-for="file in item.attachments" :key="file.id" class="max-w-64 break-words whitespace-normal text-sm">
-        {{ file.fileName }}<Badge v-if="file.deleted" variant="secondary">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
-      </div></div><span v-else class="text-sm text-muted-foreground">{{ $t(item.randomAttachment ? 'challengeDelivery.notAssigned' : 'common.label.symbol') }}</span></TableCell>
-      <TableCell class="align-top"><div v-if="item.flags?.length" class="flex flex-col gap-3"><div v-for="flag in item.flags" :key="flag.id" class="flex flex-col gap-1">
-        <div class="flex items-start gap-2"><code class="max-w-xl min-w-0 flex-1 break-all whitespace-pre-wrap font-mono text-sm">{{ flag.flag }}</code>
-          <Button variant="ghost" size="icon" :aria-label="$t('challengeDelivery.copyFlag')" @click="copy(flag)"><Copy /></Button></div>
-        <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Badge variant="secondary">{{ $t(stateKey(flag)) }}</Badge>
-          <span v-if="flag.attachmentId">{{ attachmentName(item, flag) }}</span>
+    </TableRow></TableHeader><TableBody><TableRow v-for="item in items" :key="`${item.teamId}:${item.competitionChallengeId}`" class="h-14">
+      <TableCell class="py-3 font-medium"><NuxtLink :to="adminTeamPath(competitionId, item.teamId)" class="hover:underline">{{ item.teamName }}</NuxtLink></TableCell>
+      <TableCell class="py-3"><NuxtLink :to="adminChallengePath(competitionId, item.competitionChallengeId)" class="hover:underline">{{ item.challengeTitle }}</NuxtLink></TableCell>
+      <TableCell class="py-3"><div v-if="item.attachments?.length" class="flex flex-col gap-2"><Hint v-for="file in item.attachments" :key="file.id" :content="file.fileName"><div tabindex="0" class="flex items-center gap-2 text-sm"><span class="max-w-64 truncate">
+        {{ file.fileName }}</span><Badge v-if="file.deleted" variant="secondary">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
+      </div></Hint></div><span v-else class="text-sm text-muted-foreground">{{ $t(item.randomAttachment ? 'challengeDelivery.notAssigned' : 'common.label.symbol') }}</span></TableCell>
+      <TableCell class="py-3"><div v-if="item.flags?.length" class="flex flex-col gap-2"><div v-for="flag in item.flags" :key="flag.id" class="flex h-8 items-center gap-2 whitespace-nowrap">
+        <Hint :content="flag.flag"><code tabindex="0" class="max-w-xl truncate font-mono text-sm">{{ flag.flag }}</code></Hint>
+        <Badge variant="secondary" class="shrink-0">{{ $t(stateKey(flag)) }}</Badge>
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+          <Hint v-if="flag.attachmentId" :content="attachmentName(item, flag)"><span tabindex="0" class="max-w-40 truncate">{{ attachmentName(item, flag) }}</span></Hint>
           <Badge v-if="flag.matchKind === 'RegularExpression'" variant="secondary">{{ $t('runtimeFlags.regex') }}</Badge>
           <span v-if="flag.validStart || flag.validUntil" class="font-mono tabular-nums">{{ adminFormatDateTime(flag.validStart) }} · {{ adminFormatDateTime(flag.validUntil) }}</span>
         </div>
+        <Button variant="ghost" size="icon-sm" class="ml-auto shrink-0" :aria-label="$t('challengeDelivery.copyFlag')" @click="copy(flag)"><Copy /></Button>
       </div></div><span v-else class="text-sm text-muted-foreground">{{ $t('challengeDelivery.notIssued') }}</span></TableCell>
     </TableRow></TableBody></Table>
     <OffsetPagination v-if="total > 0" :page="page" :page-count="pageCount" :total="total" :limit="pageLimit" :loading="loading"
