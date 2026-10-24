@@ -212,6 +212,29 @@ public sealed class CompetitionWebhookBloodReadinessTests
 
                 var projection = Projection(competitionId, challengeId, teamId,
                     clock.GetUtcNow(), competition.FrozenStartAt);
+                if (kind == CompetitionEventKind.FirstBloodAwarded && scope == LeaderboardDataScope.Live)
+                {
+                    for (var attempt = 0; attempt < 3; attempt++)
+                        await store.RecordProjectionWaitAsync(command,
+                            CompetitionWebhookProjectionFailure.MissingPublicProjection, clock.GetUtcNow(), ct);
+                    var failed = await db.CompetitionWebhookDeliveries.SingleAsync(
+                        item => item.EventId == eventId && item.TargetId == targetId, ct);
+                    await Assert.That(failed.State).IsEqualTo(CompetitionWebhookDeliveryState.DeadLetter);
+                    await Assert.That(await store.RetryProjectionFailureAsync(Guid.NewGuid(), targetId, eventId, clock.GetUtcNow(), ct))
+                        .IsEqualTo(CompetitionWebhookRetryFailure.NotFound);
+                    competition.WebhookTargets[0].Enabled = false;
+                    await db.SaveChangesAsync(ct);
+                    await Assert.That(await store.RetryProjectionFailureAsync(competitionId, targetId, eventId, clock.GetUtcNow(), ct))
+                        .IsEqualTo(CompetitionWebhookRetryFailure.TargetUnavailable);
+                    competition.WebhookTargets[0].Enabled = true;
+                    await db.SaveChangesAsync(ct);
+                    await Assert.That(await store.RetryProjectionFailureAsync(competitionId, targetId, eventId, clock.GetUtcNow(), ct)).IsNull();
+                    await db.Entry(failed).ReloadAsync(ct);
+                    await Assert.That(failed.State).IsEqualTo(CompetitionWebhookDeliveryState.Pending);
+                    await Assert.That(failed.ProjectionRetryCount).IsEqualTo(0);
+                    await Assert.That(await store.RetryProjectionFailureAsync(competitionId, targetId, eventId, clock.GetUtcNow(), ct))
+                        .IsEqualTo(CompetitionWebhookRetryFailure.NotRetryable);
+                }
                 if (scope == LeaderboardDataScope.Frozen)
                     leaderboard.GetFrozenWebhookScoreboardAsync(
                             competitionId, competition.FrozenStartAt!.Value,
@@ -270,6 +293,9 @@ public sealed class CompetitionWebhookBloodReadinessTests
                 await store.RecordHttpCompletedAsync(command,
                     new(CompetitionWebhookSendResult.Delivered, 204),
                     clock.GetUtcNow(), ct);
+                await Assert.That(await store.RetryProjectionFailureAsync(
+                    competitionId, targetId, eventId, clock.GetUtcNow(), ct))
+                    .IsEqualTo(CompetitionWebhookRetryFailure.NotRetryable);
                 clock.Advance(TimeSpan.FromSeconds(1));
             }
         });

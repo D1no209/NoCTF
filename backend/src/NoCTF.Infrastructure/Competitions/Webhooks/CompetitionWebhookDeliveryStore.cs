@@ -227,6 +227,9 @@ public sealed class CompetitionWebhookDeliveryStore(
                 ? CompetitionWebhookDeadLetterReason.InvalidPayload
                 : CompetitionWebhookDeadLetterReason.ProjectionUnavailable;
             NoCtfTelemetry.RecordWebhookDeadLetter(row.DeadLetterReason.Value.ToString());
+            logger.LogWarning(
+                "Competition webhook projection retries exhausted. CompetitionId {CompetitionId}, EventId {EventId}, TargetId {TargetId}, Failure {ProjectionFailure}, Attempts {ProjectionRetryCount}.",
+                delivery.CompetitionId, delivery.EventId, delivery.TargetId, failure, row.ProjectionRetryCount);
         }
         else
         {
@@ -235,6 +238,32 @@ public sealed class CompetitionWebhookDeliveryStore(
             NoCtfTelemetry.RecordWebhookRetry("projection");
         }
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<CompetitionWebhookRetryFailure?> RetryProjectionFailureAsync(
+        Guid competitionId, Guid targetId, Guid eventId, DateTimeOffset now, CancellationToken ct)
+    {
+        var record = db.CompetitionWebhookDeliveries.Where(item => item.CompetitionId == competitionId
+            && item.TargetId == targetId && item.EventId == eventId);
+        if (!await record.AnyAsync(ct)) return CompetitionWebhookRetryFailure.NotFound;
+        if (!await db.Competitions.Where(item => item.Id == competitionId && item.DeletedAt == null)
+                .AnyAsync(item => item.WebhookTargets.Any(target => target.Id == targetId && target.Enabled), ct))
+            return CompetitionWebhookRetryFailure.TargetUnavailable;
+        // A pending row is recovered by the existing scanner, including a crash after this commit.
+        // Never resend a delivered message or one whose HTTP outcome is already uncertain.
+        var changed = await record.Where(item => item.State == CompetitionWebhookDeliveryState.DeadLetter
+                && item.DeadLetterReason == CompetitionWebhookDeadLetterReason.ProjectionUnavailable
+                && item.FirstHttpAttemptStartedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.State, CompetitionWebhookDeliveryState.Pending)
+                .SetProperty(item => item.PayloadState, CompetitionWebhookPayloadState.Unknown)
+                .SetProperty(item => item.ProjectionRetryCount, 0)
+                .SetProperty(item => item.CompletedAt, (DateTimeOffset?)null)
+                .SetProperty(item => item.DeadLetterReason, (CompetitionWebhookDeadLetterReason?)null)
+                .SetProperty(item => item.NextRetryAt, now)
+                .SetProperty(item => item.EnqueueLeaseUntil, (DateTimeOffset?)null)
+                .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null), ct);
+        return changed == 1 ? null : CompetitionWebhookRetryFailure.NotRetryable;
     }
 
     public async Task RecordHttpStartedAsync(DeliverCompetitionWebhook delivery,

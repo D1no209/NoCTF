@@ -25199,6 +25199,91 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Retry Competition Webhook Delivery",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry.",
+        "operationId": "AdminRetryCompetitionWebhookDelivery",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryConflict"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/rotate-secret": {
       "post": {
         "tags": [
@@ -51691,6 +51776,47 @@
             "nullable": false
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryConflict": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "failure": {
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure"
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "NotFound",
+          "TargetUnavailable",
+          "NotRetryable"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse": {
         "type": "object",

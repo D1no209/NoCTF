@@ -68,6 +68,18 @@ Webhook Worker 每 250ms 扫描未完成的 Outbox 与到期目标记录，覆�
 完整受保护正文或签名密钥。网络超时后的重投仍可能到达接收方两次，接收方必须按 `webhook-id` 幂等。
 测试投递状态是短期状态，不代表正式 Outbox。
 
+### 未发送的投影死信恢复
+
+`POST /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry`
+要求调用方具备比赛管理权限。仅接受目标仍启用、状态为 `DeadLetter`、原因为
+`ProjectionUnavailable` 且 `FirstHttpAttemptStartedAt` 为空的指定记录。原子条件更新将其恢复为
+`Pending`，清除完成/死信状态并重置投影重试计数，由恢复扫描器重新发布投递任务。
+事件 ID、目标 ID、原始业务时间保留；重复请求观察到状态变化时返回 `409`，跨比赛或不存在记录返回 `404`。
+`202` 的 `Location` 指向该比赛的投递诊断列表，发送结果以诊断记录的 HTTP 回执为准。
+
+血榜公告在排行榜投影完成后生成，公告事件必须再触发一次排行榜刷新，使公开投影的源事件序号
+覆盖血榜 Outbox 序号。投影完整性和隐藏榜校验在重新准备负载时继续生效。
+
 ## 观测与 SLO
 
 赛事管理的 Webhook 页面可分页查看事件 ID/类型、目标、业务事件时间、Outbox 写入、Worker 出队、

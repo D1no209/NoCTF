@@ -145,6 +145,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<UpdateCompetitionWebhookTarget>();
         services.AddScoped<RotateCompetitionWebhookSecret>();
         services.AddScoped<DeleteCompetitionWebhookTarget>();
+        services.AddScoped<RetryCompetitionWebhookDelivery>();
         var webhookTimeoutSeconds = configuration.GetValue("Webhooks:TimeoutSeconds", 10);
         if (webhookTimeoutSeconds is < 1 or > 120)
             throw new InvalidOperationException("Webhooks:TimeoutSeconds must be between 1 and 120.");

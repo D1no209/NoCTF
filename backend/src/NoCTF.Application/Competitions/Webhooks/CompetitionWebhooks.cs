@@ -152,6 +152,9 @@ public sealed record CompetitionWebhookDelivery(
 
 public interface ICompetitionWebhookDeliveryStore
 {
+    Task<CompetitionWebhookRetryFailure?> RetryProjectionFailureAsync(
+        Guid competitionId, Guid targetId, Guid eventId, DateTimeOffset now, CancellationToken ct);
+
     Task<IReadOnlyList<CompetitionWebhookOutboxWakeup>> ClaimPendingOutboxAsync(
         DateTimeOffset now,
         int limit,

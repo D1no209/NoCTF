@@ -55,6 +55,11 @@ webhook-signature
 
 在管理页检查每个目标的 HTTP 状态、公开投影等待、首次/最近尝试、重试时间和 DeadLetter 原因。网络超时后对方可能已处理，因此接收方必须幂等。
 
+对于 `ProjectionUnavailable` 死信且尚未发起过 HTTP 的记录，拥有比赛管理权限的调用方可使用
+`POST /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry`
+恢复指定投递。目标需保持启用；接口重置投影重试计数并交由既有恢复扫描器处理，保留事件 ID 和业务发生时间。
+返回 `202` 表示受理，需通过投递记录确认最终 HTTP 回执；记录状态已变化时返回 `409`。
+
 URL 默认只允许公开 HTTPS，阻止回环、私网、metadata 和 DNS 重绑定。内网例外由部署运维精确配置，不在比赛页面自行放开。
 
 ## Bot 与 GitOps

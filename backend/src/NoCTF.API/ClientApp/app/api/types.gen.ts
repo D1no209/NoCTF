@@ -6108,6 +6108,21 @@ export type NoCtfapiEndpointsAdministrationCompetitionsPreviewAwdScoringRulesReq
     reason: string;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryResponse = {
+    eventId?: string;
+    targetId?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryConflict = {
+    failure?: NoCtfApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure;
+};
+
+export type NoCtfApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse = {
     signingSecret?: string;
     previousSecretValidUntil?: string;
@@ -19722,6 +19737,48 @@ export type AdminRestoreCompetitionResponses = {
 };
 
 export type AdminRestoreCompetitionResponse = AdminRestoreCompetitionResponses[keyof AdminRestoreCompetitionResponses];
+
+export type AdminRetryCompetitionWebhookDeliveryData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+        eventId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/deliveries/{eventId}/retry';
+};
+
+export type AdminRetryCompetitionWebhookDeliveryErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryConflict;
+};
+
+export type AdminRetryCompetitionWebhookDeliveryError = AdminRetryCompetitionWebhookDeliveryErrors[keyof AdminRetryCompetitionWebhookDeliveryErrors];
+
+export type AdminRetryCompetitionWebhookDeliveryResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryResponse;
+};
+
+export type AdminRetryCompetitionWebhookDeliveryResponse = AdminRetryCompetitionWebhookDeliveryResponses[keyof AdminRetryCompetitionWebhookDeliveryResponses];
 
 export type AdminRotateCompetitionWebhookSecretData = {
     body?: never;
