@@ -38,7 +38,7 @@ jobs:
         id: crowdin
         if: steps.translations.outputs.enabled == 'true'
         continue-on-error: true
-        uses: crowdin/github-action@9c23991700c0ec5256fd41089b9d9d7d540e424e # v3
+        uses: crowdin/github-action@959dc74ac104447731cba99a016f85d0ae719788 # v3
         with:
           config: .crowdin-stage.yml
           upload_sources: true
