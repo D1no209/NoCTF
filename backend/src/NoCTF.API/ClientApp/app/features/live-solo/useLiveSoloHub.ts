@@ -12,7 +12,7 @@ function connection() {
   }).withAutomaticReconnect([0, 2000, 5000, 10000]).configureLogging(LogLevel.None).build()
 }
 /** Private invalidations only. Delayed program pages never call this controller. */
-export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string | null>, staff: Ref<boolean>, refresh: () => Promise<void>, dependencies?: Dependencies) {
+export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string | null>, staff: Ref<boolean>, refresh: () => Promise<void>, dependencies?: Dependencies, scope: 'Match' | 'Bracket' = 'Match') {
   const auth = dependencies ? null : useAuth()
   const eligible = dependencies?.eligible ?? computed(() => !!auth?.user.value?.userId)
   const connected = ref(false), invalidate = createTrailingRefresh(refresh)
@@ -23,27 +23,30 @@ export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string |
   function clearRetry() { if (retryTimer) clearTimeout(retryTimer); retryTimer = undefined }
   /** 心跳失败或连接意外关闭后按固定退避重连;否则本对局剩余时间内的实时失效会永久消失。 */
   function scheduleRetry() {
-    if (disposed || retryTimer || !eligible.value || !matchId.value) return
+    if (disposed || retryTimer || !eligible.value || scope === 'Match' && !matchId.value) return
     retryTimer = setTimeout(() => { retryTimer = undefined; if (!disposed && eligible.value) void start() }, RETRY_DELAY_MS)
   }
   async function start() {
     const generation = ++revision, previous = hub; hub = null; connected.value = false; clearHeartbeat(); clearRetry()
     if (previous) await previous.stop().catch(() => {})
-    if (disposed || generation !== revision || !eligible.value || !competitionId.value || !matchId.value) return
+    if (disposed || generation !== revision || !eligible.value || !competitionId.value || scope === 'Match' && !matchId.value) return
     const competition = competitionId.value, match = matchId.value, audience = staff.value ? 1 : 0
     const candidate = (dependencies?.createConnection ?? connection)(); hub = candidate
     const current = () => !disposed && generation === revision && hub === candidate
     async function join() {
-      await candidate.invoke('JoinMatch', competition, match, audience)
+      if (scope === 'Bracket') await candidate.invoke('JoinBracket', competition)
+      else await candidate.invoke('JoinMatch', competition, match, audience)
       if (!current()) { await candidate.stop(); return }
       connected.value = true; clearHeartbeat()
       heartbeat = setInterval(() => {
-        void candidate.invoke('HeartbeatMatch', match).catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop(); scheduleRetry() })
+        void candidate.invoke(scope === 'Bracket' ? 'HeartbeatBracket' : 'HeartbeatMatch', scope === 'Bracket' ? competition : match)
+          .catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop(); scheduleRetry() })
       }, 5000)
       await invalidate()
     }
     candidate.on('matchChanged', (change: MatchInvalidation) => {
-      if (current() && connected.value && change?.competitionId?.toLowerCase() === competition.toLowerCase() && change?.matchId?.toLowerCase() === match.toLowerCase()) void invalidate()
+      if (current() && connected.value && change?.competitionId?.toLowerCase() === competition.toLowerCase()
+        && (scope === 'Bracket' || change?.matchId?.toLowerCase() === match?.toLowerCase())) void invalidate()
     })
     candidate.onreconnecting(() => { if (current()) { connected.value = false; clearHeartbeat() } })
     candidate.onreconnected(() => { if (current()) void join().catch(() => { connected.value = false; clearHeartbeat(); void candidate.stop() }) })
@@ -54,4 +57,7 @@ export function useLiveSoloHub(competitionId: Ref<string>, matchId: Ref<string |
   watch([competitionId, matchId, staff, eligible], () => { void start() }, { immediate: true })
   onScopeDispose(() => { disposed = true; revision++; clearHeartbeat(); clearRetry(); const previous = hub; hub = null; connected.value = false; if (previous) void previous.stop() })
   return { connected }
+}
+export function useLiveSoloBracketHub(competitionId: Ref<string>, refresh: () => Promise<void>, dependencies?: Dependencies) {
+  return useLiveSoloHub(competitionId, ref(null), ref(true), refresh, dependencies, 'Bracket')
 }

@@ -31,4 +31,18 @@ describe('LiveSolo schedule state', () => {
     expect(diagram.edges).toHaveLength(1); expect(diagram.edges[0]?.loser).toBe(true)
     expect(diagram.edges[0]?.from).toBe('first'); expect(diagram.edges[0]?.to).toBe('loser')
   })
+  test('avatars and full names survive projection while provisional winners remain unhighlighted', () => {
+    const diagram = tournamentDiagram({ matches: [
+      { lane: 'Swiss', stage: 1, match: { id: 'confirmed', state: 'Completed', leftTeamId: 'a', rightTeamId: 'b',
+        leftTeamName: 'A very long team name', leftAvatarUrl: '/teams/a/avatar', winnerTeamId: 'a' } },
+      { lane: 'Swiss', stage: 2, match: { id: 'correction', state: 'Completed', leftTeamId: 'a', rightTeamId: 'c', winnerTeamId: 'a', pendingCorrectionId: 'correction-id' } },
+      { lane: 'Swiss', stage: 3, match: { id: 'running', state: 'Running', leftTeamId: 'a', rightTeamId: 'd', winnerTeamId: 'a' } },
+    ] }, 1)
+    expect(diagram.nodes[0]?.sides[0]).toMatchObject({ name: 'A very long team name', avatarUrl: '/teams/a/avatar', winner: true })
+    expect(diagram.nodes[1]?.sides[0]?.winner).toBe(false)
+    expect(diagram.nodes[2]?.sides[0]?.winner).toBe(false)
+    expect(diagram.edges.map(edge => [edge.from, edge.to, edge.teamIds])).toEqual([
+      ['confirmed', 'correction', ['a']], ['correction', 'running', ['a']],
+    ])
+  })
 })

@@ -1,4 +1,10 @@
 {
+  "liveSolo.tournament.versus": "VS",
+  "liveSolo.tournament.winner": "Winner",
+  "liveSolo.tournament.live": "Live updates",
+  "liveSolo.tournament.polling": "Automatic refresh",
+  "liveSolo.tournament.syncing": "Updating",
+  "liveSolo.tournament.matchLabel": "Match {number}: {left} versus {right}, {state}",
   "liveSolo.tournament.swiss": "Swiss",
   "liveSolo.tournament.forfeit": "Forfeit",
   "liveSolo.tournament.resetNotNeeded": "Reset not needed",

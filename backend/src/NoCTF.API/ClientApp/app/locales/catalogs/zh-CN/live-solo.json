@@ -1,4 +1,10 @@
 {
+  "liveSolo.tournament.versus": "VS",
+  "liveSolo.tournament.winner": "胜方",
+  "liveSolo.tournament.live": "实时更新",
+  "liveSolo.tournament.polling": "自动刷新",
+  "liveSolo.tournament.syncing": "正在同步",
+  "liveSolo.tournament.matchLabel": "第 {number} 场：{left} 对阵 {right}，{state}",
   "liveSolo.tournament.swiss": "瑞士轮",
   "liveSolo.tournament.forfeit": "弃权结束",
   "liveSolo.tournament.resetNotNeeded": "无需重置决赛",

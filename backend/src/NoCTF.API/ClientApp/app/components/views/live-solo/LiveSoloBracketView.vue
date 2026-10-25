@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { LiveSoloBracketState } from '~/features/live-solo/useLiveSoloBracket'
 const props = defineProps<{ state: LiveSoloBracketState }>()
 const { bracket, loading, busy, error, writable, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows, seeded, champion,
-  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, display, LiveSoloTournamentMap } = toRefs(props.state)
+  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, display, connected, LiveSoloTournamentMap } = toRefs(props.state)
 </script>
 <template>
   <div class="flex w-full min-w-0 flex-col gap-6">
@@ -11,7 +11,7 @@ const { bracket, loading, busy, error, writable, options, addOptions, candidate,
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <div v-if="seeded && rows.length" class="flex flex-col gap-4">
       <ToggleGroup v-model="display" type="single" variant="outline" :aria-label="$t('liveSolo.tournament.view')"><ToggleGroupItem value="Map">{{ $t('liveSolo.tournament.overview') }}</ToggleGroupItem><ToggleGroupItem value="List">{{ $t('liveSolo.tournament.list') }}</ToggleGroupItem></ToggleGroup>
-      <component :is="LiveSoloTournamentMap" v-if="display !== 'List' && bracket" :bracket="bracket" @enter="enter" />
+      <component :is="LiveSoloTournamentMap" v-if="display !== 'List' && bracket" :bracket="bracket" :connected="connected" :syncing="loading" @enter="enter" />
     </div>
     <Card v-if="!seeded || !rows.length || display === 'List'" class="min-w-0"><CardContent class="flex min-w-0 flex-col gap-6">
       <Skeleton v-if="loading && !bracket" class="h-64" />
