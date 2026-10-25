@@ -2,7 +2,7 @@ import type { NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse as Bracket, NoCtf
   NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse as Row } from '../../api'
 import type { MessageKey } from '../../locales/en'
 import { matchStateKey } from './live-solo-state'
-const lanes = { Winners: 'liveSolo.settings.winners', Losers: 'liveSolo.settings.losers', GrandFinal: 'liveSolo.settings.grandFinal', ResetFinal: 'liveSolo.settings.resetFinal' } as const
+const lanes = { Winners: 'liveSolo.settings.winners', Losers: 'liveSolo.settings.losers', GrandFinal: 'liveSolo.settings.grandFinal', ResetFinal: 'liveSolo.settings.resetFinal', Swiss: 'liveSolo.tournament.swiss' } as const
 export function hasSeededBracket(bracket: Bracket | null) { return bracket?.matches?.some(row => row.sources?.some(source => source.seed != null || source.sourceMatchId != null)) ?? false }
 export function selectableTeams(teams: Team[], bracket: Bracket | null): Team[] {
   const active = new Set((bracket?.matches ?? []).filter(row => !['Completed', 'Canceled'].includes(row.match?.state ?? ''))

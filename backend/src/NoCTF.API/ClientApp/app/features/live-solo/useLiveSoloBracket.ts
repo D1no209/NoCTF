@@ -1,5 +1,5 @@
 import { liveSoloBasePath } from './navigation'
-import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
+import { computed, inject, markRaw, onMounted, onScopeDispose, ref } from 'vue'
 import { adminListTeams, createLiveSoloMatch, generateLiveSoloBracket, getLiveSoloBracket } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse as Bracket, NoCtfapiEndpointsTeamsTeamResponse as Team } from '~/api'
 import { competitionContextKey } from '~/utils/labels'
@@ -7,6 +7,7 @@ import { message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
 import { canManageLiveSolo } from './settings-draft'
 import { bracketRows, hasSeededBracket, selectableTeams, reorderSeed } from './bracket-state'
+import LiveSoloTournamentMapComponent from './LiveSoloTournamentMap.vue'
 
 export function useLiveSoloBracket() {
   const route = useRoute(), router = useRouter(), context = inject(competitionContextKey)
@@ -14,6 +15,7 @@ export function useLiveSoloBracket() {
   const bracket = ref<Bracket | null>(null), teams = ref<Team[]>([]), loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null)
   const seedIds = ref<string[]>([]), candidate = ref<string | null>(null), left = ref<string | null>(null), right = ref<string | null>(null), wins = ref<number | null>(null)
   const confirmation = ref<'Generate' | 'Create' | null>(null), plan = ref<{ stamp?: string; teamIds: string[]; wins: number | null } | null>(null)
+  const display = ref('Map')
   const available = computed(() => selectableTeams(teams.value, bracket.value)), seeded = computed(() => hasSeededBracket(bracket.value))
   const options = computed(() => available.value.map(team => ({ value: team.id!, label: team.name ?? '—' })))
   const addOptions = computed(() => options.value.filter(row => !seedIds.value.includes(row.value)))
@@ -24,13 +26,14 @@ export function useLiveSoloBracket() {
   const confirmationNames = computed(() => plan.value?.teamIds.map(id => teams.value.find(team => team.id === id)?.name ?? '—') ?? [])
   let disposed = false, request = 0
   async function load() {
-    if (busy.value || disposed) return
+    if (busy.value || loading.value && request > 0 || disposed) return
     const generation = ++request; loading.value = true
     try {
       if (!context?.competition.value) await context?.refresh()
       const path = { competitionId: competitionId.value }; const graph = await getLiveSoloBracket({ path })
       if (graph.error || !graph.data) throw parseLiveSoloError(graph.error, message('liveSolo.error.load'))
-      const roster: Team[] = []; let offset = 0, total = Infinity
+      const roster: Team[] = hasSeededBracket(graph.data) && teams.value.length ? [...teams.value] : []
+      let offset = 0, total = roster.length ? 0 : Infinity
       while (offset < total) {
         const result = await adminListTeams({ path, query: { offset, limit: 100, desc: false } })
         if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
@@ -73,8 +76,11 @@ export function useLiveSoloBracket() {
   }
   async function enter(id: string) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${id}`) }
   async function back() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}`) }
-  onMounted(() => { void load() }); onScopeDispose(() => { disposed = true; request++ })
+  let timer: ReturnType<typeof setInterval> | undefined
+  onMounted(() => { void load(); timer = setInterval(() => { if (document.visibilityState === 'visible' && confirmation.value === null) void load() }, 10_000) })
+  onScopeDispose(() => { disposed = true; request++; if (timer) clearInterval(timer) })
   return { bracket, teams, loading, busy, error, writable, available, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows,
-    seeded, champion, matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, back }
+    seeded, champion, matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, back,
+    display, LiveSoloTournamentMap: markRaw(LiveSoloTournamentMapComponent) }
 }
 export type LiveSoloBracketState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloBracket>>

@@ -1,7 +1,11 @@
 import type { NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract as Configuration } from '../../api'
 import type { MessageKey } from '../../locales/en'
 
-export type LiveSoloSettingsDraft = Required<Omit<Configuration, 'stageRules'>> & { stageRules: Required<NonNullable<Configuration['stageRules']>[number]>[] }
+export type TournamentStageDraft = Required<NonNullable<Configuration['tournamentStages']>[number]>
+export type LiveSoloSettingsDraft = Required<Omit<Configuration, 'stageRules' | 'tournamentStages'>> & {
+  stageRules: (Required<Omit<NonNullable<Configuration['stageRules']>[number], 'tournamentStage'>> & { tournamentStage?: number })[]
+  tournamentStages: TournamentStageDraft[]
+}
 export type NumberSetting = 'requiredWins' | 'countdownSeconds' | 'questionIntervalSeconds' | 'roundLimitSeconds' | 'publicDelaySeconds' | 'recordingRetentionDays' | 'maximumConcurrentMatches' | 'maximumRosterMembers' | 'maximumViewers'
 export const settingFields: { key: NumberSetting; label: MessageKey; min: number; max: number; section: 'match' | 'timing' | 'media' }[] = [
   { key: 'requiredWins', label: 'liveSolo.settings.wins', min: 1, max: 1024, section: 'match' },
@@ -21,13 +25,22 @@ export function settingsDraft(value: Configuration): LiveSoloSettingsDraft {
     recordingEnabled: value.recordingEnabled ?? false, recordingRetentionDays: value.recordingRetentionDays ?? 30,
     maximumConcurrentMatches: value.maximumConcurrentMatches ?? 4, maximumRosterMembers: value.maximumRosterMembers ?? 2,
     maximumViewers: value.maximumViewers ?? 50,
-    stageRules: (value.stageRules ?? []).map(row => ({ lane: row.lane ?? 'Winners', stage: row.stage ?? 1, requiredWins: row.requiredWins ?? 2 })) }
+    stageRules: (value.stageRules ?? []).map(row => ({ lane: row.lane ?? 'Winners', stage: row.stage ?? 1, requiredWins: row.requiredWins ?? 2, tournamentStage: row.tournamentStage ?? 1 })),
+    tournamentStages: (value.tournamentStages ?? []).map(row => ({ name: row.name ?? '', format: row.format ?? 'SingleElimination',
+      requiredWins: row.requiredWins ?? 1, advanceCount: row.advanceCount ?? 1, swissAdvanceWins: row.swissAdvanceWins ?? 3,
+      swissEliminateLosses: row.swissEliminateLosses ?? 3, swissQualificationRequiredWins: row.swissQualificationRequiredWins ?? 2,
+      swissEliminationRequiredWins: row.swissEliminationRequiredWins ?? 2 })) }
 }
 export function validSettings(value: LiveSoloSettingsDraft): boolean {
   return settingFields.every(field => Number.isInteger(value[field.key]) && value[field.key] >= field.min && value[field.key] <= field.max)
-    && ['SingleElimination', 'DoubleElimination'].includes(value.bracketFormat)
-    && value.stageRules.every(row => ['Winners', 'Losers', 'GrandFinal', 'ResetFinal'].includes(row.lane)
+    && ['SingleElimination', 'DoubleElimination', 'Swiss'].includes(value.bracketFormat)
+    && value.stageRules.every(row => ['Winners', 'Losers', 'GrandFinal', 'ResetFinal', 'Swiss'].includes(row.lane)
+      && Number.isInteger(row.tournamentStage ?? 1) && (row.tournamentStage ?? 1) >= 1
       && Number.isInteger(row.stage) && row.stage >= 1 && Number.isInteger(row.requiredWins) && row.requiredWins >= 1 && row.requiredWins <= 1024)
-    && new Set(value.stageRules.map(row => `${row.lane}:${row.stage}`)).size === value.stageRules.length
+    && new Set(value.stageRules.map(row => `${row.tournamentStage ?? 1}:${row.lane}:${row.stage}`)).size === value.stageRules.length
+    && value.tournamentStages.every(row => ['SingleElimination', 'DoubleElimination', 'Swiss'].includes(row.format) && row.name.length <= 120
+      && Number.isInteger(row.advanceCount) && row.advanceCount >= (row.format === 'Swiss' ? 0 : 1) && row.advanceCount <= 1024
+      && [row.requiredWins, row.swissQualificationRequiredWins, row.swissEliminationRequiredWins].every(n => Number.isInteger(n) && n >= 1 && n <= 1024)
+      && [row.swissAdvanceWins, row.swissEliminateLosses].every(n => Number.isInteger(n) && n >= 1 && n <= 32))
 }
 export function canManageLiveSolo(role: string | null | undefined) { return ['Administrator', 'Owner', 'Manager'].includes(role ?? '') }

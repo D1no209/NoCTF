@@ -3,13 +3,17 @@ import { toRefs } from 'vue'
 import type { LiveSoloBracketState } from '~/features/live-solo/useLiveSoloBracket'
 const props = defineProps<{ state: LiveSoloBracketState }>()
 const { bracket, loading, busy, error, writable, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows, seeded, champion,
-  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter } = toRefs(props.state)
+  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, display, LiveSoloTournamentMap } = toRefs(props.state)
 </script>
 <template>
   <div class="flex w-full min-w-0 flex-col gap-6">
     <header class="flex flex-wrap items-center gap-4"><h1 class="text-display text-2xl">{{ $t('liveSolo.bracket.title') }}</h1><Badge v-if="champion">{{ $t('liveSolo.bracket.champion',{team:champion}) }}</Badge><Button class="ml-auto" variant="ghost" :disabled="busy || confirmation !== null" @click="load">{{ $t('common.label.refresh') }}</Button></header>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
-    <Card class="min-w-0"><CardContent class="flex min-w-0 flex-col gap-6">
+    <div v-if="seeded && rows.length" class="flex flex-col gap-4">
+      <ToggleGroup v-model="display" type="single" variant="outline" :aria-label="$t('liveSolo.tournament.view')"><ToggleGroupItem value="Map">{{ $t('liveSolo.tournament.overview') }}</ToggleGroupItem><ToggleGroupItem value="List">{{ $t('liveSolo.tournament.list') }}</ToggleGroupItem></ToggleGroup>
+      <component :is="LiveSoloTournamentMap" v-if="display !== 'List' && bracket" :bracket="bracket" @enter="enter" />
+    </div>
+    <Card v-if="!seeded || !rows.length || display === 'List'" class="min-w-0"><CardContent class="flex min-w-0 flex-col gap-6">
       <Skeleton v-if="loading && !bracket" class="h-64" />
       <template v-if="writable && bracket && !seeded">
         <DefinitionSection v-if="!rows.length" :title="$t('liveSolo.bracket.seedTitle')" :collapsible="false"><div class="flex flex-col gap-4"><div class="flex min-w-0 flex-col gap-3 sm:flex-row"><div class="min-w-0 flex-1"><ChoicePicker v-model="candidate" :items="addOptions" :label="$t('liveSolo.bracket.chooseTeam')" :search-label="$t('liveSolo.bracket.searchTeam')" :empty-label="$t('liveSolo.bracket.noTeam')" :disabled="busy" /></div><Button class="shrink-0" :disabled="busy || !candidate" @click="add">{{ $t('liveSolo.bracket.add') }}</Button></div><div v-for="(team,index) in seeds" :key="team.id" class="flex flex-wrap items-center gap-3"><span class="w-8 font-mono tabular-nums">{{ team.number }}</span><span class="min-w-0 flex-1 break-words">{{ team.name }}</span><Button variant="ghost" :disabled="busy || index === 0" :aria-label="$t('liveSolo.bracket.up',{team:team.name})" @click="move(index,-1)">{{ $t('liveSolo.bracket.upShort') }}</Button><Button variant="ghost" :disabled="busy || index === seeds.length-1" :aria-label="$t('liveSolo.bracket.down',{team:team.name})" @click="move(index,1)">{{ $t('liveSolo.bracket.downShort') }}</Button><Button variant="ghost" :disabled="busy" @click="remove(index)">{{ $t('liveSolo.settings.remove') }}</Button></div><p class="text-sm text-muted-foreground">{{ $t('liveSolo.bracket.seedHelp') }}</p><div><Button :disabled="busy || seedIds.length < 2" @click="open('Generate')">{{ $t('liveSolo.bracket.generate') }}</Button></div></div></DefinitionSection>
