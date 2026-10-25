@@ -12,21 +12,33 @@ public interface ILiveSoloConnectionAccess
 public sealed class LiveSoloConnectionGuard(ILiveSoloConnectionAccess access, MfaConnectionGuard mfa)
 {
     private sealed record Subscription(HubCallerContext Context, LiveSoloRealtimeAccessRequest Request);
-    private readonly ConcurrentDictionary<(string Connection, Guid Match), Subscription> subscriptions = new();
-    public async Task<bool> JoinAsync(HubCallerContext context, Guid competitionId, Guid matchId, LiveSoloRealtimeAudience audience, CancellationToken ct)
+    private readonly ConcurrentDictionary<(string Connection, Guid Competition, Guid? Match), Subscription> subscriptions = new();
+    public Task<bool> JoinAsync(HubCallerContext context, Guid competitionId, Guid matchId, LiveSoloRealtimeAudience audience, CancellationToken ct)
+        => JoinCoreAsync(context, competitionId, matchId, audience, ct);
+    public Task<bool> JoinBracketAsync(HubCallerContext context, Guid competitionId, CancellationToken ct)
+        => JoinCoreAsync(context, competitionId, null, LiveSoloRealtimeAudience.Staff, ct);
+    private async Task<bool> JoinCoreAsync(HubCallerContext context, Guid competitionId, Guid? matchId, LiveSoloRealtimeAudience audience, CancellationToken ct)
     {
         if (!Guid.TryParse(context.UserIdentifier, out var userId)) return false;
-        if (!subscriptions.ContainsKey((context.ConnectionId, matchId)) && subscriptions.Keys.Count(x => x.Connection == context.ConnectionId) >= 16) return false;
+        if (!subscriptions.ContainsKey((context.ConnectionId, competitionId, matchId)) && subscriptions.Keys.Count(x => x.Connection == context.ConnectionId) >= 16) return false;
         var subscription = new Subscription(context, new(Guid.NewGuid().ToString("N"), userId, competitionId, matchId, audience));
         if (!(await ValidateAsync([subscription], ct)).Contains(context.ConnectionId)) return false;
-        subscriptions[(context.ConnectionId, matchId)] = subscription; return true;
+        subscriptions[(context.ConnectionId, competitionId, matchId)] = subscription; return true;
     }
-    public void Leave(string connectionId, Guid matchId) => subscriptions.TryRemove((connectionId, matchId), out _);
+    public void Leave(string connectionId, Guid matchId)
+    { foreach (var key in subscriptions.Keys.Where(x => x.Connection == connectionId && x.Match == matchId)) subscriptions.TryRemove(key, out _); }
+    public void LeaveBracket(string connectionId, Guid competitionId) => subscriptions.TryRemove((connectionId, competitionId, null), out _);
     public void Remove(string connectionId) { foreach (var key in subscriptions.Keys.Where(x => x.Connection == connectionId)) subscriptions.TryRemove(key, out _); }
     public async Task<bool> HeartbeatAsync(string connectionId, Guid matchId, CancellationToken ct)
-        => subscriptions.TryGetValue((connectionId, matchId), out var subscription) && (await ValidateAsync([subscription], ct)).Contains(connectionId);
+    {
+        var subscription = subscriptions.Values.SingleOrDefault(x => x.Context.ConnectionId == connectionId && x.Request.MatchId == matchId);
+        return subscription is not null && (await ValidateAsync([subscription], ct)).Contains(connectionId);
+    }
+    public async Task<bool> HeartbeatBracketAsync(string connectionId, Guid competitionId, CancellationToken ct)
+        => subscriptions.TryGetValue((connectionId, competitionId, null), out var subscription) && (await ValidateAsync([subscription], ct)).Contains(connectionId);
     public Task<string[]> EligibleAsync(Guid competitionId, Guid matchId, CancellationToken ct)
-        => ValidateAsync(subscriptions.Values.Where(x => x.Request.CompetitionId == competitionId && x.Request.MatchId == matchId).ToArray(), ct);
+        => ValidateAsync(subscriptions.Values.Where(x => x.Request.CompetitionId == competitionId
+            && (x.Request.MatchId == matchId || x.Request.MatchId is null && x.Request.Audience == LiveSoloRealtimeAudience.Staff)).ToArray(), ct);
     public async Task RevalidateAsync(CancellationToken ct) => await ValidateAsync(subscriptions.Values.ToArray(), ct);
     private async Task<string[]> ValidateAsync(IReadOnlyList<Subscription> candidates, CancellationToken ct)
     {

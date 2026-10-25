@@ -12,6 +12,17 @@ public interface ILiveSoloHubClient
 [Authorize]
 public sealed class LiveSoloHub(LiveSoloConnectionGuard guard) : Hub<ILiveSoloHubClient>
 {
+    public async Task JoinBracket(Guid competitionId)
+    {
+        if (competitionId == Guid.Empty || !await guard.JoinBracketAsync(Context, competitionId, Context.ConnectionAborted))
+            throw new HubException("The bracket subscription is not authorized.");
+    }
+    public async Task HeartbeatBracket(Guid competitionId)
+    {
+        if (!await guard.HeartbeatBracketAsync(Context.ConnectionId, competitionId, Context.ConnectionAborted))
+            throw new HubException("The bracket subscription is no longer authorized.");
+    }
+    public Task LeaveBracket(Guid competitionId) { guard.LeaveBracket(Context.ConnectionId, competitionId); return Task.CompletedTask; }
     public async Task JoinMatch(Guid competitionId, Guid matchId, LiveSoloRealtimeAudience audience)
     {
         if (!Enum.IsDefined(audience) || competitionId == Guid.Empty || matchId == Guid.Empty

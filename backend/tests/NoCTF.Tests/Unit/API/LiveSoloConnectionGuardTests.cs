@@ -9,6 +9,22 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class LiveSoloConnectionGuardTests
 {
     [Test]
+    public async Task Staff_bracket_subscription_covers_new_matches_only_in_its_competition_and_rechecks_revocation()
+    {
+        var user = Guid.NewGuid(); var context = Context(user); var access = Access();
+        var guard = new LiveSoloConnectionGuard(access, MfaHubTestSupport.Guard(("live", user, MfaHubKind.LiveSolo)));
+        var competition = Guid.NewGuid();
+        await Assert.That(await guard.JoinBracketAsync(context, competition, CancellationToken.None)).IsTrue();
+        await Assert.That(await guard.EligibleAsync(competition, Guid.NewGuid(), CancellationToken.None)).Contains("live");
+        await Assert.That(await guard.EligibleAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None)).IsEmpty();
+        guard.LeaveBracket("live", competition);
+        await Assert.That(await guard.HeartbeatBracketAsync("live", competition, CancellationToken.None)).IsFalse();
+        await guard.JoinBracketAsync(context, competition, CancellationToken.None);
+        access.EligibleAsync(Arg.Any<IReadOnlyList<LiveSoloRealtimeAccessRequest>>(), CancellationToken.None).Returns(new HashSet<string>());
+        await Assert.That(await guard.EligibleAsync(competition, Guid.NewGuid(), CancellationToken.None)).IsEmpty();
+        context.Received(1).Abort();
+    }
+    [Test]
     public async Task Private_push_rechecks_the_exact_match_and_disconnects_revoked_audiences()
     {
         var user = Guid.NewGuid(); var context = Context(user); var access = Access();

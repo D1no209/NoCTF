@@ -41,6 +41,7 @@ public sealed partial class LiveSoloMatchStore
             .Where(x => x.CompetitionId == competitionId && x.SupersededAt == null).OrderBy(x => x.TournamentStage).ThenBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var avatars = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AvatarFileId, ct);
         var stages = LiveSoloTournamentPolicy.Stages(configuration).Select((rules, index) => {
             var stageMatches = matches.Where(x => x.TournamentStage == index + 1).ToArray();
             var complete = LiveSoloTournamentPolicy.Complete(stageMatches, rules);
@@ -53,7 +54,9 @@ public sealed partial class LiveSoloMatchStore
         var matchIds = matches.Select(x => x.Id).ToArray();
         var withMedia = (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => matchIds.Contains(x.MatchId))
             .Select(x => x.MatchId).Distinct().ToArrayAsync(ct)).ToHashSet();
-        return new(competitionId, stamp, configuration.BracketFormat, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names, corrections, withMedia.Contains(x.Id)), x.Lane, x.Stage, x.Position, x.Conditional,
+        return new(competitionId, stamp, configuration.BracketFormat, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names, corrections, withMedia.Contains(x.Id)) with {
+            LeftAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Left).TeamId is Guid left ? avatars.GetValueOrDefault(left) : null,
+            RightAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Right).TeamId is Guid right ? avatars.GetValueOrDefault(right) : null }, x.Lane, x.Stage, x.Position, x.Conditional,
             x.Slots.Select(s => new LiveSoloBracketSourceView(s.Side, s.Source, s.Seed, s.SourceMatchId, s.Resolved, s.TeamId)).ToArray())
             { TournamentStage = x.TournamentStage, SwissWins = x.SwissWins, SwissLosses = x.SwissLosses }).ToArray(),
             matches.Any(x => x.Slots.Any(s => s.Seed != null)) ? champion : null) { TournamentStages = stages };

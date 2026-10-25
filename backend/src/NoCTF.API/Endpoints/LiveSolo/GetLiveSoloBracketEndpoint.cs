@@ -26,15 +26,15 @@ public sealed record LiveSoloBracketResponse(Guid CompetitionId, Guid Concurrenc
     IReadOnlyList<LiveSoloTournamentStageResponse>? TournamentStages = null);
 internal static class LiveSoloBracketProtocol
 {
-    public static LiveSoloBracketResponse Map(LiveSoloBracketView view) => new(view.CompetitionId, view.ConcurrencyStamp, view.Format,
-        view.Matches.Select(x => new LiveSoloBracketMatchResponse(LiveSoloProtocol.Match(x.Match), x.Lane, x.Stage, x.Position, x.Conditional,
+    public static LiveSoloBracketResponse Map(LiveSoloBracketView view, LinkGenerator? links = null, HttpContext? context = null) => new(view.CompetitionId, view.ConcurrencyStamp, view.Format,
+        view.Matches.Select(x => new LiveSoloBracketMatchResponse(LiveSoloProtocol.Match(x.Match, links, context), x.Lane, x.Stage, x.Position, x.Conditional,
             x.Sources.Select(s => new LiveSoloBracketSourceResponse(s.Side, s.Source, s.Seed, s.SourceMatchId, s.Resolved, s.TeamId)).ToArray(),
             x.TournamentStage, x.SwissWins, x.SwissLosses)).ToArray(), view.ChampionTeamId,
         view.TournamentStages.Select(x => new LiveSoloTournamentStageResponse(x.Number, LiveSoloConfigurationMapping.Stage(x.Rules), x.Complete,
             x.Standings.Select(s => new LiveSoloTournamentStandingResponse(s.TeamId, s.Seed, s.Wins, s.Losses, s.Buchholz, s.Byes, s.State)).ToArray(), x.QualifiedTeamIds)).ToArray());
 }
 public sealed class GetLiveSoloBracketRequest { public Guid CompetitionId { get; set; } }
-public sealed class GetLiveSoloBracketEndpoint(ManageLiveSoloBracket brackets, IUserContext user)
+public sealed class GetLiveSoloBracketEndpoint(ManageLiveSoloBracket brackets, IUserContext user, LinkGenerator links)
     : Endpoint<GetLiveSoloBracketRequest, Results<Ok<LiveSoloBracketResponse>, NotFound>>
 {
     public override void Configure()
@@ -47,6 +47,6 @@ public sealed class GetLiveSoloBracketEndpoint(ManageLiveSoloBracket brackets, I
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await brackets.ReadAsync(req.CompetitionId, user.UserId, ct);
-        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloBracketProtocol.Map(result));
+        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloBracketProtocol.Map(result, links, HttpContext));
     }
 }

@@ -29,14 +29,18 @@ public sealed class LiveSoloRealtimePersistenceTests
             var requests = new[] { Request("left", f.Left.Id, LiveSoloRealtimeAudience.Participant), Request("owner", f.Owner.Id, LiveSoloRealtimeAudience.Staff),
                 Request("not-staff", f.Left.Id, LiveSoloRealtimeAudience.Staff), Request("unknown", Guid.NewGuid(), LiveSoloRealtimeAudience.Participant),
                 Request("other-match", f.Left.Id, LiveSoloRealtimeAudience.Participant) with { MatchId = Guid.NewGuid() },
-                Request("other-event", f.Owner.Id, LiveSoloRealtimeAudience.Staff) with { CompetitionId = Guid.NewGuid() } };
-            await Assert.That(await access.EligibleAsync(requests, ct)).IsEquivalentTo(new[] { "left", "owner" });
+                Request("other-event", f.Owner.Id, LiveSoloRealtimeAudience.Staff) with { CompetitionId = Guid.NewGuid() },
+                Request("owner-bracket", f.Owner.Id, LiveSoloRealtimeAudience.Staff) with { MatchId = null },
+                Request("not-staff-bracket", f.Left.Id, LiveSoloRealtimeAudience.Staff) with { MatchId = null },
+                Request("participant-bracket", f.Left.Id, LiveSoloRealtimeAudience.Participant) with { MatchId = null } };
+            await Assert.That(await access.EligibleAsync(requests, ct)).IsEquivalentTo(new[] { "left", "owner", "owner-bracket" });
             (await f.Db.Teams.SingleAsync(x => x.Id == f.LeftTeam.Id, ct)).IsBanned = true; await f.Db.SaveChangesAsync(ct);
-            await Assert.That(await access.EligibleAsync(requests, ct)).IsEquivalentTo(new[] { "owner" });
+            await Assert.That(await access.EligibleAsync(requests, ct)).IsEquivalentTo(new[] { "owner", "owner-bracket" });
             var competition = await f.Db.Competitions.Include(x => x.Collaborators).SingleAsync(ct);
             competition.Collaborators.Add(new() { CompetitionId = f.Competition.Id, UserId = f.Right.Id, Role = CompetitionCollaboratorRole.Observer }); await f.Db.SaveChangesAsync(ct);
-            var observer = new[] { Request("observer", f.Right.Id, LiveSoloRealtimeAudience.Staff) };
-            await Assert.That(await access.EligibleAsync(observer, ct)).Contains("observer");
+            var observer = new[] { Request("observer", f.Right.Id, LiveSoloRealtimeAudience.Staff),
+                Request("observer-bracket", f.Right.Id, LiveSoloRealtimeAudience.Staff) with { MatchId = null } };
+            await Assert.That(await access.EligibleAsync(observer, ct)).IsEquivalentTo(new[] { "observer", "observer-bracket" });
             competition.Collaborators.Clear(); await f.Db.SaveChangesAsync(ct);
             await Assert.That(await access.EligibleAsync(observer, ct)).IsEmpty();
             (await f.Db.Set<LiveSoloCompetitionModeConfiguration>().SingleAsync(ct)).Enabled = false; await f.Db.SaveChangesAsync(ct);
