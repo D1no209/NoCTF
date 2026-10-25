@@ -29,7 +29,7 @@ public sealed class GenerateLiveSoloBracketEndpoint(ManageLiveSoloBracket bracke
     {
         Post("/competitions/{competitionId}/live-solo/bracket"); AuthSchemes("Bearer");
         Description(x => x.WithName("GenerateLiveSoloBracket"));
-        Summary(x => x.Summary = "Generates a seeded single/double elimination bracket before Matches exist; byes do not count as defeats.");
+        Summary(x => x.Summary = "Generates the first configured tournament stage before matches exist; Swiss pairings and later stages advance from confirmed results.");
     }
     public override async Task<Results<Ok<LiveSoloBracketResponse>, NotFound, ForbidHttpResult,
         Conflict<LiveSoloFailureResponse>, UnprocessableEntity<LiveSoloFailureResponse>>> ExecuteAsync(GenerateLiveSoloBracketRequest req, CancellationToken ct)

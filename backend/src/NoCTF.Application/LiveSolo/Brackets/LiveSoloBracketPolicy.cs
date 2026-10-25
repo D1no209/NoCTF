@@ -11,6 +11,8 @@ public static class LiveSoloBracketPolicy
         if (!Enum.IsDefined(configuration.BracketFormat)) throw new ArgumentOutOfRangeException(nameof(configuration));
         if (seeds.Count is < 2 or > 1024 || seeds.Contains(Guid.Empty) || seeds.Distinct().Count() != seeds.Count)
             throw new ArgumentException("A bracket requires 2..1024 distinct teams.", nameof(seeds));
+        if (configuration.BracketFormat == LiveSoloBracketFormat.Swiss)
+            return LiveSoloTournamentPolicy.Generate(competitionId, seeds, configuration, 1, now);
         var size = 2; while (size < seeds.Count) size *= 2;
         var order = new[] { 1, 2 };
         for (var n = 4; n <= size; n *= 2) order = order.SelectMany(x => new[] { x, n + 1 - x }).ToArray();

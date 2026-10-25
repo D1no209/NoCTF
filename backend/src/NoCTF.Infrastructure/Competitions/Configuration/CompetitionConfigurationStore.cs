@@ -86,13 +86,21 @@ public sealed class CompetitionConfigurationStore(
                 return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
         }
         if (tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration existingLive
-            && configuration is LiveSoloCompetitionModeConfiguration nextLive && existingLive.BracketFormat != nextLive.BracketFormat
+            && configuration is LiveSoloCompetitionModeConfiguration nextLive
+            && (existingLive.BracketFormat != nextLive.BracketFormat || !existingLive.TournamentStages.OrderBy(x => x.Position)
+                .Select(x => (x.Position, x.Name, x.Format, x.RequiredWins, x.AdvanceCount, x.SwissAdvanceWins, x.SwissEliminateLosses, x.SwissQualificationRequiredWins, x.SwissEliminationRequiredWins))
+                .SequenceEqual(nextLive.TournamentStages.OrderBy(x => x.Position)
+                    .Select(x => (x.Position, x.Name, x.Format, x.RequiredWins, x.AdvanceCount, x.SwissAdvanceWins, x.SwissEliminateLosses, x.SwissQualificationRequiredWins, x.SwissEliminationRequiredWins))))
             && await db.LiveSoloMatches.AnyAsync(x => x.CompetitionId == competitionId, ct))
             return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
         var stagesChanged = tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration beforeLive
             && configuration is LiveSoloCompetitionModeConfiguration afterLive
-            && !beforeLive.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.Lane, x.Stage, x.RequiredWins))
-                .SequenceEqual(afterLive.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.Lane, x.Stage, x.RequiredWins)));
+            && !beforeLive.StageRules.OrderBy(x => x.TournamentStage).ThenBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.TournamentStage, x.Lane, x.Stage, x.RequiredWins))
+                .SequenceEqual(afterLive.StageRules.OrderBy(x => x.TournamentStage).ThenBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.TournamentStage, x.Lane, x.Stage, x.RequiredWins)));
+        var tournamentChanged = tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration oldTournament
+            && configuration is LiveSoloCompetitionModeConfiguration newTournament
+            && !oldTournament.TournamentStages.OrderBy(x => x.Position).Select(x => (x.Name, x.Format, x.RequiredWins, x.AdvanceCount, x.SwissAdvanceWins, x.SwissEliminateLosses, x.SwissQualificationRequiredWins, x.SwissEliminationRequiredWins))
+                .SequenceEqual(newTournament.TournamentStages.OrderBy(x => x.Position).Select(x => (x.Name, x.Format, x.RequiredWins, x.AdvanceCount, x.SwissAdvanceWins, x.SwissEliminateLosses, x.SwissQualificationRequiredWins, x.SwissEliminationRequiredWins)));
         var bloodChanged = tracked.ModeConfiguration is CtfCompetitionModeConfiguration beforeCtf
             && configuration is CtfCompetitionModeConfiguration afterCtf
             && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
@@ -106,7 +114,7 @@ public sealed class CompetitionConfigurationStore(
             && configuration is AwdCompetitionModeConfiguration nextAwd)
             currentAwd.AwdOptions = nextAwd.AwdOptions with { };
         db.ChangeTracker.DetectChanges();
-        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged && !tieBreaksChanged)
+        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged && !tieBreaksChanged && !tournamentChanged)
         {
             var unchanged = await FindAsync(competitionId, ct);
             await transaction.CommitAsync(ct);
@@ -132,7 +140,17 @@ public sealed class CompetitionConfigurationStore(
             currentLive.StageRules.Clear();
             await db.SaveChangesAsync(ct);
             currentLive.StageRules = requestedLive.StageRules.Select(x => new LiveSoloStageRule {
-                CompetitionId = competitionId, Lane = x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList();
+                CompetitionId = competitionId, TournamentStage = x.TournamentStage, Lane = x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList();
+            db.Set<LiveSoloStageRule>().AddRange(currentLive.StageRules);
+        }
+        if (tournamentChanged && tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration currentTournament
+            && configuration is LiveSoloCompetitionModeConfiguration requestedTournament)
+        {
+            db.Set<LiveSoloTournamentStage>().RemoveRange(currentTournament.TournamentStages);
+            currentTournament.TournamentStages.Clear();
+            await db.SaveChangesAsync(ct);
+            currentTournament.TournamentStages = requestedTournament.TournamentStages;
+            db.Set<LiveSoloTournamentStage>().AddRange(currentTournament.TournamentStages);
         }
         if (tieBreaksChanged && tracked.ModeConfiguration is AwdCompetitionModeConfiguration ranking
             && configuration is AwdCompetitionModeConfiguration requestedRanking)

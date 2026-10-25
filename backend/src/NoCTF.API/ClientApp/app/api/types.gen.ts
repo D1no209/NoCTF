@@ -1723,9 +1723,10 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse = {
     format?: NoCtfDomainLiveSoloLiveSoloBracketFormat;
     matches?: Array<NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse>;
     championTeamId?: string | null;
+    tournamentStages?: Array<NoCtfapiEndpointsLiveSoloLiveSoloTournamentStageResponse> | null;
 };
 
-export type NoCtfDomainLiveSoloLiveSoloBracketFormat = 'SingleElimination' | 'DoubleElimination';
+export type NoCtfDomainLiveSoloLiveSoloBracketFormat = 'SingleElimination' | 'DoubleElimination' | 'Swiss';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse = {
     match?: NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse;
@@ -1734,9 +1735,12 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse = {
     position?: number;
     conditional?: boolean;
     sources?: Array<NoCtfapiEndpointsLiveSoloLiveSoloBracketSourceResponse>;
+    tournamentStage?: number;
+    swissWins?: number | null;
+    swissLosses?: number | null;
 };
 
-export type NoCtfDomainLiveSoloLiveSoloBracketLane = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal';
+export type NoCtfDomainLiveSoloLiveSoloBracketLane = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal' | 'Swiss';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloBracketSourceResponse = {
     side?: NoCtfDomainLiveSoloLiveSoloSide;
@@ -1750,6 +1754,39 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloBracketSourceResponse = {
 export type NoCtfDomainLiveSoloLiveSoloSide = 'Left' | 'Right';
 
 export type NoCtfDomainLiveSoloLiveSoloSlotSource = 'Seed' | 'Winner' | 'Loser' | 'Bye';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloTournamentStageResponse = {
+    number?: number;
+    rules?: NoCtfapiEndpointsLiveSoloLiveSoloTournamentStageContract;
+    complete?: boolean;
+    standings?: Array<NoCtfapiEndpointsLiveSoloLiveSoloTournamentStandingResponse>;
+    qualifiedTeamIds?: Array<string>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloTournamentStageContract = {
+    name?: string;
+    format?: NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol;
+    requiredWins?: number;
+    advanceCount?: number;
+    swissAdvanceWins?: number;
+    swissEliminateLosses?: number;
+    swissQualificationRequiredWins?: number;
+    swissEliminationRequiredWins?: number;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol = 'SingleElimination' | 'DoubleElimination' | 'Swiss';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloTournamentStandingResponse = {
+    teamId?: string;
+    seed?: number;
+    wins?: number;
+    losses?: number;
+    buchholz?: number;
+    byes?: number;
+    state?: NoCtfApplicationLiveSoloBracketsLiveSoloTournamentStandingState;
+};
+
+export type NoCtfApplicationLiveSoloBracketsLiveSoloTournamentStandingState = 'Active' | 'Qualified' | 'Eliminated';
 
 export type NoCtfapiEndpointsLiveSoloGenerateLiveSoloBracketRequest = {
     expectedStamp: string;
@@ -1777,17 +1814,17 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract = {
     maximumViewers?: number;
     stageRules?: Array<NoCtfapiEndpointsLiveSoloLiveSoloStageRuleContract>;
     staticFlagEvidenceRequired?: boolean;
+    tournamentStages?: Array<NoCtfapiEndpointsLiveSoloLiveSoloTournamentStageContract> | null;
 };
-
-export type NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol = 'SingleElimination' | 'DoubleElimination';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloStageRuleContract = {
     lane?: NoCtfapiEndpointsLiveSoloLiveSoloBracketLaneProtocol;
     stage?: number;
     requiredWins?: number;
+    tournamentStage?: number;
 };
 
-export type NoCtfapiEndpointsLiveSoloLiveSoloBracketLaneProtocol = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal';
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketLaneProtocol = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal' | 'Swiss';
 
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloConfigurationRequest = {
     [key: string]: never;

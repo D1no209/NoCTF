@@ -4569,6 +4569,20 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("superseded_at");
 
+                    b.Property<int?>("SwissLosses")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_losses");
+
+                    b.Property<int?>("SwissWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_wins");
+
+                    b.Property<int>("TournamentStage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tournament_stage");
+
                     b.Property<Guid?>("WinnerTeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("winner_team_id");
@@ -4591,9 +4605,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("WinnerTeamId")
                         .HasDatabaseName("ix_live_solo_matches_winner_team_id");
 
-                    b.HasIndex("CompetitionId", "Lane", "Stage", "Position", "BracketGeneration")
+                    b.HasIndex("CompetitionId", "TournamentStage", "Lane", "Stage", "Position", "BracketGeneration")
                         .IsUnique()
-                        .HasDatabaseName("ix_live_solo_matches_competition_id_lane_stage_position_bracke");
+                        .HasDatabaseName("ix_live_solo_matches_competition_id_tournament_stage_lane_stag");
 
                     b.ToTable("live_solo_matches", (string)null);
                 });
@@ -6198,6 +6212,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
+                    b.Property<int>("TournamentStage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tournament_stage");
+
                     b.Property<short>("Lane")
                         .HasColumnType("smallint")
                         .HasColumnName("lane");
@@ -6210,7 +6230,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("required_wins");
 
-                    b.HasKey("CompetitionId", "Lane", "Stage")
+                    b.HasKey("CompetitionId", "TournamentStage", "Lane", "Stage")
                         .HasName("pk_live_solo_stage_rules");
 
                     b.ToTable("live_solo_stage_rules", (string)null);
@@ -6245,6 +6265,56 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_submissions_round_id_admission_sequence");
 
                     b.ToTable("live_solo_submissions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloTournamentStage", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("AdvanceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("advance_count");
+
+                    b.Property<short>("Format")
+                        .HasColumnType("smallint")
+                        .HasColumnName("format");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.Property<int>("SwissAdvanceWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_advance_wins");
+
+                    b.Property<int>("SwissEliminateLosses")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_eliminate_losses");
+
+                    b.Property<int>("SwissEliminationRequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_elimination_required_wins");
+
+                    b.Property<int>("SwissQualificationRequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_qualification_required_wins");
+
+                    b.HasKey("CompetitionId", "Position")
+                        .HasName("pk_live_solo_tournament_stages");
+
+                    b.ToTable("live_solo_tournament_stages", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloViewerLease", b =>
@@ -13480,6 +13550,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_live_solo_submissions_live_solo_round_questions_round_quest");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloTournamentStage", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", null)
+                        .WithMany("TournamentStages")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_tournament_stages_competition_mode_configuration_");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloViewerLease", b =>
                 {
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
@@ -15098,6 +15178,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", b =>
                 {
                     b.Navigation("StageRules");
+
+                    b.Navigation("TournamentStages");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", b =>

@@ -19,6 +19,9 @@ public sealed class SaveLiveSoloConfigurationValidator : Validator<SaveLiveSoloC
         RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.Configuration).NotNull();
         RuleFor(x => x.Configuration.StageRules).NotNull().When(x => x.Configuration is not null);
         RuleForEach(x => x.Configuration.StageRules).NotNull().When(x => x.Configuration?.StageRules is not null);
+        RuleForEach(x => x.Configuration.TournamentStages!).NotNull().When(x => x.Configuration?.TournamentStages is not null);
+        RuleForEach(x => x.Configuration.TournamentStages!).ChildRules(stage => stage.RuleFor(x => x.Name).NotNull().MaximumLength(120))
+            .When(x => x.Configuration?.TournamentStages is not null);
     }
 }
 public sealed class SaveLiveSoloConfigurationEndpoint(ManageLiveSoloConfiguration configuration, IUserContext user, TimeProvider clock)

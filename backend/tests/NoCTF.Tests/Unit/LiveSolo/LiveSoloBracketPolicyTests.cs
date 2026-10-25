@@ -50,6 +50,56 @@ public sealed class LiveSoloBracketPolicyTests
         await Assert.That(graph.Where(x => x.State == LiveSoloMatchState.AwaitingOpponents).All(x => x.Slots.Any(s => !s.Resolved))).IsTrue();
     }
 
+    [Test]
+    [Arguments(3)] [Arguments(8)] [Arguments(16)]
+    public async Task Swiss_rounds_use_thresholds_and_stage_specific_deciding_rules(int count)
+    {
+        var seeds = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray();
+        var now = DateTimeOffset.UtcNow;
+        var rules = new LiveSoloTournamentStage { Format = LiveSoloBracketFormat.Swiss, RequiredWins = 1,
+            SwissAdvanceWins = 3, SwissEliminateLosses = 3, SwissQualificationRequiredWins = 3, SwissEliminationRequiredWins = 2, AdvanceCount = 0 };
+        var graph = new List<LiveSoloMatch>();
+        for (var round = 1; round <= 5; round++)
+        {
+            var next = LiveSoloTournamentPolicy.SwissRound(Guid.NewGuid(), seeds, graph, rules, [], 1, now);
+            await Assert.That(next.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId).Distinct().Count())
+                .IsEqualTo(next.Sum(x => x.Slots.Count(s => s.TeamId != null)));
+            foreach (var match in next)
+            {
+                if (match.SwissWins == 2) await Assert.That(match.RequiredWins).IsEqualTo(3);
+                if (match.State == LiveSoloMatchState.Completed) continue;
+                match.WinnerTeamId = match.Slots[0].TeamId; match.State = LiveSoloMatchState.Completed;
+            }
+            graph.AddRange(next);
+            if (LiveSoloTournamentPolicy.Complete(graph, rules)) break;
+        }
+        var standings = LiveSoloTournamentPolicy.Standings(graph, rules);
+        await Assert.That(standings.All(x => x.Wins == 3 || x.Losses == 3)).IsTrue();
+        await Assert.That(LiveSoloTournamentPolicy.Complete(graph, rules)).IsTrue();
+        await Assert.That(LiveSoloTournamentPolicy.Qualifiers(graph, rules).Count).IsEqualTo(standings.Count(x => x.Wins == 3));
+        var elimination = new LiveSoloCompetitionModeConfiguration { TournamentStages = [rules,
+            new() { Position = 1, Format = LiveSoloBracketFormat.DoubleElimination, RequiredWins = 2, AdvanceCount = 1 }] };
+        var qualified = LiveSoloTournamentPolicy.Qualifiers(graph, rules);
+        var playoffs = LiveSoloTournamentPolicy.Generate(Guid.NewGuid(), qualified, elimination, 2, now);
+        Play(playoffs, false, now);
+        await Assert.That(LiveSoloTournamentPolicy.Complete(playoffs, elimination.TournamentStages[1])).IsTrue();
+        await Assert.That(playoffs.All(x => x.TournamentStage == 2)).IsTrue();
+    }
+
+    [Test]
+    public async Task Swiss_winner_correction_invalidates_all_later_pairings_and_stages()
+    {
+        var seeds = Enumerable.Range(0, 8).Select(_ => Guid.NewGuid()).ToArray();
+        var config = new LiveSoloCompetitionModeConfiguration { TournamentStages = [new() { Format = LiveSoloBracketFormat.Swiss, AdvanceCount = 0 }] };
+        var first = LiveSoloTournamentPolicy.Generate(Guid.NewGuid(), seeds, config, 1, DateTimeOffset.UtcNow);
+        foreach (var match in first) { match.WinnerTeamId = match.Slots[0].TeamId; match.State = LiveSoloMatchState.Completed; }
+        var next = LiveSoloTournamentPolicy.SwissRound(Guid.NewGuid(), seeds, first, config.TournamentStages[0], [], 1, DateTimeOffset.UtcNow);
+        var later = new LiveSoloMatch { Id = Guid.NewGuid(), TournamentStage = 2 };
+        var graph = first.Concat(next).Append(later).ToArray();
+        var affected = NoCTF.Application.LiveSolo.Adjudication.LiveSoloCorrectionPolicy.Downstream(first[0].Id, graph);
+        await Assert.That(affected.Select(x => x.Id).ToHashSet().SetEquals(next.Select(x => x.Id).Append(later.Id))).IsTrue();
+    }
+
     private static void Play(IReadOnlyList<LiveSoloMatch> graph, bool reset, DateTimeOffset now)
     {
         for (var step = 0; step < graph.Count * 2; step++)

@@ -1461,7 +1461,7 @@ export const getLiveSoloBracket = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * Generates a seeded single/double elimination bracket before Matches exist; byes do not count as defeats.
+ * Generates the first configured tournament stage before matches exist; Swiss pairings and later stages advance from confirmed results.
  *
  * Executes POST /api/v1/competitions/{competitionId}/live-solo/bracket.
  */
