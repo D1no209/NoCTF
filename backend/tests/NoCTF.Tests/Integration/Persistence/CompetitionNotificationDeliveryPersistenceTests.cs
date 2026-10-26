@@ -350,11 +350,13 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     ct);
 
             var delivery = new CompetitionNotificationDelivery(db);
+            const string banReason = "提交他人 Flag，经管理员核实";
             var payload = new TeamBannedPayload(
                 competitionId,
                 bannedTeamId,
                 "Banned",
-                now);
+                now,
+                banReason);
             await delivery.DeliverAsync(
                 competitionId,
                 bannedTeamId,
@@ -381,13 +383,17 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(notifications[0].TargetId).IsEqualTo(bannedTeamId);
             await Assert.That(notifications[0].SourceEventKey)
                 .IsEqualTo($"team-banned:{bannedTeamId:N}:1");
+            await Assert.That(notifications[0].Reason).IsEqualTo(banReason);
+            var content = (TeamBannedNotificationContent)NotificationContentProjection.Create(notifications[0]);
+            await Assert.That(content.Reason).IsEqualTo(banReason);
 
             var announcedBan = new TeamBanned(
                 competitionId,
                 bannedTeamId,
                 "Banned",
                 now.AddMilliseconds(1),
-                TeamBanAnnouncementKind.ConfirmedCheating);
+                TeamBanAnnouncementKind.ConfirmedCheating,
+                banReason);
             var banEventStore = new CompetitionEventStore(db, new RecordingOutbox());
             await CompetitionNotificationMessageHandlers.Handle(
                 announcedBan,
@@ -411,8 +417,11 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(announcements[0].TargetType)
                 .IsEqualTo(NotificationTargetType.CompetitionParticipants);
             await Assert.That(announcements[0].Title).IsEqualTo("赛事纪律公告");
-            await Assert.That(announcements[0].Body).Contains("作弊行为");
+            await Assert.That(announcements[0].Body).Contains(banReason);
             await Assert.That(announcements[0].TeamName).IsEqualTo("Banned");
+            var banNotice = await db.Notifications.AsNoTracking().SingleAsync(notification =>
+                notification.Kind == NotificationKind.TeamBanned && notification.PayloadOccurredAt == announcedBan.BannedAt, ct);
+            await Assert.That(banNotice.Reason).IsEqualTo(banReason);
 
             var publicBanEvents = await db.CompetitionEvents.AsNoTracking()
                 .Where(item =>
@@ -423,6 +432,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     && item.SubjectId == bannedTeamId)
                 .ToArrayAsync(ct);
             await Assert.That(publicBanEvents).Count().IsEqualTo(1);
+            await Assert.That(publicBanEvents[0].Reason).IsEqualTo(banReason);
 
             var internalTracks = new CompetitionTrackConfiguration(
                 [

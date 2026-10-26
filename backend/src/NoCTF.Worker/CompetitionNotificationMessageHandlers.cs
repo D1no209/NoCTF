@@ -131,7 +131,8 @@ public static class CompetitionNotificationMessageHandlers
                 message.CompetitionId,
                 message.TeamId,
                 message.TeamName,
-                message.BannedAt),
+                message.BannedAt,
+                message.Reason),
             message.TeamId,
             ct);
 
@@ -171,22 +172,17 @@ public static class CompetitionNotificationMessageHandlers
                     CompetitionEventLevel.Warning,
                     CompetitionEventVisibility.Public,
                     message.BannedAt,
-                    TeamId: message.TeamId), ct);
+                    TeamId: message.TeamId,
+                    Reason: message.Reason), ct);
                 await db.SaveChangesAsync(ct);
             }
         }
 
-        var body = announcementKind switch
-        {
-            TeamBanAnnouncementKind.ConfirmedCheating =>
-                $"队伍「{message.TeamName}」经核实存在作弊行为，现已由赛事组委会予以封禁。",
-            TeamBanAnnouncementKind.RuleViolation =>
-                $"队伍「{message.TeamName}」因违反赛事规则，现已由赛事组委会予以封禁。",
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(message),
-                announcementKind,
-                "Unsupported team ban announcement kind.")
-        };
+        if (!Enum.IsDefined(announcementKind))
+            throw new ArgumentOutOfRangeException(nameof(message), announcementKind, "Unsupported team ban announcement kind.");
+        var body = $"队伍「{message.TeamName}」已被赛事组委会封禁。";
+        if (!string.IsNullOrWhiteSpace(message.Reason))
+            body += $"\n\n封禁原因：{message.Reason}";
         await delivery.DeliverAsync(
             message.CompetitionId,
             message.TeamId,

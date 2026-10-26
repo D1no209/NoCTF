@@ -126,6 +126,12 @@ describe('notificationTargetPath', () => {
     expect(notificationBody(item)).toBe('Manually verified the email address for “IssueJuice”.')
   })
 
+  test('shows the administrator reason in a team ban notification', () => {
+    const reason = '提交他人 Flag，经管理员核实\n涉及题目：Web 100'
+    expect(notificationBody(notification('TeamBanned', 'competition-1', { reason }))).toBe(reason)
+    expect(notificationBody(notification('TeamBanned', 'competition-1'))).toBe(null)
+  })
+
   test('keeps official competition announcements in the global message center', () => {
     expect(notificationTargetPath(notification('CompetitionAnnouncement', 'competition-1')))
       .toBe('/notifications?notification=notification-1')

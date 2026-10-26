@@ -157,6 +157,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, cheatOwnerTeamLabel, c
             :aria-invalid="remainingCharacters > 0"
             :disabled="resolutionPending"
           />
+          <FieldDescription v-if="resolutionAction === 'confirm'">{{ $t('administration.ban.notificationReasonHelp') }}</FieldDescription>
           <p
             id="cheat-resolution-reason-help"
             class="text-xs"

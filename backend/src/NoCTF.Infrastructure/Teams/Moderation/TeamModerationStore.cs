@@ -104,7 +104,8 @@ public sealed class TeamModerationStore(
                 command.OccurredAt,
                 command.AnnouncePublicly
                     ? TeamBanAnnouncementKind.RuleViolation
-                    : null));
+                    : null,
+                safeReason));
         }
         await db.SaveChangesAsync(cancellationToken);
         await (progressionReconciler ?? new ProgressionReconciler(db))

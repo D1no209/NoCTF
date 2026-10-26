@@ -258,13 +258,15 @@ public sealed class CheatIncidentStore(
                 command.OccurredAt,
                 ActorUserId: command.ActorUserId,
                 TeamId: team.Id,
-                GameplayFactId: fact.Id), cancellationToken);
+                GameplayFactId: fact.Id,
+                Reason: safeReason), cancellationToken);
             await outbox.PublishAsync(new TeamBanned(
                 command.CompetitionId,
                 team.Id,
                 team.Name,
                 command.OccurredAt,
-                TeamBanAnnouncementKind.ConfirmedCheating));
+                TeamBanAnnouncementKind.ConfirmedCheating,
+                safeReason));
         }
         else if (operation == ResolutionOperation.CorrectAndUnban)
         {

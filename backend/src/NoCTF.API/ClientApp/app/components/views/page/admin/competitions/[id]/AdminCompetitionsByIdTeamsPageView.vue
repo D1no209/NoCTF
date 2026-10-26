@@ -308,6 +308,7 @@ const { appealsOnly, adminUserPath, teamDetailOpen, teamLoading, teamDetailError
           <Field>
             <FieldLabel for="ban-reason">{{ $t('administration.label.reason') }}</FieldLabel>
             <Textarea id="ban-reason" v-model="banReason" maxlength="512" required />
+            <FieldDescription v-if="banDialog?.mode === 'ban'">{{ $t('administration.ban.notificationReasonHelp') }}</FieldDescription>
             <FieldDescription v-if="banDialog?.mode === 'correct'">
               {{ $t('administration.label.leastCharactersCurrently', { length: banReason.trim().length }) }}
             </FieldDescription>

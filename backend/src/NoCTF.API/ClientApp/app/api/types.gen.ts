@@ -1158,6 +1158,7 @@ export type NoCtfApplicationNotificationsTeamBannedNotificationContent = Omit<No
     teamId?: string | null;
     teamName?: string | null;
     bannedAt?: string | null;
+    reason?: string | null;
     type: 'team-banned';
 };
 
