@@ -10,7 +10,7 @@ defineProps<{
 <template>
   <div class="grid min-w-0 gap-1">
     <AlertTitle>{{ title }}</AlertTitle>
-    <AlertDescription v-if="body">{{ body }}</AlertDescription>
+    <AlertDescription v-if="body" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ body }}</AlertDescription>
     <Button as-child variant="link" size="sm" class="mt-1 h-auto w-fit px-0 py-1">
       <NuxtLink :to="href">{{ actionLabel }}</NuxtLink>
     </Button>

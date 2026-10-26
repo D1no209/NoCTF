@@ -57,7 +57,7 @@ describe('competition broadcast projection', () => {
     expect(competitionBroadcastText(event('ThirdBloodAwarded')))
       .toBe('队伍「Alpha」获得题目「Web 100」三血')
     expect(competitionBroadcastText(event('TeamBanned')))
-      .toBe('队伍「Alpha」由于「作弊」被封禁')
+      .toBe('队伍「Alpha」已被封禁')
     expect(competitionBroadcastText(event('TeamBanCorrectionPublished')))
       .toBe('队伍「Alpha」申诉成功，封禁已撤销')
     expect(competitionBroadcastText(event('HintPublished')))
@@ -84,6 +84,13 @@ describe('competition broadcast projection', () => {
     }))).toBe('队伍「Alpha」防御题目「Web 100」失败')
     expect(competitionBroadcastText(event('AnnouncementPublished')))
       .toBe('赛事发布了新通知')
+  })
+
+  test('includes the administrator-provided ban reason in the broadcast', () => {
+    expect(competitionBroadcastText(event('TeamBanned', { reason: '提交他人 Flag，经管理员核实' })))
+      .toBe('队伍「Alpha」因「提交他人 Flag，经管理员核实」被封禁')
+    expect(competitionBroadcastText(event('TeamBanned', { reason: '  ' })))
+      .toBe('队伍「Alpha」已被封禁')
   })
 
   test('links challenge broadcasts to the matching challenge', () => {

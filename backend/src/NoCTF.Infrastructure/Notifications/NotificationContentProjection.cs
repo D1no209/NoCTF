@@ -83,7 +83,8 @@ internal static class NotificationContentProjection
             item.CompetitionId,
             item.TeamId,
             item.TeamName,
-            item.PayloadOccurredAt),
+            item.PayloadOccurredAt,
+            item.Reason),
         NotificationKind.CheatIncidentDetected => new CheatIncidentDetectedNotificationContent(
             item.CompetitionId,
             item.GameplayFactId,

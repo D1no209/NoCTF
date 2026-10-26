@@ -138,7 +138,7 @@ Competition 聚合与必要的 Serializable 事务内：
 - Unregistered/Pending/Rejected 不能获得题目、附件、提示、咨询、Flag、Runtime 或新 GameplayFact 权限。退出 Approved 后已有 Runtime 保留至正常生命周期结束，但所有选手读取与操作 API 都拒绝访问。
 - CaptainId 是唯一队长来源。转让队长原子更新 TeamCaptain 复合外键；成员关系无顺序。
 - Ban 立即拒绝私有数据、Runtime 与 GameplayFact，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复当前事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
-- 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。
+- 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联。封禁原因进入队伍通知，并在发布纪律公告时公开；内部证据和申诉内容仍按原有权限读取。
 
 ## 权限矩阵
 

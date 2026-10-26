@@ -32852,6 +32852,10 @@
                 "type": "string",
                 "format": "date-time",
                 "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
               }
             }
           }

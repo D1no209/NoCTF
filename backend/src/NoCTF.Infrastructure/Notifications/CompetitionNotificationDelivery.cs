@@ -190,6 +190,7 @@ public sealed class CompetitionNotificationDelivery(
                 notification.TeamId = value.TeamId;
                 notification.TeamName = value.TeamName;
                 notification.PayloadOccurredAt = value.BannedAt;
+                notification.Reason = value.Reason;
                 return;
             case TeamBanAnnouncementPayload value:
                 notification.CompetitionId = value.CompetitionId;

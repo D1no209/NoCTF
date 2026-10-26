@@ -117,7 +117,9 @@ export function competitionBroadcastText(
     FirstBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedFirstBlood", { team, challenge }),
     SecondBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedSecondBlood", { team, challenge }),
     ThirdBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedThirdBlood", { team, challenge }),
-    TeamBanned: translate("competitions.competitionBroadcast.label.teamWasBannedCheating", { team }),
+    TeamBanned: event.reason?.trim()
+      ? translate('competitions.competitionBroadcast.label.teamBannedWithReason', { team, reason: event.reason })
+      : translate("competitions.competitionBroadcast.label.teamWasBannedCheating", { team }),
     TeamBanCorrectionPublished: translate("competitions.competitionBroadcast.description.teamWonAppealBan", { team }),
     HintPublished: translate("competitions.competitionBroadcast.label.challengeNewHint", { challenge }),
     ChallengeDescriptionUpdated: translate("common.label.challengeUpdatedDescription", { challenge }),

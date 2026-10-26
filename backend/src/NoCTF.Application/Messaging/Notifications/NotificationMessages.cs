@@ -42,7 +42,8 @@ public sealed record TeamBanned(
     Guid TeamId,
     string TeamName,
     DateTimeOffset BannedAt,
-    TeamBanAnnouncementKind? AnnouncementKind = null);
+    TeamBanAnnouncementKind? AnnouncementKind = null,
+    string? Reason = null);
 
 public enum TeamBanAnnouncementKind : short
 {

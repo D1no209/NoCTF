@@ -31,7 +31,8 @@ public sealed record TeamBannedPayload(
     Guid CompetitionId,
     Guid TeamId,
     string TeamName,
-    DateTimeOffset BannedAt);
+    DateTimeOffset BannedAt,
+    string? Reason = null);
 
 public sealed record TeamBanAnnouncementPayload(
     Guid CompetitionId,

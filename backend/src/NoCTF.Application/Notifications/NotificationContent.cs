@@ -123,7 +123,8 @@ public sealed record TeamBannedNotificationContent(
     Guid? CompetitionId,
     Guid? TeamId,
     string? TeamName,
-    DateTimeOffset? BannedAt) : NotificationContent;
+    DateTimeOffset? BannedAt,
+    string? Reason = null) : NotificationContent;
 
 public sealed record CheatIncidentDetectedNotificationContent(
     Guid? CompetitionId,
