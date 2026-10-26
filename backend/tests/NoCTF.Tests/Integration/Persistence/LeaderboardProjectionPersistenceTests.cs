@@ -929,15 +929,16 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         });
     }
 
-    [Test]
+    [Test, Arguments(GameMode.Ctf), Arguments(GameMode.Awdp)]
     [Timeout(300_000)]
-    public async Task Awdp_ban_and_unban_reproject_the_authoritative_cache(
+    public async Task Ban_and_unban_reproject_scores_activity_and_achievements_in_the_authoritative_cache(
+        GameMode mode,
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_awdp_ban_reprojection")
+                .WithDatabase("noctf_ban_reprojection")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
@@ -951,7 +952,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(now);
-            var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, now);
+            var fixture = CreateFixture(mode, 0, owner.Id, now);
             var scoredFact = fixture.Facts[0];
             scoredFact.Result = GameplayFactResult.Correct;
             db.Users.Add(owner);
@@ -977,6 +978,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             var initialTeam = initial!.Snapshot.Teams.Single(team => team.TeamId == fixture.Team.Id);
             await Assert.That(initialTeam.RankingState).IsEqualTo(ScoreboardRankingState.Eligible);
             await Assert.That(initialTeam.TotalScore).IsNotEqualTo(0L);
+            await Assert.That(initialTeam.Achievements).Count().IsEqualTo(1);
 
             await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
             var monotonicRefresh = await cache.GetScoreboardAsync(
@@ -1002,6 +1004,8 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(bannedTeam.RankingState).IsEqualTo(ScoreboardRankingState.Banned);
             await Assert.That(bannedTeam.TotalScore).IsEqualTo(0L);
             await Assert.That(bannedTeam.Slots).IsEmpty();
+            await Assert.That(bannedTeam.Achievements).IsEmpty();
+            await Assert.That(await db.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(1);
 
             var unban = await moderation.ApplyAsync(new(
                 fixture.Competition.Id,
@@ -1018,6 +1022,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(restoredTeam.RankingState).IsEqualTo(ScoreboardRankingState.Eligible);
             await Assert.That(restoredTeam.TotalScore).IsEqualTo(initialTeam.TotalScore);
             await Assert.That(restoredTeam.Slots).IsNotEmpty();
+            await Assert.That(restoredTeam.Achievements).Count().IsEqualTo(1);
         });
     }
 

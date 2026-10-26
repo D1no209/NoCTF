@@ -19,8 +19,10 @@ internal static class NormalizedScoreboardProjection
         LeaderboardProjectionInput input, IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
     {
         if (input.Mode is not (GameMode.Ctf or GameMode.Awdp)) return [];
+        var activeTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted)
+            .Select(team => team.Id).ToHashSet();
         // All-history bounded summaries retain the first success outside the visible round window.
-        var facts = input.GameplayFacts.Where(fact => fact.TeamId is not null
+        var facts = input.GameplayFacts.Where(fact => fact.TeamId is Guid teamId && activeTeams.Contains(teamId)
                 && fact.CompetitionChallengeId is Guid challengeId && challenges.ContainsKey(challengeId)
                 && fact.State == GameplayFactState.Completed && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact)
                 && fact.OccurredAt <= input.ProjectedAt
@@ -71,9 +73,14 @@ internal static class NormalizedScoreboardProjection
     {
         var projectedAt = input.ProjectedAt
             ?? throw new InvalidOperationException("Leaderboard projection time is required.");
-        var scoreboardInput = input.ScoreboardGameplayFacts is null
-            ? input
-            : input with { GameplayFacts = input.ScoreboardGameplayFacts };
+        var activeTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted)
+            .Select(team => team.Id).ToHashSet();
+        var scoreboardInput = input with
+        {
+            GameplayFacts = (input.ScoreboardGameplayFacts ?? input.GameplayFacts)
+                .Where(fact => fact.TeamId is null || activeTeams.Contains(fact.TeamId.Value))
+                .ToArray()
+        };
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .OrderBy(challenge => challenge.Order)
