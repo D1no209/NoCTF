@@ -21,6 +21,10 @@ using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
 
+/// <summary>
+/// Trusted external verification for an already patched target. Optional Fix input is untrusted data;
+/// executable Fix content belongs exclusively to the credential-free target Runtime.
+/// </summary>
 public sealed record AwdpCheckerWork(
     Guid RuntimeInstanceId,
     RuntimeProvider Provider,

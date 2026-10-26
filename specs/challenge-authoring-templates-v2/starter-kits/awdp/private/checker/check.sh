@@ -7,32 +7,26 @@ set -eu
 : "${NOCTF_CALLBACK_URL:?缺少 NOCTF_CALLBACK_URL}"
 : "${NOCTF_CALLBACK_TOKEN:?缺少 NOCTF_CALLBACK_TOKEN}"
 
-test -d /noctf/fix
-test -f /noctf/fix/fix.sh
+# Fix 已由 Runner 在独立靶机中执行；Checker 只读取可选输入并验证靶机。
+if [ -d /noctf/fix ]; then
+  python3 /checker/inspect-file.py --source input --path fix.sh >/dev/null
+fi
 
 outcome='DefenseSucceeded'
-if find /noctf/fix -type f -maxdepth 8 -print0 \
-    | xargs -0 grep -IlE '(^|[^[:alnum:]_])(curl|wget|nc|socat)[[:space:]]|/var/run/docker.sock|/proc/[0-9]+/root' \
-    | grep -q .; then
-  outcome='ServiceAbnormal'
-elif ! /checker/replay-and-diff.sh; then
-  outcome='ServiceAbnormal'
-else
-  target="http://${TARGET_HOST}:8080"
-  remaining="${TARGET_READY_TIMEOUT_SECONDS}"
-  while [ "$remaining" -gt 0 ]; do
-    if wget -qO- -T 2 "${target}/health" 2>/dev/null | grep -qx ok; then
-      break
-    fi
-    remaining=$((remaining - 1))
-    sleep 1
-  done
-  if ! wget -qO- -T 3 "${target}/file?name=public.txt" 2>/dev/null \
-      | grep -qx training-public-data; then
-    outcome='ServiceAbnormal'
-  elif /checker/exploit.sh "$target"; then
-    outcome='ExploitSucceeded'
+target="http://${TARGET_HOST}:8080"
+remaining="${TARGET_READY_TIMEOUT_SECONDS}"
+while [ "$remaining" -gt 0 ]; do
+  if wget -qO- -T 2 "${target}/health" 2>/dev/null | grep -qx ok; then
+    break
   fi
+  remaining=$((remaining - 1))
+  sleep 1
+done
+if ! wget -qO- -T 3 "${target}/file?name=public.txt" 2>/dev/null \
+    | grep -qx training-public-data; then
+  outcome='ServiceAbnormal'
+elif /checker/exploit.sh "$target"; then
+  outcome='ExploitSucceeded'
 fi
 
 attempt=0

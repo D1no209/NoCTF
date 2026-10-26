@@ -135,6 +135,43 @@ public sealed class DockerOneShotInputArchiveTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Bridge_input_is_prepared_before_start_without_an_address_for_the_created_container(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await EnsureBusyBoxAsync(cancellationToken);
+            using var docker = CreateClient();
+            using var lifecycle = CreateLifecycle();
+            var network = await docker.Networks.CreateNetworkAsync(new()
+            {
+                Name = $"noctf-input-{Guid.NewGuid():N}", Driver = "bridge"
+            }, cancellationToken);
+            try
+            {
+                await using var archive = PrefixedCanonicalTar("bridge-input-ready");
+                var input = new OneShotInputArchive(archive, OneShotInputArchive.RootDestinationPath);
+                var result = await lifecycle.RunAsync(
+                    Request(Guid.NewGuid(), "cat /noctf/fix/payload.txt") with { NetworkName = network.ID },
+                    input, cancellationToken);
+                await Assert.That(result.ExitCode).IsEqualTo(0);
+                await Assert.That(result.StandardOutput).IsEqualTo("bridge-input-ready");
+                await Assert.That(input.PreparationCompleted).IsTrue();
+                var completed = await lifecycle.RunAsync(
+                    Request(Guid.NewGuid(), "printf completed-on-bridge") with { NetworkName = network.ID },
+                    null, cancellationToken);
+                await Assert.That(completed.ExitCode).IsEqualTo(0);
+                await Assert.That(completed.StandardOutput).IsEqualTo("completed-on-bridge");
+            }
+            finally
+            {
+                await docker.Networks.DeleteNetworkAsync(network.ID, CancellationToken.None);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task InvalidInputArchive_IsRejectedAndCreatedContainerIsRemoved(
         CancellationToken cancellationToken)
     {

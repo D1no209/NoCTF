@@ -158,7 +158,10 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, status,
                 ReadPublishedPorts(created, request.PortMappings.Keys),
                 options.PublicHost,
-                ResolveInternalAddress(created, request.NetworkName ?? options.NetworkName),
+                // Prepared archive jobs are not started yet; completed one-shots no longer own a live endpoint.
+                status == RuntimeStatus.Running
+                    ? ResolveInternalAddress(created, request.NetworkName ?? options.NetworkName)
+                    : null,
                 RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch

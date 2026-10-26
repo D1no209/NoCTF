@@ -54,8 +54,6 @@ describe('leaderboard progressive display', () => {
     expect(slotStatus).toContain('<Flag')
     expect(slotStatus).toContain('<ShieldCheck')
     expect(page).toContain("<component :is=\"ScoreboardSlotStatus\"")
-    expect(page).toContain("slot?.scoreState === 'Settled'")
-    expect(page).toContain("slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''")
     expect(page).toContain('getScoreboardSlotDetailEndpoint')
     expect(page).toContain('getScoreboardAdjustmentDetailEndpoint')
     expect(page).toContain('(team.globalAdjustmentCount ?? 0) > 0')

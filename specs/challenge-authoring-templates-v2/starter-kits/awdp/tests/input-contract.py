@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""不依赖 Docker 的输入文件与重放产物边界测试。"""
+# 不依赖 Docker 的不可信输入文件边界测试。
 import hashlib
 import importlib.util
 import tempfile
@@ -18,15 +18,15 @@ class InputContractTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
 
-    def test_input_and_replay_are_distinct_sources(self):
-        for name, content in [("input", b"submitted"), ("replay", b"generated")]:
-            folder = self.root / name
-            folder.mkdir()
-            (folder / "policy.txt").write_bytes(content)
-            evidence = MODULE.inspect_file(folder, "policy.txt")
-            self.assertEqual(evidence["sha256"], hashlib.sha256(content).hexdigest())
-            self.assertEqual(evidence["sizeBytes"], len(content))
-            self.assertNotIn("content", evidence)
+    def test_input_is_hashed_without_execution_or_content_disclosure(self):
+        marker = self.root / "executed"
+        content = f"from pathlib import Path; Path({str(marker)!r}).write_text('executed')".encode()
+        (self.root / "fix.py").write_bytes(content)
+        evidence = MODULE.inspect_file(self.root, "fix.py")
+        self.assertEqual(evidence["sha256"], hashlib.sha256(content).hexdigest())
+        self.assertEqual(evidence["sizeBytes"], len(content))
+        self.assertNotIn("content", evidence)
+        self.assertFalse(marker.exists())
 
     def test_invalid_paths_are_rejected(self):
         for path in ["", "/etc/passwd", "../private", "x/../private", "x//y", "x\\y", "./x"]:
