@@ -111,8 +111,8 @@ public sealed partial class LiveSoloMediaStore
                 await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,ct);
                 var session=await db.LiveSoloMediaSessions.Include(x=>x.Participants).SingleAsync(x=>x.Id==sessionId,ct);
                 await db.Entry(session).ReloadAsync(ct);
-                var match=await db.LiveSoloMatches.SingleAsync(x=>x.Id==matchId,ct);
-                if(session.State!=LiveSoloMediaState.Ready||match.CurrentMediaSessionId!=session.Id)return;
+                var match=await db.LiveSoloMatches.SingleOrDefaultAsync(x=>x.Id==matchId,ct);
+                if(match is null||session.State!=LiveSoloMediaState.Ready||match.CurrentMediaSessionId!=session.Id)return;
                 var previous=await db.Set<LiveSoloMediaParticipant>().AsNoTracking().Where(x=>x.MediaSessionId==session.Id)
                     .Select(x=>new{x.UserId,x.ScreenState,x.ScreenTrackId}).ToDictionaryAsync(x=>x.UserId,ct);
                 var changed=false;

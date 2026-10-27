@@ -28,8 +28,10 @@ public sealed class LiveSoloReviewStore(NoCtfDbContext db, ICompetitionModeratio
             && x.RegistrationStatus == TeamRegistrationStatus.Approved && x.Members.Any(m => m.UserId == request.ActorId))
             .Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
         if (teamId is not Guid team) return null;
-        if (competition.Status != CompetitionStatus.Finished && (!match.Roster.Any(x => x.UserId == request.ActorId && x.TeamId == team)
-            || !match.Slots.Any(x => x.TeamId == team && x.RosterLockedAt != null))) return null;
+        if (competition.Status != CompetitionStatus.Finished
+            && !(match.Roster.Any(x => x.UserId == request.ActorId && x.TeamId == team) && match.Slots.Any(x => x.TeamId == team && x.RosterLockedAt != null))
+            && !await db.Set<LiveSoloRoundRosterMember>().AnyAsync(x => x.UserId == request.ActorId && x.TeamId == team
+                && db.LiveSoloRounds.Any(r => r.Id == x.RoundId && r.MatchId == match.Id), ct)) return null;
         return new(team, match);
     }
 
@@ -37,9 +39,11 @@ public sealed class LiveSoloReviewStore(NoCtfDbContext db, ICompetitionModeratio
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         if (await AuthorizeAsync(request, ct) is null) return null;
+        var finished = await db.Competitions.AnyAsync(x => x.Id == request.CompetitionId && x.Status == CompetitionStatus.Finished, ct);
         var rows = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => request.Staff || x.OpenedAt != null)
             .Join(db.LiveSoloRounds.AsNoTracking().Where(x => x.MatchId == request.MatchId), q => q.RoundId, r => r.Id,
                 (q, r) => new { Question = q, Round = r })
+            .Where(x => request.Staff || finished || !x.Round.Roster.Any() || x.Round.Roster.Any(r => r.UserId == request.ActorId))
             .OrderBy(x => x.Round.Number).ThenBy(x => x.Round.Replay).ThenBy(x => x.Question.Position)
             .Select(x => new { x.Question.Id, x.Question.RoundId, x.Question.CompetitionChallengeId, x.Round.Number, x.Round.Replay,
                 x.Question.Position, x.Question.OpenedAt, Content = x.Question.OpenedContent }).ToArrayAsync(ct);
@@ -56,8 +60,10 @@ public sealed class LiveSoloReviewStore(NoCtfDbContext db, ICompetitionModeratio
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         var access = await AuthorizeAsync(request, ct); if (access is null) return null;
+        var finished = await db.Competitions.AnyAsync(x => x.Id == request.CompetitionId && x.Status == CompetitionStatus.Finished, ct);
         var question = await db.LiveSoloRoundQuestions.AsNoTracking().Include(x => x.OpenedContent)
-            .SingleOrDefaultAsync(x => x.Id == questionId && db.LiveSoloRounds.Any(r => r.Id == x.RoundId && r.MatchId == request.MatchId), ct);
+            .SingleOrDefaultAsync(x => x.Id == questionId && db.LiveSoloRounds.Any(r => r.Id == x.RoundId && r.MatchId == request.MatchId
+                && (request.Staff || finished || !r.Roster.Any() || r.Roster.Any(member => member.UserId == request.ActorId))), ct);
         if (question is null || !request.Staff && question.OpenedAt is null) return null;
         LiveSoloQuestionView body;
         IReadOnlyList<LiveSoloHintView> hints;

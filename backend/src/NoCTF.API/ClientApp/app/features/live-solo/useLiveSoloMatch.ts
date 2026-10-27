@@ -12,12 +12,13 @@ import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiE
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
-import { matchStateKey, canLockLiveSoloRoster, roundRemainingSeconds, formatRoundClock } from './live-solo-state'
+import { matchStateKey, roundRemainingSeconds, formatRoundClock } from './live-solo-state'
 import LiveSoloQuestions from './LiveSoloQuestions.vue'
 import { useLiveSoloScreen } from './media/useLiveSoloScreen'
 import { useLiveSoloHub } from './useLiveSoloHub'
 import CompetitionParticipantWorkspace from '~/features/competition/CompetitionParticipantWorkspace.vue'
 import LiveSoloProgramControl from './LiveSoloProgramControl.vue'
+import LiveSoloMatchDirections from './LiveSoloMatchDirections.vue'
 import LiveSoloReview from './LiveSoloReview.vue'
 import { indexedDbResultPromptStore, type ResultPromptStore } from './result-observation'
 import { resultPresentation } from './result-presentation'
@@ -94,8 +95,9 @@ export function useLiveSoloMatch() {
   const myRoster = computed(() => match.value?.rosters?.find(x => x.teamId === team.value?.id) ?? null)
   const captain = computed(() => user.value?.userId != null && team.value?.captainId === user.value.userId)
   const onRoster = computed(() => !!user.value?.userId && myRoster.value?.userIds?.includes(user.value.userId) === true)
-  const mayReview = computed(() => staff.value || onRoster.value || ctx?.competition.value?.status === 'Finished')
-  const canLock = computed(() => !match.value?.pendingCorrectionId && canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
+  const mayReview = computed(() => staff.value || onRoster.value || !!workspace.value?.history?.length || ctx?.competition.value?.status === 'Finished')
+  const canLock = computed(() => workspaceAuthorized.value && workspace.value?.allowedOperations?.includes('LockRoster') === true)
+  const rosterLimit = computed(() => configuration.value?.maximumRosterMembers ?? 1)
   const allLocked = computed(() => match.value?.rosters?.length === 2 && match.value.rosters.every(x => x.locked))
   const platformStreaming = computed(() => round.value?.platformStreamingEnabled ?? configuration.value?.platformStreamingEnabled ?? false)
   const readOnlyMedia = computed(() => !workspaceAuthorized.value || staff.value && !onRoster.value)
@@ -134,6 +136,7 @@ export function useLiveSoloMatch() {
       if (disposed || id !== request || identity !== workspaceIdentity.value) return
       if ([401, 403, 404].includes(result.response?.status ?? 0)) { workspace.value = null; match.value = null; round.value = null }
       if (result.error || !result.data?.match || config.error || !config.data) throw parseLiveSoloError(result.error ?? config.error, message('liveSolo.error.load'))
+      const rosterWasLocked = myRoster.value?.locked === true
       workspace.value = result.data; match.value = result.data.match; round.value = result.data.round ?? null
       workspaceActor.value = identity; workspaceFresh.value = true; authorized = true
       configuration.value = config.data; team.value = mine.data ?? null
@@ -155,6 +158,7 @@ export function useLiveSoloMatch() {
       profiles.forEach((profile, index) => { if (profile.data?.userName) names.set(missing[index]!, profile.data.userName) })
       memberNames.value = names
       if (myRoster.value?.locked) selectedRoster.value = [...(myRoster.value.userIds ?? [])]
+      else if (rosterWasLocked) selectedRoster.value = []
       else selectedRoster.value = selectedRoster.value.filter(member => mine.data?.memberIds?.includes(member))
       if (staff.value) {
         const lists = await listLiveSoloQuestionGroupCandidates({ path })
@@ -190,7 +194,7 @@ export function useLiveSoloMatch() {
   }
   async function lockRoster() {
     if (!canLock.value || !team.value?.id || !match.value?.concurrencyStamp || !selectedRoster.value.length
-      || selectedRoster.value.length > (configuration.value?.maximumRosterMembers ?? 1)) return
+      || selectedRoster.value.length > rosterLimit.value) return
     await operation(() => lockLiveSoloRoster({ path: { competitionId: competitionId.value, matchId: matchId.value },
       body: { teamId: team.value!.id!, expectedStamp: match.value!.concurrencyStamp!, userIds: [...selectedRoster.value] } }))
   }
@@ -214,8 +218,8 @@ export function useLiveSoloMatch() {
   }
   async function prepareRound() {
     if (!judge.value || !match.value?.concurrencyStamp) return
-    await operation(() => prepareLiveSoloRound({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp!, questionGroupId: selectedGroupId.value,
-        expectedGroupStamp: selectedCandidate.value?.concurrencyStamp ?? null, selectionRevision: selectedCandidate.value?.selectionRevision ?? null } }))
+    await operation(() => prepareLiveSoloRound({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp!, questionGroupId: match.value!.usesDirectionPool ? null : selectedGroupId.value,
+        expectedGroupStamp: match.value!.usesDirectionPool ? null : selectedCandidate.value?.concurrencyStamp ?? null, selectionRevision: match.value!.usesDirectionPool ? null : selectedCandidate.value?.selectionRevision ?? null } }))
   }
   async function start() {
     if (!judge.value || !round.value?.id || !round.value.concurrencyStamp) return
@@ -317,7 +321,7 @@ export function useLiveSoloMatch() {
     stableResult, resultWindow, resultOpen, setResultOpen, showResult, nextRound, resultAvatar, leftReady, rightReady, failedResources,
     candidatePreviewOpen, setCandidatePreviewOpen, candidatePreviewLoading, candidatePreviewTitle, candidatePreviewItems, previewCandidate, Review: markRaw(LiveSoloReview),
     platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, mayReview, staffOnlyMedia,
-    canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
+    canLock, rosterLimit, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start, Directions: markRaw(LiveSoloMatchDirections),
     candidates, groupOptions, groupChoice, chooseGroup, currentCandidate, selectionRisks, selectionUses, openUsage, unavailableCandidates, startAllowed, preparationKey, preparationFailure, retryPreparation, specifyCurrent,
     staff, hasStaffAccess, manage, backLabel, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,

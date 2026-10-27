@@ -19,7 +19,7 @@ public sealed partial class LiveSoloMatchStore
             if (round is null || round.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Canceled or LiveSoloRoundState.TimedOut) return false;
             // A durable outcome is immutable here; corrections require the dedicated adjudication flow.
             if (round.State == LiveSoloRoundState.Won) return true;
-            var match = await MatchAsync((await db.LiveSoloMatches.AsNoTracking().Where(x => x.Id == round.MatchId).Select(x => x.CompetitionId).SingleAsync(ct)), round.MatchId, ct);
+            var match = await MatchAsync((await db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == round.MatchId).Select(x => x.CompetitionId).SingleAsync(ct)), round.MatchId, ct);
             if (match is null || match.CurrentRoundId != round.Id || match.PendingCorrectionId is not null || match.SupersededAt is not null) return false;
             await SynchronizeCompetitionPausesAsync(round, match.CompetitionId, now, true, ct);
             var associations = await db.LiveSoloSubmissions.AsNoTracking().Where(x => x.RoundId == round.Id).OrderBy(x => x.AdmissionSequence).ToArrayAsync(ct);
@@ -108,8 +108,8 @@ public sealed partial class LiveSoloMatchStore
         if (roundInfo is null || roundInfo.TimelineRevision != timelineRevision) return;
         if (roundInfo.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled)
         { await runtimePreparation.StopRoundAsync(roundId, now, ct); return; }
-        if (await db.LiveSoloMatches.AnyAsync(x => x.Id == roundInfo.MatchId && (x.PendingCorrectionId != null || x.SupersededAt != null), ct)) return;
-        var competitionId = await db.LiveSoloMatches.AsNoTracking().Where(x => x.Id == roundInfo.MatchId).Select(x => x.CompetitionId).SingleAsync(ct);
+        if (await db.LiveSoloMatches.IgnoreQueryFilters().AnyAsync(x => x.Id == roundInfo.MatchId && (x.DeletedAt != null || x.PendingCorrectionId != null || x.SupersededAt != null), ct)) return;
+        var competitionId = await db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == roundInfo.MatchId).Select(x => x.CompetitionId).SingleAsync(ct);
         await SynchronizeCompetitionPausesAsync(roundInfo, competitionId, (clock ?? TimeProvider.System).GetUtcNow(), false, ct);
         var verifiedQuestions = new HashSet<Guid>();
         foreach (var question in LiveSoloRoundSchedulePolicy.PreparationCandidates(roundInfo, (clock ?? TimeProvider.System).GetUtcNow()))
@@ -119,8 +119,8 @@ public sealed partial class LiveSoloMatchStore
         {
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
             var round = await db.LiveSoloRounds.Include(x => x.Pauses).Include(x => x.Questions).SingleAsync(x => x.Id == roundId, ct);
-            var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleAsync(x => x.Id == round.MatchId, ct);
-            if (round.TimelineRevision != timelineRevision || match.CurrentRoundId != round.Id || match.PendingCorrectionId is not null || match.SupersededAt is not null) return false;
+            var match = await db.LiveSoloMatches.IgnoreQueryFilters().Include(x => x.Slots).Include(x => x.Roster).SingleAsync(x => x.Id == round.MatchId, ct);
+            if (match.DeletedAt != null || round.TimelineRevision != timelineRevision || match.CurrentRoundId != round.Id || match.PendingCorrectionId is not null || match.SupersededAt is not null) return false;
             await SynchronizeCompetitionPausesAsync(round, match.CompetitionId, effectiveAt, true, ct);
             var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == match.CompetitionId, ct);
             effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
@@ -134,7 +134,8 @@ public sealed partial class LiveSoloMatchStore
                     || !await RosterEligibleAsync(match, ct))
                 { round.State = LiveSoloRoundState.Canceled; round.EndedAt = effectiveAt; match.State = LiveSoloMatchState.AwaitingAdjudication; round.TimelineRevision++;
                   LiveSoloResults.Confirm(round, match, LiveSoloEndReason.EligibilityChanged); return true; }
-                if (round.SelectionKind != LiveSoloQuestionSelectionKind.StaffSpecified && !await NoNewPublicExposureAsync(match, round, ct))
+                if (round.SelectionKind is not (LiveSoloQuestionSelectionKind.StaffSpecified or LiveSoloQuestionSelectionKind.DirectionDraw)
+                    && !await NoNewPublicExposureAsync(match, round, ct))
                 { round.State = LiveSoloRoundState.Canceled; round.EndedAt = effectiveAt; match.State = LiveSoloMatchState.Preparing; round.TimelineRevision++;
                   LiveSoloResults.Confirm(round, match, LiveSoloEndReason.SelectionChanged); return true; }
                 effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();

@@ -84,6 +84,7 @@ public sealed class LiveSoloCompetitionDeletionTests
             f.Db.Add(correction);
             var match = await f.Db.LiveSoloMatches.SingleAsync(x => x.Id == f.Match.Id, ct);
             match.PendingCorrectionId = correction.Id; match.ReplacementMatchId = downstream.Id;
+            match.DeletedAt = f.Now; match.DeletedByUserId = f.Owner.Id;
             var other = new LiveSoloCompetition { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Preserved competition", StartAt = f.Now, EndAt = f.Now.AddHours(1),
                 CreatedAt = f.Now, UpdatedAt = f.Now, FlagDerivationSecret = new byte[32], ModeConfiguration = new LiveSoloCompetitionModeConfiguration() };
             f.Db.Add(other);
@@ -103,7 +104,7 @@ public sealed class LiveSoloCompetitionDeletionTests
             var deleted = await store.ForceDeleteAsync(Command(f), true, ct);
             await Assert.That(deleted.State).IsEqualTo(CompetitionForceDeleteState.Deleted);
             await Assert.That((await f.Db.Competitions.SingleAsync(ct)).Id).IsEqualTo(other.Id);
-            await Assert.That((await f.Db.LiveSoloMatches.SingleAsync(ct)).Id).IsEqualTo(otherMatch.Id);
+            await Assert.That((await f.Db.LiveSoloMatches.IgnoreQueryFilters().SingleAsync(ct)).Id).IsEqualTo(otherMatch.Id);
             await Assert.That(await f.Db.LiveSoloRounds.CountAsync(ct)).IsEqualTo(0);
             await Assert.That(await f.Db.LiveSoloQuestionGroups.CountAsync(ct)).IsEqualTo(0);
             await Assert.That(await f.Db.LiveSoloMediaSessions.CountAsync(ct)).IsEqualTo(0);

@@ -39,6 +39,8 @@ internal sealed class LiveSoloMatchConfiguration : IEntityTypeConfiguration<Live
     public void Configure(EntityTypeBuilder<LiveSoloMatch> builder)
     {
         builder.ToTable("live_solo_matches"); builder.HasKey(x => x.Id);
+        builder.HasQueryFilter(x => x.DeletedAt == null);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.DeletedByUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.CompetitionId, x.Lane, x.Stage, x.Position, x.BracketGeneration }).IsUnique();
         builder.HasOne<LiveSoloResultCorrection>().WithMany().HasForeignKey(x => x.PendingCorrectionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.ReplacementMatchId).OnDelete(DeleteBehavior.Restrict);
@@ -92,6 +94,7 @@ internal sealed class LiveSoloRoundConfiguration : IEntityTypeConfiguration<Live
         builder.HasMany(x => x.Questions).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Pauses).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<LiveSoloQuestionGroup>().WithMany().HasForeignKey(x => x.QuestionGroupId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMatchDirection>().WithMany().HasForeignKey(x => x.DirectionDrawId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Team>().WithMany().HasForeignKey(x => x.WinnerTeamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<GameplayFact>().WithMany().HasForeignKey(x => x.WinningGameplayFactId).OnDelete(DeleteBehavior.Restrict);
     }

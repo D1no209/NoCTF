@@ -2,7 +2,8 @@
 import { toRefs } from 'vue'
 import type { LiveSoloHallState } from '~/features/live-solo/useLiveSoloHall'
 const props = defineProps<{ state: LiveSoloHallState }>()
-const { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, postgame, finished, staff, management, reviewMode, hasStaffAccess, manage, load, stateKey, Workspace, activityRows, endReasonKey } = toRefs(props.state)
+const { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, postgame, finished, staff, management, reviewMode, hasStaffAccess, manage, load, stateKey, Workspace, activityRows, endReasonKey,
+  canManage, deleteOpen, deleteLabel, deleting, deleteError, askDelete, setDeleteOpen, removeMatch } = toRefs(props.state)
 </script>
 <template>
   <component :is="Workspace" :competition-id="competitionId" :show-challenge-navigator="false" :show-supporting-panels="!management" :content-scroll="!management">
@@ -21,11 +22,17 @@ const { competitionId, options, selected, current, configuration, loading, error
             <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-center"><div class="flex min-w-0 flex-col items-center gap-2"><Avatar class="size-16"><AvatarImage v-if="current.leftAvatarUrl" :src="current.leftAvatarUrl" :alt="current.leftTeamName ?? ''" /><AvatarFallback>{{ current.leftTeamName?.slice(0, 2) }}</AvatarFallback></Avatar><h2 class="min-w-0 break-words text-base font-semibold md:text-xl">{{ current.leftTeamName || '—' }}</h2></div><div class="font-mono text-2xl font-bold md:text-4xl tabular-nums text-primary">{{ current.leftWins ?? 0 }} : {{ current.rightWins ?? 0 }}</div><div class="flex min-w-0 flex-col items-center gap-2"><Avatar class="size-16"><AvatarImage v-if="current.rightAvatarUrl" :src="current.rightAvatarUrl" :alt="current.rightTeamName ?? ''" /><AvatarFallback>{{ current.rightTeamName?.slice(0, 2) }}</AvatarFallback></Avatar><h2 class="min-w-0 break-words text-base font-semibold md:text-xl">{{ current.rightTeamName || '—' }}</h2></div></div>
             <p v-if="['Completed', 'Canceled'].includes(current.state ?? '')" class="text-center text-sm text-muted-foreground">{{ $t(endReasonKey) }}</p>
             <div class="flex flex-wrap justify-center gap-3"><Button :disabled="reviewMode && !finished" @click="enter">{{ $t(reviewMode ? 'liveSolo.postgame.title' : 'liveSolo.enterMatch') }}</Button><Button v-if="finished && !reviewMode" variant="outline" @click="postgame">{{ $t('liveSolo.postgame.title') }}</Button><Button v-if="current.hasMedia && (staff || current.state === 'Completed')" variant="outline" @click="recordings">{{ $t(staff ? 'liveSolo.recording.staffTitle' : 'liveSolo.recording.replays') }}</Button></div>
+            <div v-if="canManage && !reviewMode" class="flex justify-center"><Button variant="destructive" :disabled="deleting" @click="askDelete">{{ $t('liveSolo.matchDeletion.action') }}</Button></div>
             <p v-if="reviewMode && !finished" class="text-center text-sm text-muted-foreground">{{ $t('liveSolo.navigation.postgameAfterFinish') }}</p><section v-if="activityRows.length" class="flex flex-col gap-3 border-t pt-4"><h3 class="font-semibold">{{ $t('liveSolo.activity.title') }}</h3><ol class="flex flex-col gap-3"><li v-for="row in activityRows" :key="row.id" class="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{{ $message(row.label) }}</span><time v-if="row.time" :datetime="row.time" class="text-xs text-muted-foreground">{{ formatDateTime(row.time) }}</time></li></ol></section>
           </template>
           <Empty v-else><EmptyHeader><EmptyTitle>{{ $t('liveSolo.noMatches') }}</EmptyTitle><EmptyDescription>{{ $t('liveSolo.noMatchesDescription') }}</EmptyDescription></EmptyHeader></Empty>
         </CardContent></Card>
       </div>
     </div>
+    <AlertDialog :open="deleteOpen" @update:open="setDeleteOpen"><AlertDialogContent>
+      <AlertDialogHeader><AlertDialogTitle>{{ $t('liveSolo.matchDeletion.title', { match: deleteLabel }) }}</AlertDialogTitle><AlertDialogDescription>{{ $t('liveSolo.matchDeletion.description') }}</AlertDialogDescription></AlertDialogHeader>
+      <Alert v-if="deleteError" variant="destructive"><AlertDescription>{{ $message(deleteError) }}</AlertDescription></Alert>
+      <AlertDialogFooter><AlertDialogCancel :disabled="deleting">{{ $t('common.action.cancel') }}</AlertDialogCancel><Button variant="destructive" :disabled="deleting" @click="removeMatch"><Spinner v-if="deleting" />{{ $t('liveSolo.matchDeletion.action') }}</Button></AlertDialogFooter>
+    </AlertDialogContent></AlertDialog>
   </component>
 </template>

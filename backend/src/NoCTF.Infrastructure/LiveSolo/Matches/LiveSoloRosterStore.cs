@@ -15,7 +15,14 @@ public sealed partial class LiveSoloMatchStore
         if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
         if (match.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
         var slot = match.Slots.SingleOrDefault(x => x.TeamId == command.TeamId);
-        if (slot is null || match.State != LiveSoloMatchState.Preparing || match.StartedAt is not null) return new(null, LiveSoloFailure.RosterLocked);
+        var directional = match.DirectionPool.Count != 0;
+        if (slot is null || match.State != LiveSoloMatchState.Preparing || !directional && match.StartedAt is not null) return new(null, LiveSoloFailure.RosterLocked);
+        if (directional)
+        {
+            var rounds = await db.LiveSoloRounds.AsNoTracking().Where(x => x.MatchId == match.Id).ToArrayAsync(ct);
+            if (rounds.Any(x => x.State is not (LiveSoloRoundState.Won or LiveSoloRoundState.Canceled or LiveSoloRoundState.TimedOut))
+                || !match.DirectionPool.Any(x => x.RoundNumber == LiveSoloDirectionPoolPolicy.RoundNumber(rounds))) return new(null, LiveSoloFailure.NotReady);
+        }
         var team = await db.Teams.Include(x => x.Members).SingleOrDefaultAsync(x => x.Id == command.TeamId && x.CompetitionId == command.CompetitionId, ct);
         if (team is null || team.IsBanned || !await ActiveAsync(command.ActorId, ct)
             || team.CaptainId != command.ActorId && !await authorizer.CanModerateAsync(command.ActorId, command.CompetitionId, ct)) return new(null, LiveSoloFailure.Forbidden);

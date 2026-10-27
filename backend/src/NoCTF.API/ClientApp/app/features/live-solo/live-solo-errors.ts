@@ -12,6 +12,7 @@ const failureMessages = {
   CompetitionNotStarted: 'api.liveSolo.competitionNotStarted', ResourceCapacityExceeded: 'api.liveSolo.resourceCapacityExceeded', UnsupportedEnvironment: 'api.liveSolo.unsupportedEnvironment',
   IsolationNotConfigured: 'api.liveSolo.isolationNotConfigured', IsolationVerificationFailed: 'api.liveSolo.isolationVerificationFailed', QuestionGroupNotFound: 'api.liveSolo.questionGroupNotFound',
   SelectionChanged: 'api.liveSolo.selectionChanged', ActiveQuestionConflict: 'api.liveSolo.activeQuestionConflict',
+  QuestionGroupAlreadyDrawn: 'api.liveSolo.questionGroupAlreadyDrawn',
   DependencyUnavailable: 'liveSolo.error.dependency', IdempotencyConflict: 'liveSolo.error.idempotency',
 } satisfies Record<NoCtfApplicationLiveSoloRoundsLiveSoloFailure, MessageKey>
 

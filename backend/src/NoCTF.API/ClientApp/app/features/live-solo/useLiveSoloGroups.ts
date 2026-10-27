@@ -10,7 +10,7 @@ import { parseLiveSoloError } from './live-solo-errors'
 import { takeGroupDraft, keepGroupDraft } from './group-handoff'
 import { ApiError } from '~/utils/api-error'
 import { canManageLiveSolo } from './settings-draft'
-import { groupDraft, validGroup, groupOffsets, moveGroupQuestion } from './group-draft'
+import { groupDraft, groupValidationError, groupOffsets, moveGroupQuestion } from './group-draft'
 
 export function useLiveSoloGroups() {
   const route = useRoute(), router = useRouter(), context = inject(competitionContextKey)
@@ -19,6 +19,7 @@ export function useLiveSoloGroups() {
   const groups = ref<Group[]>([]), challenges = ref<Challenge[]>([]), interval = ref(180), limit = ref(900)
   const draft = ref(groupDraft()), original = ref(''), loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null), saved = ref(false)
   const selectedQuestion = ref<string | null>(null)
+  const validationShown = ref(false)
   const { user } = useAuth()
   const handoffKey = computed(() => `${user.value?.userId}:${competitionId.value}:${groupId.value ?? 'new'}`)
   const leaveOpen = ref(false)
@@ -28,8 +29,14 @@ export function useLiveSoloGroups() {
   const questionOptions = computed(() => challenges.value.filter(row => row.id && !draft.value.questions.some(item => item.competitionChallengeId === row.id))
     .map(row => ({ value: row.id!, label: row.title ?? '—' })))
   const offsets = computed(() => groupOffsets(draft.value, interval.value))
+  const validation = computed(() => groupValidationError(draft.value, interval.value, limit.value))
+  const displayedError = computed(() => error.value ?? (validationShown.value ? validation.value?.message ?? null : null))
+  const nameError = computed(() => validationShown.value && validation.value?.field === 'name' ? validation.value.message : null)
+  const limitError = computed(() => validation.value?.field === 'limit' ? validation.value.message : null)
+  const selectionError = computed(() => validationShown.value && validation.value?.field === 'questions' ? validation.value.message : null)
   const questions = computed(() => draft.value.questions.map((row,index) => ({ ...row, index, effectiveOffset: offsets.value[index]!,
-    title: challenges.value.find(question => question.id === row.competitionChallengeId)?.title ?? '—' })))
+    title: challenges.value.find(question => question.id === row.competitionChallengeId)?.title ?? '—',
+    validationError: validation.value?.field === 'offset' && validation.value.index === index ? validation.value.message : null })))
   async function load() {
     if (busy.value || disposed) return
     const generation = ++request; loading.value = true
@@ -57,7 +64,7 @@ export function useLiveSoloGroups() {
   async function create() {
     if (groupId.value) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/groups`); return }
     if (dirty.value) { newPending = true; reloadPending = false; leaveOpen.value = true; return }
-    draft.value = groupDraft(); original.value = JSON.stringify(draft.value)
+    draft.value = groupDraft(); original.value = JSON.stringify(draft.value); validationShown.value = false
   }
   function add() { if (selectedQuestion.value && writable.value && !busy.value && questionOptions.value.some(row => row.value === selectedQuestion.value)) { draft.value.questions.push({ competitionChallengeId: selectedQuestion.value, openOffsetSeconds: null }); selectedQuestion.value = null } }
   function remove(index: number) { if (writable.value && !busy.value) draft.value.questions.splice(index,1) }
@@ -67,7 +74,9 @@ export function useLiveSoloGroups() {
   function reserve(value: boolean | 'indeterminate') { if (writable.value && !busy.value) draft.value.reserve = value === true }
   async function save() {
     if (!writable.value || busy.value) return
-    if (!validGroup(draft.value,interval.value,limit.value)) { error.value = message('liveSolo.groups.invalidSchedule'); return }
+    error.value = null
+    validationShown.value = true
+    if (validation.value) return
     busy.value = true
     try {
       const result = await saveLiveSoloQuestionGroup({ path: { competitionId: competitionId.value }, body: { ...draft.value, name: draft.value.name.trim() } })
@@ -77,7 +86,7 @@ export function useLiveSoloGroups() {
         throw problem
       }
       if (disposed) return
-      draft.value = groupDraft(result.data); original.value = JSON.stringify(draft.value); saved.value = true; error.value = null
+      draft.value = groupDraft(result.data); original.value = JSON.stringify(draft.value); saved.value = true; error.value = null; validationShown.value = false
       groups.value = [...groups.value.filter(row => row.id !== result.data!.id), result.data]
       if (result.data.id !== groupId.value && result.data.id) { allowLeave = true; await router.replace(`${liveSoloBasePath(competitionId.value, route.path)}/groups/${result.data.id}`) }
     }
@@ -95,8 +104,8 @@ export function useLiveSoloGroups() {
   async function leave() {
     if (busy.value) return
     leaveOpen.value = false
-    if (newPending) { newPending = false; draft.value = groupDraft(); original.value = JSON.stringify(draft.value); return }
-    if (reloadPending) { reloadPending = false; draft.value = groupDraft(); original.value = ''; await load(); return }
+    if (newPending) { newPending = false; draft.value = groupDraft(); original.value = JSON.stringify(draft.value); validationShown.value = false; return }
+    if (reloadPending) { reloadPending = false; draft.value = groupDraft(); original.value = ''; validationShown.value = false; await load(); return }
     if (leaveTo) { allowLeave = true; await router.push(leaveTo) }
   }
   async function back() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/groups`) }
@@ -104,7 +113,8 @@ export function useLiveSoloGroups() {
   onBeforeRouteLeave(to => { if (allowLeave) return true; if (busy.value) return false; if (!dirty.value) return true; reloadPending = false; newPending = false; leaveTo = to.fullPath; leaveOpen.value = true; return false })
   onMounted(() => { const restored = takeGroupDraft(handoffKey.value); if (restored) { draft.value = restored.draft; original.value = restored.original } void load(); window.addEventListener('beforeunload',beforeUnload) })
   onScopeDispose(() => { disposed = true; request++; window.removeEventListener('beforeunload',beforeUnload) })
-  return { options, groupId, draft, loading, busy, error, saved, dirty, writable, questionOptions, questions, selectedQuestion, interval, limit, reload,
+  return { options, groupId, draft, loading, busy, error: displayedError, saved, dirty, writable, questionOptions, questions, selectedQuestion, interval, limit, reload,
+    nameError, limitError, selectionError,
     select, create, add, remove, move, offset, setLimit, reserve, save, back, leaveOpen, setLeave, leave,
     pool }
 }

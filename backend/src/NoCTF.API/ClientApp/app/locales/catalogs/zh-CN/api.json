@@ -604,6 +604,7 @@
   "api.liveSolo.isolationVerificationFailed": "环境隔离验证失败。",
   "api.liveSolo.mediaUnavailable": "媒体服务不可用，对局尚未开始。",
   "api.liveSolo.noSuitableQuestionGroup": "暂无适合自动选择的低风险题单，工作人员可明确指定可用题单并查看风险。",
+  "api.liveSolo.questionGroupAlreadyDrawn": "至少一支参赛队伍已经抽取或使用过该题单，请选择其他题单。",
   "api.liveSolo.notFound": "对局、轮次或题目不可用。",
   "api.liveSolo.notReady": "双方队伍、上场成员屏幕和题目环境就绪后才能开始。",
   "api.liveSolo.pool.alreadyInQuestionBank": "此题目仍关联题库模板，无需保存到题库。",

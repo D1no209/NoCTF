@@ -13,8 +13,9 @@ internal static class LiveSoloPublicExposure
     {
         var candidates = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.PublicAt <= now)
             .Join(db.LiveSoloMediaSessions, s => s.MediaSessionId, m => m.Id, (s, m) => new { Segment = s, m.MatchId })
-            .Join(db.LiveSoloMatches, x => x.MatchId, m => m.Id, (x, m) => new { x.Segment, Match = m })
-            .Where(x => x.Match.CompetitionId == competitionId && x.Match.StartedAt != null)
+            .Join(db.LiveSoloMatches.IgnoreQueryFilters(), x => x.MatchId, m => m.Id, (x, m) => new { x.Segment, Match = m })
+            .Where(x => x.Match.CompetitionId == competitionId && x.Match.StartedAt != null
+                && (x.Match.DeletedAt == null || x.Segment.PublicAt <= x.Match.DeletedAt))
             .Join(db.Competitions, x => x.Match.CompetitionId, c => c.Id, (x, c) => new { x.Segment, x.Match, Competition = c })
             .Where(x => x.Competition.Mode == GameMode.LiveSolo && x.Competition.AccessMode == CompetitionAccessMode.Public
                 && (x.Competition.Status == CompetitionStatus.Running || x.Competition.Status == CompetitionStatus.Paused || x.Competition.Status == CompetitionStatus.Finished)

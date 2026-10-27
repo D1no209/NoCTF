@@ -39,7 +39,7 @@ public sealed partial class LiveSoloMatchStore
         var records = await db.Set<LiveSoloResultCorrection>().Include(x => x.Matches).Where(x => x.CompetitionId == competitionId && x.MatchId == matchId)
             .OrderByDescending(x => x.CreatedAt).Take(100).ToArrayAsync(ct);
         var matchIds=records.SelectMany(x=>x.Matches).Select(x=>x.MatchId).Distinct().ToArray();
-        var matches=await db.LiveSoloMatches.Include(x=>x.Slots).Where(x=>matchIds.Contains(x.Id)).ToArrayAsync(ct);
+        var matches=await db.LiveSoloMatches.IgnoreQueryFilters().Include(x=>x.Slots).Where(x=>matchIds.Contains(x.Id)).ToArrayAsync(ct);
         var actorIds=records.SelectMany(x=>new Guid?[]{x.ActorUserId,x.ResolvedByUserId}).Where(x=>x!=null).Select(x=>x!.Value).Distinct().ToArray();
         var actors=await db.Users.Where(x=>actorIds.Contains(x.Id)).ToDictionaryAsync(x=>x.Id,x=>x.UserName,ct);
         var impacts=await ImpactsAsync(matches,null,ct);
@@ -197,7 +197,7 @@ public sealed partial class LiveSoloMatchStore
     private async Task<LiveSoloCorrectionView> CorrectionViewAsync(LiveSoloResultCorrection correction,CancellationToken ct)
     {
         var ids=correction.Matches.Select(x=>x.MatchId).ToArray();
-        var matches=await db.LiveSoloMatches.Include(x=>x.Slots).Where(x=>ids.Contains(x.Id)).OrderBy(x=>x.Lane).ThenBy(x=>x.Stage).ThenBy(x=>x.Position).ToArrayAsync(ct);
+        var matches=await db.LiveSoloMatches.IgnoreQueryFilters().Include(x=>x.Slots).Where(x=>ids.Contains(x.Id)).OrderBy(x=>x.Lane).ThenBy(x=>x.Stage).ThenBy(x=>x.Position).ToArrayAsync(ct);
         var actors=await db.Users.Where(x=>x.Id==correction.ActorUserId || x.Id==correction.ResolvedByUserId).ToDictionaryAsync(x=>x.Id,x=>x.UserName,ct);
         return CorrectionView(correction,await ImpactsAsync(matches,correction.Matches,ct),actors);
     }

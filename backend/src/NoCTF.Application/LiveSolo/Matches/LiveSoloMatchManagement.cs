@@ -17,6 +17,7 @@ public sealed record LiveSoloMatchView(Guid Id, Guid CompetitionId, LiveSoloMatc
     public DateTimeOffset? ResultUpdatedAt { get; init; }
     public Guid? LeftAvatarFileId { get; init; }
     public Guid? RightAvatarFileId { get; init; }
+    public bool UsesDirectionPool { get; init; }
 }
 public sealed record LiveSoloMatchResult(LiveSoloMatchView? Match, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloRoundView(Guid Id, Guid MatchId, int Number, int Replay, LiveSoloRoundState State,
@@ -59,6 +60,7 @@ public interface ILiveSoloMatchStore
 {
     Task<IReadOnlyList<LiveSoloQuestionCandidate>?> CandidatesAsync(Guid competitionId, Guid matchId, Guid actorId, DateTimeOffset now, CancellationToken ct);
     Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct);
+    Task<LiveSoloMatchDeletionResult> DeleteAsync(DeleteLiveSoloMatch command, CancellationToken ct);
     Task<LiveSoloMatchView?> FindAsync(Guid competitionId, Guid matchId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
     Task<IReadOnlyList<LiveSoloMatchView>?> ListAsync(Guid competitionId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
     Task<LiveSoloMatchResult> LockRosterAsync(SetLiveSoloRoster command, CancellationToken ct);
@@ -78,6 +80,7 @@ public interface ILiveSoloMatchStore
 
 public sealed class ManageLiveSoloMatches(ILiveSoloMatchStore store)
 {
+    public Task<LiveSoloMatchDeletionResult> DeleteAsync(DeleteLiveSoloMatch command, CancellationToken ct) => store.DeleteAsync(command, ct);
     public Task<LiveSoloMatchResult> ReadyAsync(Guid competitionId, Guid matchId, Guid actorId, Guid stamp, DateTimeOffset now, CancellationToken ct) =>
         store.ConfirmReadyAsync(competitionId, matchId, actorId, stamp, now, ct);
     public Task<LiveSoloRoundResult> PrepareAsync(PrepareLiveSoloRound command, CancellationToken ct) => store.PrepareRoundAsync(command, ct);

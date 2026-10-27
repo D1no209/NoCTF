@@ -26,11 +26,12 @@ public sealed partial class LiveSoloMatchStore
         var teamIds = match.Slots.Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).ToArray(); var userIds = match.Roster.Select(x => x.UserId).ToArray();
         var history = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.OpenedAt != null)
             .Join(db.LiveSoloRounds.AsNoTracking(), x => x.RoundId, x => x.Id, (q, r) => new { Question = q, Round = r })
-            .Join(db.LiveSoloMatches.AsNoTracking(), x => x.Round.MatchId, x => x.Id, (x, m) => new { x.Question, x.Round, Match = m })
+            .Join(db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking(), x => x.Round.MatchId, x => x.Id, (x, m) => new { x.Question, x.Round, Match = m })
             .Where(x => x.Match.CompetitionId == match.CompetitionId)
             .Select(x => new { x.Question.CompetitionChallengeId, x.Round.QuestionGroupId, x.Round.MatchId,
                 SeenByTeam = x.Match.Slots.Any(s => s.TeamId != null && teamIds.Contains(s.TeamId.Value)),
-                SeenByMember = x.Match.Roster.Any(r => userIds.Contains(r.UserId)) }).ToArrayAsync(ct);
+                SeenByMember = x.Round.Roster.Any(r => userIds.Contains(r.UserId))
+                    || !x.Round.Roster.Any() && x.Match.Roster.Any(r => userIds.Contains(r.UserId)) }).ToArrayAsync(ct);
         var active = await db.LiveSoloRoundQuestions.AsNoTracking()
             .Join(db.LiveSoloRounds.AsNoTracking(), x => x.RoundId, x => x.Id, (q, r) => new { Question = q, Round = r })
             .Where(x => (x.Round.State == LiveSoloRoundState.Preparing || x.Round.State == LiveSoloRoundState.Countdown || x.Round.State == LiveSoloRoundState.Running || x.Round.State == LiveSoloRoundState.ConfirmingResult)
@@ -40,7 +41,7 @@ public sealed partial class LiveSoloMatchStore
         var exposed = await db.LiveSoloQuestionExposures.AsNoTracking().Where(x => x.PublicAt <= now).Select(x => x.CanonicalChallengeId).Distinct().ToArrayAsync(ct);
         var seenTeams = entries.Where(x => history.Any(h => h.CompetitionChallengeId == x.Id && h.SeenByTeam)).Select(x => Canonical(x.ChallengeId)).ToHashSet();
         var seenMembers = entries.Where(x => history.Any(h => h.CompetitionChallengeId == x.Id && h.SeenByMember)).Select(x => Canonical(x.ChallengeId)).ToHashSet();
-        var uses = await db.LiveSoloRounds.AsNoTracking().Where(x => db.LiveSoloMatches.Any(m => m.Id == x.MatchId && m.CompetitionId == match.CompetitionId))
+        var uses = await db.LiveSoloRounds.AsNoTracking().Where(x => db.LiveSoloMatches.IgnoreQueryFilters().Any(m => m.Id == x.MatchId && m.CompetitionId == match.CompetitionId))
             .OrderByDescending(x => x.CreatedAt).Select(x => new { x.QuestionGroupId, Use = new LiveSoloQuestionUse(x.MatchId, x.Id, x.Number, x.Replay,
                 x.State, x.CreatedAt, x.Questions.Select(q => q.OpenedAt).Min()) }).ToArrayAsync(ct);
         return groups.Select(group =>
@@ -55,7 +56,7 @@ public sealed partial class LiveSoloMatchStore
                 return new LiveSoloSelectionMaterial(entry.Id, canonical, entry.ConcurrencyStamp, template.ConcurrencyStamp, true,
                     entry.DeletedAt != null || template.DeletedAt != null,
                     template.Definition is LiveSoloChallengeDefinition definition && LiveSoloConfigurationValidator.ValidateDefinition(definition).Count == 0,
-                    active.Contains(entry.Id), seenTeams.Contains(canonical), seenMembers.Contains(canonical), exposed.Contains(canonical));
+                    match.DirectionPool.Count == 0 && active.Contains(entry.Id), seenTeams.Contains(canonical), seenMembers.Contains(canonical), exposed.Contains(canonical));
             }).ToArray();
             return LiveSoloQuestionSelection.Evaluate(group.Id, group.Name, group.Reserve, group.Position, group.ConcurrencyStamp, materials,
                 ordered.Select(x => new LiveSoloQuestionGroupEntry(x.CompetitionChallengeId, x.OpenOffsetSeconds)).ToArray(),

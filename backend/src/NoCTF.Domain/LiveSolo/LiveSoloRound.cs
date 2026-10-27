@@ -24,6 +24,8 @@ public sealed class LiveSoloRound : IConcurrencyTracked
     public List<LiveSoloRoundSelectionAudit> SelectionAudits { get; set; } = [];
     public List<LiveSoloRoundSelectionRisk> SelectionRisks { get; set; } = [];
     public Guid QuestionGroupId { get; set; }
+    public Guid? DirectionDrawId { get; set; }
+    public List<LiveSoloRoundRosterMember> Roster { get; set; } = [];
     public int LimitSeconds { get; set; } = 900;
     public int CountdownSeconds { get; set; } = 5;
     public long TimelineRevision { get; set; }

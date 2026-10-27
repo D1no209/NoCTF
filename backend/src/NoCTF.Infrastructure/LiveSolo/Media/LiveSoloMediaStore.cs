@@ -163,8 +163,8 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         var stillCurrent = await db.LiveSoloMatches.AsNoTracking().AnyAsync(x => x.Id == command.MatchId && x.CurrentMediaSessionId == session.Id, ct);
         if (!stillCurrent || !await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.Id == session.Id && x.State == LiveSoloMediaState.Ready, ct))
             return new(null, Failure: LiveSoloMediaFailure.InvalidGeneration);
-        var latestMatch = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster).SingleAsync(x => x.Id == command.MatchId, ct);
-        if (!LiveSoloMediaPolicy.Active(latestMatch.State) || !await AvailableAsync(latestMatch, ct)
+        var latestMatch = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(x => x.Id == command.MatchId, ct);
+        if (latestMatch is null || !LiveSoloMediaPolicy.Active(latestMatch.State) || !await AvailableAsync(latestMatch, ct)
             || !await RosterEligibleAsync(latestMatch, ct) || !await EligibleAsync(latestMatch, command.ActorId, command.Role != LiveSoloMediaRole.Publisher, ct)
             || command.Role == LiveSoloMediaRole.Director && !await authorizer.CanModerateAsync(command.ActorId, command.CompetitionId, ct)
             || await authentication.ValidateContextAsync(command.ActorId, command.TokenVersion, command.Authentication, ct) is not null)

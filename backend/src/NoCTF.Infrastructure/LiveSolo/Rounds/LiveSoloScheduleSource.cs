@@ -18,7 +18,7 @@ public sealed class LiveSoloScheduleSource(NoCtfDbContext db) : IClusterSchedule
                     && (r.State == RuntimeState.Queued || r.State == RuntimeState.Provisioning || r.State == RuntimeState.Running))))
             .ToArrayAsync(ct);
         var matchIds = rounds.Select(x => x.MatchId).Distinct().ToArray();
-        var competitions = await db.LiveSoloMatches.AsNoTracking().Where(x => matchIds.Contains(x.Id))
+        var competitions = await db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking().Where(x => matchIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.CompetitionId, ct);
         var transitions = await LiveSoloCompetitionPauseReader.ReadAsync(db, competitions.Values.Distinct().ToArray(), now, ct);
         var result = new List<ClusterScheduleEntry>();

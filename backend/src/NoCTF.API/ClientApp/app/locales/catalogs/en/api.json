@@ -604,6 +604,7 @@
   "api.liveSolo.isolationVerificationFailed": "Environment isolation verification failed.",
   "api.liveSolo.mediaUnavailable": "The media service is unavailable. The Match has not started.",
   "api.liveSolo.noSuitableQuestionGroup": "No low-risk question list is available for automatic selection. Staff may specify an available list and review its risks.",
+  "api.liveSolo.questionGroupAlreadyDrawn": "One of these teams has already drawn or received this question list. Choose a different list.",
   "api.liveSolo.notFound": "The Match, Round or question is unavailable.",
   "api.liveSolo.notReady": "Both teams, roster screens and scoped resources must be ready before starting.",
   "api.liveSolo.pool.alreadyInQuestionBank": "This question still follows a question-bank template.",

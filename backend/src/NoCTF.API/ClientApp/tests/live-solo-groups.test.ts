@@ -1,6 +1,25 @@
 import { describe, expect, test } from 'bun:test'
-import { groupDraft, groupOffsets, validGroup, moveGroupQuestion } from '../app/features/live-solo/group-draft'
+import { groupDraft, groupOffsets, validGroup, moveGroupQuestion, groupValidationError } from '../app/features/live-solo/group-draft'
+import { message } from '../app/utils/i18n'
 describe('LiveSolo group editing', () => {
+  test('an opening at 1200 seconds identifies the second question and its inherited 900-second limit', () => {
+    const draft = groupDraft({ name: 'PWN1', questions: [
+      { competitionChallengeId: 'rbp', openOffsetSeconds: 0 },
+      { competitionChallengeId: 'paper-shell', openOffsetSeconds: 1200 },
+    ] })
+    expect(groupValidationError(draft, 180, 900)).toEqual({ field: 'offset', index: 1,
+      message: message('liveSolo.groups.validation.offsetLimit', { position: 2, offset: 1200, limit: 900 }) })
+    draft.limitSeconds = 1800
+    expect(groupValidationError(draft, 180, 900)).toBeNull()
+    expect(validGroup(draft, 180, 900)).toBe(true)
+  })
+  test('the last default offset and an opening exactly at the deadline report the actual limit', () => {
+    const draft = groupDraft({ name: 'Round', questions: Array.from({ length: 6 }, (_, index) => ({ competitionChallengeId: `question-${index}` })) })
+    expect(groupValidationError(draft, 180, 900)).toEqual({ field: 'offset', index: 5,
+      message: message('liveSolo.groups.validation.offsetLimit', { position: 6, offset: 900, limit: 900 }) })
+    draft.limitSeconds = 901
+    expect(validGroup(draft, 180, 900)).toBe(true)
+  })
   test('ordered defaults and explicit offsets share the actual group limit', () => {
     const draft = groupDraft({ name: 'Final', questions: [{ competitionChallengeId: 'one' }, { competitionChallengeId: 'two' }] })
     expect(groupOffsets(draft,180)).toEqual([0,180]); expect(validGroup(draft,180,900)).toBe(true)

@@ -21,6 +21,9 @@ public sealed partial class LiveSoloMatchStore
             && x.RegistrationStatus == TeamRegistrationStatus.Approved && !x.IsBanned, ct) != command.TeamIds.Count)
             return new(null, LiveSoloFailure.InvalidConfiguration);
         var matches = LiveSoloBracketPolicy.Generate(competition.Id, command.TeamIds, configuration, command.Now);
+        var generation = (await db.LiveSoloMatches.IgnoreQueryFilters().Where(x => x.CompetitionId == competition.Id)
+            .Select(x => (int?)x.BracketGeneration).MaxAsync(ct) ?? -1) + 1;
+        foreach (var match in matches) match.BracketGeneration = generation;
         db.LiveSoloMatches.AddRange(matches);
         foreach (var match in matches.Where(x => x.State == LiveSoloMatchState.Preparing))
             db.LiveSoloActiveTeamSlots.AddRange(match.Slots.Select(x => new LiveSoloActiveTeamSlot { CompetitionId = competition.Id, MatchId = match.Id, TeamId = x.TeamId!.Value }));

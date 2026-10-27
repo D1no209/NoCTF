@@ -12499,7 +12499,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("CompetitionScorePresetId");
 
-                            b1.ToTable("competition_score_presets");
+                            b1.ToTable("competition_score_presets", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("CompetitionScorePresetId")
@@ -14546,7 +14546,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("StaffWebhookEventItemEventId", "StaffWebhookEventItemPosition");
 
-                            b1.ToTable("competition_staff_webhook_event_items");
+                            b1.ToTable("competition_staff_webhook_event_items", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("StaffWebhookEventItemEventId", "StaffWebhookEventItemPosition")
@@ -14698,7 +14698,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("StaffWebhookWorkItemCompetitionId", "StaffWebhookWorkItemKind", "StaffWebhookWorkItemItemId");
 
-                            b1.ToTable("competition_staff_webhook_work_items");
+                            b1.ToTable("competition_staff_webhook_work_items", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("StaffWebhookWorkItemCompetitionId", "StaffWebhookWorkItemKind", "StaffWebhookWorkItemItemId")

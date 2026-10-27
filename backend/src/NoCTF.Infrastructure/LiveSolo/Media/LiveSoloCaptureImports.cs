@@ -48,7 +48,7 @@ public sealed partial class LiveSoloCaptureStore
                     program.LastFragmentImportedAt=observed;program.StalledAt=null;
                     if(recovered)
                     {
-                        var match=await db.LiveSoloMatches.SingleAsync(x=>x.Id==session.MatchId,ct);
+                        var match=await db.LiveSoloMatches.IgnoreQueryFilters().SingleAsync(x=>x.Id==session.MatchId,ct);
                         await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.CompetitionId,match.Id,observed));
                     }
                     attached = true;

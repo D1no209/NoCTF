@@ -1,6 +1,6 @@
 namespace NoCTF.Domain.LiveSolo;
 
-public enum LiveSoloQuestionSelectionKind : short { Automatic, StaffSpecified }
+public enum LiveSoloQuestionSelectionKind : short { Automatic, StaffSpecified, DirectionDraw }
 public enum LiveSoloSelectionRiskKind : short { SeenByTeam, SeenByRosterMember, SameSource, PreviouslyUsed, PublicExposure }
 public enum LiveSoloResourceFailure : short { None, NotFound, ResourceCapacityExceeded, UnsupportedEnvironment, IsolationNotConfigured, IsolationVerificationFailed, DependencyUnavailable }
 

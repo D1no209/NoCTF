@@ -83,7 +83,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         .Where(x => x.CompetitionId == competition && !x.IsBanned && x.RegistrationStatus == TeamRegistrationStatus.Approved
             && x.Members.Any(m => m.UserId == actor)).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
     private async Task<LiveSoloMatch?> MatchAsync(Guid competition, Guid match, CancellationToken ct) => await db.LiveSoloMatches
-        .Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(x => x.Id == match && x.CompetitionId == competition, ct);
+        .Include(x => x.Slots).Include(x => x.Roster).Include(x => x.DirectionPool).SingleOrDefaultAsync(x => x.Id == match && x.CompetitionId == competition, ct);
     private async Task<LiveSoloMatchView> MapAsync(LiveSoloMatch match, CancellationToken ct)
     {
         var ids = match.Slots.Where(x => x.TeamId is not null).Select(x => x.TeamId!.Value).ToArray();
@@ -109,7 +109,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
             match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia)
         { ResultRevision = match.ResultRevision, EndReason = match.EndReason, ResultLeftWins = match.ResultLeftWins,
-          ResultRightWins = match.ResultRightWins, ResultUpdatedAt = match.ResultUpdatedAt };
+          ResultRightWins = match.ResultRightWins, ResultUpdatedAt = match.ResultUpdatedAt, UsesDirectionPool = match.DirectionPool.Count != 0 };
     }
 
     public async Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct) =>
@@ -124,7 +124,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             if (ids.Distinct().Count() != 2 || await db.Teams.CountAsync(x => ids.Contains(x.Id) && x.CompetitionId == command.CompetitionId
                 && !x.IsBanned && x.RegistrationStatus == TeamRegistrationStatus.Approved, ct) != 2) return new(null, LiveSoloFailure.InvalidConfiguration);
             if (await db.LiveSoloActiveTeamSlots.AnyAsync(x => x.CompetitionId == command.CompetitionId && ids.Contains(x.TeamId), ct)) return new(null, LiveSoloFailure.Conflict);
-            var position = (await db.LiveSoloMatches.Where(x => x.CompetitionId == command.CompetitionId && x.Lane == LiveSoloBracketLane.Winners && x.Stage == 1)
+            var position = (await db.LiveSoloMatches.IgnoreQueryFilters().Where(x => x.CompetitionId == command.CompetitionId && x.Lane == LiveSoloBracketLane.Winners && x.Stage == 1)
                 .Select(x => (int?)x.Position).MaxAsync(ct) ?? -1) + 1;
             var match = new LiveSoloMatch { Id = Guid.CreateVersion7(command.Now), CompetitionId = command.CompetitionId, Lane = LiveSoloBracketLane.Winners,
                 Stage = 1, Position = position, RequiredWins = command.RequiredWins ?? configuration.RequiredWins,
@@ -151,7 +151,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         if (staff && !await authorizer.CanObserveAsync(actorId, competitionId, ct)) return null;
         var team = await TeamAsync(competitionId, actorId, ct);
         if (!staff && team is null) return null;
-        var matches = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster)
+        var matches = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster).Include(x => x.DirectionPool)
             .Where(x => x.CompetitionId == competitionId && x.SupersededAt == null && (staff || x.Slots.Any(s => s.TeamId == team)))
             .OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();

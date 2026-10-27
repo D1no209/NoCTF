@@ -24,6 +24,7 @@ public static class LiveSoloInfrastructure
     public static IServiceCollection AddNoCtfLiveSolo(this IServiceCollection services, IConfiguration? configuration = null)
     {
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
+        services.AddScoped<ILiveSoloDirectionStore, LiveSoloMatchStore>();
         services.AddScoped<ILiveSoloWorkspaceReader, LiveSoloMatchStore>();
         services.AddScoped<ILiveSoloBracketStore, LiveSoloMatchStore>();
         services.AddScoped<ManageLiveSoloBracket>();

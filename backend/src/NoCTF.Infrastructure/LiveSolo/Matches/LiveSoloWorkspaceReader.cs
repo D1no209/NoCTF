@@ -71,7 +71,10 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
                 var slot = match.Slots.SingleOrDefault(x => x.TeamId == team);
                 if (slot != null && match.State == LiveSoloMatchState.Preparing)
                 {
-                    if (slot.RosterLockedAt == null && await db.Teams.AnyAsync(x => x.Id == team && x.CaptainId == actorId, ct)) allowed.Add(LiveSoloWorkspaceOperation.LockRoster);
+                    var rounds = await db.LiveSoloRounds.AsNoTracking().Where(x => x.MatchId == matchId).ToArrayAsync(ct);
+                    var canSelect = match.DirectionPool.Count == 0 || match.DirectionPool.Any(x => x.RoundNumber == LiveSoloDirectionPoolPolicy.RoundNumber(rounds))
+                        && rounds.All(x => x.State is LiveSoloRoundState.Won or LiveSoloRoundState.Canceled or LiveSoloRoundState.TimedOut);
+                    if (canSelect && slot.RosterLockedAt == null && await db.Teams.AnyAsync(x => x.Id == team && x.CaptainId == actorId, ct)) allowed.Add(LiveSoloWorkspaceOperation.LockRoster);
                     if (slot.RosterLockedAt != null && slot.ReadyConfirmedAt == null && match.Roster.Any(x => x.TeamId == team && x.UserId == actorId)) allowed.Add(LiveSoloWorkspaceOperation.ConfirmReady);
                 }
                 if (round?.State == LiveSoloRoundState.Running && match.State == LiveSoloMatchState.Running && competition.Status == CompetitionStatus.Running
@@ -84,9 +87,13 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
         var teamId = await TeamAsync(competitionId, actorId, ct);
         var historyAllowed = staff || competition.Status == CompetitionStatus.Finished && teamId != null
             || teamId != null && match.Roster.Any(x => x.UserId == actorId && x.TeamId == teamId)
-                && match.Slots.Any(x => x.TeamId == teamId && x.RosterLockedAt != null);
+                && match.Slots.Any(x => x.TeamId == teamId && x.RosterLockedAt != null)
+            || teamId != null && await db.Set<LiveSoloRoundRosterMember>().AnyAsync(x => x.UserId == actorId && x.TeamId == teamId
+                && db.LiveSoloRounds.Any(r => r.Id == x.RoundId && r.MatchId == matchId), ct);
         var history = historyAllowed ? await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.OpenedAt != null)
             .Join(db.LiveSoloRounds.Where(x => x.MatchId == matchId), q => q.RoundId, r => r.Id, (q, r) => new { q, r })
+            .Where(x => staff || competition.Status == CompetitionStatus.Finished || !x.r.Roster.Any()
+                || x.r.Roster.Any(member => member.UserId == actorId && member.TeamId == teamId))
             .OrderBy(x => x.r.Number).ThenBy(x => x.r.Replay).ThenBy(x => x.q.Position)
             .Select(x => new LiveSoloReviewQuestion(x.q.Id, x.r.Id, x.q.CompetitionChallengeId, x.r.Number, x.r.Replay, x.q.Position,
                 x.q.OpenedContent != null ? x.q.OpenedContent.Title : null, x.q.OpenedAt, x.q.OpenedContent != null)).ToArrayAsync(ct) : [];
@@ -100,6 +107,10 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
     private async Task<bool> PreparedSelectionCurrentAsync(LiveSoloMatch match, LiveSoloRound round, DateTimeOffset now, CancellationToken ct)
     {
         var candidates = await QuestionCandidatesAsync(match, now, ct);
+        if (round.DirectionDrawId is Guid drawId)
+            return match.DirectionPool.Any(x => x.Id == drawId && x.QuestionGroupId == round.QuestionGroupId)
+                && candidates.Any(x => x.Id == round.QuestionGroupId && x.Available && x.ConcurrencyStamp == round.QuestionGroupStamp)
+                && !(await PreviouslyDrawnGroupsAsync(match, ct)).Contains(round.QuestionGroupId);
         return candidates.Any(x => x.Id == round.QuestionGroupId && x.AutomaticEligible);
     }
 }

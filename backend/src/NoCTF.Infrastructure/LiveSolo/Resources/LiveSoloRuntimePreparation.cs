@@ -73,7 +73,7 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         if (messages is not null)
         {
-            var match = await db.LiveSoloMatches.AsNoTracking().SingleAsync(x => x.Id == round.MatchId, ct);
+            var match = await db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == round.MatchId, ct);
             await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.CompetitionId, match.Id, TimeProvider.System.GetUtcNow()));
             await messages.FlushCommittedMessagesAsync();
         }

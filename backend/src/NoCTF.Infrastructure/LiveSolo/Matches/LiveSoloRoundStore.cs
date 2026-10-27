@@ -27,8 +27,12 @@ public sealed partial class LiveSoloMatchStore
             if (rounds.Any(x => x.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running or LiveSoloRoundState.ConfirmingResult))
                 return new(null, LiveSoloFailure.AlreadyEnded);
             var candidates = await QuestionCandidatesAsync(match, command.Now, ct);
-            var choice = LiveSoloQuestionSelection.Select(candidates, command.GroupId);
-            if (command.GroupId is Guid requested)
+            var draw = match.DirectionPool.SingleOrDefault(x => x.RoundNumber == LiveSoloDirectionPoolPolicy.RoundNumber(rounds));
+            if (match.DirectionPool.Count != 0 && draw is null) return new(null, LiveSoloFailure.NotReady);
+            if (draw != null && command.GroupId != null && command.GroupId != draw.QuestionGroupId) return new(null, LiveSoloFailure.SelectionChanged);
+            if (draw != null && (await PreviouslyDrawnGroupsAsync(match, ct)).Contains(draw.QuestionGroupId)) return new(null, LiveSoloFailure.QuestionGroupAlreadyDrawn);
+            var choice = LiveSoloQuestionSelection.Select(candidates, draw?.QuestionGroupId ?? command.GroupId);
+            if (draw is null && command.GroupId is Guid requested)
             {
                 var candidate = candidates.SingleOrDefault(x => x.Id == requested);
                 if (candidate is null) return new(null, LiveSoloFailure.QuestionGroupNotFound);
@@ -46,13 +50,16 @@ public sealed partial class LiveSoloMatchStore
             if (!LiveSoloRoundSchedulePolicy.FitsRuntimeQuota(runtimeCount, runtimeQuota)) return new(null, LiveSoloFailure.ResourceCapacityExceeded);
             _ = await db.Challenges.Where(x => templateIds.Contains(x.Id)).Select(x => new { x.Id, x.ConcurrencyStamp }).ToArrayAsync(ct);
             var last = rounds.LastOrDefault();
+            if (last != null) await ExpireRoundRescuesAsync(match, last.Id, command.Now, ct);
             var replay = last?.State is LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled;
             var round = new LiveSoloRound { Id = Guid.CreateVersion7(command.Now), MatchId = match.Id,
                 Number = replay ? last!.Number : (last?.Number ?? 0) + 1, Replay = replay ? last!.Replay + 1 : 0,
+                DirectionDrawId = draw?.Id,
+                Roster = match.Roster.Select(x => new LiveSoloRoundRosterMember { TeamId = x.TeamId, UserId = x.UserId, JoinedAt = command.Now }).ToList(),
                 QuestionGroupId = group.Id, QuestionGroupStamp = choice.ConcurrencyStamp, SelectionRevision = choice.SelectionRevision,
-                SelectionKind = command.GroupId is null ? LiveSoloQuestionSelectionKind.Automatic : LiveSoloQuestionSelectionKind.StaffSpecified,
+                SelectionKind = draw != null ? LiveSoloQuestionSelectionKind.DirectionDraw : command.GroupId is null ? LiveSoloQuestionSelectionKind.Automatic : LiveSoloQuestionSelectionKind.StaffSpecified,
                 SelectedByUserId = command.ActorId,
-                SelectionAudits = [new() { Position = 0, Kind = command.GroupId is null ? LiveSoloQuestionSelectionKind.Automatic : LiveSoloQuestionSelectionKind.StaffSpecified,
+                SelectionAudits = [new() { Position = 0, Kind = draw != null ? LiveSoloQuestionSelectionKind.DirectionDraw : command.GroupId is null ? LiveSoloQuestionSelectionKind.Automatic : LiveSoloQuestionSelectionKind.StaffSpecified,
                     ActorUserId = command.ActorId, QuestionGroupId = group.Id, QuestionGroupStamp = choice.ConcurrencyStamp, SelectionRevision = choice.SelectionRevision, OccurredAt = command.Now }],
                 SelectionRisks = choice.Risks.Select((x, position) => new LiveSoloRoundSelectionRisk { Position = position, Kind = x.Kind, CompetitionChallengeId = x.CompetitionChallengeId, CanonicalChallengeId = x.CanonicalChallengeId }).ToList(),
                 LimitSeconds = group.RoundLimitSeconds ?? config.RoundLimitSeconds,
@@ -91,6 +98,7 @@ public sealed partial class LiveSoloMatchStore
         var round = await db.LiveSoloRounds.Include(x => x.Questions).Include(x => x.Pauses).Include(x => x.SelectionRisks).Include(x => x.SelectionAudits)
             .SingleOrDefaultAsync(x => x.Id == command.RoundId && x.MatchId == command.MatchId, ct);
         if (match is null || round is null || match.CurrentRoundId != round.Id) return new(null, LiveSoloFailure.NotFound);
+        if (round.DirectionDrawId != null) return new(null, LiveSoloFailure.NotReady);
         if (round.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
         if (match.State != LiveSoloMatchState.Preparing || round.State != LiveSoloRoundState.Preparing || match.PendingCorrectionId != null) return new(null, LiveSoloFailure.NotReady);
         if (command.QuestionGroupId != round.QuestionGroupId) return new(null, LiveSoloFailure.SelectionChanged);
@@ -248,7 +256,9 @@ public sealed partial class LiveSoloMatchStore
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);
             // Exposure can change while both sides are preparing. Recheck before a new Match starts.
-            if (round.SelectionKind != LiveSoloQuestionSelectionKind.StaffSpecified && !await NoNewPublicExposureAsync(match, round, ct)) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
+            if (round.SelectionKind is not (LiveSoloQuestionSelectionKind.StaffSpecified or LiveSoloQuestionSelectionKind.DirectionDraw)
+                && !await NoNewPublicExposureAsync(match, round, ct)) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
+            if (round.DirectionDrawId != null && !await PreparedSelectionCurrentAsync(match, round, command.Now, ct)) return new(null, LiveSoloFailure.SelectionChanged);
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
             match.State = LiveSoloMatchState.Countdown; round.State = LiveSoloRoundState.Countdown; round.CountdownAt = effectiveAt; round.TimelineRevision++;
             await messages.ScheduleAsync(new NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound(round.Id, round.TimelineRevision,

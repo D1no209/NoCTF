@@ -8,7 +8,7 @@ public enum LiveSoloFailure : short
     NotFound, Forbidden, Disabled, InvalidConfiguration, Conflict, RosterLocked, NotReady,
     MediaUnavailable, IsolationUnavailable, RoundNotRunning, RoundPaused, QuestionNotOpen,
     DeadlinePassed, AlreadyEnded, NoSuitableQuestionGroup, DependencyUnavailable, IdempotencyConflict, CompetitionNotStarted, ResourceCapacityExceeded, UnsupportedEnvironment,
-    IsolationNotConfigured, IsolationVerificationFailed, QuestionGroupNotFound, SelectionChanged, ActiveQuestionConflict
+    IsolationNotConfigured, IsolationVerificationFailed, QuestionGroupNotFound, SelectionChanged, ActiveQuestionConflict, QuestionGroupAlreadyDrawn
 }
 public enum LiveSoloResolution : short { Waiting, NoWinner, Winner }
 public sealed record LiveSoloOrderedResult(long Sequence, Guid GameplayFactId, Guid TeamId,

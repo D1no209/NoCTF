@@ -64,7 +64,7 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
     {
         var at = clock.GetUtcNow();
         if (await db.LiveSoloProgramFrames.AnyAsync(x => x.MediaSessionId == session.Id && x.Kind==kind && x.OccurredAt == at, ct)) return;
-        var match = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).SingleAsync(x => x.Id == session.MatchId, ct);
+        var match = await db.LiveSoloMatches.IgnoreQueryFilters().AsNoTracking().Include(x => x.Slots).SingleAsync(x => x.Id == session.MatchId, ct);
         if(kind==LiveSoloProgramFrameKind.DelayedResult && (match.State is not (LiveSoloMatchState.Completed or LiveSoloMatchState.Canceled)
             || await db.LiveSoloProgramFrames.AnyAsync(x=>x.MediaSessionId==session.Id&&x.Kind==kind&&x.MatchRevision==match.ConcurrencyStamp,ct)))return;
         var round = match.CurrentRoundId is Guid roundId ? await db.LiveSoloRounds.AsNoTracking().Include(x => x.Pauses).SingleOrDefaultAsync(x => x.Id == roundId, ct) : null;

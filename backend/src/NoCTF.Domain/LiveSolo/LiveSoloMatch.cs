@@ -35,10 +35,13 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
     [MaxLength(4000)] public string? AdjudicationReason { get; set; }
     public List<LiveSoloMatchSlot> Slots { get; set; } = [];
     public List<LiveSoloRosterMember> Roster { get; set; } = [];
     public List<LiveSoloRound> Rounds { get; set; } = [];
+    public List<LiveSoloMatchDirection> DirectionPool { get; set; } = [];
 }
 
 public sealed class LiveSoloMatchSlot

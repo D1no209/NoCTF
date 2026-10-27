@@ -13,7 +13,7 @@ public sealed partial class LiveSoloCaptureStore
     {
         var key=$"live-solo-export:{exportId:N}:{revision:N}:{(short)reason}";
         if(await db.Notifications.AnyAsync(x=>x.Kind==NotificationKind.LiveSoloMediaInterrupted&&x.SourceEventKey==key,ct))return;
-        var match=await db.LiveSoloMatches.SingleAsync(x=>x.Id==session.MatchId,ct);var now=clock.GetUtcNow();
+        var match=await db.LiveSoloMatches.IgnoreQueryFilters().SingleAsync(x=>x.Id==session.MatchId,ct);var now=clock.GetUtcNow();
         var alert=NotificationGeneratedCatalog.Create(NotificationKind.LiveSoloMediaInterrupted);
         alert.Id=Guid.CreateVersion7(now);alert.SourceType=NotificationSourceType.System;alert.SourceId=exportId;
         alert.TargetType=NotificationTargetType.CompetitionCollaborators;alert.TargetId=match.CompetitionId;

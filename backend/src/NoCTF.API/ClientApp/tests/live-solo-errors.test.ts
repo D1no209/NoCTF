@@ -7,6 +7,8 @@ test('LiveSolo media and isolation failures retain specific reasons rather than 
     .toEqual(message('liveSolo.error.mediaUnavailable'))
   expect(parseLiveSoloError({ status: 409, code: 'IsolationUnavailable' }, message('liveSolo.error.operation')).displayMessage)
     .toEqual(message('liveSolo.error.isolation'))
+  expect(parseLiveSoloError({ status: 409, code: 'QuestionGroupAlreadyDrawn' }, message('liveSolo.error.operation')).displayMessage)
+    .toEqual(message('api.liveSolo.questionGroupAlreadyDrawn'))
 })
 
 test('field validation and authentication failures keep their own messages', () => {

@@ -4780,6 +4780,167 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool": {
+      "put": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Configure Live Solo Direction Pool",
+        "description": "Executes PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool.",
+        "operationId": "ConfigureLiveSoloDirectionPool",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ConfigureLiveSoloDirectionPoolRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloConfigureLiveSoloDirectionPoolRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Live Solo Direction Pool",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool.",
+        "operationId": "GetLiveSoloDirectionPool",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloDirectionPoolResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready": {
       "post": {
         "tags": [
@@ -5157,6 +5318,203 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/direction-presets/{presetId}": {
+      "delete": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Delete Live Solo Direction Preset",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/live-solo/direction-presets/{presetId}.",
+        "operationId": "DeleteLiveSoloDirectionPreset",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "presetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}": {
+      "delete": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Delete Live Solo Match",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}.",
+        "operationId": "DeleteLiveSoloMatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloDeleteLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads a participating team's Match or an authorized staff projection.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}.",
+        "operationId": "GetLiveSoloMatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/question-pool/deploy": {
       "post": {
         "tags": [
@@ -5441,6 +5799,82 @@
         "responses": {
           "404": {
             "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool/draw": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Draw Live Solo Direction",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool/draw.",
+        "operationId": "DrawLiveSoloDirection",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -5915,70 +6349,6 @@
                 }
               }
             }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}": {
-      "get": {
-        "tags": [
-          "Competitions"
-        ],
-        "summary": "Reads a participating team's Match or an authorized staff projection.",
-        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}.",
-        "operationId": "GetLiveSoloMatch",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "matchId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "staff",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -7238,6 +7608,141 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/direction-presets": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "List Live Solo Direction Presets",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/direction-presets.",
+        "operationId": "ListLiveSoloDirectionPresets",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloListLiveSoloDirectionPresetsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Save Live Solo Direction Preset",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/direction-presets.",
+        "operationId": "SaveLiveSoloDirectionPreset",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveLiveSoloDirectionPresetRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSaveLiveSoloDirectionPresetRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloDirectionPresetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8782,6 +9287,222 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramHealthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/rescue-requests": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Request Live Solo Rescue",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/rescue-requests.",
+        "operationId": "RequestLiveSoloRescue",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "RequestLiveSoloRescueRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloRequestLiveSoloRescueRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rescue-requests/{requestId}/decision": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Resolve Live Solo Rescue",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rescue-requests/{requestId}/decision.",
+        "operationId": "ResolveLiveSoloRescue",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ResolveLiveSoloRescueRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloResolveLiveSoloRescueRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
                 }
               }
             }
@@ -33439,6 +34160,9 @@
           "rightAvatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "usesDirectionPool": {
+            "type": "boolean"
           }
         }
       },
@@ -33699,11 +34423,13 @@
         "description": "",
         "x-enumNames": [
           "Automatic",
-          "StaffSpecified"
+          "StaffSpecified",
+          "DirectionDraw"
         ],
         "enum": [
           "Automatic",
-          "StaffSpecified"
+          "StaffSpecified",
+          "DirectionDraw"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloAdjudicationResponse": {
@@ -33855,7 +34581,8 @@
           "IsolationVerificationFailed",
           "QuestionGroupNotFound",
           "SelectionChanged",
-          "ActiveQuestionConflict"
+          "ActiveQuestionConflict",
+          "QuestionGroupAlreadyDrawn"
         ],
         "enum": [
           "NotFound",
@@ -33882,7 +34609,8 @@
           "IsolationVerificationFailed",
           "QuestionGroupNotFound",
           "SelectionChanged",
-          "ActiveQuestionConflict"
+          "ActiveQuestionConflict",
+          "QuestionGroupAlreadyDrawn"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloAdjudicateLiveSoloMatchRequest": {
@@ -34283,6 +35011,24 @@
           "RetryArchive",
           "StartNewChunk"
         ]
+      },
+      "NoCTFAPIEndpointsLiveSoloConfigureLiveSoloDirectionPoolRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "presetIds"
+        ],
+        "properties": {
+          "presetIds": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
       },
       "NoCTFAPIEndpointsLiveSoloConfirmLiveSoloReadyRequest": {
         "type": "object",
@@ -35160,6 +35906,27 @@
           }
         }
       },
+      "NoCTFAPIEndpointsLiveSoloDeleteLiveSoloDirectionPresetRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloDeleteLiveSoloMatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloDeleteLiveSoloMatchRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -35191,6 +35958,10 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsLiveSoloDownloadLiveSoloReviewAttachmentRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloDrawLiveSoloDirectionRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -35592,6 +36363,135 @@
         ]
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloDirectionPoolResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pool": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloDirectionResponse"
+            }
+          },
+          "rescues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRescueResponse"
+            }
+          },
+          "canConfigure": {
+            "type": "boolean"
+          },
+          "canDraw": {
+            "type": "boolean"
+          },
+          "canRequestRescue": {
+            "type": "boolean"
+          },
+          "canJudgeRescue": {
+            "type": "boolean"
+          },
+          "canManagePresets": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloDirectionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "drawnAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRescueResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRescueState"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "judgeUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "decisionReason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloRescueState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Approved",
+          "Rejected"
+        ],
+        "enum": [
+          "Pending",
+          "Approved",
+          "Rejected"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloDirectionPoolRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -36467,6 +37367,45 @@
         ]
       },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloAttachmentsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloDirectionPresetsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloDirectionPresetResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloDirectionPresetResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "questionGroupName": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloDirectionPresetsRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -37536,6 +38475,42 @@
           }
         }
       },
+      "NoCTFAPIEndpointsLiveSoloRequestLiveSoloRescueRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0,
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloResolveLiveSoloRescueRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "approve": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0,
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsLiveSoloResolveLiveSoloResultCorrectionRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -37703,6 +38678,39 @@
           "configuration": {
             "nullable": false,
             "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloSaveLiveSoloDirectionPresetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "direction",
+          "questionGroupId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": true
+          },
+          "direction": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 0,
+            "nullable": false
+          },
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
           }
         }
       },

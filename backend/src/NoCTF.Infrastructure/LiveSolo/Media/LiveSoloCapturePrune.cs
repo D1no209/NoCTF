@@ -23,7 +23,7 @@ public sealed partial class LiveSoloCaptureStore
     {
         var now = clock.GetUtcNow();
         var raw = new HashSet<Guid>();
-        var competitionId = await db.LiveSoloMediaSessions.Where(x => x.Id == sessionId).Join(db.LiveSoloMatches, s => s.MatchId, m => m.Id, (s, m) => (Guid?)m.CompetitionId).SingleOrDefaultAsync(ct);
+        var competitionId = await db.LiveSoloMediaSessions.Where(x => x.Id == sessionId).Join(db.LiveSoloMatches.IgnoreQueryFilters(), s => s.MatchId, m => m.Id, (s, m) => (Guid?)m.CompetitionId).SingleOrDefaultAsync(ct);
         if (competitionId is Guid id) await TransactionAsync(() => NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, id, now, ct), ct);
         // References remain until external deletion succeeds, so a lost wakeup can be rebuilt from expired rows.
         foreach (var segment in await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.MediaSessionId == sessionId && x.RemoveAfter <= now).ToArrayAsync(ct))
