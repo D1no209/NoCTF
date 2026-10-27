@@ -15,7 +15,7 @@ public sealed class LiveSoloRealtimeAccess(NoCtfDbContext db) : ILiveSoloRealtim
         if (requests.Count == 0) return new HashSet<string>();
         var userIds = requests.Select(x => x.UserId).Distinct().ToArray();
         var competitionIds = requests.Select(x => x.CompetitionId).Distinct().ToArray();
-        var matchIds = requests.Select(x => x.MatchId).Distinct().ToArray();
+        var matchIds = requests.Where(x => x.MatchId != null).Select(x => x.MatchId!.Value).Distinct().ToArray();
         var users = await db.Users.AsNoTracking().Where(x => userIds.Contains(x.Id) && x.AccountStatus == UserAccountStatus.Active).ToDictionaryAsync(x => x.Id, ct);
         var competitions = await db.Competitions.AsNoTracking().Include(x => x.Collaborators).Where(x => competitionIds.Contains(x.Id) && x.Mode == GameMode.LiveSolo
             && x.Status != CompetitionStatus.Draft && db.Set<LiveSoloCompetitionModeConfiguration>().Any(c => c.CompetitionId == x.Id && c.Enabled)).ToDictionaryAsync(x => x.Id, ct);
@@ -24,12 +24,13 @@ public sealed class LiveSoloRealtimeAccess(NoCtfDbContext db) : ILiveSoloRealtim
         var teams = await db.Teams.AsNoTracking().Include(x => x.Members).Where(x => teamIds.Contains(x.Id) && x.RegistrationStatus == TeamRegistrationStatus.Approved && !x.IsBanned).ToDictionaryAsync(x => x.Id, ct);
         return requests.Where(request =>
         {
-            if (!users.TryGetValue(request.UserId, out var user) || !competitions.TryGetValue(request.CompetitionId, out var competition)
-                || !matches.TryGetValue(request.MatchId, out var match) || match.CompetitionId != competition.Id) return false;
+            if (!users.TryGetValue(request.UserId, out var user) || !competitions.TryGetValue(request.CompetitionId, out var competition)) return false;
+            if (request.MatchId is Guid matchId && (!matches.TryGetValue(matchId, out var target) || target.CompetitionId != competition.Id)) return false;
             return request.Audience switch
             {
                 LiveSoloRealtimeAudience.Staff => user.Role == UserRole.Administrator || competition.OwnerId == user.Id || competition.Collaborators.Any(x => x.UserId == user.Id),
-                LiveSoloRealtimeAudience.Participant => match.Slots.Any(slot => slot.TeamId is Guid id && teams.TryGetValue(id, out var team)
+                LiveSoloRealtimeAudience.Participant => request.MatchId is Guid participantMatch && matches.TryGetValue(participantMatch, out var match)
+                    && match.Slots.Any(slot => slot.TeamId is Guid id && teams.TryGetValue(id, out var team)
                     && team.CompetitionId == competition.Id && team.Members.Any(member => member.UserId == user.Id)),
                 _ => false
             };

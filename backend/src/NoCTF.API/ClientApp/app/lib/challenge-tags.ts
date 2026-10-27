@@ -30,7 +30,7 @@ export function challengeTagOptions(items: readonly { tags?: readonly string[] }
     .sort((left, right) => tagKey(left).localeCompare(tagKey(right)))
 }
 
-export function competitionTagCatalog<T extends { name?: string }>(presets: readonly T[], challenges: readonly { tags?: readonly string[] }[]) {
+export function competitionTagCatalog<T extends { name?: string; scoreCurve?: unknown }>(presets: readonly T[], challenges: readonly { tags?: readonly string[] }[]) {
   const tags = new Map<string, { name: string; challengeCount: number; preset?: T }>()
   for (const preset of presets)
     if (preset.name) tags.set(tagKey(preset.name), { name: preset.name, challengeCount: 0, preset })
@@ -42,7 +42,8 @@ export function competitionTagCatalog<T extends { name?: string }>(presets: read
       tags.set(key, tag)
     }
   }
-  return [...tags.values()].sort((a, b) => tagKey(a.name).localeCompare(tagKey(b.name)))
+  return [...tags.values()].sort((a, b) => Number(!!b.preset?.scoreCurve) - Number(!!a.preset?.scoreCurve)
+    || tagKey(a.name).localeCompare(tagKey(b.name)))
 }
 
 export function matchesAllTags(tags: readonly string[], selected: readonly string[]): boolean {

@@ -112,18 +112,20 @@ public sealed partial class LiveSoloMatchStore
                 if (correction.PreviousWinnerTeamId != correction.WinnerTeamId || correction.PreviousLeftWins != correction.LeftWins
                     || correction.PreviousRightWins != correction.RightWins)
                     LiveSoloResults.Confirm(source, LiveSoloEndReason.ResultCorrected, now);
-                var replacements = downstream.ToDictionary(x => x.Id, x => new LiveSoloMatch {
+                var replacements = downstream.Where(x => x.TournamentStage == source.TournamentStage && source.Lane != LiveSoloBracketLane.Swiss)
+                    .ToDictionary(x => x.Id, x => new LiveSoloMatch {
                     Id = Guid.CreateVersion7(now), CompetitionId = x.CompetitionId, Lane = x.Lane, Stage = x.Stage, Position = x.Position,
+                    TournamentStage = x.TournamentStage, SwissWins = x.SwissWins, SwissLosses = x.SwissLosses,
                     BracketGeneration = checked(x.BracketGeneration + 1), RequiredWins = x.RequiredWins, Conditional = x.Conditional,
                     State = LiveSoloMatchState.AwaitingOpponents, CreatedAt = now });
                 foreach (var old in downstream)
                 {
-                    var replacement = replacements[old.Id];
-                    foreach (var slot in old.Slots)
-                        replacement.Slots.Add(new() { MatchId = replacement.Id, Side = slot.Side, Source = slot.Source, Seed = slot.Seed,
+                    replacements.TryGetValue(old.Id, out var replacement);
+                    foreach (var slot in replacement is null ? [] : old.Slots)
+                        replacement!.Slots.Add(new() { MatchId = replacement.Id, Side = slot.Side, Source = slot.Source, Seed = slot.Seed,
                             SourceMatchId = slot.SourceMatchId is Guid parent && replacements.TryGetValue(parent, out var mapped) ? mapped.Id : slot.SourceMatchId,
                             TeamId = slot.SourceMatchId is null ? slot.TeamId : null, Resolved = slot.SourceMatchId is null && slot.Resolved });
-                    db.Add(replacement);
+                    if (replacement is not null) db.Add(replacement);
                     await ReleaseActiveTeamSlotsAsync(old.Id, ct);
                     foreach (var round in old.Rounds)
                     {
@@ -145,14 +147,14 @@ public sealed partial class LiveSoloMatchStore
                         session.State = LiveSoloMediaState.Stopping;
                         await messages.PublishAsync(new RefreshLiveSoloMedia(session.Id, session.RoomIdentity));
                     }
-                    old.State = LiveSoloMatchState.Canceled; old.SupersededAt = now; old.ReplacementMatchId = replacement.Id;
+                    old.State = LiveSoloMatchState.Canceled; old.SupersededAt = now; old.ReplacementMatchId = replacement?.Id;
                     old.AdjudicationReason = command.Reason;
                     LiveSoloResults.Confirm(old, LiveSoloEndReason.DownstreamReplaced, now);
                     old.PendingCorrectionId = null; old.ConcurrencyStamp = Guid.NewGuid();
                 }
                 // Release old unique team slots before normal graph resolution allocates new ones.
                 await db.SaveChangesAsync(ct); source.PendingCorrectionId = null;
-                foreach (var node in correction.Matches) node.ReplacementMatchId = replacements[node.MatchId].Id;
+                foreach (var node in correction.Matches) node.ReplacementMatchId = replacements.GetValueOrDefault(node.MatchId)?.Id;
                 await AdvanceBracketAsync(source, now, ct);
             }
             else

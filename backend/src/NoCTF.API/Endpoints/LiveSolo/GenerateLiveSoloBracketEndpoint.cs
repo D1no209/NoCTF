@@ -21,7 +21,7 @@ public sealed class GenerateLiveSoloBracketValidator : Validator<GenerateLiveSol
         RuleFor(x => x.TeamIds).NotEmpty().Must(x => x.Count is >= 2 and <= 1024); RuleForEach(x => x.TeamIds).NotEmpty();
     }
 }
-public sealed class GenerateLiveSoloBracketEndpoint(ManageLiveSoloBracket brackets, IUserContext user, TimeProvider clock)
+public sealed class GenerateLiveSoloBracketEndpoint(ManageLiveSoloBracket brackets, IUserContext user, TimeProvider clock, LinkGenerator links)
     : Endpoint<GenerateLiveSoloBracketRequest, Results<Ok<LiveSoloBracketResponse>, NotFound, ForbidHttpResult,
         Conflict<LiveSoloFailureResponse>, UnprocessableEntity<LiveSoloFailureResponse>>>
 {
@@ -29,7 +29,7 @@ public sealed class GenerateLiveSoloBracketEndpoint(ManageLiveSoloBracket bracke
     {
         Post("/competitions/{competitionId}/live-solo/bracket"); AuthSchemes("Bearer");
         Description(x => x.WithName("GenerateLiveSoloBracket"));
-        Summary(x => x.Summary = "Generates a seeded single/double elimination bracket before Matches exist; byes do not count as defeats.");
+        Summary(x => x.Summary = "Generates the first configured tournament stage before matches exist; Swiss pairings and later stages advance from confirmed results.");
     }
     public override async Task<Results<Ok<LiveSoloBracketResponse>, NotFound, ForbidHttpResult,
         Conflict<LiveSoloFailureResponse>, UnprocessableEntity<LiveSoloFailureResponse>>> ExecuteAsync(GenerateLiveSoloBracketRequest req, CancellationToken ct)
@@ -37,7 +37,7 @@ public sealed class GenerateLiveSoloBracketEndpoint(ManageLiveSoloBracket bracke
         var result = await brackets.GenerateAsync(new(req.CompetitionId, user.UserId, req.ExpectedStamp, req.TeamIds, clock.GetUtcNow()), ct);
         return result.Failure switch
         {
-            null when result.Bracket is not null => TypedResults.Ok(LiveSoloBracketProtocol.Map(result.Bracket)),
+            null when result.Bracket is not null => TypedResults.Ok(LiveSoloBracketProtocol.Map(result.Bracket, links, HttpContext)),
             LiveSoloFailure.NotFound => TypedResults.NotFound(), LiveSoloFailure.Forbidden => TypedResults.Forbid(),
             LiveSoloFailure.InvalidConfiguration => TypedResults.UnprocessableEntity(new LiveSoloFailureResponse(result.Failure.Value)),
             _ => TypedResults.Conflict(new LiveSoloFailureResponse(result.Failure ?? LiveSoloFailure.Conflict))

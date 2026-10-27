@@ -18,9 +18,16 @@ public static class LiveSoloConfigurationValidator
         if (value.MaximumConcurrentMatches is < 1 or > 128) errors.Add("MaximumConcurrentMatches must be between 1 and 128.");
         if (value.MaximumRosterMembers is < 1 or > 64) errors.Add("MaximumRosterMembers must be between 1 and 64.");
         if (value.MaximumViewers is < 1 or > 100000) errors.Add("MaximumViewers must be between 1 and 100000.");
-        if (value.StageRules.Any(x => !Enum.IsDefined(x.Lane) || x.Stage < 1 || x.RequiredWins is < 1 or > 1024))
+        if (value.StageRules.Any(x => !Enum.IsDefined(x.Lane) || x.TournamentStage < 1 || x.Stage < 1 || x.RequiredWins is < 1 or > 1024))
             errors.Add("Stage rules require a valid lane, positive stage and RequiredWins between 1 and 1024.");
-        if (value.StageRules.GroupBy(x => (x.Lane, x.Stage)).Any(x => x.Count() > 1)) errors.Add("Duplicate LiveSolo stage rules.");
+        if (value.StageRules.GroupBy(x => (x.TournamentStage, x.Lane, x.Stage)).Any(x => x.Count() > 1)) errors.Add("Duplicate LiveSolo stage rules.");
+        if (!value.TournamentStages.OrderBy(x => x.Position).Select(x => x.Position).SequenceEqual(Enumerable.Range(0, value.TournamentStages.Count)))
+            errors.Add("Tournament stage positions must be consecutive.");
+        if (value.TournamentStages.Any(x => !Enum.IsDefined(x.Format) || x.Name.Length > 120 || x.RequiredWins is < 1 or > 1024
+            || x.AdvanceCount is < 0 or > 1024 || x.Format != LiveSoloBracketFormat.Swiss && x.AdvanceCount == 0
+            || x.SwissAdvanceWins is < 1 or > 32 || x.SwissEliminateLosses is < 1 or > 32
+            || x.SwissQualificationRequiredWins is < 1 or > 1024 || x.SwissEliminationRequiredWins is < 1 or > 1024))
+            errors.Add("Invalid tournament stage rules.");
         return errors;
     }
 

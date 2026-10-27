@@ -13,6 +13,7 @@ import { scoreboardChallengeColumnGroupsByDirection, scoreboardBloodAward, score
 import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
 import { useLeaderboardMatrixFilters } from '../../../leaderboard/useLeaderboardMatrixFilters'
+import { buildScoreboardCsv } from '../../../leaderboard/scoreboard-export'
 
 /** Owns state, effects and commands for CompetitionsByIdLeaderboardPage. */
 export function useCompetitionsByIdLeaderboardPage() {
@@ -275,19 +276,13 @@ export function useCompetitionsByIdLeaderboardPage() {
         return `${challenge?.title ?? translate("common.label.unknownQuestion")} · ${roundLabel(column)}`
       }),
     ]
-    const rows = filteredTeams.value.map(team => [
+    const csv = buildScoreboardCsv(header, filteredTeams.value, flatColumns.value, board.schema.value?.mode ?? null, team => [
       displayRank(team) ?? '',
       displayTeamName(team),
       ...(tracksEnabled.value && selectedAllTracks.value ? [trackName(team.trackKey)] : []),
       team.totalScore ?? 0,
       ...(theoryEnabled.value ? [team.theoryScore ?? 0] : []),
-      ...flatColumns.value.map((column) => {
-        const slot = scoreboardSlot(team, column.index)
-        return slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''
-      }),
     ])
-    const escape = (value: unknown) => `"${String(value).replaceAll('"', '""')}"`
-    const csv = '\uFEFF' + [header, ...rows].map(row => row.map(escape).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url

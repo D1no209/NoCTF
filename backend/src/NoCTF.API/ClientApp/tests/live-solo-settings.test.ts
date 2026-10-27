@@ -17,4 +17,13 @@ describe('LiveSolo typed settings', () => {
     expect(canManageLiveSolo('Administrator')).toBe(true); expect(canManageLiveSolo('Owner')).toBe(true); expect(canManageLiveSolo('Manager')).toBe(true)
     expect(canManageLiveSolo('Judge')).toBe(false); expect(canManageLiveSolo('Observer')).toBe(false); expect(canManageLiveSolo(null)).toBe(false)
   })
+  test('ordered stages retain independent Swiss thresholds and round overrides', () => {
+    const draft = settingsDraft({ tournamentStages: [{ name: 'Swiss', format: 'Swiss', advanceCount: 0 },
+      { name: 'Playoffs', format: 'DoubleElimination', advanceCount: 2 }] })
+    expect(validSettings(draft)).toBe(true)
+    draft.stageRules = [{ lane: 'Winners', stage: 1, requiredWins: 1, tournamentStage: 1 },
+      { lane: 'Winners', stage: 1, requiredWins: 3, tournamentStage: 2 }]
+    expect(validSettings(draft)).toBe(true)
+    draft.tournamentStages[1]!.advanceCount = 0; expect(validSettings(draft)).toBe(false)
+  })
 })

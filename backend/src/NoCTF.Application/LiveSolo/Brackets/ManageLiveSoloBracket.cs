@@ -7,9 +7,19 @@ namespace NoCTF.Application.LiveSolo.Brackets;
 public sealed record GenerateLiveSoloBracket(Guid CompetitionId, Guid ActorId, Guid ExpectedStamp, IReadOnlyList<Guid> TeamIds, DateTimeOffset Now);
 public sealed record LiveSoloBracketSourceView(LiveSoloSide Side, LiveSoloSlotSource Source, int? Seed, Guid? SourceMatchId, bool Resolved, Guid? TeamId);
 public sealed record LiveSoloBracketMatchView(LiveSoloMatchView Match, LiveSoloBracketLane Lane, int Stage, int Position, bool Conditional,
-    IReadOnlyList<LiveSoloBracketSourceView> Sources);
+    IReadOnlyList<LiveSoloBracketSourceView> Sources)
+{
+    public int TournamentStage { get; init; } = 1;
+    public int? SwissWins { get; init; }
+    public int? SwissLosses { get; init; }
+}
+public sealed record LiveSoloTournamentStageView(int Number, LiveSoloTournamentStage Rules, bool Complete,
+    IReadOnlyList<LiveSoloTournamentStanding> Standings, IReadOnlyList<Guid> QualifiedTeamIds);
 public sealed record LiveSoloBracketView(Guid CompetitionId, Guid ConcurrencyStamp, LiveSoloBracketFormat Format,
-    IReadOnlyList<LiveSoloBracketMatchView> Matches, Guid? ChampionTeamId);
+    IReadOnlyList<LiveSoloBracketMatchView> Matches, Guid? ChampionTeamId)
+{
+    public IReadOnlyList<LiveSoloTournamentStageView> TournamentStages { get; init; } = [];
+}
 public sealed record LiveSoloBracketResult(LiveSoloBracketView? Bracket, LiveSoloFailure? Failure = null);
 public interface ILiveSoloBracketStore
 {

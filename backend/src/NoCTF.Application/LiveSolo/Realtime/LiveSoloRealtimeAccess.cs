@@ -1,7 +1,7 @@
 namespace NoCTF.Application.LiveSolo.Realtime;
 
 public enum LiveSoloRealtimeAudience : short { Participant, Staff }
-public sealed record LiveSoloRealtimeAccessRequest(string Key, Guid UserId, Guid CompetitionId, Guid MatchId, LiveSoloRealtimeAudience Audience);
+public sealed record LiveSoloRealtimeAccessRequest(string Key, Guid UserId, Guid CompetitionId, Guid? MatchId, LiveSoloRealtimeAudience Audience);
 public interface ILiveSoloRealtimeAccess
 {
     Task<IReadOnlySet<string>> EligibleAsync(IReadOnlyList<LiveSoloRealtimeAccessRequest> requests, CancellationToken ct);

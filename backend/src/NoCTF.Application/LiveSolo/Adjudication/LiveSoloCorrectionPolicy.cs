@@ -22,12 +22,17 @@ public static class LiveSoloCorrectionPolicy
     }
     public static IReadOnlyList<LiveSoloMatch> Downstream(Guid sourceId, IReadOnlyList<LiveSoloMatch> graph)
     {
+        var source = graph.Single(x => x.Id == sourceId);
         var selected = new HashSet<Guid> { sourceId }; var changed = true;
         while (changed)
         {
             changed = false;
             foreach (var match in graph.Where(x => x.SupersededAt is null && !selected.Contains(x.Id)))
-                if (match.Slots.Any(x => x.SourceMatchId is Guid id && selected.Contains(id))) changed |= selected.Add(match.Id);
+                if (match.Slots.Any(x => x.SourceMatchId is Guid id && selected.Contains(id))
+                    || source.Slots.Any(x => x.Seed != null || x.SourceMatchId != null)
+                    && (match.TournamentStage > source.TournamentStage
+                        || source.Lane == LiveSoloBracketLane.Swiss && match.TournamentStage == source.TournamentStage && match.Stage > source.Stage))
+                    changed |= selected.Add(match.Id);
         }
         return graph.Where(x => x.Id != sourceId && selected.Contains(x.Id)).OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArray();
     }

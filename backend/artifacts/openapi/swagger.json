@@ -6093,7 +6093,7 @@
         "tags": [
           "Competitions"
         ],
-        "summary": "Generates a seeded single/double elimination bracket before Matches exist; byes do not count as defeats.",
+        "summary": "Generates the first configured tournament stage before matches exist; Swiss pairings and later stages advance from confirmed results.",
         "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/bracket.",
         "operationId": "GenerateLiveSoloBracket",
         "parameters": [
@@ -36104,6 +36104,13 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "tournamentStages": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStageResponse"
+            }
           }
         }
       },
@@ -36112,11 +36119,13 @@
         "description": "",
         "x-enumNames": [
           "SingleElimination",
-          "DoubleElimination"
+          "DoubleElimination",
+          "Swiss"
         ],
         "enum": [
           "SingleElimination",
-          "DoubleElimination"
+          "DoubleElimination",
+          "Swiss"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloBracketMatchResponse": {
@@ -36145,6 +36154,20 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketSourceResponse"
             }
+          },
+          "tournamentStage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swissWins": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "swissLosses": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -36155,13 +36178,15 @@
           "Winners",
           "Losers",
           "GrandFinal",
-          "ResetFinal"
+          "ResetFinal",
+          "Swiss"
         ],
         "enum": [
           "Winners",
           "Losers",
           "GrandFinal",
-          "ResetFinal"
+          "ResetFinal",
+          "Swiss"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloBracketSourceResponse": {
@@ -36220,6 +36245,132 @@
           "Winner",
           "Loser",
           "Bye"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStageResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStageContract"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "standings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStandingResponse"
+            }
+          },
+          "qualifiedTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStageContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "format": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "advanceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swissAdvanceWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swissEliminateLosses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swissQualificationRequiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swissEliminationRequiredWins": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SingleElimination",
+          "DoubleElimination",
+          "Swiss"
+        ],
+        "enum": [
+          "SingleElimination",
+          "DoubleElimination",
+          "Swiss"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStandingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "seed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "losses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "buchholz": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloBracketsLiveSoloTournamentStandingState"
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloBracketsLiveSoloTournamentStandingState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Active",
+          "Qualified",
+          "Eliminated"
+        ],
+        "enum": [
+          "Active",
+          "Qualified",
+          "Eliminated"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloGenerateLiveSoloBracketRequest": {
@@ -36314,20 +36465,15 @@
           },
           "staticFlagEvidenceRequired": {
             "type": "boolean"
+          },
+          "tournamentStages": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTournamentStageContract"
+            }
           }
         }
-      },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "SingleElimination",
-          "DoubleElimination"
-        ],
-        "enum": [
-          "SingleElimination",
-          "DoubleElimination"
-        ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloStageRuleContract": {
         "type": "object",
@@ -36343,6 +36489,10 @@
           "requiredWins": {
             "type": "integer",
             "format": "int32"
+          },
+          "tournamentStage": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -36353,13 +36503,15 @@
           "Winners",
           "Losers",
           "GrandFinal",
-          "ResetFinal"
+          "ResetFinal",
+          "Swiss"
         ],
         "enum": [
           "Winners",
           "Losers",
           "GrandFinal",
-          "ResetFinal"
+          "ResetFinal",
+          "Swiss"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloConfigurationRequest": {

@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2508,
+  "textAssertions": 2510,
   "sourceTextAssertions": {
-    "total": 1801,
+    "total": 1798,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -21,7 +21,7 @@
       "awdp-control-screen.test.ts": 75,
       "awdp-panel.test.ts": 71,
       "cap-wasm-asset.test.ts": 3,
-      "challenge-card-progress.test.ts": 113,
+      "challenge-card-progress.test.ts": 112,
       "challenge-hints.test.ts": 18,
       "challenge-list-density.test.ts": 28,
       "challenge-responsive-feedback.test.ts": 12,
@@ -51,7 +51,7 @@
       "i18n.test.ts": 18,
       "impersonation-session.test.ts": 22,
       "latest-request.test.ts": 2,
-      "leaderboard-progressive-display.test.ts": 92,
+      "leaderboard-progressive-display.test.ts": 90,
       "live-solo-state.test.ts": 2,
       "locale-domain-loading.test.ts": 4,
       "locale-layout-motion.test.ts": 13,

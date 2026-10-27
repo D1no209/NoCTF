@@ -15,6 +15,9 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public LiveSoloBracketLane Lane { get; set; }
     public int Stage { get; set; }
     public int Position { get; set; }
+    public int TournamentStage { get; set; } = 1;
+    public int? SwissWins { get; set; }
+    public int? SwissLosses { get; set; }
     public int RequiredWins { get; set; } = 2;
     public LiveSoloMatchState State { get; set; }
     public bool Conditional { get; set; }

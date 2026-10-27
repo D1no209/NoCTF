@@ -10,14 +10,18 @@ using NoCTF.Domain.LiveSolo;
 namespace NoCTF.API.Endpoints.LiveSolo;
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloBracketFormatProtocol>))]
-public enum LiveSoloBracketFormatProtocol { SingleElimination, DoubleElimination }
+public enum LiveSoloBracketFormatProtocol { SingleElimination, DoubleElimination, Swiss }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloBracketLaneProtocol>))]
-public enum LiveSoloBracketLaneProtocol { Winners, Losers, GrandFinal, ResetFinal }
-public sealed record LiveSoloStageRuleContract(LiveSoloBracketLaneProtocol Lane, int Stage, int RequiredWins);
+public enum LiveSoloBracketLaneProtocol { Winners, Losers, GrandFinal, ResetFinal, Swiss }
+public sealed record LiveSoloStageRuleContract(LiveSoloBracketLaneProtocol Lane, int Stage, int RequiredWins, int TournamentStage = 1);
+public sealed record LiveSoloTournamentStageContract(string Name, LiveSoloBracketFormatProtocol Format, int RequiredWins,
+    int AdvanceCount, int SwissAdvanceWins = 3, int SwissEliminateLosses = 3,
+    int SwissQualificationRequiredWins = 2, int SwissEliminationRequiredWins = 2);
 public sealed record LiveSoloConfigurationContract(bool Enabled, bool PlatformStreamingEnabled, LiveSoloBracketFormatProtocol BracketFormat,
     int RequiredWins, int CountdownSeconds, int QuestionIntervalSeconds, int RoundLimitSeconds,
     int PublicDelaySeconds, bool ParticipantsMayViewOpponents, bool RecordingEnabled, int RecordingRetentionDays,
-    int MaximumConcurrentMatches, int MaximumRosterMembers, int MaximumViewers, IReadOnlyList<LiveSoloStageRuleContract> StageRules, bool StaticFlagEvidenceRequired = false);
+    int MaximumConcurrentMatches, int MaximumRosterMembers, int MaximumViewers, IReadOnlyList<LiveSoloStageRuleContract> StageRules, bool StaticFlagEvidenceRequired = false,
+    IReadOnlyList<LiveSoloTournamentStageContract>? TournamentStages = null);
 
 public static class LiveSoloConfigurationMapping
 {
@@ -26,7 +30,11 @@ public static class LiveSoloConfigurationMapping
         value.QuestionIntervalSeconds, value.RoundLimitSeconds, value.PublicDelaySeconds, value.ParticipantsMayViewOpponents,
         value.RecordingEnabled, value.RecordingRetentionDays, value.MaximumConcurrentMatches, value.MaximumRosterMembers,
         value.MaximumViewers, value.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage)
-            .Select(x => new LiveSoloStageRuleContract((LiveSoloBracketLaneProtocol)x.Lane, x.Stage, x.RequiredWins)).ToArray(), value.StaticFlagEvidenceRequired);
+            .Select(x => new LiveSoloStageRuleContract((LiveSoloBracketLaneProtocol)x.Lane, x.Stage, x.RequiredWins, x.TournamentStage)).ToArray(), value.StaticFlagEvidenceRequired,
+        value.TournamentStages.OrderBy(x => x.Position).Select(Stage).ToArray());
+    public static LiveSoloTournamentStageContract Stage(LiveSoloTournamentStage value) => new(value.Name,
+        (LiveSoloBracketFormatProtocol)value.Format, value.RequiredWins, value.AdvanceCount, value.SwissAdvanceWins,
+        value.SwissEliminateLosses, value.SwissQualificationRequiredWins, value.SwissEliminationRequiredWins);
     public static LiveSoloCompetitionModeConfiguration ToDomain(Guid competitionId, LiveSoloConfigurationContract value) => new()
     {
         CompetitionId = competitionId, StaticFlagEvidenceRequired = value.StaticFlagEvidenceRequired, Enabled = value.Enabled, PlatformStreamingEnabled = value.PlatformStreamingEnabled, BracketFormat = (LiveSoloBracketFormat)value.BracketFormat,
@@ -36,7 +44,12 @@ public static class LiveSoloConfigurationMapping
         RecordingRetentionDays = value.RecordingRetentionDays, MaximumConcurrentMatches = value.MaximumConcurrentMatches,
         MaximumRosterMembers = value.MaximumRosterMembers, MaximumViewers = value.MaximumViewers,
         StageRules = value.StageRules.Select(x => new LiveSoloStageRule { CompetitionId = competitionId,
-            Lane = (LiveSoloBracketLane)x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList()
+            Lane = (LiveSoloBracketLane)x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins, TournamentStage = x.TournamentStage }).ToList(),
+        TournamentStages = (value.TournamentStages ?? []).Select((x, index) => new LiveSoloTournamentStage {
+            CompetitionId = competitionId, Position = index, Name = x.Name, Format = (LiveSoloBracketFormat)x.Format,
+            RequiredWins = x.RequiredWins, AdvanceCount = x.AdvanceCount, SwissAdvanceWins = x.SwissAdvanceWins,
+            SwissEliminateLosses = x.SwissEliminateLosses, SwissQualificationRequiredWins = x.SwissQualificationRequiredWins,
+            SwissEliminationRequiredWins = x.SwissEliminationRequiredWins }).ToList()
     };
 }
 public sealed class GetLiveSoloConfigurationRequest { public Guid CompetitionId { get; set; } }

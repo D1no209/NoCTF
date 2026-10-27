@@ -4,7 +4,7 @@ import type { HubConnection } from '@microsoft/signalr'
 import { useLiveSoloHub } from '../app/features/live-solo/useLiveSoloHub'
 
 async function settle() { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
-function fixture(delay?: Promise<void>) {
+function fixture(delay?: Promise<void>, subscription: 'Match' | 'Bracket' = 'Match') {
   const operations: unknown[][] = [], handlers = new Map<string, (...args: any[]) => void>()
   const candidate = {
     async start() { operations.push(['start']); await delay },
@@ -18,10 +18,24 @@ function fixture(delay?: Promise<void>) {
   const eligible = ref(true), competition = ref('competition'), match = ref<string | null>('match'), staff = ref(false)
   const scope = effectScope(); let refreshes = 0
   const state = scope.run(() => useLiveSoloHub(competition, match, staff, async () => { refreshes++ },
-    { eligible, createConnection: () => candidate as unknown as HubConnection }))!
+    { eligible, createConnection: () => candidate as unknown as HubConnection }, subscription))!
   return { state, scope, eligible, competition, match, staff, operations, handlers, refreshes: () => refreshes }
 }
 describe('LiveSolo private invalidations', () => {
+  test('a bracket subscription receives new matches in its competition and rejoins after reconnecting', async () => {
+    const f = fixture(undefined, 'Bracket'); await settle()
+    expect(f.operations).toContainEqual(['JoinBracket', 'competition'])
+    f.handlers.get('matchChanged')?.({ competitionId: 'other', matchId: 'new-round' }); await settle()
+    expect(f.refreshes()).toBe(1)
+    f.handlers.get('matchChanged')?.({ competitionId: 'competition', matchId: 'new-round' }); await settle()
+    expect(f.refreshes()).toBe(2)
+    f.handlers.get('reconnected')?.(); await settle()
+    expect(f.operations.filter(x => x[0] === 'JoinBracket')).toHaveLength(2)
+    expect(f.refreshes()).toBe(3)
+    f.scope.stop()
+    f.handlers.get('matchChanged')?.({ competitionId: 'competition', matchId: 'later' }); await settle()
+    expect(f.refreshes()).toBe(3)
+  })
   test('joins an explicit participant audience and refreshes only the exact current match', async () => {
     const f = fixture(); await settle()
     expect(f.operations).toContainEqual(['JoinMatch', 'competition', 'match', 0])

@@ -41,7 +41,8 @@ internal sealed class LiveSoloMatchConfiguration : IEntityTypeConfiguration<Live
         builder.ToTable("live_solo_matches"); builder.HasKey(x => x.Id);
         builder.HasQueryFilter(x => x.DeletedAt == null);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.DeletedByUserId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(x => new { x.CompetitionId, x.Lane, x.Stage, x.Position, x.BracketGeneration }).IsUnique();
+        builder.HasIndex(x => new { x.CompetitionId, x.TournamentStage, x.Lane, x.Stage, x.Position, x.BracketGeneration }).IsUnique();
+        builder.Property(x => x.TournamentStage).HasDefaultValue(1);
         builder.HasOne<LiveSoloResultCorrection>().WithMany().HasForeignKey(x => x.PendingCorrectionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.ReplacementMatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Competition>().WithMany().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Restrict);
@@ -224,13 +225,26 @@ internal sealed class LiveSoloCompetitionConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.PlatformStreamingEnabled).HasDefaultValue(true).HasSentinel(true);
         builder.HasMany(x => x.StageRules).WithOne().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.StageRules).AutoInclude();
+        builder.HasMany(x => x.TournamentStages).WithOne().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.TournamentStages).AutoInclude();
     }
 }
 internal sealed class LiveSoloStageRuleConfiguration : IEntityTypeConfiguration<LiveSoloStageRule>
 {
     public void Configure(EntityTypeBuilder<LiveSoloStageRule> builder)
     {
-        builder.ToTable("live_solo_stage_rules"); builder.HasKey(x => new { x.CompetitionId, x.Lane, x.Stage });
+        builder.ToTable("live_solo_stage_rules"); builder.HasKey(x => new { x.CompetitionId, x.TournamentStage, x.Lane, x.Stage });
+        builder.Property(x => x.TournamentStage).HasDefaultValue(1);
+    }
+}
+
+internal sealed class LiveSoloTournamentStageConfiguration : IEntityTypeConfiguration<LiveSoloTournamentStage>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloTournamentStage> builder)
+    {
+        builder.ToTable("live_solo_tournament_stages");
+        builder.HasKey(x => new { x.CompetitionId, x.Position });
+        builder.Property(x => x.Format).HasConversion<short>();
     }
 }
 internal sealed class LiveSoloMediaSessionConfiguration : IEntityTypeConfiguration<LiveSoloMediaSession>

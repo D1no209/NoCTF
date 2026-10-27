@@ -4441,6 +4441,50 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("live_solo_correction_matches", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDirectionPreset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("QuestionGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_group_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_direction_presets");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_live_solo_direction_presets_competition_id");
+
+                    b.HasIndex("QuestionGroupId")
+                        .HasDatabaseName("ix_live_solo_direction_presets_question_group_id");
+
+                    b.ToTable("live_solo_direction_presets", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDownloadEvidence", b =>
                 {
                     b.Property<Guid>("GameplayFactId")
@@ -4504,6 +4548,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("CurrentRoundId")
                         .HasColumnType("uuid")
                         .HasColumnName("current_round_id");
+
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by_user_id");
 
                     b.Property<short>("EndReason")
                         .HasColumnType("smallint")
@@ -4569,6 +4621,20 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("superseded_at");
 
+                    b.Property<int?>("SwissLosses")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_losses");
+
+                    b.Property<int?>("SwissWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_wins");
+
+                    b.Property<int>("TournamentStage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tournament_stage");
+
                     b.Property<Guid?>("WinnerTeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("winner_team_id");
@@ -4582,6 +4648,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("CurrentRoundId")
                         .HasDatabaseName("ix_live_solo_matches_current_round_id");
 
+                    b.HasIndex("DeletedByUserId")
+                        .HasDatabaseName("ix_live_solo_matches_deleted_by_user_id");
+
                     b.HasIndex("PendingCorrectionId")
                         .HasDatabaseName("ix_live_solo_matches_pending_correction_id");
 
@@ -4591,11 +4660,71 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("WinnerTeamId")
                         .HasDatabaseName("ix_live_solo_matches_winner_team_id");
 
-                    b.HasIndex("CompetitionId", "Lane", "Stage", "Position", "BracketGeneration")
+                    b.HasIndex("CompetitionId", "TournamentStage", "Lane", "Stage", "Position", "BracketGeneration")
                         .IsUnique()
-                        .HasDatabaseName("ix_live_solo_matches_competition_id_lane_stage_position_bracke");
+                        .HasDatabaseName("ix_live_solo_matches_competition_id_tournament_stage_lane_stag");
 
                     b.ToTable("live_solo_matches", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchDirection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("direction");
+
+                    b.Property<long?>("DrawnAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("drawn_at");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("QuestionGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_group_id");
+
+                    b.Property<int?>("RoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_match_directions");
+
+                    b.HasIndex("QuestionGroupId")
+                        .HasDatabaseName("ix_live_solo_match_directions_question_group_id");
+
+                    b.HasIndex("MatchId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_match_directions_match_id_position");
+
+                    b.HasIndex("MatchId", "QuestionGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_match_directions_match_id_question_group_id");
+
+                    b.HasIndex("MatchId", "RoundNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_match_directions_match_id_round_number");
+
+                    b.ToTable("live_solo_match_directions", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchSlot", b =>
@@ -5761,6 +5890,89 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("live_solo_recording_decisions", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRescueRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("decision_reason");
+
+                    b.Property<Guid?>("JudgeUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("judge_user_id");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RequestedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_at");
+
+                    b.Property<long?>("ResolvedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_rescue_requests");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_actor_user_id");
+
+                    b.HasIndex("JudgeUserId")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_judge_user_id");
+
+                    b.HasIndex("MatchId")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_match_id");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_team_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_user_id");
+
+                    b.HasIndex("RoundId", "TeamId", "State")
+                        .HasDatabaseName("ix_live_solo_rescue_requests_round_id_team_id_state");
+
+                    b.ToTable("live_solo_rescue_requests", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloResultCorrection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5913,6 +6125,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("DirectionDrawId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("direction_draw_id");
+
                     b.Property<short>("EndReason")
                         .HasColumnType("smallint")
                         .HasColumnName("end_reason");
@@ -6010,6 +6226,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasKey("Id")
                         .HasName("pk_live_solo_rounds");
 
+                    b.HasIndex("DirectionDrawId")
+                        .HasDatabaseName("ix_live_solo_rounds_direction_draw_id");
+
                     b.HasIndex("QuestionGroupId")
                         .HasDatabaseName("ix_live_solo_rounds_question_group_id");
 
@@ -6088,6 +6307,36 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_round_questions_round_id_position");
 
                     b.ToTable("live_solo_round_questions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundRosterMember", b =>
+                {
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("JoinedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("joined_at");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("RoundId", "UserId")
+                        .HasName("pk_live_solo_round_roster_members");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_round_roster_members_team_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_live_solo_round_roster_members_user_id");
+
+                    b.ToTable("live_solo_round_roster_members", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundSelectionAudit", b =>
@@ -6198,6 +6447,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
+                    b.Property<int>("TournamentStage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tournament_stage");
+
                     b.Property<short>("Lane")
                         .HasColumnType("smallint")
                         .HasColumnName("lane");
@@ -6210,7 +6465,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("required_wins");
 
-                    b.HasKey("CompetitionId", "Lane", "Stage")
+                    b.HasKey("CompetitionId", "TournamentStage", "Lane", "Stage")
                         .HasName("pk_live_solo_stage_rules");
 
                     b.ToTable("live_solo_stage_rules", (string)null);
@@ -6245,6 +6500,56 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_submissions_round_id_admission_sequence");
 
                     b.ToTable("live_solo_submissions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloTournamentStage", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("AdvanceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("advance_count");
+
+                    b.Property<short>("Format")
+                        .HasColumnType("smallint")
+                        .HasColumnName("format");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.Property<int>("SwissAdvanceWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_advance_wins");
+
+                    b.Property<int>("SwissEliminateLosses")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_eliminate_losses");
+
+                    b.Property<int>("SwissEliminationRequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_elimination_required_wins");
+
+                    b.Property<int>("SwissQualificationRequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("swiss_qualification_required_wins");
+
+                    b.HasKey("CompetitionId", "Position")
+                        .HasName("pk_live_solo_tournament_stages");
+
+                    b.ToTable("live_solo_tournament_stages", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloViewerLease", b =>
@@ -12499,7 +12804,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("CompetitionScorePresetId");
 
-                            b1.ToTable("competition_score_presets", (string)null);
+                            b1.ToTable("competition_score_presets");
 
                             b1.WithOwner()
                                 .HasForeignKey("CompetitionScorePresetId")
@@ -12874,6 +13179,23 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_live_solo_correction_matches_live_solo_matches_replacement_");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDirectionPreset", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_direction_presets_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_direction_presets_live_solo_question_groups_quest");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDownloadEvidence", b =>
                 {
                     b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
@@ -12912,6 +13234,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_live_solo_matches_live_solo_rounds_current_round_id");
 
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_matches_users_deleted_by_user_id");
+
                     b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloResultCorrection", null)
                         .WithMany()
                         .HasForeignKey("PendingCorrectionId")
@@ -12929,6 +13257,23 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasForeignKey("WinnerTeamId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_live_solo_matches_teams_winner_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchDirection", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany("DirectionPool")
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_match_directions_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_match_directions_live_solo_question_groups_questi");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchSlot", b =>
@@ -13289,6 +13634,50 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_live_solo_recording_decisions_live_solo_media_sessions_medi");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRescueRequest", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rescue_requests_users_actor_user_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("JudgeUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_rescue_requests_users_judge_user_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany()
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rescue_requests_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rescue_requests_live_solo_rounds_round_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rescue_requests_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rescue_requests_users_user_id");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloResultCorrection", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -13345,6 +13734,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRound", b =>
                 {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatchDirection", null)
+                        .WithMany()
+                        .HasForeignKey("DirectionDrawId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_rounds_live_solo_match_directions_direction_draw_");
+
                     b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
                         .WithMany("Rounds")
                         .HasForeignKey("MatchId")
@@ -13393,6 +13788,30 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_round_questions_live_solo_rounds_round_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundRosterMember", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany("Roster")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_round_roster_members_live_solo_rounds_round_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_round_roster_members_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_round_roster_members_users_user_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundSelectionAudit", b =>
@@ -13478,6 +13897,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_submissions_live_solo_round_questions_round_quest");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloTournamentStage", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", null)
+                        .WithMany("TournamentStages")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_tournament_stages_competition_mode_configuration_");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloViewerLease", b =>
@@ -14546,7 +14975,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("StaffWebhookEventItemEventId", "StaffWebhookEventItemPosition");
 
-                            b1.ToTable("competition_staff_webhook_event_items", (string)null);
+                            b1.ToTable("competition_staff_webhook_event_items");
 
                             b1.WithOwner()
                                 .HasForeignKey("StaffWebhookEventItemEventId", "StaffWebhookEventItemPosition")
@@ -14698,7 +15127,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                             b1.HasKey("StaffWebhookWorkItemCompetitionId", "StaffWebhookWorkItemKind", "StaffWebhookWorkItemItemId");
 
-                            b1.ToTable("competition_staff_webhook_work_items", (string)null);
+                            b1.ToTable("competition_staff_webhook_work_items");
 
                             b1.WithOwner()
                                 .HasForeignKey("StaffWebhookWorkItemCompetitionId", "StaffWebhookWorkItemKind", "StaffWebhookWorkItemItemId")
@@ -14930,6 +15359,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
                 {
+                    b.Navigation("DirectionPool");
+
                     b.Navigation("Roster");
 
                     b.Navigation("Rounds");
@@ -14971,6 +15402,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Pauses");
 
                     b.Navigation("Questions");
+
+                    b.Navigation("Roster");
 
                     b.Navigation("SelectionAudits");
 
@@ -15098,6 +15531,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", b =>
                 {
                     b.Navigation("StageRules");
+
+                    b.Navigation("TournamentStages");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", b =>
