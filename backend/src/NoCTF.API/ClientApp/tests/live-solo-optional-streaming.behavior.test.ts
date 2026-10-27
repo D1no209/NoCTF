@@ -1,6 +1,6 @@
 import * as soloNavigation from '../app/features/live-solo/navigation'
 import { expect, test } from 'bun:test'
-import { computed, effectScope, markRaw, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, effectScope, markRaw, ref, shallowRef, watch } from 'vue'
 import { settingsDraft, settingFields, validSettings } from '../app/features/live-solo/settings-draft'
 import { message, translate } from '../app/utils/i18n'
 import { canJudgeLiveSolo, canLockLiveSoloRoster, canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds } from '../app/features/live-solo/live-solo-state'
@@ -43,6 +43,7 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player', mana
     getLiveSoloMedia: async () => { mediaReads++; return { data: { state: 'Ready', generation: 'generation', members: [] } } },
     prepareLiveSoloMedia: async () => { mediaPreparations++; return {} },
     LiveSoloQuestions: {}, CompetitionParticipantWorkspace: {}, LiveSoloProgramControl: {},
+    LiveSoloMatchDirections: defineAsyncComponent(() => import('../app/features/live-solo/LiveSoloMatchDirections.vue')),
   }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; ${compiled}; return useLiveSoloMatch;`)(deps)
   const scope = effectScope(), state = scope.run(() => factory())!
