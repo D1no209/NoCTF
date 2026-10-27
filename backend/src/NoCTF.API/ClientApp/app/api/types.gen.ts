@@ -2578,6 +2578,11 @@ export type NoCtfapiEndpointsLiveSoloSaveLiveSoloDirectionPresetRequest = {
     questionGroupId: string;
 };
 
+export type NoCtfapiEndpointsLiveSoloSaveLiveSoloDirectionPresetsRequest = {
+    direction: string;
+    questionGroupIds: Array<string>;
+};
+
 export type NoCtfapiEndpointsLiveSoloSaveLiveSoloQuestionGroupRequest = {
     id?: string | null;
     expectedStamp?: string | null;
@@ -11947,6 +11952,43 @@ export type ReviewLiveSoloWriteUpResponses = {
 };
 
 export type ReviewLiveSoloWriteUpResponse = ReviewLiveSoloWriteUpResponses[keyof ReviewLiveSoloWriteUpResponses];
+
+export type SaveLiveSoloDirectionPresetsData = {
+    body: NoCtfapiEndpointsLiveSoloSaveLiveSoloDirectionPresetsRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/direction-presets/batch';
+};
+
+export type SaveLiveSoloDirectionPresetsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type SaveLiveSoloDirectionPresetsError = SaveLiveSoloDirectionPresetsErrors[keyof SaveLiveSoloDirectionPresetsErrors];
+
+export type SaveLiveSoloDirectionPresetsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloListLiveSoloDirectionPresetsResponse;
+};
+
+export type SaveLiveSoloDirectionPresetsResponse = SaveLiveSoloDirectionPresetsResponses[keyof SaveLiveSoloDirectionPresetsResponses];
 
 export type SaveLiveSoloWriteUpDraftData = {
     body: NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpDraftRequest;

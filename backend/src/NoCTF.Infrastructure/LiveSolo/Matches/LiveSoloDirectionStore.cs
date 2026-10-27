@@ -38,6 +38,36 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloDirectionStore
             return new(new(preset.Id, preset.Name, preset.Direction, group.Id, group.Name));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
 
+    public Task<LiveSoloDirectionPresetsResult> SavePresetsAsync(Guid competitionId, Guid actorId, string direction,
+        IReadOnlyList<Guid> questionGroupIds, CancellationToken ct) => TransactionAsync(async () =>
+        {
+            if (!await ActiveAsync(actorId, ct) || !await authorizer.CanModerateAsync(actorId, competitionId, ct))
+                return new LiveSoloDirectionPresetsResult([], LiveSoloFailure.Forbidden);
+            if (string.IsNullOrWhiteSpace(direction) || direction.Trim().Length > 96 || questionGroupIds.Count == 0 || questionGroupIds.Contains(Guid.Empty))
+                return new([], LiveSoloFailure.InvalidConfiguration);
+            var ids = questionGroupIds.Distinct().ToArray();
+            var groups = await db.LiveSoloQuestionGroups.AsNoTracking().Where(x => x.CompetitionId == competitionId && ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            if (groups.Count != ids.Length) return new([], LiveSoloFailure.QuestionGroupNotFound);
+            var value = direction.Trim();
+            var existing = await db.Set<LiveSoloDirectionPreset>().Where(x => x.CompetitionId == competitionId && x.Direction == value && ids.Contains(x.QuestionGroupId))
+                .OrderBy(x => x.Id).ToArrayAsync(ct);
+            var saved = new List<LiveSoloDirectionPresetView>();
+            foreach (var id in ids)
+            {
+                var group = groups[id];
+                var preset = existing.FirstOrDefault(x => x.QuestionGroupId == id);
+                if (preset is null)
+                {
+                    preset = new LiveSoloDirectionPreset { Id = Guid.CreateVersion7(), CompetitionId = competitionId,
+                        Name = group.Name, Direction = value, QuestionGroupId = group.Id };
+                    db.Add(preset);
+                }
+                saved.Add(new(preset.Id, preset.Name, preset.Direction, group.Id, group.Name));
+            }
+            await db.SaveChangesAsync(ct);
+            return new(saved);
+        }, () => new([], LiveSoloFailure.Conflict), ct);
+
     public Task<LiveSoloFailure?> DeletePresetAsync(Guid competitionId, Guid presetId, Guid actorId, CancellationToken ct) =>
         TransactionAsync<LiveSoloFailure?>(async () =>
         {

@@ -1,11 +1,12 @@
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import { getLiveSoloDirectionPool, listLiveSoloDirectionPresets, saveLiveSoloDirectionPreset, deleteLiveSoloDirectionPreset,
-  configureLiveSoloDirectionPool, drawLiveSoloDirection, requestLiveSoloRescue, resolveLiveSoloRescue, listLiveSoloQuestionGroups } from '~/api'
+import { getLiveSoloDirectionPool, listLiveSoloDirectionPresets, saveLiveSoloDirectionPreset, saveLiveSoloDirectionPresets, deleteLiveSoloDirectionPreset, adminGetCompetitionDirections,
+  configureLiveSoloDirectionPool, drawLiveSoloDirection, requestLiveSoloRescue, resolveLiveSoloRescue, listLiveSoloQuestionGroups } from '../../api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloDirectionPoolResponse as Pool,
   NoCtfapiEndpointsLiveSoloLiveSoloDirectionPresetResponse as Preset,
-  NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round } from '~/api'
-import { message, type UiMessage } from '~/utils/i18n'
+  NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round } from '../../api'
+import { message, type UiMessage } from '../../utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
+import { directionPoolCounts } from './direction-pool'
 
 export interface LiveSoloMatchDirectionsProps {
   competitionId: string
@@ -21,6 +22,13 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
   const groups = ref<{ value: string; label: string }[]>([]), selectedIds = ref<string[]>([])
   const busy = ref(false), error = ref<UiMessage | null>(null), editorOpen = ref(false)
   const presetId = ref<string | null>(null), presetName = ref(''), direction = ref(''), questionGroupId = ref('')
+  const directionCatalog = ref<string[]>([]), questionGroupIds = ref<string[]>([]), groupSearch = ref('')
+  const editingPreset = computed(() => presetId.value != null)
+  const directionOptions = computed(() => [...new Set([...directionCatalog.value, ...presets.value.map(x => x.direction ?? ''), direction.value])]
+    .filter(Boolean).map(value => ({ value, label: value })))
+  const batchGroups = computed(() => groups.value.filter(x => x.label.toLocaleLowerCase().includes(groupSearch.value.trim().toLocaleLowerCase()))
+    .map(x => ({ ...x, selected: questionGroupIds.value.includes(x.value) })))
+  const batchSelectedCount = computed(() => questionGroupIds.value.length)
   const rescueUserId = ref(''), rescueReason = ref(''), decisionReasons = ref<Record<string, string>>({})
   let disposed = false, request = 0
   let poolEdited = false
@@ -30,6 +38,8 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
   const poolRows = computed(() => (state.value?.pool ?? []).map(row => ({ ...row,
     label: row.roundNumber != null ? message('liveSolo.draw.drawnRound', { number: row.roundNumber })
       : message(row.available ? 'liveSolo.draw.remaining' : 'liveSolo.draw.alreadyUsed') })))
+  const directionCounts = computed(() => directionPoolCounts(state.value?.pool ?? []))
+  const drawnRows = computed(() => poolRows.value.filter(x => x.roundNumber != null))
   const roster = computed(() => props.match.rosters?.find(x => x.teamId === props.teamId))
   const rescueOptions = computed(() => props.members.filter(x => !roster.value?.userIds?.includes(x.id))
     .map(x => ({ value: x.id, label: x.name })))
@@ -40,7 +50,7 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
     mayResolve: row.state === 'Pending' && row.roundId === props.round?.id && state.value?.canJudgeRescue === true,
   })))
   const presetRows = computed(() => presets.value.map(row => ({ ...row, selected: !!row.id && selectedIds.value.includes(row.id) })))
-  const validPreset = computed(() => !!direction.value.trim() && !!questionGroupId.value)
+  const validPreset = computed(() => !!direction.value.trim() && (editingPreset.value ? !!questionGroupId.value : questionGroupIds.value.length > 0))
 
   async function load() {
     const generation = ++request, path = { competitionId: props.competitionId, matchId: props.match.id! }
@@ -51,10 +61,12 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
       if (response.error || !response.data) throw parseLiveSoloError(response.error, message('liveSolo.error.load'))
       state.value = response.data
       if (props.staff && (response.data.canConfigure || response.data.canManagePresets)) {
-        const [catalog, lists] = await Promise.all([listLiveSoloDirectionPresets({ path }), listLiveSoloQuestionGroups({ path })])
+        const [catalog, lists, directions] = await Promise.all([listLiveSoloDirectionPresets({ path }), listLiveSoloQuestionGroups({ path }),
+          adminGetCompetitionDirections({ path: { competitionId: props.competitionId } })])
         if (disposed || generation !== request) return
-        if (catalog.error || lists.error) throw parseLiveSoloError(catalog.error ?? lists.error, message('liveSolo.error.load'))
+        if (catalog.error || lists.error || directions.error) throw parseLiveSoloError(catalog.error ?? lists.error ?? directions.error, message('liveSolo.error.load'))
         presets.value = catalog.data?.items ?? []
+        directionCatalog.value = (directions.data?.items ?? []).map(x => x.name ?? '').filter(Boolean)
         groups.value = (lists.data?.items ?? []).filter(x => x.id).map(x => ({ value: x.id!, label: x.name ?? '—' }))
         selectedIds.value = selectedIds.value.filter(id => presets.value.some(x => x.id === id))
         if (!poolEdited) selectedIds.value = (state.value?.pool ?? []).filter(x => !x.drawnAt).map(x =>
@@ -86,13 +98,33 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
   }
   function editPreset(preset?: Preset) {
     presetId.value = preset?.id ?? null; presetName.value = preset?.name ?? ''; direction.value = preset?.direction ?? ''
-    questionGroupId.value = preset?.questionGroupId ?? ''; editorOpen.value = true
+    questionGroupId.value = preset?.questionGroupId ?? ''; questionGroupIds.value = []; groupSearch.value = ''; editorOpen.value = true
   }
+  function toggleGroup(id: string, selected: boolean | 'indeterminate') {
+    if (selected === true && !questionGroupIds.value.includes(id)) questionGroupIds.value = [...questionGroupIds.value, id]
+    else if (selected !== true) questionGroupIds.value = questionGroupIds.value.filter(value => value !== id)
+  }
+  function selectVisibleGroups() { questionGroupIds.value = [...new Set([...questionGroupIds.value, ...batchGroups.value.map(x => x.value)])] }
+  function clearGroups() { questionGroupIds.value = [] }
   function closeEditor() { editorOpen.value = false }
   async function savePreset() {
     if (!state.value?.canManagePresets || !validPreset.value) return
-    await mutate(() => saveLiveSoloDirectionPreset({ path: { competitionId: props.competitionId }, body: { id: presetId.value,
-      name: presetName.value.trim(), direction: direction.value.trim(), questionGroupId: questionGroupId.value } }))
+    if (editingPreset.value) {
+      await mutate(() => saveLiveSoloDirectionPreset({ path: { competitionId: props.competitionId }, body: { id: presetId.value,
+        name: presetName.value.trim(), direction: direction.value.trim(), questionGroupId: questionGroupId.value } }))
+    } else {
+      await mutate(async () => {
+        const result = await saveLiveSoloDirectionPresets({ path: { competitionId: props.competitionId }, body: {
+          direction: direction.value.trim(), questionGroupIds: [...questionGroupIds.value] } })
+        if (result.data && state.value?.canConfigure) {
+          poolEdited = true
+          const items = result.data.items ?? [], boundGroups = new Set(items.map(x => x.questionGroupId))
+          const retained = selectedIds.value.filter(id => !presets.value.some(x => x.id === id && boundGroups.has(x.questionGroupId)))
+          selectedIds.value = [...new Set([...retained, ...items.map(x => x.id!).filter(Boolean)])]
+        }
+        return result
+      })
+    }
     if (!error.value) editorOpen.value = false
   }
   async function removePreset(id: string) {
@@ -119,12 +151,17 @@ export function useLiveSoloMatchDirections(props: LiveSoloMatchDirectionsProps, 
     if (!state.value?.canJudgeRescue) return
     await mutate(() => resolveLiveSoloRescue({ path: { competitionId: props.competitionId, matchId: props.match.id!, requestId: id }, body: { approve, reason } }))
   }
-  watch(() => [props.competitionId, props.match.id, props.staff], () => {
-    state.value = null; selectedIds.value = []; poolEdited = false; decisionReasons.value = {}; closeEditor(); void load()
+  watch([() => props.competitionId, () => props.match.id, () => props.staff,
+    () => props.match.concurrencyStamp, () => props.round?.id, () => props.round?.state],
+  ([competitionId, matchId, staff], previous) => {
+    if (competitionId !== previous[0] || matchId !== previous[1] || staff !== previous[2]) {
+      state.value = null; selectedIds.value = []; poolEdited = false; decisionReasons.value = {}; directionCatalog.value = []; questionGroupIds.value = []; closeEditor()
+    }
+    void load()
   }, { immediate: true })
-  watch(() => [props.match.concurrencyStamp, props.round?.state], () => { void load() })
   onScopeDispose(() => { disposed = true; request++ })
-  return { state, presets: presetRows, groups, selectedCount, suggestedSlots, remaining, poolRows, busy, error, editorOpen, presetName, direction, questionGroupId,
+  return { state, presets: presetRows, groups, selectedCount, suggestedSlots, remaining, poolRows, directionCounts, drawnRows, busy, error, editorOpen, presetName, direction, questionGroupId,
+    editingPreset, directionOptions, batchGroups, batchSelectedCount, groupSearch, toggleGroup, selectVisibleGroups, clearGroups,
     rescueUserId, rescueReason, decisionReasons, rescueOptions, requests, validPreset, togglePreset, editPreset, closeEditor, savePreset, removePreset, configure, draw, requestRescue, resolve }
 }
 export type LiveSoloMatchDirectionsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloMatchDirections>>

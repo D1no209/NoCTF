@@ -6,6 +6,7 @@ namespace NoCTF.Application.LiveSolo.Matches;
 public sealed record LiveSoloDirectionPresetInput(Guid? Id, string Name, string Direction, Guid QuestionGroupId);
 public sealed record LiveSoloDirectionPresetView(Guid Id, string Name, string Direction, Guid QuestionGroupId, string QuestionGroupName);
 public sealed record LiveSoloDirectionPresetResult(LiveSoloDirectionPresetView? Preset, LiveSoloFailure? Failure = null);
+public sealed record LiveSoloDirectionPresetsResult(IReadOnlyList<LiveSoloDirectionPresetView> Presets, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloDirectionView(Guid Id, string Name, string Direction, int? RoundNumber, DateTimeOffset? DrawnAt,
     Guid? QuestionGroupId, bool Available);
 public sealed record LiveSoloRescueView(Guid Id, Guid RoundId, Guid TeamId, Guid UserId, string UserName,
@@ -19,6 +20,7 @@ public interface ILiveSoloDirectionStore
 {
     Task<IReadOnlyList<LiveSoloDirectionPresetView>?> PresetsAsync(Guid competitionId, Guid actorId, CancellationToken ct);
     Task<LiveSoloDirectionPresetResult> SavePresetAsync(Guid competitionId, Guid actorId, LiveSoloDirectionPresetInput input, CancellationToken ct);
+    Task<LiveSoloDirectionPresetsResult> SavePresetsAsync(Guid competitionId, Guid actorId, string direction, IReadOnlyList<Guid> questionGroupIds, CancellationToken ct);
     Task<LiveSoloFailure?> DeletePresetAsync(Guid competitionId, Guid presetId, Guid actorId, CancellationToken ct);
     Task<LiveSoloDirectionState?> DirectionsAsync(Guid competitionId, Guid matchId, Guid actorId, bool staff, CancellationToken ct);
     Task<LiveSoloMatchResult> ConfigurePoolAsync(Guid competitionId, Guid matchId, Guid actorId, IReadOnlyList<Guid> presetIds, CancellationToken ct);

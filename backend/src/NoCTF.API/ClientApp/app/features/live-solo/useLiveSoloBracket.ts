@@ -21,6 +21,9 @@ export function useLiveSoloBracket() {
   const display = ref('Map')
   const available = computed(() => selectableTeams(teams.value, bracket.value)), seeded = computed(() => hasSeededBracket(bracket.value))
   const options = computed(() => available.value.map(team => ({ value: team.id!, label: team.name ?? '—' })))
+  const leftOptions = computed(() => options.value.filter(row => row.value !== right.value))
+  const rightOptions = computed(() => options.value.filter(row => row.value !== left.value))
+  const sameTeam = computed(() => !!left.value && left.value === right.value)
   const addOptions = computed(() => options.value.filter(row => !seedIds.value.includes(row.value)))
   const seeds = computed(() => seedIds.value.map((id, index) => ({ id, number: index + 1, name: teams.value.find(team => team.id === id)?.name ?? '—' })))
   const rows = computed(() => bracketRows(bracket.value))
@@ -68,8 +71,19 @@ export function useLiveSoloBracket() {
   function remove(index: number) { if (!busy.value) seedIds.value.splice(index, 1) }
   function move(index: number, direction: -1 | 1) { if (!busy.value) seedIds.value = reorderSeed(seedIds.value, index, direction) }
   function setWins(value: unknown) { const parsed = Number(value); wins.value = value === '' || value == null ? null : parsed }
+  function selectLeft(id: string) {
+    if (busy.value || !writable.value) return
+    if (id === right.value) { error.value = message('liveSolo.bracket.sameTeam'); return }
+    if (leftOptions.value.some(row => row.value === id)) { left.value = id; error.value = null }
+  }
+  function selectRight(id: string) {
+    if (busy.value || !writable.value) return
+    if (id === left.value) { error.value = message('liveSolo.bracket.sameTeam'); return }
+    if (rightOptions.value.some(row => row.value === id)) { right.value = id; error.value = null }
+  }
   function open(action: 'Generate' | 'Create') {
     if (!writable.value || busy.value || !bracket.value) return
+    if (action === 'Create' && sameTeam.value) { error.value = message('liveSolo.bracket.sameTeam'); return }
     const ids = action === 'Generate' ? seedIds.value : [left.value, right.value].filter((id): id is string => !!id)
     if (ids.length < 2 || new Set(ids).size !== ids.length || ids.some(id => !available.value.some(team => team.id === id))
       || action === 'Generate' && rows.value.length !== 0 || action === 'Create' && seeded.value
@@ -97,7 +111,7 @@ export function useLiveSoloBracket() {
   function visible() { if (document.visibilityState === 'visible') void load() }
   onMounted(() => { void load(); timer = setInterval(visible, 10_000); document.addEventListener('visibilitychange', visible) })
   onScopeDispose(() => { disposed = true; request++; if (timer) clearInterval(timer); document.removeEventListener('visibilitychange', visible) })
-  return { bracket, teams, loading, busy, error, writable, available, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows,
+  return { bracket, teams, loading, busy, error, writable, available, options, leftOptions, rightOptions, sameTeam, selectLeft, selectRight, addOptions, candidate, seeds, seedIds, left, right, wins, rows,
     seeded, champion, matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, back,
     display, connected, LiveSoloTournamentMap: markRaw(LiveSoloTournamentMapComponent) }
 }

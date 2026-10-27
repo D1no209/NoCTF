@@ -9896,6 +9896,93 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/direction-presets/batch": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Save Live Solo Direction Presets",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/direction-presets/batch.",
+        "operationId": "SaveLiveSoloDirectionPresets",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveLiveSoloDirectionPresetsRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSaveLiveSoloDirectionPresetsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloListLiveSoloDirectionPresetsResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/draft": {
       "put": {
         "tags": [
@@ -38863,6 +38950,31 @@
             "format": "guid",
             "minLength": 1,
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloSaveLiveSoloDirectionPresetsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "direction",
+          "questionGroupIds"
+        ],
+        "properties": {
+          "direction": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 0,
+            "nullable": false
+          },
+          "questionGroupIds": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
           }
         }
       },

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { LiveSoloMatchDirectionsState } from '~/features/live-solo/useLiveSoloMatchDirections'
 const props = defineProps<{ state: LiveSoloMatchDirectionsState }>()
-const { state, presets, groups, selectedCount, suggestedSlots, remaining, poolRows, busy, error, editorOpen, presetName, direction, questionGroupId,
+const { state, presets, groups, selectedCount, suggestedSlots, remaining, poolRows, directionCounts, drawnRows, busy, error, editorOpen, presetName, direction, questionGroupId,
+  editingPreset, directionOptions, batchGroups, batchSelectedCount, groupSearch, toggleGroup, selectVisibleGroups, clearGroups,
   rescueUserId, rescueReason, decisionReasons, rescueOptions, requests, validPreset, togglePreset, editPreset, closeEditor, savePreset, removePreset,
   configure, draw, requestRescue, resolve } = toRefs(props.state)
 </script>
@@ -9,8 +10,11 @@ const { state, presets, groups, selectedCount, suggestedSlots, remaining, poolRo
   <section v-if="state?.pool?.length || state?.canConfigure || state?.canManagePresets || state?.canRequestRescue || requests.length || error" class="flex min-w-0 flex-col gap-4">
     <div v-if="poolRows.length || state?.canConfigure || state?.canManagePresets" class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold">{{ $t('liveSolo.draw.title') }}</h2><Badge v-if="poolRows.length" variant="secondary">{{ $t('liveSolo.draw.remainingCount', { count: remaining }) }}</Badge></div>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
-    <ol v-if="poolRows.length" class="flex flex-col gap-2" aria-live="polite">
-      <li v-for="entry in poolRows" :key="entry.id" class="flex flex-wrap items-center justify-between gap-2 text-sm"><span><template v-if="entry.name !== entry.direction">{{ entry.name }} · </template>{{ entry.direction }}</span><Badge :variant="entry.drawnAt ? 'default' : 'secondary'">{{ $message(entry.label) }}</Badge></li>
+    <ul v-if="directionCounts.length" class="flex flex-col gap-2" aria-live="polite" :aria-label="$t('liveSolo.draw.directionCounts')">
+      <li v-for="entry in directionCounts" :key="entry.direction" class="flex items-center justify-between gap-2 text-sm"><span class="font-medium">{{ entry.direction }}</span><Badge :variant="entry.remaining ? 'default' : 'secondary'">{{ $t('liveSolo.draw.ticketsRemaining', { count: entry.remaining }) }}</Badge></li>
+    </ul>
+    <ol v-if="drawnRows.length" class="flex flex-col gap-2" :aria-label="$t('liveSolo.draw.history')">
+      <li v-for="entry in drawnRows" :key="entry.id" class="flex flex-wrap items-center justify-between gap-2 text-sm"><span><template v-if="entry.name !== entry.direction">{{ entry.name }} · </template>{{ entry.direction }}</span><Badge variant="secondary">{{ $message(entry.label) }}</Badge></li>
     </ol>
     <Button v-if="state?.canDraw" :disabled="busy" @click="draw"><Spinner v-if="busy" data-icon="inline-start" />{{ $t('liveSolo.draw.draw') }}</Button>
     <Accordion v-if="state?.canConfigure || state?.canManagePresets" type="single" collapsible>
@@ -24,10 +28,17 @@ const { state, presets, groups, selectedCount, suggestedSlots, remaining, poolRo
         <p v-if="state?.canConfigure" class="text-sm font-mono tabular-nums">{{ $t('liveSolo.draw.selectedCount', { count: selectedCount }) }}</p>
         <div class="flex flex-wrap gap-2"><template v-if="state?.canConfigure"><Button :disabled="busy" @click="configure()">{{ $t('liveSolo.draw.savePool') }}</Button><Button v-if="poolRows.length" variant="outline" :disabled="busy" @click="configure(true)">{{ $t('liveSolo.draw.clearPool') }}</Button></template><Button v-if="state?.canManagePresets" variant="outline" :disabled="busy" @click="editPreset()">{{ $t('liveSolo.draw.newPreset') }}</Button></div>
         <UiForm v-if="editorOpen" validation="feature" class="flex flex-col gap-3" @submit="savePreset"><FieldGroup>
-          <Field><FieldLabel>{{ $t('liveSolo.draw.presetName') }}</FieldLabel><Input v-model="presetName" :maxlength="160" :disabled="busy" /></Field>
-          <Field><FieldLabel>{{ $t('liveSolo.draw.direction') }}</FieldLabel><Input v-model="direction" :maxlength="96" :disabled="busy" /></Field>
-          <Field><FieldLabel>{{ $t('liveSolo.draw.questionList') }}</FieldLabel><ChoicePicker v-model="questionGroupId" :items="groups" :disabled="busy" :label="$t('liveSolo.draw.questionList')" :search-label="$t('liveSolo.groups.name')" :empty-label="$t('liveSolo.selection.empty')" /></Field>
-        </FieldGroup><div class="flex flex-wrap gap-2"><Button type="submit" :disabled="busy || !validPreset">{{ $t('common.action.save') }}</Button><Button type="button" variant="ghost" :disabled="busy" @click="closeEditor">{{ $t('common.action.cancel') }}</Button></div></UiForm>
+          <Field v-if="editingPreset"><FieldLabel>{{ $t('liveSolo.draw.presetName') }}</FieldLabel><Input v-model="presetName" :maxlength="160" :disabled="busy" /></Field>
+          <Field><FieldLabel>{{ $t('liveSolo.draw.direction') }}</FieldLabel><ChoicePicker v-model="direction" :items="directionOptions" :disabled="busy" :label="$t('liveSolo.draw.direction')" :search-label="$t('liveSolo.draw.searchDirection')" :empty-label="$t('liveSolo.draw.noDirections')" /></Field>
+          <Field v-if="editingPreset"><FieldLabel>{{ $t('liveSolo.draw.questionList') }}</FieldLabel><ChoicePicker v-model="questionGroupId" :items="groups" :disabled="busy" :label="$t('liveSolo.draw.questionList')" :search-label="$t('liveSolo.groups.name')" :empty-label="$t('liveSolo.selection.empty')" /></Field>
+          <Field v-else><FieldLabel>{{ $t('liveSolo.draw.questionLists') }}</FieldLabel><FieldDescription>{{ $t('liveSolo.draw.batchHelp') }}</FieldDescription>
+            <Input v-model="groupSearch" :disabled="busy" :placeholder="$t('liveSolo.draw.searchGroups')" :aria-label="$t('liveSolo.draw.searchGroups')" />
+            <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="ghost" size="sm" :disabled="busy || !batchGroups.length" @click="selectVisibleGroups">{{ $t('liveSolo.draw.selectVisible') }}</Button><Button type="button" variant="ghost" size="sm" :disabled="busy || !batchSelectedCount" @click="clearGroups">{{ $t('liveSolo.draw.clearSelection') }}</Button></div>
+            <ScrollSurface class="max-h-56" :aria-label="$t('liveSolo.draw.questionLists')"><FieldGroup v-if="batchGroups.length" class="gap-3 p-1"><Field v-for="group in batchGroups" :key="group.value" orientation="horizontal"><Checkbox :id="`preset-group-${group.value}`" :model-value="group.selected" :disabled="busy" @update:model-value="toggleGroup(group.value, $event)" /><FieldLabel :for="`preset-group-${group.value}`" class="min-w-0 break-words">{{ group.label }}</FieldLabel></Field></FieldGroup><Empty v-else><EmptyHeader><EmptyTitle>{{ $t('liveSolo.selection.empty') }}</EmptyTitle></EmptyHeader></Empty></ScrollSurface>
+            <FieldDescription>{{ $t('liveSolo.draw.batchSelected', { count: batchSelectedCount }) }}</FieldDescription>
+            <FieldDescription v-if="state?.canConfigure">{{ $t('liveSolo.draw.batchPoolHelp') }}</FieldDescription>
+          </Field>
+        </FieldGroup><div class="flex flex-wrap gap-2"><Button type="submit" :disabled="busy || !validPreset"><Spinner v-if="busy" data-icon="inline-start" />{{ $t(editingPreset ? 'common.action.save' : 'liveSolo.draw.saveBatch') }}</Button><Button type="button" variant="ghost" :disabled="busy" @click="closeEditor">{{ $t('common.action.cancel') }}</Button></div></UiForm>
       </AccordionContent></AccordionItem>
     </Accordion>
     <section v-if="state?.canRequestRescue || requests.length" class="flex flex-col gap-3">

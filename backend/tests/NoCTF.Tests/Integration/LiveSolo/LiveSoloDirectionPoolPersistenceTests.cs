@@ -18,6 +18,33 @@ namespace NoCTF.Tests.Integration.LiveSolo;
 [Category("Integration")]
 public sealed class LiveSoloDirectionPoolPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public Task Batch_presets_bind_each_list_atomically_and_reuse_existing_bindings(CancellationToken ct) =>
+        DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var f = await Fixture.CreateAsync(ct, false);
+            var store = f.Store(f.Db);
+            var groups = new List<Guid>();
+            for (var i = 0; i < 2; i++)
+            {
+                var group = await store.SaveGroupAsync(f.Competition.Id, f.Owner.Id, new(null, "Web list " + i, false, null,
+                    [new(f.Entries[i].Id, 0)], null), f.Now, ct);
+                groups.Add(group.Group!.Id);
+            }
+            var invalid = await store.SavePresetsAsync(f.Competition.Id, f.Owner.Id, "Web", [groups[0], Guid.NewGuid()], ct);
+            await Assert.That(invalid.Failure).IsEqualTo(LiveSoloFailure.QuestionGroupNotFound);
+            await Assert.That(await f.Db.Set<LiveSoloDirectionPreset>().CountAsync(ct)).IsEqualTo(0);
+            await Assert.That((await store.SavePresetsAsync(f.Competition.Id, f.Left.Id, "Web", groups, ct)).Failure).IsEqualTo(LiveSoloFailure.Forbidden);
+            var saved = await store.SavePresetsAsync(f.Competition.Id, f.Owner.Id, " Web ", groups, ct);
+            await Assert.That(saved.Failure).IsNull();
+            await Assert.That(saved.Presets.Select(x => x.QuestionGroupId).ToArray()).IsEquivalentTo(groups);
+            await Assert.That(saved.Presets.Select(x => x.Name).ToArray()).IsEquivalentTo(["Web list 0", "Web list 1"]);
+            await Assert.That(saved.Presets.All(x => x.Direction == "Web")).IsTrue();
+            var repeated = await store.SavePresetsAsync(f.Competition.Id, f.Owner.Id, "Web", groups, ct);
+            await Assert.That(repeated.Presets.Select(x => x.Id).ToArray()).IsEquivalentTo(saved.Presets.Select(x => x.Id));
+            await Assert.That(await f.Db.Set<LiveSoloDirectionPreset>().CountAsync(ct)).IsEqualTo(2);
+        });
+
     [Test, Arguments(0), Arguments(3), Timeout(300_000)]
     public async Task Bo7_draws_independent_slots_once_resets_rosters_and_stops_at_four_wins(int opposingWins, CancellationToken ct)
     {
