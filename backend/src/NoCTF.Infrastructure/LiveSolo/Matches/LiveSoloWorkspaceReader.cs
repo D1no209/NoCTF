@@ -106,11 +106,15 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
 
     private async Task<bool> PreparedSelectionCurrentAsync(LiveSoloMatch match, LiveSoloRound round, DateTimeOffset now, CancellationToken ct)
     {
-        var candidates = await QuestionCandidatesAsync(match, now, ct);
         if (round.DirectionDrawId is Guid drawId)
             return match.DirectionPool.Any(x => x.Id == drawId && x.QuestionGroupId == round.QuestionGroupId)
-                && candidates.Any(x => x.Id == round.QuestionGroupId && x.Available && x.ConcurrencyStamp == round.QuestionGroupStamp)
+                && await db.LiveSoloQuestionGroups.AnyAsync(x => x.Id == round.QuestionGroupId && x.CompetitionId == match.CompetitionId
+                    && x.ConcurrencyStamp == round.QuestionGroupStamp && x.Items.Any(), ct)
+                && !await db.LiveSoloRoundQuestions.Where(x => x.RoundId == round.Id).AnyAsync(x =>
+                    !db.CompetitionChallenges.Any(entry => entry.Id == x.CompetitionChallengeId && entry.DeletedAt == null
+                        && db.Challenges.Any(template => template.Id == entry.ChallengeId && template.DeletedAt == null)), ct)
                 && !(await PreviouslyDrawnGroupsAsync(match, ct)).Contains(round.QuestionGroupId);
+        var candidates = await QuestionCandidatesAsync(match, now, ct);
         return candidates.Any(x => x.Id == round.QuestionGroupId && x.AutomaticEligible);
     }
 }

@@ -7,31 +7,36 @@ public static class LiveSoloRoundSchedulePolicy
     public const int PrewarmLeadSeconds = 30;
     public static readonly TimeSpan RecoveryInterval = TimeSpan.FromSeconds(2);
 
+    private static bool Recoverable(LiveSoloRoundQuestion question) =>
+        question.Readiness != LiveSoloQuestionReadiness.Failed
+        || question.PreparationFailure is LiveSoloResourceFailure.ResourceCapacityExceeded
+            or LiveSoloResourceFailure.IsolationVerificationFailed or LiveSoloResourceFailure.DependencyUnavailable;
+
     public static bool FitsRuntimeQuota(int requiredConcurrentInstances, int configuredQuota) =>
         configuredQuota <= 0 || requiredConcurrentInstances <= configuredQuota;
 
     public static IReadOnlyList<Guid> PreparationCandidates(LiveSoloRound round, DateTimeOffset now)
     {
         if (round.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown)
-            return round.Questions.Where(x => x.Position == 0 && x.Readiness != LiveSoloQuestionReadiness.Failed).Select(x => x.Id).ToArray();
+            return round.Questions.Where(x => x.Position == 0 && Recoverable(x)).Select(x => x.Id).ToArray();
         if (round.State != LiveSoloRoundState.Running || round.StartedAt is not { } start || LiveSoloActiveClock.Paused(round.Pauses)) return [];
         var elapsed = LiveSoloActiveClock.Elapsed(start, now, round.Pauses).TotalSeconds;
         if (elapsed >= round.LimitSeconds) return [];
         var next = round.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).FirstOrDefault();
-        return next is not null && next.Readiness != LiveSoloQuestionReadiness.Failed
+        return next is not null && Recoverable(next)
             && elapsed >= Math.Max(0, next.OpenOffsetSeconds - PrewarmLeadSeconds) ? [next.Id] : [];
     }
 
     public static DateTimeOffset? NextWakeup(LiveSoloRound round, DateTimeOffset now)
     {
         if (LiveSoloActiveClock.Paused(round.Pauses)) return null;
-        if (round.State == LiveSoloRoundState.Preparing) return round.Questions.Any(x => x.Position == 0 && x.Readiness is not (LiveSoloQuestionReadiness.Ready or LiveSoloQuestionReadiness.Failed))
+        if (round.State == LiveSoloRoundState.Preparing) return round.Questions.Any(x => x.Position == 0 && x.Readiness != LiveSoloQuestionReadiness.Ready && Recoverable(x))
             ? now.Add(RecoveryInterval) : null;
         if (round.State == LiveSoloRoundState.Countdown && round.CountdownAt is { } countdown)
         {
-            if (round.Questions.Any(x => x.Position == 0 && x.Readiness == LiveSoloQuestionReadiness.Failed)) return null;
+            if (round.Questions.Any(x => x.Position == 0 && !Recoverable(x))) return null;
             var remaining = round.CountdownSeconds - LiveSoloActiveClock.Elapsed(countdown, now, round.Pauses).TotalSeconds;
-            if (remaining <= 0 && round.Questions.Any(x => x.Position == 0 && x.Readiness is not (LiveSoloQuestionReadiness.Ready or LiveSoloQuestionReadiness.Failed)))
+            if (remaining <= 0 && round.Questions.Any(x => x.Position == 0 && x.Readiness != LiveSoloQuestionReadiness.Ready))
                 return now.Add(RecoveryInterval);
             return now.AddSeconds(Math.Max(0, remaining));
         }
@@ -40,7 +45,7 @@ public static class LiveSoloRoundSchedulePolicy
             var elapsed = LiveSoloActiveClock.Elapsed(start, now, round.Pauses).TotalSeconds;
             var remaining = Math.Max(0, round.LimitSeconds - elapsed);
             var next = round.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).FirstOrDefault();
-            if (next is not null && next.Readiness != LiveSoloQuestionReadiness.Failed)
+            if (next is not null && Recoverable(next))
             {
                 var offset = next.Readiness == LiveSoloQuestionReadiness.Waiting ? Math.Max(0, next.OpenOffsetSeconds - PrewarmLeadSeconds) : next.OpenOffsetSeconds;
                 var questionDelay = Math.Max(0, offset - elapsed);

@@ -22,6 +22,20 @@ public sealed class LiveSoloRoundSchedulePolicyTests
         await Assert.That(LiveSoloRoundSchedulePolicy.PreparationCandidates(round, now)).IsEmpty();
     }
     [Test]
+    [Arguments(LiveSoloResourceFailure.ResourceCapacityExceeded)]
+    [Arguments(LiveSoloResourceFailure.IsolationVerificationFailed)]
+    [Arguments(LiveSoloResourceFailure.DependencyUnavailable)]
+    public async Task Transient_preparation_failure_recovers_after_countdown(LiveSoloResourceFailure failure)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var question = new LiveSoloRoundQuestion { Id = Guid.NewGuid(), Position = 0,
+            Readiness = LiveSoloQuestionReadiness.Failed, PreparationFailure = failure };
+        var round = new LiveSoloRound { State = LiveSoloRoundState.Countdown, CountdownAt = now.AddSeconds(-10),
+            CountdownSeconds = 5, Questions = [question] };
+        await Assert.That(LiveSoloRoundSchedulePolicy.NextWakeup(round, now)).IsEqualTo(now.Add(LiveSoloRoundSchedulePolicy.RecoveryInterval));
+        await Assert.That(LiveSoloRoundSchedulePolicy.PreparationCandidates(round, now)).IsEquivalentTo([question.Id]);
+    }
+    [Test]
     public async Task Preparation_is_limited_to_the_first_or_next_due_question_and_wakeups_use_the_timeline()
     {
         var now = DateTimeOffset.UtcNow;

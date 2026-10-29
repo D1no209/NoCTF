@@ -175,7 +175,8 @@ public sealed partial class LiveSoloMatchStore
             return new(null, LiveSoloFailure.NotReady);
         var first = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.RoundId == command.RoundId && x.Position == 0).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
         if (first is null) return new(null, LiveSoloFailure.NotFound);
-        if (await runtimePreparation.PrepareAsync(first.Value, command.Now, ct) is { } failed) return new(null, failed);
+        if (!await db.LiveSoloRoundQuestions.AnyAsync(x => x.Id == first.Value && x.Readiness == LiveSoloQuestionReadiness.Ready, ct))
+            return new(null, LiveSoloFailure.NotReady);
         LiveSoloMediaSession? session = null;
         LiveSoloProgramCapture? program = null;
         LiveSoloRoomObservation? observed = null;

@@ -223,7 +223,11 @@ export function useLiveSoloMatch() {
   }
   async function start() {
     if (!judge.value || !round.value?.id || !round.value.concurrencyStamp) return
-    await operation(() => startLiveSoloCountdown({ path: { competitionId: competitionId.value, matchId: matchId.value, roundId: round.value!.id! }, body: { expectedStamp: round.value!.concurrencyStamp! } }))
+    await operation(async () => {
+      const result = await startLiveSoloCountdown({ path: { competitionId: competitionId.value, matchId: matchId.value, roundId: round.value!.id! }, body: { expectedStamp: round.value!.concurrencyStamp! } })
+      if (result.data && !result.error) { round.value = result.data; observedAt = performance.now(); elapsedSinceSnapshot.value = 0 }
+      return result
+    })
   }
   function openDecision(action: JudgeAction) {
     if (!judge.value || !match.value?.concurrencyStamp) return
