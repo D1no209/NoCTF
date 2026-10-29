@@ -126,7 +126,7 @@ public sealed partial class DockerContainerLifecycle
                 using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 foreach (var probe in probes)
                 {
-                    try { await client.Containers.RemoveContainerAsync(probe, new() { Force = true }, cleanup.Token); }
+                    try { await client.Containers.RemoveContainerAsync(probe, new() { Force = true, RemoveVolumes = true }, cleanup.Token); }
                     catch (DockerApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound) { }
                 }
                 if (passed) { probedExecutionNetwork = networkId; executionProbedAt = timeProvider.GetUtcNow(); }

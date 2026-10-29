@@ -404,7 +404,7 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         {
             await client.Containers.RemoveContainerAsync(
                 receipt.ResourceId,
-                new ContainerRemoveParameters { Force = true },
+                new ContainerRemoveParameters { Force = true, RemoveVolumes = true },
                 force.Token);
             NoCtfTelemetry.RecordRuntimeStopDuration(
                 "docker", "container", "force_delete", "success",
@@ -1127,7 +1127,7 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         {
             await client.Containers.RemoveContainerAsync(
                 resourceId,
-                new ContainerRemoveParameters { Force = true },
+                new ContainerRemoveParameters { Force = true, RemoveVolumes = true },
                 cancellationToken);
         }
         catch (DockerContainerNotFoundException)

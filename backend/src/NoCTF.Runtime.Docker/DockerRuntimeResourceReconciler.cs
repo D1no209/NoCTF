@@ -129,7 +129,7 @@ public sealed class DockerRuntimeResourceReconciler(
                 {
                     await client.Containers.RemoveContainerAsync(
                         container.ID,
-                        new ContainerRemoveParameters { Force = true },
+                        new ContainerRemoveParameters { Force = true, RemoveVolumes = true },
                         force.Token);
                 }
                 catch (DockerContainerNotFoundException)
