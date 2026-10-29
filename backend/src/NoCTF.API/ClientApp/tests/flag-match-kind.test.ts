@@ -74,7 +74,7 @@ describe('attachment delivery editor', () => {
 
     expect(confirmation).toContain('<Button variant="destructive"')
     expect(confirmation).not.toContain('<AlertDialogAction')
-    expect(deletion).toContain('adminChallengeBankDeleteAttachment({')
+    expect(deletion).toContain('adminChallengeBankPermanentlyDeleteAttachment({')
     expect(deletion.indexOf('deletingAttachment.value = null'))
       .toBeGreaterThan(deletion.indexOf('if (error)'))
   })
