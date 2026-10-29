@@ -15,7 +15,7 @@ namespace NoCTF.Infrastructure.Runtime.Instances;
 /// <summary>Execution-neutral provisioning. The caller owns roster/round authorization and never manipulates a provider.</summary>
 public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placement, IPerTeamRuntimeFlagStore flags, IPostCommitMessagePublisher messages,
-    IExecutionRuntimeIsolation? isolation = null, IExecutionScopeAccess? access = null, TimeProvider? clock = null,
+    IExecutionScopeAccess? access = null, TimeProvider? clock = null,
     IRequestReplay? replay = null) : IScopedRuntimeControl
 {
     public async Task<ScopedRuntimeResult> EnsureAsync(ScopedRuntimeRequest request, CancellationToken ct)
@@ -48,12 +48,7 @@ public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTem
                 if (request.ExpectedRuntimeInstanceId is Guid expected && current?.Id != expected)
                     return new(current?.Id, current?.State, false, RuntimeMutationFailure.Conflict);
                 if (request.Reset && current is null) return new(null, null, false, RuntimeMutationFailure.InvalidState);
-                if (isolation is null) return new(current?.Id, current?.State, false, RuntimeMutationFailure.Unsupported, ExecutionIsolationStatus.NotConfigured);
                 var provider = current?.RuntimeProvider ?? placement.Resolve(template.RuntimeKind).Provider;
-                var qualification = (await isolation.AssessAsync(
-                    new(template.RuntimeKind, provider, request.ExecutionScopeId, request.TeamId, current?.Id), ct)).Status;
-                if (qualification != ExecutionIsolationStatus.Verified || current is not null && current.AccessMode != RuntimeAccessMode.WsrxOnly)
-                    return new(current?.Id, current?.State, false, RuntimeMutationFailure.Unsupported, qualification);
                 if (current is not null && !request.Reset)
                 {
                     if (request.ActorId is not null && replay is not null)
@@ -78,7 +73,7 @@ public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTem
                 var runtime = new PlayerRuntimeInstance { Id = Guid.CreateVersion7(now), CompetitionId = request.CompetitionId,
                     CompetitionChallengeId = request.CompetitionChallengeId, TeamId = request.TeamId, ExecutionScopeId = request.ExecutionScopeId,
                     RuntimeKind = template.RuntimeKind, RuntimeProvider = provider,
-                    AccessMode = RuntimeAccessMode.WsrxOnly, State = RuntimeState.Queued, CreatedAt = now,
+                    AccessMode = scope.Competition.RuntimeAccessMode, State = RuntimeState.Queued, CreatedAt = now,
                     TrafficCaptureEnabled = scope.Competition.TrafficCaptureEnabled, TrafficCaptureLimitBytes = scope.Competition.TrafficCaptureLimitBytes };
                 if (template.FlagSource == RuntimeFlagSource.PerTeam)
                     await flags.EnsureRuntimeInstanceAsync(request.CompetitionId, request.CompetitionChallengeId, request.TeamId, runtime.Id, now, ct);

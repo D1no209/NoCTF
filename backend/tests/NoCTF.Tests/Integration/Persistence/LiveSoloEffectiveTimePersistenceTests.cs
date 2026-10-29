@@ -79,7 +79,7 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Wsrx_access_mode_cannot_certify_an_existing_or_new_execution_runtime(CancellationToken ct)
+    public async Task LiveSolo_runtime_uses_competition_access_mode_without_isolation_qualification(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -89,18 +89,15 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
             await fixture.Db.SaveChangesAsync(ct);
             var placement = Substitute.For<IRuntimePlacementPolicy>(); placement.Resolve(RuntimeKind.Container).Returns(new RuntimePlacement(RuntimeProvider.Docker, "test"));
             var control = new ScopedRuntimeControl(fixture.Db, new ChallengeRuntimeTemplateCatalog(), placement,
-                Substitute.For<IPerTeamRuntimeFlagStore>(), Substitute.For<IPostCommitMessagePublisher>(), new UnverifiedExecutionRuntimeIsolation());
+                Substitute.For<IPerTeamRuntimeFlagStore>(), Substitute.For<IPostCommitMessagePublisher>());
             var request = new ScopedRuntimeRequest(fixture.Competition.Id, fixture.Entries[0].Id, Guid.NewGuid(), fixture.LeftTeam.Id, fixture.Now);
             var unavailable = await control.EnsureAsync(request, ct);
-            await Assert.That(unavailable.IsolationAvailable).IsFalse();
-            await Assert.That(await fixture.Db.RuntimeInstances.CountAsync(ct)).IsEqualTo(0);
-            var existing = new PlayerRuntimeInstance { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id, CompetitionChallengeId = fixture.Entries[0].Id,
-                TeamId = fixture.LeftTeam.Id, ExecutionScopeId = request.ExecutionScopeId, State = RuntimeState.Running, RuntimeKind = RuntimeKind.Container,
-                RuntimeProvider = RuntimeProvider.Docker, AccessMode = RuntimeAccessMode.WsrxOnly, CreatedAt = fixture.Now, RunningAt = fixture.Now };
-            fixture.Db.RuntimeInstances.Add(existing); await fixture.Db.SaveChangesAsync(ct);
+            await Assert.That(unavailable.Failure).IsNull();
+            var existing = await fixture.Db.RuntimeInstances.SingleAsync(ct);
+            await Assert.That(existing.AccessMode).IsEqualTo(fixture.Competition.RuntimeAccessMode);
             var stillUnverified = await control.EnsureAsync(request, ct);
             await Assert.That(stillUnverified.RuntimeInstanceId).IsEqualTo(existing.Id);
-            await Assert.That(stillUnverified.IsolationAvailable).IsFalse();
+            await Assert.That(stillUnverified.Failure).IsNull();
         });
     }
 

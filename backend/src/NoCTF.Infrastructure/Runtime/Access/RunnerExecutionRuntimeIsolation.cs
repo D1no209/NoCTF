@@ -34,7 +34,9 @@ public sealed class RunnerExecutionRuntimeIsolation(NoCtfDbContext db, NatsRunne
         {
             if (current?.RunnerId is { } runnerId)
             {
-                var runner = await runners.ReadEligibleRunnerAsync(target.RunnerPool, runnerId, ct);
+                var runner = current.State == RuntimeState.Running
+                    ? await runners.ReadServingRunnerAsync(target.RunnerPool, runnerId, ct)
+                    : await runners.ReadEligibleRunnerAsync(target.RunnerPool, runnerId, ct);
                 return new(runner?.Provider == request.Provider && runner.ExecutionIsolation == RuntimeIsolationState.Verified
                     ? ExecutionIsolationStatus.Verified : ExecutionIsolationStatus.Unverified);
             }

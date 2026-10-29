@@ -494,7 +494,7 @@
   "liveSolo.selection.risk.PublicExposure": "此题源的答案曾公开曝光。",
   "liveSolo.preparation.failed": "环境准备失败",
   "liveSolo.preparation.ready": "首题环境已就绪",
-  "liveSolo.preparation.notRequired": "首题不需要环境隔离",
+  "liveSolo.preparation.notRequired": "首题不需要运行环境",
   "liveSolo.preparation.pending": "正在准备首题资源",
   "liveSolo.preparation.retry": "重试当前局准备",
   "liveSolo.settings.evidence": "检查静态 Flag 获取证据",

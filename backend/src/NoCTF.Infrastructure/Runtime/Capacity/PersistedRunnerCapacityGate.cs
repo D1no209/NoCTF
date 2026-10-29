@@ -174,10 +174,8 @@ public sealed class PersistedRunnerCapacityGate(
             if (target is null)
                 return new(RunnerCapacityAvailability.Unavailable,
                     Failure: RunnerAdmissionFailure.NoEligibleRunner);
-            var candidates = eligible.Where(item => (target.RunnerId is null
+            var candidates = eligible.Where(item => target.RunnerId is null
                     || item.RunnerId == target.RunnerId)
-                    && (target.ExecutionScopeId is null
-                        || item.ExecutionIsolation == RuntimeIsolationState.Verified))
                 .OrderBy(AdmissionPressure)
                 .ThenBy(item => item.RunnerId, StringComparer.Ordinal)
                 .Take(8).ToArray();
@@ -240,8 +238,6 @@ public sealed class PersistedRunnerCapacityGate(
                 Failure: RunnerAdmissionFailure.NoEligibleRunner);
 
         var identity = request.Workload ?? PrimaryIdentity(current.Purpose, current.Id);
-        if (current.ExecutionScopeId is not null)
-            eligible = eligible.Where(item => item.ExecutionIsolation == RuntimeIsolationState.Verified).ToArray();
         identity.Validate();
         if (identity.RuntimeInstanceId != current.Id)
             throw new InvalidOperationException("The capacity identity belongs to another Runtime.");
@@ -283,8 +279,7 @@ public sealed class PersistedRunnerCapacityGate(
                 : new(RunnerCapacityAvailability.Claimed, existing.RunnerId, RunnerCapacityClaimState.AlreadyOwned);
         }
         if (candidate is null || domain is null
-            || current.RunnerId is { } currentOwner && candidate.RunnerId != currentOwner
-            || current.ExecutionScopeId is not null && candidate.ExecutionIsolation != RuntimeIsolationState.Verified)
+            || current.RunnerId is { } currentOwner && candidate.RunnerId != currentOwner)
             return new(RunnerCapacityAvailability.Insufficient,
                 Failure: RunnerAdmissionFailure.NoEligibleRunner);
 

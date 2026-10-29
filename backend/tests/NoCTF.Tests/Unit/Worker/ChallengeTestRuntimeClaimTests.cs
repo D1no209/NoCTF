@@ -9,18 +9,21 @@ namespace NoCTF.Tests.Unit.Worker;
 public sealed class ChallengeTestRuntimeClaimTests
 {
     [Test]
-    public async Task Opaque_execution_scope_and_per_team_flag_are_forwarded_to_the_provider_plan()
+    [Arguments(RuntimeAccessMode.Direct)]
+    [Arguments(RuntimeAccessMode.DirectAndWsrx)]
+    [Arguments(RuntimeAccessMode.WsrxOnly)]
+    public async Task LiveSolo_uses_normal_provider_network_and_the_configured_access_mode(RuntimeAccessMode accessMode)
     {
         var scope = Guid.NewGuid();
         var instance = new PlayerRuntimeInstance { Id = Guid.NewGuid(), ExecutionScopeId = scope, TeamId = Guid.NewGuid(),
-            RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, AccessMode = RuntimeAccessMode.WsrxOnly };
+            RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, AccessMode = accessMode };
         var template = new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition([new("web", "challenge:test", FlagEnvironmentVariableName: "FLAG")]),
             new(536_870_912, 500, 256), FlagSource: RuntimeFlagSource.PerTeam);
         var message = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(instance, "runner", GameMode.LiveSolo, template, null, "flag{scoped}");
-        await Assert.That(message.Definition.ExecutionScopeId).IsEqualTo(scope);
+        await Assert.That(message.Definition.ExecutionScopeId).IsNull();
         await Assert.That(message.Definition.Services[0].Environment!["FLAG"]).IsEqualTo("flag{scoped}");
-        await Assert.That(message.Definition.AccessMode).IsEqualTo(RuntimeAccessMode.WsrxOnly);
+        await Assert.That(message.Definition.AccessMode).IsEqualTo(accessMode);
     }
     [Test]
     public async Task Provider_isolation_evidence_and_scope_survive_relational_receipt_mapping()

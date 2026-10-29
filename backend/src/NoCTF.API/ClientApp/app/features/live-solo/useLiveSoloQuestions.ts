@@ -44,7 +44,7 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
   })
   async function resources() {
     const questionId = selected.value, id = ++resourceRequest
-    attachments.value = null; runtime.value = null; resourceError.value = null
+    resourceError.value = null
     if (!questionId || !props.round.id) return
     const [files, environment] = await Promise.all([listLiveSoloAttachments({ path: path(questionId) }), getLiveSoloRuntime({ path: path(questionId) })])
     if (disposed || id !== resourceRequest || selected.value !== questionId) return
@@ -140,8 +140,8 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     catch (cause) { if (!disposed) resourceError.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
     finally { runtimeBusy.value = false }
   }
-  async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 5000) }
-  watch(selected, () => { runtimePolling.stop(); hints.value = []; hintsError.value = null; void resources(); void refreshHints() })
+  async function tick() { await load(); await resources(); if (!disposed) timer = setTimeout(tick, 5000) }
+  watch(selected, () => { runtimePolling.stop(); attachments.value = null; runtime.value = null; hints.value = []; hintsError.value = null; void resources(); void refreshHints() })
   watch(() => route.params.workspace, syncSelection)
   watch(() => props.initialQuestions, () => { void load() })
   watch(() => user.value?.userId, () => {

@@ -42,7 +42,6 @@ internal static class DockerRuntimeProviderRegistration
 
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
-        services.AddSingleton<NoCTF.Application.Runtime.Access.IRuntimeExecutionIsolationProbe, DockerExecutionIsolationProbe>();
         services.AddSingleton<DockerContainerRuntime>();
         services.AddSingleton<DockerRuntimeResourceReconciler>();
         services.AddSingleton<IRuntimeProviderAvailabilityProbe>(provider =>

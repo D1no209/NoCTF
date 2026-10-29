@@ -7,8 +7,7 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.LiveSolo.Resources;
 
-public sealed class LiveSoloRuntimeStore(NoCtfDbContext db, IExecutionScopeAccess access, IScopedRuntimeControl runtimes, TimeProvider clock,
-    IExecutionRuntimeIsolation isolation)
+public sealed class LiveSoloRuntimeStore(NoCtfDbContext db, IExecutionScopeAccess access, IScopedRuntimeControl runtimes, TimeProvider clock)
     : ILiveSoloRuntimeStore
 {
     private sealed record Scope(Guid TeamId, Guid CompetitionChallengeId);
@@ -36,13 +35,12 @@ public sealed class LiveSoloRuntimeStore(NoCtfDbContext db, IExecutionScopeAcces
                 && x.CompetitionChallengeId == scope.CompetitionChallengeId && x.TeamId == scope.TeamId && (id == null || x.Id == id))
             .OrderByDescending(x => x.ActiveSlot != null).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
         if (runtime is null) return null;
-        var expose = runtime.State == RuntimeState.Running && (await isolation.AssessAsync(new(runtime.RuntimeKind, runtime.RuntimeProvider,
-            request.QuestionId, scope.TeamId, runtime.Id), ct)).Status == ExecutionIsolationStatus.Verified;
+        var expose = runtime.State == RuntimeState.Running;
         return new(runtime.Id, runtime.CompetitionId, runtime.CompetitionChallengeId, null, runtime.TeamId,
             runtime.Purpose, runtime.RuntimeKind, runtime.RuntimeProvider, runtime.State, runtime.FailureCode, runtime.CreatedAt,
             runtime.RunningAt, runtime.ExpiresAt, runtime.StoppedAt, runtime.RunnerId, AccessMode: runtime.AccessMode,
             AccessEndpoints: expose ? runtime.AccessEndpoints.OrderBy(x => x.BindingIndex).Select(x =>
-                new RuntimeAccessEndpointView(x.BindingIndex, null, x.TargetHost, x.TargetPort)).ToArray() : []);
+                new RuntimeAccessEndpointView(x.BindingIndex, x.DirectAddress, x.TargetHost, x.TargetPort)).ToArray() : []);
     }
     public async Task<RuntimeMutationResult> MutateAsync(LiveSoloRuntimeCommand command, CancellationToken ct)
     {

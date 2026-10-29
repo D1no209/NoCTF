@@ -8,7 +8,6 @@ using NoCTF.Application.LiveSolo.Media;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Runtime.Capacity;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
@@ -29,10 +28,8 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Notifications.IGameplayFactStateChangedNotification _gameplayFactStateChangedNotification;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog _challengeRuntimeTemplateCatalog;
-        private readonly NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy _runtimePlacementPolicy1;
-        private readonly NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy _runtimePlacementPolicy2;
+        private readonly NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy _runtimePlacementPolicy;
         private readonly NoCTF.Infrastructure.Persistence.IDatabaseConstraintClassifier _databaseConstraintClassifier;
-        private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
@@ -40,7 +37,7 @@ namespace Internal.Generated.WolverineHandlers
         private readonly System.TimeProvider _timeProvider5;
         private readonly System.TimeProvider _timeProvider6;
 
-        public GameplayFactStateChangedHandler1831762223(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.EntityFrameworkCore.IDbContextFactory<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextFactoryOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy1, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy2, NoCTF.Infrastructure.Persistence.IDatabaseConstraintClassifier databaseConstraintClassifier, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, System.TimeProvider __timeProvider5, System.TimeProvider __timeProvider6)
+        public GameplayFactStateChangedHandler1831762223(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.EntityFrameworkCore.IDbContextFactory<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextFactoryOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy runtimePlacementPolicy, NoCTF.Infrastructure.Persistence.IDatabaseConstraintClassifier databaseConstraintClassifier, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4, System.TimeProvider __timeProvider5, System.TimeProvider __timeProvider6)
         {
             _httpContextAccessor = httpContextAccessor;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
@@ -54,10 +51,8 @@ namespace Internal.Generated.WolverineHandlers
             _gameplayFactStateChangedNotification = gameplayFactStateChangedNotification;
             _notificationChangePublisher = notificationChangePublisher;
             _challengeRuntimeTemplateCatalog = challengeRuntimeTemplateCatalog;
-            _runtimePlacementPolicy1 = __runtimePlacementPolicy1;
-            _runtimePlacementPolicy2 = __runtimePlacementPolicy2;
+            _runtimePlacementPolicy = runtimePlacementPolicy;
             _databaseConstraintClassifier = databaseConstraintClassifier;
-            _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
             _timeProvider3 = __timeProvider3;
@@ -72,13 +67,12 @@ namespace Internal.Generated.WolverineHandlers
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var liveSoloExecutionAccess = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloExecutionAccess(noCtfDbContext);
-            var runnerExecutionRuntimeIsolation = new NoCTF.Infrastructure.Runtime.Access.RunnerExecutionRuntimeIsolation(noCtfDbContext, _natsRunnerAvailabilityRegistry, _runtimePlacementPolicy2);
             var perTeamRuntimeFlagStore = new NoCTF.Infrastructure.Challenges.Flags.PerTeamRuntimeFlagStore(noCtfDbContext);
             var requestCommandKey = new NoCTF.API.Security.RequestCommandKey(_httpContextAccessor);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider4);
-            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider3, transactionalRequestReplay);
+            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, liveSoloExecutionAccess, _timeProvider3, transactionalRequestReplay);
             var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
             var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, _liveSoloEgressGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider5);

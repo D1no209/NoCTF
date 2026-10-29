@@ -494,7 +494,7 @@
   "liveSolo.selection.risk.PublicExposure": "An answer from this source has been publicly exposed.",
   "liveSolo.preparation.failed": "Environment preparation failed",
   "liveSolo.preparation.ready": "First question environment is ready",
-  "liveSolo.preparation.notRequired": "No environment isolation is required for the first question",
+  "liveSolo.preparation.notRequired": "The first question does not require a runtime",
   "liveSolo.preparation.pending": "Preparing first question resources",
   "liveSolo.preparation.retry": "Retry this round preparation",
   "liveSolo.settings.evidence": "Check static Flag acquisition evidence",

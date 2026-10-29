@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NATS.Client.Core;
 using NSubstitute;
 using NoCTF.Application.Runtime.Access;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Messaging;
@@ -50,6 +51,11 @@ public sealed class ExecutionIsolationQualificationTests
             await Assert.That((await assessor.AssessAsync(request, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Unverified);
             receipt.IsolationState = RuntimeIsolationState.Verified; await fixture.Db.SaveChangesAsync(ct);
             await Assert.That((await assessor.AssessAsync(request, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Verified);
+            await registry.RegisterAsync(registration with { Admission = registration.Admission with
+                { State = RunnerAdmissionState.PressureBlocked, Failure = RunnerAdmissionFailure.NodePressureHigh } }, ct);
+            await Assert.That((await assessor.AssessAsync(request, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Verified);
+            await Assert.That((await assessor.AssessAsync(request with { RuntimeInstanceId = null }, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Unverified);
+            await registry.RegisterAsync(registration, ct);
             await Assert.That((await assessor.AssessAsync(request with { TeamId = fixture.RightTeam.Id }, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Unverified);
             receipt.ExecutionScopeId = Guid.NewGuid(); await fixture.Db.SaveChangesAsync(ct);
             await Assert.That((await assessor.AssessAsync(request, ct)).Status).IsEqualTo(ExecutionIsolationStatus.Unverified);

@@ -183,13 +183,28 @@ public sealed class NatsRunnerAvailabilityRegistry(
 
     public async Task<RunnerAvailabilityRegistration?> ReadEligibleRunnerAsync(
         string runnerId, CancellationToken ct)
+        => await ReadRunnerAsync(runnerId, true, ct);
+
+    public async Task<RunnerAvailabilityRegistration?> ReadServingRunnerAsync(
+        string pool, string runnerId, CancellationToken ct)
+    {
+        var registration = await ReadRunnerAsync(runnerId, false, ct);
+        return registration?.RunnerPool == pool ? registration : null;
+    }
+
+    private async Task<RunnerAvailabilityRegistration?> ReadRunnerAsync(
+        string runnerId, bool requireAdmission, CancellationToken ct)
     {
         return await storeAccess.ExecuteAsync<RunnerAvailabilityRegistration?>(async store =>
         {
             var now = clock.GetUtcNow();
             var registration = await ReadRegistrationAsync(store, runnerId, ct);
             if (registration is null
-                || Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online)
+                || (requireAdmission
+                    ? Evaluate(registration, now) != RunnerAvailabilityRegistrationOutcome.Online
+                    : registration.Schema != 3 || registration.ExpiresAt <= now
+                        || !registration.Registration.Reconciled || !registration.Registration.ProviderAvailable
+                        || registration.Registration.ResourceDomainFencingToken == 0))
                 return null;
             var heartbeat = await ReadHeartbeatAsync(store, runnerId, ct);
             return heartbeat is not null

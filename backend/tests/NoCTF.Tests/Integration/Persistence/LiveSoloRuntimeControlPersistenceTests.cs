@@ -113,9 +113,9 @@ public sealed class LiveSoloRuntimeControlPersistenceTests
         isolation.AssessAsync(Arg.Any<ExecutionIsolationRequest>(), Arg.Any<CancellationToken>()).Returns(new ExecutionIsolationAssessment(ExecutionIsolationStatus.Verified));
         var placement = Substitute.For<IRuntimePlacementPolicy>(); placement.Resolve(RuntimeKind.Container).Returns(new RuntimePlacement(RuntimeProvider.Docker, "test"));
         var control = new ScopedRuntimeControl(db, new ChallengeRuntimeTemplateCatalog(), placement, Substitute.For<IPerTeamRuntimeFlagStore>(),
-            Substitute.For<IPostCommitMessagePublisher>(), isolation, access, fixture.Clock,
+            Substitute.For<IPostCommitMessagePublisher>(), access, fixture.Clock,
             new TransactionalRequestReplay(db, new CommandKey(key, actor ?? fixture.Left.Id), fixture.Clock));
-        return new(db, access, control, fixture.Clock, isolation);
+        return new(db, access, control, fixture.Clock);
     }
     private sealed record CommandKey(Guid? Key, Guid? ActorId) : IRequestCommandKey;
 }

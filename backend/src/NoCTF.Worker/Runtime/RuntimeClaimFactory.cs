@@ -40,7 +40,7 @@ public static class RuntimeClaimFactory
                 instance.RuntimeProvider, services, labels, RuntimeResourceBudgetPolicy.Sum(services.Select(service => service.Resources(processLimit))),
                 instance.ExecutionScopeId is null ? ttl : null, timeout, template.UrlBindings, mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
                 mode == GameMode.Awd && challengeDefinition?.Checker is { } checker ? new(checker.TargetServiceName) : null,
-                container.EgressPolicy, instance.AccessMode, ExecutionScopeId: instance.ExecutionScopeId));
+                container.EgressPolicy, instance.AccessMode, ExecutionScopeId: mode == GameMode.LiveSolo ? null : instance.ExecutionScopeId));
         }
         if (template.Definition is OvaRuntimeDefinition ova && instance.RuntimeProvider == RuntimeProvider.Libvirt)
             return new ProvisionOvaRuntime(instance.Id, runnerId, new OvaRuntimeRequest(instance.Id,

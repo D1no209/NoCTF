@@ -193,17 +193,17 @@ internal static partial class BackendMessageOperations
                 .Select(flag => flag.Flag)
                 .SingleOrDefaultAsync(cancellationToken);
         }
-        else if (target.Mode is GameMode.Ctf or GameMode.Awdp
+        else if (target.Mode is GameMode.Ctf or GameMode.Awdp or GameMode.LiveSolo
             && !IsPatchVerificationTarget(instance.Purpose)
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
             if (instance.TeamId is Guid teamId
                 && instance.CompetitionChallengeId is Guid competitionChallengeId)
             {
-                var specificationKind = target.Mode == GameMode.Awdp
+                var specificationKind = target.Mode is GameMode.Awdp or GameMode.LiveSolo
                     ? SpecificationKind.RuntimeInstance
                     : SpecificationKind.RuntimeDefinition;
-                var specificationId = target.Mode == GameMode.Awdp
+                var specificationId = target.Mode is GameMode.Awdp or GameMode.LiveSolo
                     ? instance.Id
                     : competitionChallengeId;
                 perTeamFlag = await db.ChallengeFlags.AsNoTracking()
@@ -219,7 +219,7 @@ internal static partial class BackendMessageOperations
             }
         }
         if ((instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment
-                || target.Mode is GameMode.Ctf or GameMode.Awdp
+                || target.Mode is GameMode.Ctf or GameMode.Awdp or GameMode.LiveSolo
                     && !IsPatchVerificationTarget(instance.Purpose)
                     && template.FlagSource == RuntimeFlagSource.PerTeam)
             && perTeamFlag is null)
@@ -228,6 +228,10 @@ internal static partial class BackendMessageOperations
                 instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
+
+        if (instance.ExecutionScopeId is null && await db.RuntimeInstances.AnyAsync(
+                runtime => runtime.State == RuntimeState.Queued && runtime.ExecutionScopeId != null, cancellationToken))
+            return;
 
         var placement = placementPolicy.Resolve(instance.RuntimeKind);
         if (placement.Provider != instance.RuntimeProvider)
