@@ -41,3 +41,10 @@ test('quick add excludes existing placements and other modes', () => {
   const free = projectChallengePlacements({ id: 'available', mode: 'Ctf' }, [], 'template')
   expect(availablePlacementCompetitions([placed, other, free], 'Ctf').map(item => item.competition.id)).toEqual(['available'])
 })
+
+test('finished competitions are hidden until explicitly included', () => {
+  const finished = projectChallengePlacements({ id: 'finished', mode: 'Ctf', status: 'Finished' }, [], 'template')
+  const running = projectChallengePlacements({ id: 'running', mode: 'Ctf', status: 'Running' }, [], 'template')
+  expect(availablePlacementCompetitions([finished, running], 'Ctf').map(x => x.competition.id)).toEqual(['running'])
+  expect(availablePlacementCompetitions([finished, running], 'Ctf', true).map(x => x.competition.id)).toEqual(['finished', 'running'])
+})

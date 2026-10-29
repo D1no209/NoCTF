@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { ChallengeCompetitionPlacementsViewState } from '~/features/admin/useChallengeCompetitionPlacements'
 const viewProps = defineProps<{ state: ChallengeCompetitionPlacementsViewState }>()
-const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error, adding, linked, linkedOptions, candidates, preview, previewPosterUrl, previewMotion, targetIndex, targetId, canAdd, previousTarget, nextTarget, selectTarget, load, addToCompetition } = toRefs(viewProps.state)
+const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error, adding, linked, linkedOptions, candidates, preview, previewPosterUrl, previewMotion, targetIndex, targetId, canAdd, previousTarget, nextTarget, selectTarget, load, addToCompetition, includeFinished } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -37,6 +37,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
           <Separator />
           <section class="flex min-w-0 flex-col gap-3">
             <h3 class="text-sm font-semibold">{{ $t('placements.quickAdd') }}</h3>
+            <Field orientation="horizontal"><Switch id="include-finished" v-model="includeFinished" /><FieldLabel for="include-finished">{{ $t('placements.includeFinished') }}</FieldLabel></Field>
             <template v-if="candidates.length">
               <div class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                 <Button type="button" variant="ghost" size="icon" :aria-label="$t('placements.previous')" :disabled="adding || targetIndex <= 0" @click="previousTarget"><ChevronLeft aria-hidden="true" /></Button>

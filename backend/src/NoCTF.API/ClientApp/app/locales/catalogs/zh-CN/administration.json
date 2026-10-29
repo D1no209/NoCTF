@@ -1,4 +1,5 @@
 {
+  "placements.includeFinished": "显示已结束竞赛",
   "challengeDelivery.title": "下发",
   "challengeDelivery.refresh": "刷新",
   "challengeDelivery.includeHistory": "显示历史及待生效 Flag",

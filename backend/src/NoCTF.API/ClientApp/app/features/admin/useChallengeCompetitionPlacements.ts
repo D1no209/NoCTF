@@ -17,11 +17,12 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
   const adding = ref(false)
+  const includeFinished = ref(false)
   const targetId = ref('')
   const protectedPosters = ref<Record<string, string>>({})
   const previewMotion = ref<ContentSwapPreset>('film-left')
-  const linked = computed(() => items.value.filter(item => item.instances.length > 0))
-  const candidates = computed(() => availablePlacementCompetitions(items.value, props.mode))
+  const linked = computed(() => items.value.filter(item => item.instances.length > 0 && (includeFinished.value || item.competition.status !== 'Finished')))
+  const candidates = computed(() => availablePlacementCompetitions(items.value, props.mode, includeFinished.value))
   const linkedOptions = computed(() => linked.value.map(item => ({
     value: item.competition.id, label: item.competition.title ?? '', posterUrl: posterFor(item.competition),
     href: placementManagementPath(item),
@@ -128,8 +129,11 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
     void load()
   })
   onMounted(load)
+  watch(includeFinished, () => {
+    if (!candidates.value.some(item => item.competition.id === targetId.value)) targetId.value = candidates.value[0]?.competition.id ?? ''
+  })
   onBeforeUnmount(() => { disposed = true; generation++; reads?.abort(); clearProtectedPosters() })
-  return { ...toRefs(props), ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error, adding, linked, linkedOptions, candidates,
+  return { ...toRefs(props), ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error, adding, linked, linkedOptions, candidates, includeFinished,
     preview, previewPosterUrl, previewMotion, targetIndex, targetId, canAdd, previousTarget, nextTarget, selectTarget, load, addToCompetition }
 }
 export type ChallengeCompetitionPlacementsViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useChallengeCompetitionPlacements>>

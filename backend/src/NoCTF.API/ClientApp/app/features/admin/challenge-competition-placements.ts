@@ -27,8 +27,8 @@ export function projectChallengePlacements(
   }
 }
 
-export function availablePlacementCompetitions(items: ChallengeCompetitionPlacement[], mode: NoCtfapiEndpointsCompetitionsGameModeProtocol) {
-  return items.filter(item => item.competition.mode === mode && item.instances.length === 0)
+export function availablePlacementCompetitions(items: ChallengeCompetitionPlacement[], mode: NoCtfapiEndpointsCompetitionsGameModeProtocol, includeFinished = false) {
+  return items.filter(item => item.competition.mode === mode && (includeFinished || item.competition.status !== 'Finished') && item.instances.length === 0)
 }
 
 export function placementManagementPath(item: ChallengeCompetitionPlacement): string {

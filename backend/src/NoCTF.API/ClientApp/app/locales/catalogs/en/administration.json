@@ -1,4 +1,5 @@
 {
+  "placements.includeFinished": "Show finished competitions",
   "challengeDelivery.title": "Delivery",
   "challengeDelivery.refresh": "Refresh",
   "challengeDelivery.includeHistory": "Include historical and scheduled Flags",
