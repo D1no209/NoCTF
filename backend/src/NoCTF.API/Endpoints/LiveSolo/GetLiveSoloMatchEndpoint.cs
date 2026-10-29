@@ -26,6 +26,7 @@ public sealed record LiveSoloMatchResponse(Guid Id, Guid CompetitionId,
     public string? LeftAvatarUrl { get; init; }
     public string? RightAvatarUrl { get; init; }
     public bool UsesDirectionPool { get; init; }
+    public bool TeammatesMayViewQuestions { get; init; }
 }
 public sealed record LiveSoloFailureResponse(
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloFailure>))] LiveSoloFailure Code)
@@ -42,7 +43,7 @@ internal static class LiveSoloProtocol
         value.RightTeamId, value.RightTeamName, value.CurrentRoundId, value.WinnerTeamId,
         value.Rosters.Select(x => new LiveSoloRosterResponse(x.TeamId, x.UserIds, x.Locked, x.Ready)).ToArray(),
         value.PendingCorrectionId, value.ReplacementMatchId, value.PendingCorrectionMatchId, value.HasMedia)
-        { ResultRevision = value.ResultRevision, EndReason = value.EndReason, ResultLeftWins = value.ResultLeftWins,
+        { TeammatesMayViewQuestions = value.TeammatesMayViewQuestions, ResultRevision = value.ResultRevision, EndReason = value.EndReason, ResultLeftWins = value.ResultLeftWins,
           ResultRightWins = value.ResultRightWins, ResultUpdatedAt = value.ResultUpdatedAt,
           LeftAvatarFileId = value.LeftAvatarFileId, RightAvatarFileId = value.RightAvatarFileId,
           LeftAvatarUrl = AvatarUrl(value.CompetitionId, value.LeftTeamId, value.LeftAvatarFileId, links, context),

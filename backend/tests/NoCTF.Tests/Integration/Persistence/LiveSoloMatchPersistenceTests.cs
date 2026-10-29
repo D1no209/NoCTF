@@ -69,6 +69,16 @@ public sealed class LiveSoloMatchPersistenceTests
             await Assert.That(await access.CanAccessAsync(request, ct)).IsTrue();
             await Assert.That(await access.CanAccessAsync(request with { ActorId = fixture.Owner.Id }, ct)).IsFalse();
             await Assert.That(await access.CanAccessAsync(request with { TeamId = fixture.RightTeam.Id }, ct)).IsFalse();
+            fixture.LeftTeam.MemberIds = [fixture.Left.Id, fixture.Owner.Id];
+            await fixture.Db.SaveChangesAsync(ct);
+            await Assert.That(await store.QuestionsAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Round.Id, fixture.Owner.Id, fixture.Now, ct)).IsNull();
+            await Assert.That(await store.SetQuestionVisibilityAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Left.Id, true, ct)).IsEqualTo(LiveSoloFailure.Forbidden);
+            await Assert.That(await store.SetQuestionVisibilityAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, true, ct)).IsNull();
+            await Assert.That((await store.QuestionsAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Round.Id, fixture.Owner.Id, fixture.Now, ct))!.Count).IsEqualTo(1);
+            await Assert.That(await access.CanAccessAsync(request with { ActorId = fixture.Owner.Id }, ct)).IsTrue();
+            await Assert.That(await access.CanAccessAsync(request with { ActorId = fixture.Owner.Id, Operation = ExecutionScopeOperation.Reset }, ct)).IsFalse();
+            await store.SetQuestionVisibilityAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, false, ct);
+            await Assert.That(await access.CanAccessAsync(request with { ActorId = fixture.Owner.Id }, ct)).IsFalse();
             var unopened = fixture.Round.Questions.Single(x => x.Position == 1);
             await Assert.That(await access.CanAccessAsync(request with { ExecutionScopeId = unopened.Id,
                 CompetitionChallengeId = unopened.CompetitionChallengeId }, ct)).IsFalse();

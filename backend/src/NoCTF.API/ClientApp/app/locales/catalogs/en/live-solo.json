@@ -1,4 +1,5 @@
 {
+  "liveSolo.teammatesMayViewQuestions": "Allow teammates outside the lineup to view opened questions",
   "liveSolo.bracket.sameTeam": "Choose two different teams for the match.",
   "liveSolo.draw.directionCounts": "Remaining tickets by direction",
   "liveSolo.draw.ticketsRemaining": "{count} tickets left",

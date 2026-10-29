@@ -10217,6 +10217,78 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-visibility": {
+      "put": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Set Live Solo Question Visibility",
+        "description": "Executes PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-visibility.",
+        "operationId": "SetLiveSoloQuestionVisibility",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SetLiveSoloQuestionVisibilityRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSetLiveSoloQuestionVisibilityRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection": {
       "post": {
         "tags": [
@@ -34250,6 +34322,9 @@
           },
           "usesDirectionPool": {
             "type": "boolean"
+          },
+          "teammatesMayViewQuestions": {
+            "type": "boolean"
           }
         }
       },
@@ -39064,6 +39139,15 @@
             "type": "string",
             "format": "binary",
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloSetLiveSoloQuestionVisibilityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teammatesMayViewQuestions": {
+            "type": "boolean"
           }
         }
       },

@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { LiveSoloMatchState } from '~/features/live-solo/useLiveSoloMatch'
 const props = defineProps<{ state: LiveSoloMatchState }>()
-const { competitionId, match, round, workspace, workspaceTab, setWorkspaceTab, workspacePanel, setWorkspacePanel, resultButtonId, conditions, phaseKey, leftAvatar, rightAvatar,
+const { competitionId, match, round, workspace, workspaceTab, setWorkspaceTab, workspacePanel, setWorkspacePanel, resultButtonId, conditions, phaseKey, leftAvatar, rightAvatar, setTeammatesMayViewQuestions,
   stableResult, resultWindow, resultOpen, setResultOpen, showResult, nextRound, resultAvatar, leftReady, rightReady, failedResources, Review, loading, busy, error, myRoster, onRoster, mayReview,
   candidatePreviewOpen, setCandidatePreviewOpen, candidatePreviewLoading, candidatePreviewTitle, candidatePreviewItems, previewCandidate,
   canLock, rosterLimit, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start, Directions, team,
@@ -54,6 +54,7 @@ const { competitionId, match, round, workspace, workspaceTab, setWorkspaceTab, w
           <p v-if="!platformStreaming" class="text-sm text-muted-foreground" role="status">{{ $t('liveSolo.media.disabled') }}</p>
           <template v-if="judge"><Separator /><section class="flex flex-col gap-3">
             <h2 class="font-semibold">{{ $t('liveSolo.judge') }}</h2>
+              <Field orientation="horizontal"><FieldLabel for="teammates-view">{{ $t('liveSolo.teammatesMayViewQuestions') }}</FieldLabel><Switch id="teammates-view" :model-value="match?.teammatesMayViewQuestions ?? false" :disabled="busy" @update:model-value="setTeammatesMayViewQuestions" /></Field>
             <section v-if="round?.state === 'Preparing'" class="flex flex-col gap-2"><h3 class="text-sm font-semibold">{{ $t('liveSolo.workspace.conditions') }}</h3><p v-for="condition in conditions" :key="condition.value" class="text-sm text-muted-foreground">{{ $t(condition.label) }}</p><p v-if="!conditions.length" class="text-sm text-primary">{{ $t('liveSolo.workspace.ready') }}</p></section>
             <div class="flex flex-col gap-3">
               <Field v-if="workspace?.allowedOperations?.includes('PrepareRound') && !match?.usesDirectionPool"><FieldLabel>{{ $t('liveSolo.selection.title') }}</FieldLabel><ChoicePicker :items="groupOptions" :model-value="groupChoice" :disabled="busy" :label="$t('liveSolo.selection.title')" :search-label="$t('liveSolo.groups.name')" :empty-label="$t('liveSolo.selection.empty')" @update:model-value="chooseGroup" /></Field>

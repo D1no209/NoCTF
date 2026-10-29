@@ -108,7 +108,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
             match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia)
-        { ResultRevision = match.ResultRevision, EndReason = match.EndReason, ResultLeftWins = match.ResultLeftWins,
+        { TeammatesMayViewQuestions = match.TeammatesMayViewQuestions, ResultRevision = match.ResultRevision, EndReason = match.EndReason, ResultLeftWins = match.ResultLeftWins,
           ResultRightWins = match.ResultRightWins, ResultUpdatedAt = match.ResultUpdatedAt, UsesDirectionPool = match.DirectionPool.Count != 0 };
     }
 

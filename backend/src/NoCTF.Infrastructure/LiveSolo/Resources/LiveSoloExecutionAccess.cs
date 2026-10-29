@@ -27,7 +27,8 @@ public sealed class LiveSoloExecutionAccess(NoCtfDbContext db) : IExecutionScope
             .Join(db.Competitions.AsNoTracking(), x => x.Match.CompetitionId, x => x.Id, (x, competition) => new { x.Question, x.Round, x.Match, Competition = competition })
             .Where(x => x.Match.CompetitionId == request.CompetitionId && x.Competition.Mode == GameMode.LiveSolo
                 && x.Match.CurrentRoundId == x.Round.Id && x.Match.Slots.Any(s => s.TeamId == teamId && s.RosterLockedAt != null)
-                && x.Match.Roster.Any(r => r.TeamId == teamId && (preparation || r.UserId == request.ActorId)))
+                && (x.Match.Roster.Any(r => r.TeamId == teamId && (preparation || r.UserId == request.ActorId))
+                    || request.Operation == ExecutionScopeOperation.Read && x.Match.TeammatesMayViewQuestions))
             .Select(x => new { x.Question.OpenedAt, RoundState = x.Round.State, MatchState = x.Match.State, CompetitionState = x.Competition.Status,
                 x.Round.StartedAt, x.Round.LimitSeconds, x.Round.Pauses, RoundId = x.Round.Id, x.Round.CreatedAt })
             .SingleOrDefaultAsync(ct);

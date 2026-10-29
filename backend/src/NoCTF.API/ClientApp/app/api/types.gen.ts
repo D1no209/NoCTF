@@ -1291,6 +1291,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse = {
     leftAvatarUrl?: string | null;
     rightAvatarUrl?: string | null;
     usesDirectionPool?: boolean;
+    teammatesMayViewQuestions?: boolean;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMatchState = 'AwaitingOpponents' | 'Preparing' | 'Countdown' | 'Running' | 'Paused' | 'AwaitingAdjudication' | 'Completed' | 'Canceled';
@@ -2602,6 +2603,10 @@ export type NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpPdfDraftRequest = {
     official?: boolean;
     expectedStamp?: string | null;
     file: Blob | File;
+};
+
+export type NoCtfapiEndpointsLiveSoloSetLiveSoloQuestionVisibilityRequest = {
+    teammatesMayViewQuestions?: boolean;
 };
 
 export type NoCtfapiEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest = {
@@ -12077,6 +12082,46 @@ export type SaveLiveSoloWriteUpPdfDraftResponses = {
 };
 
 export type SaveLiveSoloWriteUpPdfDraftResponse = SaveLiveSoloWriteUpPdfDraftResponses[keyof SaveLiveSoloWriteUpPdfDraftResponses];
+
+export type SetLiveSoloQuestionVisibilityData = {
+    body: NoCtfapiEndpointsLiveSoloSetLiveSoloQuestionVisibilityRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-visibility';
+};
+
+export type SetLiveSoloQuestionVisibilityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SetLiveSoloQuestionVisibilityError = SetLiveSoloQuestionVisibilityErrors[keyof SetLiveSoloQuestionVisibilityErrors];
+
+export type SetLiveSoloQuestionVisibilityResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SetLiveSoloQuestionVisibilityResponse = SetLiveSoloQuestionVisibilityResponses[keyof SetLiveSoloQuestionVisibilityResponses];
 
 export type SpecifyPreparedLiveSoloGroupData = {
     body: NoCtfapiEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest;

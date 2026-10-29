@@ -4629,6 +4629,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("swiss_wins");
 
+                    b.Property<bool>("TeammatesMayViewQuestions")
+                        .HasColumnType("boolean")
+                        .HasColumnName("teammates_may_view_questions");
+
                     b.Property<int>("TournamentStage")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

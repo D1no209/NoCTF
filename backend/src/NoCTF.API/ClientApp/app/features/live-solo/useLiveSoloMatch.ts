@@ -4,7 +4,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { getLiveSoloWorkspace, getLiveSoloMedia, getLiveSoloPlayerPolicy, getMyTeamEndpoint,
   prepareLiveSoloMedia, lockLiveSoloRoster, confirmLiveSoloReady, prepareLiveSoloRound, startLiveSoloCountdown,
   adjudicateLiveSoloMatch, listLiveSoloQuestionGroupCandidates, listLiveSoloQuestionGroups, listLiveSoloQuestionPool,
-  retryLiveSoloPreparation, specifyPreparedLiveSoloGroup, userProfileGet } from '~/api'
+  retryLiveSoloPreparation, specifyPreparedLiveSoloGroup, setLiveSoloQuestionVisibility, userProfileGet } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round,
   NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse as Media, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration,
   NoCtfapiEndpointsTeamsTeamResponse as Team, NoCtfDomainLiveSoloLiveSoloJudgeAction as JudgeAction,
@@ -229,6 +229,11 @@ export function useLiveSoloMatch() {
       return result
     })
   }
+  async function setTeammatesMayViewQuestions(value: boolean) {
+    if (!judge.value) return
+    await operation(() => setLiveSoloQuestionVisibility({ path: { competitionId: competitionId.value, matchId: matchId.value },
+      body: { teammatesMayViewQuestions: value } }))
+  }
   function openDecision(action: JudgeAction) {
     if (!judge.value || !match.value?.concurrencyStamp) return
     judgeAction.value = action; judgeReason.value = ''; forfeitingTeam.value = null
@@ -324,7 +329,7 @@ export function useLiveSoloMatch() {
   return { competitionId, matchId, match, round, media, workspace, workspaceTab, setWorkspaceTab, workspacePanel, setWorkspacePanel, resultButtonId, conditions, phaseKey, leftAvatar, rightAvatar,
     stableResult, resultWindow, resultOpen, setResultOpen, showResult, nextRound, resultAvatar, leftReady, rightReady, failedResources,
     candidatePreviewOpen, setCandidatePreviewOpen, candidatePreviewLoading, candidatePreviewTitle, candidatePreviewItems, previewCandidate, Review: markRaw(LiveSoloReview),
-    platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, mayReview, staffOnlyMedia,
+    platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, mayReview, staffOnlyMedia, setTeammatesMayViewQuestions,
     canLock, rosterLimit, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start, Directions: markRaw(LiveSoloMatchDirections),
     candidates, groupOptions, groupChoice, chooseGroup, currentCandidate, selectionRisks, selectionUses, openUsage, unavailableCandidates, startAllowed, preparationKey, preparationFailure, retryPreparation, specifyCurrent,
     staff, hasStaffAccess, manage, backLabel, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
@@ -332,7 +337,8 @@ export function useLiveSoloMatch() {
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
     ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => workspaceAuthorized.value && workspace.value?.allowedOperations?.includes('SubmitFlag') === true),
     flagDock: computed(() => `live-solo-flag-${matchId.value}`),
-    questionsVisible: computed(() => onRoster.value && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),
+    questionsVisible: computed(() => (onRoster.value || match.value?.teammatesMayViewQuestions === true && myRoster.value != null)
+      && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),
     ...screen, mediaError: computed(() => platformStreaming.value ? screen.error.value : null), error }
 }
 export type LiveSoloMatchState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloMatch>>

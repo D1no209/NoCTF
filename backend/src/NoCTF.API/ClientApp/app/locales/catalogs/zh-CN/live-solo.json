@@ -1,4 +1,5 @@
 {
+  "liveSolo.teammatesMayViewQuestions": "允许未上场队友查看已开放题目",
   "liveSolo.bracket.sameTeam": "对局双方必须选择不同队伍。",
   "liveSolo.draw.directionCounts": "各方向剩余签数",
   "liveSolo.draw.ticketsRemaining": "剩余 {count} 签",

@@ -21,6 +21,7 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public int RequiredWins { get; set; } = 2;
     public LiveSoloMatchState State { get; set; }
     public bool Conditional { get; set; }
+    public bool TeammatesMayViewQuestions { get; set; }
     public int LeftWins { get; set; }
     public int RightWins { get; set; }
     public Guid? WinnerTeamId { get; set; }

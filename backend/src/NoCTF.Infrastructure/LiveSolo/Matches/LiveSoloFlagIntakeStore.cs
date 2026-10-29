@@ -89,7 +89,8 @@ public sealed partial class LiveSoloMatchStore
         var team = await TeamAsync(competitionId, actorId, ct);
         var match = await MatchAsync(competitionId, matchId, ct);
         if (!await ActiveAsync(actorId, ct) || match is null || team is not Guid teamId || match.CurrentRoundId != roundId
-            || !match.Roster.Any(x => x.UserId == actorId && x.TeamId == teamId)
+            || !(match.Roster.Any(x => x.UserId == actorId && x.TeamId == teamId)
+                || match.TeammatesMayViewQuestions && match.Slots.Any(x => x.TeamId == teamId))
             || match.State is not (LiveSoloMatchState.Running or LiveSoloMatchState.Paused)) return null;
         var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
         if (competition?.Status is not (NoCTF.Domain.Competitions.CompetitionStatus.Running or NoCTF.Domain.Competitions.CompetitionStatus.Paused)
