@@ -420,9 +420,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
                               @click="restoreAttachment(attachment)"
                             > {{ $t('administration.label.restore') }} </Button>
                           </template>
-                          <template v-else>
-                            <Button size="sm" variant="destructive" @click="onClickDeletingAttachment(attachment)"> {{ $t('common.action.delete') }} </Button>
-                          </template>
+                            <Button size="sm" variant="destructive" :disabled="attachmentActionPending" @click="onClickDeletingAttachment(attachment)"> {{ $t('administration.attachments.permanentDelete') }} </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -623,9 +621,9 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
     <AlertDialog :open="!!deletingAttachment" @update:open="onUpdateOpenDeletingAttachment">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('administration.label.deleteAttachment') }}</AlertDialogTitle>
+            <AlertDialogTitle>{{ $t('administration.attachments.permanentDelete') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('administration.challengesBy.description.softDeleteAttachmentRestored', { file: deletingAttachment?.fileName ?? $t('common.label.symbol') }) }}
+            {{ $t('administration.attachments.permanentDeleteDescription', { file: deletingAttachment?.fileName ?? $t('common.label.symbol') }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

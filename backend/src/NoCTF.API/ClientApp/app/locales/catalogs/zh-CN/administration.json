@@ -1,5 +1,7 @@
 {
   "placements.includeFinished": "显示已结束竞赛",
+  "administration.attachments.permanentDelete": "永久删除",
+  "administration.attachments.permanentDeleteDescription": "永久删除附件“{file}”及关联 Flag，删除后无法恢复。",
   "challengeDelivery.title": "下发",
   "challengeDelivery.refresh": "刷新",
   "challengeDelivery.includeHistory": "显示历史及待生效 Flag",

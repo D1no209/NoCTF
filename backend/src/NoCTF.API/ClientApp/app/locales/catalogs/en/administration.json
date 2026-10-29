@@ -1,5 +1,7 @@
 {
   "placements.includeFinished": "Show finished competitions",
+  "administration.attachments.permanentDelete": "Permanently delete",
+  "administration.attachments.permanentDeleteDescription": "Permanently delete attachment “{file}” and its associated Flag. This cannot be undone.",
   "challengeDelivery.title": "Delivery",
   "challengeDelivery.refresh": "Refresh",
   "challengeDelivery.includeHistory": "Include historical and scheduled Flags",

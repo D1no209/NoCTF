@@ -28976,6 +28976,65 @@
         ]
       }
     },
+    "/api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/permanent": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Challenge Bank Permanently Delete Attachment",
+        "description": "Executes DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/permanent.",
+        "operationId": "AdminChallengeBankPermanentlyDeleteAttachment",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore": {
       "post": {
         "tags": [
@@ -55498,6 +55557,10 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankPermanentlyDeleteChallengeAttachmentRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse": {
         "type": "object",

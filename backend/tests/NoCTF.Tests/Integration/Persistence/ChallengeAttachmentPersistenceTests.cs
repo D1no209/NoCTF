@@ -91,6 +91,11 @@ public sealed class ChallengeAttachmentPersistenceTests
             await Assert.That(attachment.Length).IsEqualTo(7);
             var challenge = await db.Challenges.SingleAsync(item => item.Id == challengeId, cancellationToken);
             await Assert.That(challenge.UpdatedAt).IsEqualTo(now);
+            await Assert.That(await store.DeleteAsync(challengeId, attachmentId, administratorId, true, now, cancellationToken)).IsTrue();
+            await Assert.That(await store.PermanentlyDeleteAsync(challengeId, attachmentId, administratorId, true, now, cancellationToken)).IsEqualTo(fileId);
+            db.ChangeTracker.Clear();
+            await Assert.That(await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AnyAsync(x => x.Id == attachmentId, cancellationToken)).IsFalse();
+            await Assert.That(await db.Files.AnyAsync(x => x.Id == fileId, cancellationToken)).IsTrue();
         });
     }
 

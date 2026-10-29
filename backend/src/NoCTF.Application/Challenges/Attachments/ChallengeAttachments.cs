@@ -79,6 +79,7 @@ public enum ChallengeAttachmentFailureCode
 
 public interface IChallengeAttachmentStore
 {
+    Task<Guid?> PermanentlyDeleteAsync(Guid challengeId, Guid attachmentId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken ct);
     Task RecordPlayerDownloadAsync(Guid competitionId, Guid competitionChallengeId, Guid teamId,
         Guid actorId, Guid attachmentId, CancellationToken cancellationToken);
     Task<bool> CanWriteAsync(
@@ -148,6 +149,13 @@ public sealed class ManageChallengeAttachments(
     IChallengeAttachmentStore store,
     ManagedFileUploads uploads)
 {
+    public async Task<bool> PermanentlyDeleteAsync(Guid challengeId, Guid attachmentId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken ct)
+    {
+        var fileId = await store.PermanentlyDeleteAsync(challengeId, attachmentId, actorId, isAdministrator, now, ct);
+        if (fileId is null) return false;
+        await uploads.AbandonAsync(fileId.Value);
+        return true;
+    }
     public Task<ChallengeAttachmentSet?> ListAsync(
         Guid challengeId,
         Guid actorId,

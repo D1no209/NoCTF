@@ -313,6 +313,26 @@ public sealed class ChallengeAttachmentStore(
         return true;
     }
 
+    public async Task<Guid?> PermanentlyDeleteAsync(Guid challengeId, Guid attachmentId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var challenge = await LockWritableChallengeAsync(challengeId, actorId, isAdministrator, ct);
+        if (challenge is null) return null;
+        var attachment = await db.Set<ChallengeAttachment>().IgnoreQueryFilters()
+            .SingleOrDefaultAsync(x => x.ChallengeId == challengeId && x.Id == attachmentId, ct);
+        if (attachment is null) return null;
+        var flags = await db.ChallengeFlags.IgnoreQueryFilters().Where(x => x.ChallengeId == challengeId
+            && x.SpecificationKind == SpecificationKind.Attachment && x.SpecificationId == attachmentId).ToArrayAsync(ct);
+        db.ChallengeFlags.RemoveRange(flags);
+        var assignments = await db.LiveSoloAttachmentAssignments.Where(x => x.AttachmentId == attachmentId).ToArrayAsync(ct);
+        db.LiveSoloAttachmentAssignments.RemoveRange(assignments);
+        db.Remove(attachment);
+        challenge.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return attachment.FileId;
+    }
+
     public async Task<bool> RestoreAsync(
         Guid challengeId,
         Guid attachmentId,

@@ -202,8 +202,10 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
         foreach (var originalId in removed)
         {
             var id = copiedAttachmentIds?.GetValueOrDefault(originalId) ?? originalId;
-            var attachment = source.Attachments.Single(x => x.Id == id); attachment.DeletedAt = command.Now;
-            foreach (var flag in flags.Where(x => x.SpecificationKind == SpecificationKind.Attachment && x.SpecificationId == id)) flag.DeletedAt = command.Now;
+            var attachment = source.Attachments.Single(x => x.Id == id);
+            db.ChallengeFlags.RemoveRange(flags.Where(x => x.SpecificationKind == SpecificationKind.Attachment && x.SpecificationId == id));
+            db.LiveSoloAttachmentAssignments.RemoveRange(await db.LiveSoloAttachmentAssignments.Where(x => x.AttachmentId == id).ToArrayAsync(ct));
+            source.Attachments.Remove(attachment); db.Remove(attachment);
             await messages.PublishAsync(new NoCTF.Application.Messaging.CleanupFile(attachment.FileId));
         }
         foreach (var upload in added)

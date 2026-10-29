@@ -6877,6 +6877,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplatePermiss
     managerIds: Array<string>;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengeBankPermanentlyDeleteChallengeAttachmentRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureCodeProtocol;
     message?: string;
@@ -21903,6 +21907,46 @@ export type AdminChallengeBankUploadAttachmentsResponses = {
 };
 
 export type AdminChallengeBankUploadAttachmentsResponse = AdminChallengeBankUploadAttachmentsResponses[keyof AdminChallengeBankUploadAttachmentsResponses];
+
+export type AdminChallengeBankPermanentlyDeleteAttachmentData = {
+    body?: never;
+    path: {
+        challengeId: string;
+        attachmentId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/permanent';
+};
+
+export type AdminChallengeBankPermanentlyDeleteAttachmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminChallengeBankPermanentlyDeleteAttachmentError = AdminChallengeBankPermanentlyDeleteAttachmentErrors[keyof AdminChallengeBankPermanentlyDeleteAttachmentErrors];
+
+export type AdminChallengeBankPermanentlyDeleteAttachmentResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminChallengeBankPermanentlyDeleteAttachmentResponse = AdminChallengeBankPermanentlyDeleteAttachmentResponses[keyof AdminChallengeBankPermanentlyDeleteAttachmentResponses];
 
 export type AdminChallengeBankRestoreAttachmentData = {
     body?: never;
