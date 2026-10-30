@@ -4,6 +4,7 @@ import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/pl
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
 const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailError, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime, MfaUserManagement } = toRefs(viewProps.state)
+const { tokenTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -424,11 +425,11 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           </DialogTitle>
           <DialogDescription>
             {{ tokenIntent === 'impersonate'
-              ? $t('administration.label.impersonationTokenDescription', { user: detail?.userName ?? '-' })
-              : $t('administration.platformUsers.label.issueUserAccessToken', { user: detail?.userName ?? '-' }) }}
+              ? $t('administration.label.impersonationTokenDescription', { user: tokenTarget?.userName ?? '-' })
+              : $t('administration.platformUsers.label.issueUserAccessToken', { user: tokenTarget?.userName ?? '-' }) }}
           </DialogDescription>
         </DialogHeader>
-        <template v-if="!issuedToken">
+        <div v-if="!issuedToken" class="flex min-w-0 flex-col gap-4">
           <UiForm validation="feature" class="flex flex-col gap-4" @submit.prevent="issueToken">
             <FieldGroup>
               <Field>
@@ -445,8 +446,8 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
               </Button>
             </DialogFooter>
           </UiForm>
-        </template>
-        <template v-else>
+        </div>
+        <div v-else class="flex min-w-0 flex-col gap-4">
           <Alert>
             <AlertDescription>{{ $t('administration.platformUsers.description.tokenDisplayedOnceCopy') }}</AlertDescription>
           </Alert>
@@ -467,7 +468,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           <DialogFooter>
             <Button type="button" @click="setTokenOpen(false)">{{ $t('administration.label.iSavedClose') }}</Button>
           </DialogFooter>
-        </template>
+        </div>
       </DialogContent>
     </Dialog>
 

@@ -190,6 +190,7 @@ export function useAdminPlatformUsersPage() {
   const tokenExpiresInSeconds = ref(3600)
 
   const issuedToken = ref<IssuedToken | null>(null)
+  const tokenTarget = ref<PlatformUser | null>(null)
 
   const tokenIssueRequests = createLatestRequestGuard()
 
@@ -209,7 +210,7 @@ export function useAdminPlatformUsersPage() {
     if (!target.id || target.accountStatus !== 'Active'
       || intent === 'impersonate' && identitySwitchActive.value) return
     tokenIssueRequests.invalidate()
-    detail.value = target
+    tokenTarget.value = { ...target }
     tokenIntent.value = intent
     tokenExpiresInSeconds.value = 3600
     issuedToken.value = null
@@ -222,30 +223,28 @@ export function useAdminPlatformUsersPage() {
     tokenIssueRequests.invalidate()
     tokenIssuing.value = false
     issuedToken.value = null
+    tokenTarget.value = null
   }
 
   async function issueToken(): Promise<void> {
-    const target = detail.value
+    const target = tokenTarget.value
     if (tokenIssuing.value || !target?.id) return
     const request = tokenIssueRequests.begin()
     const intent = tokenIntent.value
     tokenIssuing.value = true
-    const { data, error } = await adminPlatformIssueUserToken({
-      path: { userId: target.id },
-      body: {
-        expiresInSeconds: tokenExpiresInSeconds.value,
-      },
-    })
-    if (!tokenIssueRequests.isCurrent(request) || !tokenOpen.value) return
-    tokenIssuing.value = false
-    if (error || !data?.accessToken || !data.expiresAt || !data.targetUserId || !data.targetUserName) {
-      toast.error(parseApiError(error).displayMessage)
-      return
-    }
-    if (intent === 'impersonate') {
-      setTokenOpen(false)
-      detailOpen.value = false
-      try {
+    try {
+      const { data, error } = await adminPlatformIssueUserToken({
+        path: { userId: target.id },
+        body: { expiresInSeconds: tokenExpiresInSeconds.value },
+      })
+      if (!tokenIssueRequests.isCurrent(request) || !tokenOpen.value) return
+      if (error || !data?.accessToken || !data.expiresAt || !data.targetUserId || !data.targetUserName) {
+        toast.error(parseApiError(error).displayMessage)
+        return
+      }
+      if (intent === 'impersonate') {
+        setTokenOpen(false)
+        detailOpen.value = false
         await startImpersonation({
           accessToken: data.accessToken,
           expiresAt: data.expiresAt,
@@ -253,13 +252,17 @@ export function useAdminPlatformUsersPage() {
           targetUserName: data.targetUserName,
           returnPath: route.fullPath,
         })
+        return
       }
-      catch (impersonationError) {
-        toast.error(parseApiError(impersonationError).displayMessage)
-      }
-      return
+      issuedToken.value = data
     }
-    issuedToken.value = data
+    catch (error) {
+      if (intent === 'impersonate' || tokenIssueRequests.isCurrent(request) && tokenOpen.value)
+        toast.error(parseApiError(error).displayMessage)
+    }
+    finally {
+      if (tokenIssueRequests.isCurrent(request)) tokenIssuing.value = false
+    }
   }
 
   async function copyIssuedToken(): Promise<void> {
@@ -517,6 +520,7 @@ export function useAdminPlatformUsersPage() {
       tokenIssuing,
       tokenExpiresInSeconds,
       issuedToken,
+      tokenTarget,
       openToken,
       setTokenOpen,
       issueToken,
