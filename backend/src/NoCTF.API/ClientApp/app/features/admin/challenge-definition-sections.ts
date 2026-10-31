@@ -1,16 +1,20 @@
-import { toRaw } from 'vue'
 import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
 import {
   applyCtfInteraction,
 } from '../../utils/game-config'
+
+function cloneDefinition(value: DefinitionModel): DefinitionModel {
+  // DefinitionModel 是 JSON 数据；序列化可读取任意层级的响应式代理并保留独立副本。
+  return JSON.parse(JSON.stringify(value)) as DefinitionModel
+}
 
 /** Replaces only the Runtime portion of the persisted challenge definition. */
 export function mergeChallengeRuntimeDefinition(
   persisted: DefinitionModel,
   draft: DefinitionModel,
 ): DefinitionModel {
-  const merged = structuredClone(toRaw(persisted))
-  merged.runtime = structuredClone(toRaw(draft.runtime))
+  const merged = cloneDefinition(persisted)
+  merged.runtime = cloneDefinition(draft).runtime
   return merged
 }
 
@@ -21,11 +25,11 @@ export function mergeChallengeModeDefinition(
   draftMode: GameModeValue,
   draft: DefinitionModel,
 ): DefinitionModel {
-  const savedDraft = structuredClone(toRaw(draft))
+  const savedDraft = cloneDefinition(draft)
   if (draftMode !== persistedMode)
     return savedDraft
 
-  const persisted = structuredClone(toRaw(persistedDefinition))
+  const persisted = cloneDefinition(persistedDefinition)
   persisted.interactionKind = savedDraft.interactionKind
   persisted.checker = savedDraft.checker
   persisted.checkerJob = savedDraft.checkerJob
