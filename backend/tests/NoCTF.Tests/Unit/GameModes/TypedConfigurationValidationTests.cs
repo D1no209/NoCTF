@@ -7,6 +7,26 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class TypedConfigurationValidationTests
 {
     [Test]
+    [Arguments("nc {host} {port}\nUser: {username}")]
+    [Arguments("Connection instructions without a URL or placeholders")]
+    public async Task Access_entries_accept_author_text(string template)
+    {
+        var definition = new CtfChallengeDefinition
+        {
+            Runtime = new ContainerChallengeRuntimeTemplate
+            {
+                Allocation = PersistedRuntimeAllocation.PerTeam,
+                FlagSource = PersistedRuntimeFlagSource.Static,
+                Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/challenge:v1" }],
+                UrlBindings = [new() { UrlTemplate = template, ServiceName = "main", ContainerPort = 8080 }]
+            }
+        };
+
+        await Assert.That(new GameModeChallengeConfigurationCatalog()
+            .ValidateDefinition(GameMode.Ctf, definition)).IsEmpty();
+    }
+
+    [Test]
     [Arguments(GameMode.Ctf)]
     [Arguments(GameMode.Awd)]
     [Arguments(GameMode.Awdp)]

@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   showServiceName?: boolean
   serviceNames?: string[]
   addLabel?: string
-  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
+  /** 访问入口允许自由文本；控制检查入口使用 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }>(), {

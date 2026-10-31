@@ -125,19 +125,19 @@ public static class RuntimeUrlExpander
             throw new InvalidOperationException(
                 "OVA virtual machine receipt does not contain an address.");
         if (binding.GuestPort is null
-            && binding.UrlTemplate.Contains("{PORT}", StringComparison.Ordinal))
+            && binding.UrlTemplate.Contains("{PORT}", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 "OVA URL binding cannot expand PORT without GuestPort.");
         var expanded = binding.UrlTemplate.Replace(
             "{HOST}",
             machine.Address,
-            StringComparison.Ordinal);
+            StringComparison.OrdinalIgnoreCase);
         if (binding.GuestPort is int guestPort)
         {
             expanded = expanded.Replace(
                 "{PORT}",
                 guestPort.ToString(CultureInfo.InvariantCulture),
-                StringComparison.Ordinal);
+                StringComparison.OrdinalIgnoreCase);
         }
         return expanded;
     }
@@ -162,11 +162,11 @@ public static class RuntimeUrlExpander
         if (string.IsNullOrWhiteSpace(host))
             throw new InvalidOperationException("Runtime receipt does not contain the required host.");
         var expanded = template
-            .Replace("{HOST}", host, StringComparison.Ordinal)
+            .Replace("{HOST}", host, StringComparison.OrdinalIgnoreCase)
             .Replace(
                 "{PORT}",
                 port.ToString(CultureInfo.InvariantCulture),
-                StringComparison.Ordinal);
+                StringComparison.OrdinalIgnoreCase);
         return expanded;
     }
 

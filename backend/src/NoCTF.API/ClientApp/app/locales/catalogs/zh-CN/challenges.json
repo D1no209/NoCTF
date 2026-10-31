@@ -41,7 +41,6 @@
   "challenges.challengeTemplate.validation.commandBlankFormat": "{label}启动参数不能包含空项",
   "challenges.challengeTemplate.validation.timeoutSecondsRange": "{label}超时必须在 1 到 1800 秒之间",
   "challenges.challengeTemplate.validation.accessDisplayRequired": "访问入口的显示模板不能为空",
-  "challenges.challengeTemplate.description.accessDisplayTemplatePlaceholders": "访问入口的显示模板只能使用 {HOST} 和 {PORT} 占位符",
   "challenges.challengeTemplate.description.enableRuntimeEnablingChecker": "启用 Checker 前必须先启用运行环境",
   "challenges.challengeTemplate.validation.runtimeMemoryFormat": "运行环境的内存、CPU 和进程数上限必须为正数",
   "challenges.challengeTemplate.validation.runtimeLifetimeRange": "实例存活时间必须在 1 到 604800 秒之间",

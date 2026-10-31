@@ -12,6 +12,7 @@ describe('runtime access URL presentation', () => {
     expect(isRuntimeUrlClickable('javascript:alert(1)')).toBeFalse()
     expect(isRuntimeUrlClickable('not a URL')).toBeFalse()
     expect(isRuntimeUrlClickable('nc runtime.example 31005')).toBeFalse()
+    expect(isRuntimeUrlClickable('http://runtime.example/path\nUser: player')).toBeFalse()
   })
 
   test('all runtime URL surfaces use the safe shared renderer', async () => {

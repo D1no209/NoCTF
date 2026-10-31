@@ -41,7 +41,6 @@
   "challenges.challengeTemplate.validation.commandBlankFormat": "{label} command cannot contain blank arguments",
   "challenges.challengeTemplate.validation.timeoutSecondsRange": "{label} timeout must be between 1 and 1800 seconds",
   "challenges.challengeTemplate.validation.accessDisplayRequired": "The access display template is required",
-  "challenges.challengeTemplate.description.accessDisplayTemplatePlaceholders": "The access display template can only use the {HOST} and {PORT} placeholders",
   "challenges.challengeTemplate.description.enableRuntimeEnablingChecker": "Enable the runtime before enabling the checker",
   "challenges.challengeTemplate.validation.runtimeMemoryFormat": "Runtime memory, CPU, and process limits must be positive",
   "challenges.challengeTemplate.validation.runtimeLifetimeRange": "Runtime lifetime must be between 1 and 604800 seconds",

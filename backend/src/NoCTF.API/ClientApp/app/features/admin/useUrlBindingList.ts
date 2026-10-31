@@ -4,8 +4,8 @@ import { Plus, X } from '@lucide/vue'
 import type { UrlBindingModel } from '../../utils/game-config'
 import { protocolInput, runtimeExposureProtocols } from '../../utils/game-config'
 
-const HTTP_DISPLAY_TEMPLATE = 'http://{HOST}:{PORT}'
-const NETCAT_DISPLAY_TEMPLATE = 'nc {HOST} {PORT}'
+const HTTP_DISPLAY_TEMPLATE = 'http://{host}:{port}'
+const NETCAT_DISPLAY_TEMPLATE = 'nc {host} {port}'
 
 /** Owns state, effects and commands for UrlBindingList. */
 export function useUrlBindingList(props: Readonly<Omit<{
@@ -16,7 +16,7 @@ export function useUrlBindingList(props: Readonly<Omit<{
   showServiceName?: boolean
   serviceNames?: string[]
   addLabel?: string
-  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
+  /** 访问入口允许自由文本；控制检查入口使用 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }, "exposureOptions" | "showServiceName" | "serviceNames" | "addLabel" | "allowCustomDisplay" | "disabled"> & Required<Pick<{
@@ -27,7 +27,7 @@ export function useUrlBindingList(props: Readonly<Omit<{
   showServiceName?: boolean
   serviceNames?: string[]
   addLabel?: string
-  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
+  /** 访问入口允许自由文本；控制检查入口使用 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }, "exposureOptions" | "showServiceName" | "serviceNames" | "addLabel" | "allowCustomDisplay" | "disabled">>>,

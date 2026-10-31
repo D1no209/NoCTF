@@ -17,30 +17,14 @@ const { Plus, X, displayTemplateOptions, update, updateExposure, remove, add, mo
         <div class="grid flex-1 gap-2 sm:grid-cols-2">
           <Field>
             <FieldLabel>{{ allowCustomDisplay ? $t('administration.label.displayTemplate') : $t('administration.label.urlTemplate') }}</FieldLabel>
-            <Select
+            <Textarea
               v-if="allowCustomDisplay"
               :model-value="binding.urlTemplate"
+              :placeholder="$t('common.label.exampleNc')"
+              class="font-mono text-sm"
               :disabled="disabled"
               @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
-            >
-              <SelectTrigger class="w-full font-mono text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectGroup>
-                  <SelectItem v-for="template in displayTemplateOptions" :key="template" :value="template" class="font-mono">
-                    {{ template }}
-                  </SelectItem>
-                  <SelectItem
-                    v-if="binding.urlTemplate && !displayTemplateOptions.includes(binding.urlTemplate)"
-                    :value="binding.urlTemplate"
-                    class="font-mono"
-                  >
-                    {{ binding.urlTemplate }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            />
             <Input
               v-else
               :model-value="binding.urlTemplate"
@@ -49,6 +33,23 @@ const { Plus, X, displayTemplateOptions, update, updateExposure, remove, add, mo
               :disabled="disabled"
               @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
             />
+            <div v-if="allowCustomDisplay" class="flex flex-wrap gap-2">
+              <Button
+                v-for="template in displayTemplateOptions"
+                :key="template"
+                type="button"
+                variant="outline"
+                size="sm"
+                class="font-mono"
+                :disabled="disabled"
+                @click="update(index, { urlTemplate: template })"
+              >
+                {{ template }}
+              </Button>
+            </div>
+            <FieldDescription v-if="allowCustomDisplay">
+              {{ $t('common.description.customizeTextShownParticipants') }}
+            </FieldDescription>
           </Field>
           <Field>
             <FieldLabel>{{ $t('administration.label.exposureRange') }}</FieldLabel>

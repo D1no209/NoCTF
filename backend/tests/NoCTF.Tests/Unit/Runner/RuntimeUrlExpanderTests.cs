@@ -7,15 +7,19 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class RuntimeUrlExpanderTests
 {
     [Test]
-    public async Task Named_entries_resolve_each_services_own_random_port()
+    [Arguments("http://{HOST}:{PORT}/play", "nc {HOST} {PORT}", "http://runner.example:32000/play", "nc runner.example 32001")]
+    [Arguments("http://{host}:{port}/play", "nc {host} {port}", "http://runner.example:32000/play", "nc runner.example 32001")]
+    [Arguments("Connect: {host}:{PORT}\nUser: {username}", "nc {HOST} {port}\nLiteral: {example}", "Connect: runner.example:32000\nUser: {username}", "nc runner.example 32001\nLiteral: {example}")]
+    public async Task Named_entries_resolve_each_services_own_random_port(
+        string webTemplate, string adminTemplate, string webAddress, string adminAddress)
     {
         var id = Guid.NewGuid();
         ContainerServiceStatus[] services = [new("web", "web-resource", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 32000 }, "10.0.0.1"),
             new("admin", "admin-resource", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 32001 }, "10.0.0.2")];
         var receipt = new ContainerDeploymentReceipt(id, RuntimeProvider.Docker, $"noctf-rt-{id:N}", "", "runner.example", DateTimeOffset.UtcNow, services);
         var expanded = RuntimeUrlExpander.ExpandContainer(receipt, new(receipt.ProjectName, RuntimeStatus.Running, services),
-            [new("http://{HOST}:{PORT}/play", RuntimeExposure.OwnerOnly, 8080, "web"), new("nc {HOST} {PORT}", RuntimeExposure.Participants, 8080, "admin")]);
-        await Assert.That(expanded.DirectAddresses).IsEquivalentTo(["http://runner.example:32000/play", "nc runner.example 32001"]);
+            [new(webTemplate, RuntimeExposure.OwnerOnly, 8080, "web"), new(adminTemplate, RuntimeExposure.Participants, 8080, "admin")]);
+        await Assert.That(expanded.DirectAddresses).IsEquivalentTo([webAddress, adminAddress]);
     }
 
     [Test]

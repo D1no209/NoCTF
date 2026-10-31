@@ -133,8 +133,8 @@ public sealed class KohPollingHandler(
             return null;
         var service = receipt.Services.SingleOrDefault(service => service.Name == binding.ServiceName);
         if (string.IsNullOrWhiteSpace(service?.InternalHost)) return null;
-        var expanded = binding.UrlTemplate.Replace("{HOST}", service.InternalHost, StringComparison.Ordinal)
-            .Replace("{PORT}", port.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        var expanded = binding.UrlTemplate.Replace("{HOST}", service.InternalHost, StringComparison.OrdinalIgnoreCase)
+            .Replace("{PORT}", port.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase);
         return Uri.TryCreate(expanded, UriKind.Absolute, out var uri) ? uri : null;
     }
 

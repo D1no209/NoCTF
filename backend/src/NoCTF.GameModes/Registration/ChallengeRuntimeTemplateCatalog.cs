@@ -59,21 +59,18 @@ internal static class ChallengeRuntimeTemplateValidator
         {
             if (!Enum.IsDefined(binding.Exposure) || string.IsNullOrWhiteSpace(binding.UrlTemplate))
                 errors.Add("Runtime URL bindings require a valid exposure and template.");
-            if (!string.IsNullOrWhiteSpace(binding.UrlTemplate))
+            if (!isAccessUrl && !string.IsNullOrWhiteSpace(binding.UrlTemplate))
             {
                 var remainingTemplate = binding.UrlTemplate
-                    .Replace("{HOST}", string.Empty, StringComparison.Ordinal)
-                    .Replace("{PORT}", string.Empty, StringComparison.Ordinal);
+                    .Replace("{HOST}", string.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Replace("{PORT}", string.Empty, StringComparison.OrdinalIgnoreCase);
                 if (remainingTemplate.Contains('{') || remainingTemplate.Contains('}'))
                     errors.Add("Runtime URL bindings only allow HOST and PORT placeholders.");
-                if (!isAccessUrl)
-                {
-                    var expandedTemplate = binding.UrlTemplate
-                        .Replace("{HOST}", "runtime.invalid", StringComparison.Ordinal)
-                        .Replace("{PORT}", "1", StringComparison.Ordinal);
-                    if (!Uri.TryCreate(expandedTemplate, UriKind.Absolute, out _))
-                        errors.Add("Runtime URL bindings must expand to an absolute URI.");
-                }
+                var expandedTemplate = binding.UrlTemplate
+                    .Replace("{HOST}", "runtime.invalid", StringComparison.OrdinalIgnoreCase)
+                    .Replace("{PORT}", "1", StringComparison.OrdinalIgnoreCase);
+                if (!Uri.TryCreate(expandedTemplate, UriKind.Absolute, out _))
+                    errors.Add("Runtime URL bindings must expand to an absolute URI.");
             }
             if (binding.ContainerPort is < 1 or > 65535
                 || binding.GuestPort is < 1 or > 65535)
@@ -91,7 +88,7 @@ internal static class ChallengeRuntimeTemplateValidator
                     if (binding.GuestPort is null
                         && binding.UrlTemplate?.Contains(
                             "{PORT}",
-                            StringComparison.Ordinal) == true)
+                            StringComparison.OrdinalIgnoreCase) == true)
                         errors.Add("OVA URL bindings cannot use PORT without GuestPort.");
                     break;
             }

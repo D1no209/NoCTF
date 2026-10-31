@@ -50,13 +50,6 @@ function validateRunnerJob(issues: string[], job: RunnerJobModel | null, label: 
 function validateAccessDisplayTemplate(issues: string[], template: string): void {
   if (!template.trim()) {
     addIssue(issues, translate("challenges.challengeTemplate.validation.accessDisplayRequired"))
-    return
-  }
-  const remaining = template
-    .replaceAll('{HOST}', '')
-    .replaceAll('{PORT}', '')
-  if (remaining.includes('{') || remaining.includes('}')) {
-    addIssue(issues, translate("challenges.challengeTemplate.description.accessDisplayTemplatePlaceholders"))
   }
 }
 

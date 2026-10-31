@@ -20,7 +20,7 @@ const { Copy, entries, copy } = toRefs(viewProps.state)
       >
         {{ entry.address }}
       </ExternalLink>
-      <span v-else class="min-w-0 flex-1 select-text break-all font-mono text-sm">{{ entry.address }}</span>
+      <span v-else class="min-w-0 flex-1 select-text whitespace-pre-wrap break-all font-mono text-sm">{{ entry.address }}</span>
       <Button
         type="button"
         size="icon"

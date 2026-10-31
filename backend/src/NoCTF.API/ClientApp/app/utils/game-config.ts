@@ -184,7 +184,7 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
 }
 
 export function emptyUrlBinding(): UrlBindingModel {
-  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: 'Participants', containerPort: null, serviceName: 'main' }
+  return { urlTemplate: 'http://{host}:{port}', exposure: 'Participants', containerPort: null, serviceName: 'main' }
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
