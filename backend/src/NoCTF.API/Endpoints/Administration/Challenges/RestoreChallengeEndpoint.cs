@@ -65,8 +65,9 @@ public sealed class RestoreChallengeEndpoint(
                 or ChallengeMutationFailure.ChallengeNotFound =>
                 TypedResults.NotFound(),
             ChallengeMutationFailure.LifecycleStateConflict
+                or ChallengeMutationFailure.RequiredCapabilitiesMissing
                 or ChallengeMutationFailure.TemplateNotFound
-                or ChallengeMutationFailure.TemplateModeMismatch
+                or ChallengeMutationFailure.CompetitionModeMismatch
                 or ChallengeMutationFailure.ChallengeOrderConflict
                 or ChallengeMutationFailure.ChallengeTemplateConflict =>
                 TypedResults.Conflict(

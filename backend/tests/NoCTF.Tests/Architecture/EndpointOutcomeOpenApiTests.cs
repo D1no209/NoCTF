@@ -40,7 +40,7 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["503"] = ResponseBodyKind.Problem
                 }),
             new OutcomeContract(
-                $"{ChallengePrefix}/awdp-defense-targets/{{runtimeInstanceId}}/fix",
+                $"{ChallengePrefix}/runtimes/{{runtimeInstanceId}}/fixes",
                 "post",
                 new Dictionary<string, ResponseBodyKind>
                 {
@@ -85,7 +85,7 @@ public sealed class EndpointOutcomeOpenApiTests
         {
             ["202"] = ResponseBodyKind.Json,
             ["401"] = ResponseBodyKind.Empty,
-            ["403"] = ResponseBodyKind.Problem,
+            ["403"] = method == "delete" ? ResponseBodyKind.Empty : ResponseBodyKind.Problem,
             ["404"] = ResponseBodyKind.Empty,
             ["409"] = method == "post" ? ResponseBodyKind.Json : ResponseBodyKind.Problem,
             ["503"] = ResponseBodyKind.Problem

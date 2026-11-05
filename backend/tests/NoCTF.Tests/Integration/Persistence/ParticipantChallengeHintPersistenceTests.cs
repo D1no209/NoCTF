@@ -38,7 +38,7 @@ public sealed class ParticipantChallengeHintPersistenceTests
                 StartAt = now.AddHours(-1), EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
                 CreatedAt = now, UpdatedAt = now
             };
-            var template = new CtfChallenge
+            var template = new Challenge
             {
                 Id = Guid.NewGuid(), OwnerId = userA.Id, Title = "Hint source", Direction = "Web",
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now

@@ -11,11 +11,55 @@ using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
+using NoCTF.Domain.Challenges.Capabilities;
+using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.CurrentImport;
 
 internal static class LegacyConverters
 {
+    [JsonConverter(typeof(JsonStringEnumConverter<ArchivedRuntimePurpose>))]
+    private enum ArchivedRuntimePurpose : short
+    {
+        Player = 0, AwdpTarget = 1, Practice = 2, AwdpAttack = 3, TemplateTest = 4, PatchVerificationTarget = 5
+    }
+
+    public static RuntimePurpose RuntimeUse(JsonElement value) => value.Deserialize<ArchivedRuntimePurpose>() switch
+    {
+        ArchivedRuntimePurpose.Player => RuntimePurpose.Player,
+        ArchivedRuntimePurpose.AwdpTarget => RuntimePurpose.FixTarget,
+        ArchivedRuntimePurpose.Practice => RuntimePurpose.Practice,
+        ArchivedRuntimePurpose.AwdpAttack => RuntimePurpose.AttackTarget,
+        ArchivedRuntimePurpose.TemplateTest => RuntimePurpose.TemplateTest,
+        ArchivedRuntimePurpose.PatchVerificationTarget => throw new InvalidOperationException(
+            "CTF PatchVerification Runtime resources cannot be imported into the capability model."),
+        _ => throw new InvalidOperationException("The archive contains an unsupported Runtime purpose.")
+    };
+
+    [JsonConverter(typeof(JsonStringEnumConverter<ArchivedGameplayKind>))]
+    private enum ArchivedGameplayKind : short
+    {
+        FlagAttempt = 0, BreakAttempt = 1, FixAttempt = 2, HintUnlock = 3, ManualAdjustment = 4,
+        AwdServiceTransition = 5, KohControlObservation = 6, AttachmentDownload = 7, WriteUpUnlock = 8,
+        TheoryPaperSubmission = 9
+    }
+
+    public static GameplayFactKind GameplayKind(JsonElement value) => value.Deserialize<ArchivedGameplayKind>() switch
+    {
+        ArchivedGameplayKind.FlagAttempt or ArchivedGameplayKind.BreakAttempt => GameplayFactKind.BreakAttempt,
+        ArchivedGameplayKind.FixAttempt => GameplayFactKind.FixAttempt,
+        ArchivedGameplayKind.HintUnlock => GameplayFactKind.HintUnlock,
+        ArchivedGameplayKind.ManualAdjustment => GameplayFactKind.ManualAdjustment,
+        ArchivedGameplayKind.AwdServiceTransition => GameplayFactKind.CheckObservation,
+        ArchivedGameplayKind.KohControlObservation => GameplayFactKind.ControlObservation,
+        ArchivedGameplayKind.AttachmentDownload => GameplayFactKind.AttachmentDownload,
+        ArchivedGameplayKind.WriteUpUnlock => GameplayFactKind.WriteUpUnlock,
+        ArchivedGameplayKind.TheoryPaperSubmission => throw new InvalidOperationException(
+            "Theory paper scoring facts require explicit questionnaire assignments and cannot be imported as competition facts."),
+        _ => throw new InvalidOperationException("The archive contains an unsupported gameplay fact kind.")
+    };
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = false,
@@ -135,8 +179,8 @@ internal static class LegacyConverters
             HasScoreCurve = value.ScoreCurve is not null,
             ScoreSettlementMode = value.ScoreSettlementMode,
             ScoreCurve = Curve(value.ScoreCurve),
+            Runtime = RuntimeRules(value.Runtime, new CtfCompetitionChallengeRules().Runtime),
             MaxFlagAttempts = value.MaxFlagAttempts,
-            MaxPatchAttempts = value.MaxPatchAttempts,
             WrongSubmissionPenalty = value.WrongSubmissionPenalty,
             BloodRewards = (value.BloodRewards ?? []).Select((reward, position) =>
                 new CompetitionChallengeBloodReward
@@ -161,6 +205,7 @@ internal static class LegacyConverters
             CompetitionChallengeId = competitionChallengeId,
             AttackRewardMode = value.AttackRewardMode is null
                 ? null : (AwdAttackRewardMode)value.AttackRewardMode.Value,
+            Runtime = RuntimeRules(value.Runtime, new AwdCompetitionChallengeRules().Runtime),
             AttackPoints = value.AttackPoints,
             VictimDefensePoolPoints = value.VictimDefensePoolPoints,
             CheckerIntervalSeconds = value.CheckerIntervalSeconds,
@@ -180,6 +225,7 @@ internal static class LegacyConverters
         {
             CompetitionChallengeId = competitionChallengeId,
             HasBreakScoreCurve = value.Break is not null,
+            Runtime = RuntimeRules(value.Runtime, new AwdpCompetitionChallengeRules().Runtime),
             BreakScoreCurve = Curve(value.Break),
             HasFixScoreCurve = value.Fix is not null,
             FixScoreCurve = Curve(value.Fix),
@@ -205,6 +251,7 @@ internal static class LegacyConverters
         {
             CompetitionChallengeId = competitionChallengeId,
             PollIntervalSeconds = value.PollIntervalSeconds,
+            Runtime = RuntimeRules(value.Runtime, new KohCompetitionChallengeRules().Runtime),
             ControlPointsPerInterval = value.ControlPointsPerInterval
         };
     }
@@ -221,145 +268,119 @@ internal static class LegacyConverters
         _ => throw new InvalidOperationException($"Unsupported definition mode {mode}.")
     };
 
-    private static CtfChallengeDefinition CtfDefinition(Guid challengeId, string json)
+    private static ChallengeDefinition CtfDefinition(Guid challengeId, string json)
     {
         var value = Parse<CtfChallengeConfiguration>(json, 3);
-        var result = new CtfChallengeDefinition
+        return new ChallengeDefinition
         {
             ChallengeId = challengeId,
-            InteractionKind = value.InteractionKind,
             Runtime = Runtime(challengeId, value.Runtime),
-            PatchEntrypoint = value.PatchEntrypoint,
-            PatchTimeoutSeconds = value.PatchTimeoutSeconds,
-            ReadyTimeoutSeconds = value.ReadyTimeoutSeconds,
-            MaximumPatchUploadBytes = value.MaximumPatchUploadBytes,
-            CheckerFixInput = value.CheckerFixInput,
-            HasFlagTemplate = value.FlagTemplate is not null,
-            FlagTemplate = Flag(value.FlagTemplate),
-            Checker = value.Checker is null ? null : new ChallengeCheckerDefinition
-            {
-                ChallengeId = challengeId,
-                Image = value.Checker.Image,
-                TimeoutSeconds = value.Checker.TimeoutSeconds,
-                TargetServiceName = null
-            }
+            Capabilities = [Break(challengeId, value.FlagTemplate, value.Runtime)]
         };
-        result.StringItems = (value.PatchCommand ?? []).Select((item, position) =>
-                new ChallengeDefinitionStringItem
-                {
-                    ChallengeId = challengeId,
-                    Kind = ChallengeDefinitionStringKind.PatchCommand,
-                    Position = position,
-                    Value = item
-                })
-            .Concat((value.Checker?.Command ?? []).Select((item, position) =>
-                new ChallengeDefinitionStringItem
-                {
-                    ChallengeId = challengeId,
-                    Kind = ChallengeDefinitionStringKind.CheckerCommand,
-                    Position = position,
-                    Value = item
-                }))
-            .Concat((value.Checker?.Environment ?? new Dictionary<string, string>())
-                .OrderBy(item => item.Key, StringComparer.Ordinal)
-                .Select((item, position) => new ChallengeDefinitionStringItem
-                {
-                    ChallengeId = challengeId,
-                    Kind = ChallengeDefinitionStringKind.CheckerEnvironment,
-                    Position = position,
-                    Key = item.Key,
-                    Value = item.Value
-                }))
-            .ToList();
-        return result;
     }
 
-    private static AwdChallengeDefinition AwdDefinition(Guid challengeId, string json)
+    private static ChallengeDefinition AwdDefinition(Guid challengeId, string json)
     {
         var value = Parse<AwdChallengeConfiguration>(json, 2);
+        var attack = Break(challengeId, value.FlagTemplate, value.Runtime);
+        attack.InjectionCommand = value.FlagInjection?.Command;
+        attack.InjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds ?? 30;
+        attack.InjectionServiceName = value.FlagInjection?.ServiceName;
+        attack.FlagStores = (value.FlagStores ?? []).Select((store, position) => new FlagStoreDefinition
+        {
+            ChallengeId = challengeId, Id = store.Id, Position = position, Name = store.Name, TargetServiceName = store.TargetServiceName,
+            DeliveryKind = (FlagDeliveryKind)store.DeliveryMode, InjectionCommand = store.InjectionCommand,
+            InjectionTimeoutSeconds = store.InjectionTimeoutSeconds, PreservesHistoricalFlags = store.PreservesHistoricalFlags
+        }).ToList();
+        var capabilities = new List<ChallengeCapabilityDefinition> { attack };
+        if (value.Checker is { } checker) capabilities.Add(Checker(challengeId, checker.Job,
+            TargetService(value.Runtime, checker.TargetServiceName), [CheckItemKind.Connection, CheckItemKind.Functionality]));
         return new()
         {
             ChallengeId = challengeId,
             Runtime = Runtime(challengeId, value.Runtime),
-            Checker = Checker(challengeId, value.Checker?.Job,
-                value.Checker?.TargetServiceName),
-            StringItems = CheckerItems(challengeId, value.Checker?.Job).ToList(),
-            FlagInjectionCommand = value.FlagInjection?.Command,
-            FlagInjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds,
-            FlagInjectionServiceName = value.FlagInjection?.ServiceName,
-            HasFlagTemplate = value.FlagTemplate is not null,
-            FlagTemplate = Flag(value.FlagTemplate)
+            Capabilities = capabilities
         };
     }
 
-    private static AwdpChallengeDefinition AwdpDefinition(Guid challengeId, string json)
+    private static ChallengeDefinition AwdpDefinition(Guid challengeId, string json)
     {
         var value = Parse<AwdpChallengeConfiguration>(json, 4);
+        var capabilities = new List<ChallengeCapabilityDefinition> { Break(challengeId, value.FlagTemplate, value.Runtime) };
+        if (value.Runtime is not null)
+        {
+            var service = TargetService(value.Runtime);
+            capabilities.Add(new FixCapabilityDefinition
+            {
+                ChallengeId = challengeId, TargetServiceName = service, Entrypoint = value.PatchEntrypoint ?? "fix.sh",
+                TimeoutSeconds = value.PatchTimeoutSeconds ?? 60, MaximumUploadBytes = value.MaximumPatchUploadBytes ?? 256L * 1024 * 1024,
+                Command = (value.PatchCommand ?? []).Select((argument, position) => new FixCommandArgument
+                    { ChallengeId = challengeId, Position = position, Value = argument }).ToList()
+            });
+            if (value.Checker is { } job)
+            {
+                var check = Checker(challengeId, job, service, [CheckItemKind.Functionality, CheckItemKind.Vulnerability]);
+                check.ReadyTimeoutSeconds = value.ReadyTimeoutSeconds ?? 30; check.AcceptsFixInput = value.CheckerFixInput;
+                capabilities.Add(check);
+            }
+        }
+        else if (value.PatchEntrypoint is not null || value.PatchCommand is { Count: > 0 } || value.Checker is not null)
+            throw new InvalidOperationException("AWDP repair configuration requires a Runtime during import.");
         return new()
         {
             ChallengeId = challengeId,
             Runtime = Runtime(challengeId, value.Runtime),
-            PatchEntrypoint = value.PatchEntrypoint,
-            PatchTimeoutSeconds = value.PatchTimeoutSeconds,
-            ReadyTimeoutSeconds = value.ReadyTimeoutSeconds,
-            MaximumPatchUploadBytes = value.MaximumPatchUploadBytes,
-            CheckerFixInput = value.CheckerFixInput,
-            HasFlagTemplate = value.FlagTemplate is not null,
-            FlagTemplate = Flag(value.FlagTemplate),
-            Checker = Checker(challengeId, value.Checker),
-            StringItems = (value.PatchCommand ?? []).Select((item, position) =>
-                    new ChallengeDefinitionStringItem
-                    {
-                        ChallengeId = challengeId,
-                        Kind = ChallengeDefinitionStringKind.PatchCommand,
-                        Position = position,
-                        Value = item
-                    })
-                .Concat(CheckerItems(challengeId, value.Checker))
-                .ToList()
+            Capabilities = capabilities
         };
     }
 
-    private static KohChallengeDefinition KohDefinition(Guid challengeId, string json)
+    private static ChallengeDefinition KohDefinition(Guid challengeId, string json)
     {
         var value = Parse<KohChallengeConfiguration>(json, 1);
         return new()
         {
             ChallengeId = challengeId,
-            Runtime = Runtime(challengeId, value.Runtime)
+            Runtime = Runtime(challengeId, value.Runtime),
+            Capabilities = [new ControlCapabilityDefinition
+            {
+                ChallengeId = challengeId, UrlTemplate = value.Runtime?.ControlCheckUrlBinding?.UrlTemplate ?? string.Empty,
+                ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName, ContainerPort = value.Runtime?.ControlCheckUrlBinding?.ContainerPort,
+                VmId = value.Runtime?.ControlCheckUrlBinding?.VmId, GuestPort = value.Runtime?.ControlCheckUrlBinding?.GuestPort
+            }]
         };
     }
 
-    private static ChallengeCheckerDefinition? Checker(
+    private static CheckCapabilityDefinition Checker(
         Guid challengeId,
-        RunnerJobConfiguration? job,
-        string? targetServiceName = null) => job is null ? null : new()
+        RunnerJobConfiguration job,
+        string targetServiceName,
+        IReadOnlyList<CheckItemKind> required) => new()
     {
         ChallengeId = challengeId,
         Image = job.Image,
         TimeoutSeconds = job.TimeoutSeconds,
-        TargetServiceName = targetServiceName
+        TargetServiceName = targetServiceName,
+        Command = (job.Command ?? []).Select((value, position) => new CheckCommandArgument { ChallengeId = challengeId, Position = position, Value = value }).ToList(),
+        Environment = (job.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { ChallengeId = challengeId, Name = item.Key, Value = item.Value }).ToList(),
+        Requirements = required.Select(kind => new CheckRequirement { ChallengeId = challengeId, Kind = kind }).ToList()
     };
 
-    private static IEnumerable<ChallengeDefinitionStringItem> CheckerItems(
-        Guid challengeId,
-        RunnerJobConfiguration? job) =>
-        (job?.Command ?? []).Select((item, position) => new ChallengeDefinitionStringItem
-        {
-            ChallengeId = challengeId,
-            Kind = ChallengeDefinitionStringKind.CheckerCommand,
-            Position = position,
-            Value = item
-        }).Concat((job?.Environment ?? new Dictionary<string, string>())
-            .OrderBy(item => item.Key, StringComparer.Ordinal)
-            .Select((item, position) => new ChallengeDefinitionStringItem
-            {
-                ChallengeId = challengeId,
-                Kind = ChallengeDefinitionStringKind.CheckerEnvironment,
-                Position = position,
-                Key = item.Key,
-                Value = item.Value
-            }));
+    private static BreakCapabilityDefinition Break(Guid challengeId, NoCTF.GameModes.Flags.PerTeamFlagTemplate? template, ChallengeRuntimeTemplate? runtime) => new()
+    {
+        ChallengeId = challengeId, HasFlagTemplate = template is not null, FlagTemplate = Flag(template),
+        EnvironmentTargets = runtime?.Definition is ContainerRuntimeDefinition container
+            ? container.Services.Where(service => service.FlagEnvironmentVariableName is not null).Select((service, position) => new FlagEnvironmentTarget
+                { ChallengeId = challengeId, Position = position, ServiceName = service.Name, VariableName = service.FlagEnvironmentVariableName! }).ToList() : []
+    };
+
+    private static string TargetService(ChallengeRuntimeTemplate? runtime, string? explicitName = null)
+    {
+        if (runtime?.Definition is not ContainerRuntimeDefinition container)
+            throw new InvalidOperationException("Capability import requires a Container Runtime target.");
+        if (explicitName is { Length: > 0 } && container.Services.Any(service => service.Name == explicitName)) return explicitName;
+        return container.Services.Count == 1 ? container.Services[0].Name
+            : throw new InvalidOperationException("A multi-service capability requires an explicit target service during import.");
+    }
 
     public static CompetitionTrackConfiguration Tracks(GameMode mode, string? json)
     {
@@ -449,7 +470,6 @@ internal static class LegacyConverters
                     Image = service.Image,
                     CpuCores = service.CpuCores,
                     MemoryMiB = service.MemoryMiB,
-                    FlagEnvironmentVariableName = service.FlagEnvironmentVariableName,
                     Commands = (service.Command ?? []).Select((item, index) =>
                         new ChallengeRuntimeServiceCommand
                         { ChallengeId = challengeId, ServiceName = service.Name, Position = index, Value = item })
@@ -476,15 +496,12 @@ internal static class LegacyConverters
                 $"Unsupported runtime definition {value.Definition.GetType().Name}.")
         };
         runtime.ChallengeId = challengeId;
-        runtime.Allocation = (PersistedRuntimeAllocation)value.Allocation;
         if (runtime is OvaChallengeRuntimeTemplate resources)
         {
             resources.HasExplicitLimits = value.Limits is not null;
             resources.Limits = value.Limits is null ? new RuntimeResourceLimitsValue() : Limits(value.Limits);
         }
-        runtime.TtlSeconds = value.TtlSeconds;
         runtime.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
-        runtime.FlagSource = (PersistedRuntimeFlagSource)value.FlagSource;
         runtime.UrlBindings = (value.UrlBindings ?? []).Select((binding, position) =>
             new ChallengeRuntimeUrlBinding
             {
@@ -496,22 +513,7 @@ internal static class LegacyConverters
                 VmId = binding.VmId,
                 GuestPort = binding.GuestPort
             }).ToList();
-        if (value.ControlCheckUrlBinding is not null)
-        {
-            var binding = value.ControlCheckUrlBinding;
-            runtime.UrlBindings.Add(new ChallengeRuntimeUrlBinding
-            {
-                Position = runtime.UrlBindings.Count,
-                IsControlCheck = true,
-                UrlTemplate = binding.UrlTemplate,
-                Exposure = (PersistedRuntimeExposure)binding.Exposure,
-                ContainerPort = binding.ContainerPort,
-                ServiceName = binding.ServiceName,
-                VmId = binding.VmId,
-                GuestPort = binding.GuestPort
-            });
-        }
-        ChallengeDefinitionGraph.AssignChallengeId(new CtfChallengeDefinition
+        ChallengeDefinitionGraph.AssignChallengeId(new ChallengeDefinition
         {
             ChallengeId = challengeId,
             Runtime = runtime
@@ -525,6 +527,10 @@ internal static class LegacyConverters
         CpuMillicores = value.CpuMillicores,
         PidsLimit = value.PidsLimit
     };
+
+    private static CompetitionChallengeRuntimeRules RuntimeRules(ChallengeRuntimeTemplate? value, CompetitionChallengeRuntimeRules defaults) =>
+        value is null ? defaults : new() { Allocation = (PersistedRuntimeAllocation)value.Allocation,
+            FlagSource = (PersistedRuntimeFlagSource)value.FlagSource, TtlSeconds = value.TtlSeconds };
 
     private static ScoreCurveValue Curve(ScoreCurveConfiguration? value) => value is null
         ? new()
@@ -556,6 +562,18 @@ internal static class LegacyConverters
             throw new InvalidOperationException(
                 $"{typeof(T).Name} requires schemaVersion {expectedVersion}.");
         root.Remove("schemaVersion");
+        if (typeof(T) == typeof(CtfChallengeConfiguration))
+        {
+            if (root.Remove("interactionKind", out var interaction) && interaction is not null
+                && interaction.ToJsonString() is not ("0" or "\"FlagSubmission\""))
+                throw new InvalidOperationException("CTF PatchVerification is no longer supported and cannot be imported as Break.");
+            foreach (var field in new[] { "maxPatchAttempts", "patchEntrypoint", "patchCommand", "patchTimeoutSeconds", "checker", "readyTimeoutSeconds", "maximumPatchUploadBytes", "checkerFixInput" })
+            {
+                if (!root.Remove(field, out var content) || content is null || content is JsonArray { Count: 0 }
+                    || field == "checkerFixInput" && content.ToJsonString() == "false") continue;
+                throw new InvalidOperationException($"CTF repair field '{field}' cannot be imported into Break-only CTF rules.");
+            }
+        }
         return root.Deserialize<T>(JsonOptions)
             ?? throw new InvalidOperationException($"{typeof(T).Name} cannot be null.");
     }

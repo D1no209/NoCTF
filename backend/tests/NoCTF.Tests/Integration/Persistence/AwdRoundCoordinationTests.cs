@@ -311,12 +311,13 @@ public sealed partial class AwdRoundCoordinationTests
             var fixture = await SeedAsync(options, ct);
             await using var db = new NoCtfDbContext(options);
             var template = await db.Challenges.AsSplitQuery().SingleAsync(ct);
-            var definition = (AwdChallengeDefinition)template.Definition!;
+            var definition = template.Definition!.Break!;
             var main = definition.FlagStores.Single();
             main.InjectionCommand = "set-flag ${FLAG_ID} ${FLAG}";
+            main.DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.RunnerCommand;
             main.TargetServiceName = "web";
-            var second = new AwdFlagStore { Id = Guid.CreateVersion7(), Position = 1, Name = "notes",
-                DeliveryMode = AwdFlagDeliveryMode.BusinessChecker };
+            var second = new NoCTF.Domain.Challenges.Capabilities.FlagStoreDefinition { Id = Guid.CreateVersion7(), Position = 1, Name = "notes",
+                DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker };
             definition.FlagStores.Add(second);
             var competition = await db.Competitions.AsSplitQuery().SingleAsync(ct);
             var configuration = (AwdCompetitionModeConfiguration)competition.ModeConfiguration!;
@@ -439,22 +440,31 @@ public sealed partial class AwdRoundCoordinationTests
             Automatic = false,
             OccurredAt = now.AddMinutes(-10)
         });
-        db.Challenges.Add(new AwdChallenge
+        var breakDefinition = new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
+        {
+            FlagStores = [new() { Id = Guid.NewGuid(), Name = "main", TargetServiceName = "main",
+                DeliveryKind = includeChecker ? NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker
+                    : NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.RunnerCommand,
+                InjectionCommand = includeChecker ? null : "printf '%s' \"${FLAG}\" > /dev/shm/flag" }]
+        };
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
             Title = "AWD service",
-            Definition = new AwdChallengeDefinition
+            Definition = new ChallengeDefinition
             {
                 ChallengeId = challengeId,
-                Checker = includeChecker
-                    ? new ChallengeCheckerDefinition
-                    {
-                        ChallengeId = challengeId,
-                        Image = "checker:test",
-                        TimeoutSeconds = 30
-                    }
-                    : null
+                Runtime = new ContainerChallengeRuntimeTemplate
+                {
+                    Services = [new() { Name = "main", Image = "challenge:test", InternalPorts = [new() { Port = 8080 }] }]
+                },
+                Capabilities = includeChecker
+                    ? [breakDefinition,
+                        new NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition
+                        { ChallengeId = challengeId, Image = "checker:test", TargetServiceName = "main", TimeoutSeconds = 30,
+                            Requirements = [new() { Kind = NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Functionality }] }]
+                    : [breakDefinition]
             },
             CreatedAt = now,
             UpdatedAt = now

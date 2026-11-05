@@ -1,10 +1,10 @@
 import type { ConnectionEdge, ConnectionNode } from '../../components/ui/connection-canvas/connection-layout'
-import type { ContainerDefinitionModel, RuntimeTemplateModel } from '../../utils/game-config'
+import type { ContainerDefinitionModel, RuntimeTemplateModel, DefinitionModel } from '../../utils/game-config'
 
 export function runtimeTopology(
   definition: ContainerDefinitionModel,
   bindings: RuntimeTemplateModel['urlBindings'],
-  controlBinding: RuntimeTemplateModel['controlCheckUrlBinding'],
+  controlBinding: DefinitionModel['control'],
   labels: { unnamedService: (index: number) => string; missingImage: string; missingService: string; controlEntry: string; noEntries: string },
 ) {
   const nodes: ConnectionNode[] = definition.services.map((service, index) => ({

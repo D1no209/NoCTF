@@ -11,5 +11,5 @@ internal static class TypedConfigurationTestExtensions
 
     public static ChallengeDefinition CreateDefaultDefinitionForTest(
         this GameModeChallengeConfigurationCatalog catalog,
-        GameMode mode) => catalog.CreateDefaultDefinition(mode, Guid.NewGuid());
+        GameMode mode) => NoCTF.Tests.TestConfigurations.Definition(mode);
 }

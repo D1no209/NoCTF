@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -56,7 +58,7 @@ public sealed partial class TargetArchitectureRulesTests
                 || source.Contains("Task.Run(", StringComparison.Ordinal)
                 || Regex.IsMatch(source, @"\bHandleAsync\(")
                 || LegacyDimensionRegex().IsMatch(source)
-                || QuerySyntaxRegex().IsMatch(source))
+                || CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes().OfType<QueryExpressionSyntax>().Any())
                 violations.Add(Path.GetRelativePath(BackendRoot, file));
         }
 
@@ -259,9 +261,6 @@ public sealed partial class TargetArchitectureRulesTests
                     $"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}",
                     StringComparison.Ordinal))
             .ToArray();
-
-    [GeneratedRegex(@"\b(from|where|select|join)\s+[A-Za-z_][A-Za-z0-9_]*\s+in\b")]
-    private static partial Regex QuerySyntaxRegex();
 
     [GeneratedRegex(@"\b(ServiceId|StageId|RuntimeOperationId|ChallengeInstanceId)\b")]
     private static partial Regex LegacyDimensionRegex();

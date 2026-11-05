@@ -19,6 +19,12 @@ internal static class ConverterFixtures
     {
         const string unsupported = "{\"schemaVersion\":0}";
         var id = Guid.CreateVersion7();
+        try
+        {
+            _ = LegacyConverters.Definition(id, GameMode.Ctf, "{\"schemaVersion\":3,\"interactionKind\":1}");
+            throw new InvalidOperationException("Removed CTF repair behavior was silently imported.");
+        }
+        catch (InvalidOperationException exception) when (exception.Message.Contains("CTF PatchVerification is no longer supported", StringComparison.Ordinal)) { }
         var ctf = LegacyConverters.Competition(id, GameMode.Ctf, WithVersion(
             new CtfConfiguration(ScoreCurveConfiguration.Default, [], ScoreSettlementMode: CtfScoreSettlementMode.AtSolve), 2));
         var ctfRules = LegacyConverters.Rules(id, GameMode.Ctf, WithVersion(
@@ -48,10 +54,11 @@ internal static class ConverterFixtures
                     ["serve"], ["--port", "8080"], new Dictionary<string, string> { ["MODE"] = "test" }, [8080], "FLAG"),
                 new RuntimeServiceDefinition("db", "example/db:1", 0.5m, 256)
             ]));
-        var runtimeDefinition = LegacyConverters.Definition(id, GameMode.Koh,
-            WithVersion(new KohChallengeConfiguration(Runtime: runtime), 1));
+        var runtimeDefinition = LegacyConverters.Definition(id, GameMode.Ctf,
+            WithVersion(new CtfChallengeConfiguration(null, null, Runtime: runtime), 3));
         if (runtimeDefinition.Runtime is not ContainerChallengeRuntimeTemplate { Services.Count: 2 } container
-            || container.Services[0] is not { Name: "web", CpuCores: 0.25m, MemoryMiB: 128, FlagEnvironmentVariableName: "FLAG" }
+            || container.Services[0] is not { Name: "web", CpuCores: 0.25m, MemoryMiB: 128 }
+            || runtimeDefinition.Break?.EnvironmentTargets.SingleOrDefault() is not { ServiceName: "web", VariableName: "FLAG" }
             || container.Services[1] is not { Name: "db", Position: 1 }
             || container.Services[0].Commands.Count != 3
             || container.Services[0].Environment.Single().Value != "test"
@@ -82,7 +89,7 @@ internal static class ConverterFixtures
         var configuration = LegacyConverters.Competition(id, mode, competition);
         var definition = LegacyConverters.Definition(id, mode, challenge);
         var rules = LegacyConverters.Rules(id, mode, challenge);
-        if (configuration.Mode != mode || definition.Mode != mode || rules.Mode != mode
+        if (configuration.Mode != mode || definition.Capabilities.Count == 0 || rules.Mode != mode
             || configuration.CompetitionId != id || definition.ChallengeId != id
             || rules.CompetitionChallengeId != id)
             throw new InvalidOperationException($"Mode {mode} converter fixture did not preserve scope.");

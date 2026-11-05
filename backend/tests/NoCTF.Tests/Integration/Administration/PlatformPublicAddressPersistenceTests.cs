@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Authentication;
@@ -13,7 +11,7 @@ namespace NoCTF.Tests.Integration.Administration;
 public sealed class PlatformPublicAddressPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public async Task Upgrade_preserves_public_address_and_all_readers_follow_basic_configuration(CancellationToken ct)
+    public async Task Fresh_baseline_and_all_readers_use_the_basic_public_address_configuration(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -23,11 +21,6 @@ public sealed class PlatformPublicAddressPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString(), setup => setup.MigrationsAssembly("NoCTF.Persistence.PostgreSql"))
                 .UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            var migrations = db.Database.GetMigrations().ToArray();
-            var index = Array.FindIndex(migrations, name => name.EndsWith("_ConsolidatePlatformPublicAddress", StringComparison.Ordinal));
-            await Assert.That(index).IsGreaterThan(0);
-            await db.GetService<IMigrator>().MigrateAsync(migrations[index - 1], ct);
-            await db.Database.ExecuteSqlRawAsync("UPDATE platform_settings SET email_public_base_url = 'https://original.example', sso_public_base_url = 'https://old-sso.example'", ct);
             await db.Database.MigrateAsync(ct);
 
             var protector = new PlatformSecretProtector(Options.Create(new EmailVerificationProtectionOptions
@@ -37,6 +30,7 @@ public sealed class PlatformPublicAddressPersistenceTests
             var email = new EmailVerificationConfigurationStore(db, protector);
             var sso = new SsoConfigurationStore(db, protector, new(false, false, new HashSet<string>(), new HashSet<string>()));
             var platform = new PlatformConfigurationStore(db);
+            await platform.UpdateAsync("NoCTF", null, DateTimeOffset.UtcNow, ct, "https://original.example");
             await Assert.That((await platform.GetAsync(ct)).PublicBaseUrl).IsEqualTo("https://original.example");
             await Assert.That((await email.GetAsync(ct)).PublicBaseUrl).IsEqualTo("https://original.example");
             await Assert.That((await sso.GetAsync(ct)).PublicBaseUrl).IsEqualTo("https://original.example");

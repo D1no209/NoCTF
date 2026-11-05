@@ -78,7 +78,7 @@ public sealed class CompetitionLifecyclePersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now,
                 });
-                seed.Challenges.Add(new CtfChallenge
+                seed.Challenges.Add(new Challenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
@@ -136,7 +136,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Awd_start_rejects_a_published_challenge_without_a_runtime(
+    public async Task Awd_start_rejects_a_published_template_without_the_required_check_capability(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -168,10 +168,9 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await Assert.That(errors).IsNotNull();
             var runtimeError = errors!.Single(error =>
-                error.Code == StartGateFailureCode.RuntimeDefinitionInvalid &&
-                error.CompetitionChallengeId == fixture.CompetitionChallengeId);
-            await Assert.That(runtimeError.Message)
-                .IsEqualTo("Runtime is required when Checker is configured.");
+                error.Code == StartGateFailureCode.ChallengeRulesInvalid &&
+                error.CompetitionChallengeId == fixture.CompetitionChallengeId && error.Message.Contains("Check", StringComparison.Ordinal));
+            await Assert.That(runtimeError.Message).Contains("Check");
 
             var store = new CompetitionLifecycleStore(
                 db,
@@ -337,20 +336,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             CreatedAt = now,
             UpdatedAt = now,
         });
-        var definition = configurations.CreateDefaultDefinitionForTest(GameMode.Awd);
-        definition.Runtime = null;
-        definition.Checker = new ChallengeCheckerDefinition
-        {
-            Image = "checker:test",
-            TimeoutSeconds = 30
-        };
-        definition.StringItems.Add(new ChallengeDefinitionStringItem
-        {
-            Kind = ChallengeDefinitionStringKind.CheckerCommand,
-            Position = 0,
-            Value = "check"
-        });
-        db.Challenges.Add(new AwdChallenge
+        var definition = new ChallengeDefinition { Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()] };
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
@@ -420,7 +407,7 @@ public sealed class CompetitionLifecyclePersistenceTests
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new AwdChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,

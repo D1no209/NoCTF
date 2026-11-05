@@ -18,7 +18,6 @@ public sealed record ChallengeTestFlagPlan(
 public static class ChallengeTestFlagFactory
 {
     public static ChallengeTestFlagPlan Create(
-        GameMode mode,
         ChallengeRuntimeTemplate runtime,
         Guid challengeId,
         Guid runtimeInstanceId,
@@ -27,7 +26,7 @@ public static class ChallengeTestFlagFactory
         var delivery = runtime.FlagSource switch
         {
             RuntimeFlagSource.PerTeam => RuntimeTestFlagDelivery.Environment,
-            RuntimeFlagSource.AwdRotation when mode == GameMode.Awd =>
+            RuntimeFlagSource.AwdRotation =>
                 RuntimeTestFlagDelivery.Command,
             _ => RuntimeTestFlagDelivery.NotRequired
         };

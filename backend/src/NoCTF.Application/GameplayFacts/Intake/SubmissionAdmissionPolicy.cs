@@ -37,7 +37,7 @@ public enum GameplayFactAdmissionFailureCode
 public static class GameplayFactAdmissionPolicy
 {
     public static bool IsAwdAcceptanceWindow(GameplayFactAdmissionSnapshot snapshot, GameplayFactKind kind,
-        DateTimeOffset receivedAt) => snapshot.Mode == GameMode.Awd && kind == GameplayFactKind.FlagAttempt
+        DateTimeOffset receivedAt) => snapshot.Mode == GameMode.Awd && kind == GameplayFactKind.BreakAttempt
         && snapshot.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Finished
         && (snapshot.CompetitionStatus != CompetitionStatus.Finished || receivedAt >= snapshot.OfficialEndAt)
         && snapshot.AwdAcceptanceEndsAt is { } end && receivedAt >= snapshot.StartAt && receivedAt < end;
@@ -47,7 +47,7 @@ public static class GameplayFactAdmissionPolicy
         GameplayFactKind kind,
         DateTimeOffset receivedAt) =>
         snapshot.Mode == GameMode.Ctf
-        && kind == GameplayFactKind.FlagAttempt
+        && kind == GameplayFactKind.BreakAttempt
         && snapshot.CompetitionStatus == CompetitionStatus.Finished
         && snapshot.PracticeModeEnabled
         && receivedAt >= (snapshot.OfficialEndAt ?? snapshot.EndAt);
@@ -68,7 +68,7 @@ public static class GameplayFactAdmissionPolicy
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.TeamForbidden, "The user cannot submit for this team.");
         if (snapshot.TeamBanned)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.TeamBanned, "The team is banned.");
-        if (kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt && !rules.AllowsFlag
+        if (kind == GameplayFactKind.BreakAttempt && !rules.AllowsFlag
             || kind == GameplayFactKind.FixAttempt && !rules.AllowsFix)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported, "This game mode does not accept this gameplay fact kind.");
         var practice = IsPracticeFlagAttempt(snapshot, kind, receivedAt);
@@ -120,8 +120,8 @@ public static class GameplayFactAdmissionPolicy
                 GameplayFactAdmissionFailureCode.AchievementAlreadySucceeded,
                 "This AWDP attack or defense achievement has already succeeded.");
         }
-        var maxAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
-        var acceptedAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
+        var maxAttempts = kind == GameplayFactKind.BreakAttempt ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
+        var acceptedAttempts = kind == GameplayFactKind.BreakAttempt
             ? snapshot.AcceptedFlagAttempts
             : snapshot.AcceptedFixAttempts;
         if (kind == GameplayFactKind.FixAttempt && !practice && maxAttempts is > 0 && acceptedAttempts >= maxAttempts)

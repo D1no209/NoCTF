@@ -14,7 +14,12 @@ const failureMessages = {
   SelectionChanged: 'api.liveSolo.selectionChanged', ActiveQuestionConflict: 'api.liveSolo.activeQuestionConflict',
   QuestionGroupAlreadyDrawn: 'api.liveSolo.questionGroupAlreadyDrawn',
   DependencyUnavailable: 'liveSolo.error.dependency', IdempotencyConflict: 'liveSolo.error.idempotency',
+  SubmissionActionUnsupported: 'api.liveSolo.submissionActionUnsupported',
 } satisfies Record<NoCtfApplicationLiveSoloRoundsLiveSoloFailure, MessageKey>
+
+export function liveSoloFailureMessage(failure: NoCtfApplicationLiveSoloRoundsLiveSoloFailure): UiMessage {
+  return message(failureMessages[failure])
+}
 
 export function parseLiveSoloError(cause: unknown, fallback: UiMessage): ApiError {
   const parsed = parseApiError(cause, fallback)

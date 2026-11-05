@@ -249,7 +249,7 @@ public sealed class AdminPatchDownloadHttpTests
             ByteLength = content.Length, Sha256 = SHA256.HashData(content), CreatedAt = scope.Now });
         patch.FileId = fileId;
         var flagId = Guid.NewGuid();
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = flagId, CompetitionId = scope.Id, CompetitionChallengeId = fact.CompetitionChallengeId,
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact { Id = flagId, CompetitionId = scope.Id, CompetitionChallengeId = fact.CompetitionChallengeId,
             TeamId = fact.TeamId, ActorUserId = roles[Role.Participant], State = GameplayFactState.Completed,
             Result = GameplayFactResult.Wrong, Value = "flag{test}", ValueSha256 = new byte[32], OccurredAt = scope.Now, UpdatedAt = scope.Now });
         await db.SaveChangesAsync(ct);

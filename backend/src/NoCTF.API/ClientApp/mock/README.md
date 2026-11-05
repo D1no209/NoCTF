@@ -35,7 +35,7 @@ bun mock/dev.ts
 
 ## 数据与交互
 
-- 四种赛制、6 场比赛、56 个题库模板、84 道比赛题目、56 个模板附件、48 支队伍、排行榜、趋势与公告。每场比赛按 Misc、Web、Crypto、Pwn、Reverse、Penetration、Forensics、OSINT、AI、Mobile、IoT、Hardware、Cloud、Blockchain 各提供一道题。
+- CTF、AWD、AWDP、KoH 复用 14 个题库模板，模板多选 Break、Fix、Check、Control，按能力校验部署。每场比赛按 Misc、Web、Crypto、Pwn、Reverse、Penetration、Forensics、OSINT、AI、Mobile、IoT、Hardware、Cloud、Blockchain 各提供一道题和可下载附件。
 - 默认账号在各比赛的 Aurora 队伍中；选手是队长。
 - LiveSolo 对抗演练提供三个题组、长题名/队名、准备中/进行中/已结束对局及处理中录像，供响应式 UI 验收。仅提供读取；尚未实现的编排写入仍返回 501，屏幕与节目不连接真实媒体服务。
 - 封禁界面演示：启动前设置 `$env:NOCTF_MOCK_TEAM_BAN = 'CheatIncident'`（确认作弊）或 `'ManualModeration'`（普通封禁），再登录 `player`。支持查看封禁来源、队长提交一次申诉，以及管理员在队伍管理中解封。清除该变量并重启恢复正常种子。
@@ -44,8 +44,8 @@ bun mock/dev.ts
 - CTF 第一题预置为本队已解出；AWDP 前三题依次预置攻击成功、防御成功、攻防均成功，用于验证四种独立 SVG 状态标记。
 - CTF 血榜按每道题实际存在的解出队伍连续分配一血、二血、三血，不会因未解出的种子队伍产生名次空缺；题目列表的血标悬停提示显示获奖队伍名。
 - 14 个方向的种子题均预置运行中的模拟环境，并按题目分配 `tcp://challenge.mock.invalid:31xxx` 虚构套接字；Runtime 启动/停止/重置/续期只改变虚构内存状态，不监听端口、不运行容器、不提供真实靶机连接。
-- 理论题库提供 24 道题目（12 单选 / 6 多选 / 6 判断，含草稿与退役各一）与 5 个活动（个人练习、计时考试、竞赛笔试、草稿、已结束），并预置演示答卷与考试榜单。题库支持筛选分页、创建/编辑版本、复制、状态、授权与图片上传读取；活动支持组卷校验、发布/撤下/暂停/恢复/停止发放/延期/结束/作废、审计与试卷监控；作答支持共享队伍试卷、答案修订冲突检测、提交评分与重复提交拒绝、批改重判和试卷作废。
-- 理论活动 `理论练习 · 网络安全基础` 与 `理论测验 · 计时考试` 对全部演示账号开放；`NoCTF 春季挑战赛 · 理论笔试` 绑定第一场竞赛，默认账号所在的 Aurora 队伍可共享一份试卷。`player` 还带有两道题目的只读（Use）与编辑（Edit）授权，用于验证权限分支。
+- 题库额外提供 6 份 Questionnaire，每份包含 4 道小题，覆盖单选、多选、判断。独立活动提供练习、固定问卷考试、草稿和已结束四种示例；参与者为用户。活动支持抽题、固定整份问卷、发布时固定内容版本、发卷、答案保存、恢复、交卷重放、批改和试卷作废。活动管理支持发布、暂停、恢复、延期、结束及审计。
+- 问卷内容在题库能力编辑器中管理，图片使用题库问卷图片接口。活动发布后的模板修改不会改变候选版本和已经发出的试卷；活动成绩通过独立榜单查看。
 - SignalR 使用本地 LongPolling 协议响应握手、订阅、心跳和榜单失效消息；理论活动变更同时推送 `theoryChanged`。无需真正的 Hub 后端。
 - 未单独填充的辅助只读页面使用现有 OpenAPI 响应结构，展示空列表/默认数据。未实现的写操作明确返回 501，不伪造成功。
 - API 不包含任何向上游服务器发送请求的代码；全部前端 `/api`、`/hubs` 和 `/health` 流量固定指向 5081。
@@ -56,7 +56,7 @@ bun mock/dev.ts
 - `data/competition-poster.webp`：用户提供的本地测试海报，经 Mock 海报接口返回；前端默认等比 cover 填充，不进入生产素材目录。
 - `api.ts`：本地状态与接口行为。
 - `schema.ts`：只读使用现有 OpenAPI 文档，生成完整响应结构，避免复制或修改生产 SDK。
-- `theory.ts`：理论题库、活动、试卷、作答评分、批改重判与审计的本地状态。
+- `questionnaire.ts`：问卷题库种子、独立活动、试卷、作答评分、批改与审计的演示状态。
 - `leaderboard.ts`：虚构榜单与提交后的得分计算。
 - `realtime.ts`：演示 SignalR 传输。
 - `nuxt.config.ts` / `dev.ts` / `server.ts`：独立站点配置和启动入口。
@@ -78,6 +78,14 @@ node node_modules/@nuxt/cli/bin/nuxi.mjs typecheck mock
 Mock 显式沿用生产的原语注册路径及无前缀约定，禁止回退到 Nuxt 默认扫描整个 `components/`。`check-frontend.ts` 比较生成的原语清单并检查业务插件只注册一次。
 
 Mock 的 `vite.server.forwardConsole` 关闭浏览器日志向终端的转发，浏览器控制台仍正常显示原始错误。避免将 Vue 警告中完整的响应式对象序列化成巨量文本。
+
+## 题库能力测试与 Questionnaire
+
+题库演示支持 Break、Fix、Check、Control、Questionnaire 和 FixAndCheck 六项授权测试。Fix 每次分配独立的演示 Runtime UUID，返回 executionId 与 statusUrl；相同 requestId 和内容返回同一受理结果，内容冲突返回 409。测试状态保持在演示服务内存中，刷新页面能够恢复查询。Check 和 Control 使用当前题目的交互测试环境。演示结果不创建比赛事实或问卷作答次数。
+
+独立考试与练习位于 `/questionnaires`，管理页面位于 `/admin/questionnaires/activities`。接口采用 `/api/v1/questionnaires/activities` 和 `sessions`，发卷、保存答案及交卷保持请求幂等。已发试卷保留发放时的内容版本。
+
+`mock/capability-tests.test.ts` 与 `mock/questionnaire-contract.test.ts` 仅验证离线演示交互契约。实际能力执行、权限、恢复与资源清理由后端真实依赖测试验证。
 
 ## MFA 演示
 

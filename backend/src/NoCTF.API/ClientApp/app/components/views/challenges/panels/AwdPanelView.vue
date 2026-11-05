@@ -17,6 +17,9 @@ const { emit, targets, attackTarget, openAttackInfo, closeAttackInfo, AwdAttackI
     />
 
     <component :is="AwdPublicRules" :competition-id="competition.id!" :competition-challenge-id="challenge.id!" />
+    <component v-if="viewProps.state.persistentFixAction" :is="viewProps.state.PersistentFixSubmit"
+      :competition-id="competition.id!" :competition-challenge-id="challenge.id!" :action="viewProps.state.persistentFixAction"
+      @changed="emit('submitted')" />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
       <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('challenges.label.attackTarget') }}</h3>

@@ -75,11 +75,11 @@ public sealed class ChallengeTimingStore(NoCtfDbContext db, IPostCommitMessagePu
         var timing = ChallengeTiming.From(challenge);
         var facts = await db.GameplayFacts.Where(x => x.CompetitionChallengeId == challenge.Id
             && x.State == GameplayFactState.Completed && x.Result != null && x.AppliedTimingRevision != challenge.TimingRevision
-            && (x.Kind == GameplayFactKind.FlagAttempt || x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt))
+            && (x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt))
             .OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).Take(200).ToArrayAsync(ct);
         foreach (var fact in facts)
         {
-            var practice = competition.Mode == GameMode.Ctf && fact.Kind == GameplayFactKind.FlagAttempt && fact.OccurredAt >= officialWindow.EndAt;
+            var practice = competition.Mode == GameMode.Ctf && fact.Kind == GameplayFactKind.BreakAttempt && fact.OccurredAt >= officialWindow.EndAt;
             fact.TimeEligibility = timing.Eligibility(fact.OccurredAt, practice);
             fact.Result = timing.Classify(fact.Result!.Value, fact.OccurredAt, practice);
             fact.AppliedTimingRevision = challenge.TimingRevision;
@@ -93,7 +93,7 @@ public sealed class ChallengeTimingStore(NoCtfDbContext db, IPostCommitMessagePu
                 facts.Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray(), graph, now, ct);
         var remaining = await db.GameplayFacts.AnyAsync(x => x.CompetitionChallengeId == challenge.Id
             && x.State == GameplayFactState.Completed && x.Result != null && x.AppliedTimingRevision != challenge.TimingRevision
-            && (x.Kind == GameplayFactKind.FlagAttempt || x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt), ct);
+            && (x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt), ct);
         if (remaining) await messages.PublishAsync(command);
         else challenge.AppliedTimingRevision = challenge.TimingRevision;
         await RecordAsync(challenge, now, ct);

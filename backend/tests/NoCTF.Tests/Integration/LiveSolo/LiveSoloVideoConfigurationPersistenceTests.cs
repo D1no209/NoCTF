@@ -23,7 +23,7 @@ namespace NoCTF.Tests.Integration.LiveSolo;
 public sealed class LiveSoloVideoConfigurationPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public async Task Incremental_migration_preserves_existing_platform_configuration_and_adds_video_defaults(CancellationToken ct)
+    public async Task Initial_baseline_installs_video_defaults_and_remains_idempotent(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -32,8 +32,7 @@ public sealed class LiveSoloVideoConfigurationPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString(),
                 setup => setup.MigrationsAssembly(typeof(PostgreSqlPersistence).Assembly.FullName)).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            await db.GetService<IMigrator>().MigrateAsync("20261009212739_LiveSoloDelayedResults", ct);
-            // Select only pre-existing columns while the database is still on the preceding migration.
+            await db.Database.MigrateAsync(ct);
             await db.PlatformSettings.Where(x => x.Id == 1).ExecuteUpdateAsync(update => update.SetProperty(x => x.Name, "Existing platform"), ct);
             await db.Database.MigrateAsync(ct);
             db.ChangeTracker.Clear();
@@ -57,7 +56,7 @@ public sealed class LiveSoloVideoConfigurationPersistenceTests
             await Assert.That(updated.LiveSoloVideo!.PolicyStamp).IsNotEqualTo(initial.LiveSoloVideo.PolicyStamp);
             var unchanged=await store.UpdateLiveSoloVideoAsync(640,360,5,500_000,f.Now,ct);
             await Assert.That(unchanged.LiveSoloVideo!.PolicyStamp).IsEqualTo(updated.LiveSoloVideo.PolicyStamp);
-            await store.UpdateExperimentalFeaturesAsync(true,f.Now,ct);
+            await store.UpdateAsync(initial.Name, "Updated platform description", f.Now, ct);
             var after=await store.GetAsync(ct);await Assert.That(after.LiveSoloVideo!.MaximumBitrateBitsPerSecond).IsEqualTo(500_000);
             await Assert.That(after.Name).IsEqualTo(initial.Name);
         });

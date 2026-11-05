@@ -16,9 +16,8 @@ public sealed class RunnerNodeMessageContractTests
     [Arguments(typeof(ReconcileRuntimeResources))]
     [Arguments(typeof(InjectAwdFlag))]
     [Arguments(typeof(RunAwdChecker))]
-    [Arguments(typeof(RunAwdpFixVerification))]
-    [Arguments(typeof(RunPatchVerification))]
-    [Arguments(typeof(CleanupAwdpTarget))]
+    [Arguments(typeof(RunFixExecution))]
+    [Arguments(typeof(CleanupFixTarget))]
     public async Task Node_work_requires_a_concrete_runner_assignment(Type messageType)
     {
         await Assert.That(typeof(IRunnerNodeMessage).IsAssignableFrom(messageType)).IsTrue();

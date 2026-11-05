@@ -18,9 +18,7 @@ public sealed class GameModeDiscriminatorPersistenceTests
         {
             typeof(Competition),
             typeof(CompetitionModeConfiguration),
-            typeof(Challenge),
             typeof(CompetitionChallenge),
-            typeof(ChallengeDefinition),
             typeof(CompetitionChallengeRules)
         };
         var expected = new Dictionary<GameMode, string>
@@ -48,5 +46,7 @@ public sealed class GameModeDiscriminatorPersistenceTests
                 await Assert.That(converter.ConvertFromProvider(value)).IsEqualTo(mode);
             }
         }
+        await Assert.That(db.Model.FindEntityType(typeof(Challenge))!.FindDiscriminatorProperty()).IsNull();
+        await Assert.That(db.Model.FindEntityType(typeof(ChallengeDefinition))!.FindDiscriminatorProperty()).IsNull();
     }
 }

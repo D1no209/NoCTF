@@ -18,9 +18,9 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
     for (const client of connections.values()) if (client.hub === 'notifications')
       send(client, { type: 1, target: 'notificationChanged', arguments: [] })
   })
-  api.theoryChanges.add(activityId => {
+  api.questionnaireChanges.add(activityId => {
     for (const client of connections.values()) if (client.hub === 'notifications')
-      send(client, { type: 1, target: 'theoryChanged', arguments: [activityId] })
+      send(client, { type: 1, target: 'questionnaireChanged', arguments: [activityId] })
   })
   return async function handle(request: Request) {
     const url = new URL(request.url)

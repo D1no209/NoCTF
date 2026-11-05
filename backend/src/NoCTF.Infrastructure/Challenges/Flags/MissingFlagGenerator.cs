@@ -35,6 +35,7 @@ public sealed class MissingFlagGenerator(
                 {
                     item.Id,
                     item.ChallengeId,
+                    item.Rules,
                     Template = template
                 })
             .ToListAsync(ct);
@@ -49,7 +50,7 @@ public sealed class MissingFlagGenerator(
         foreach (var challenge in challenges)
         {
             var usesPerTeamRuntimeFlag = competition.Mode == GameMode.Ctf
-                && templates.Get(challenge.Template.Definition)?.FlagSource
+                && templates.Get(challenge.Template.Definition, challenge.Rules!)?.FlagSource
                     == RuntimeFlagSource.PerTeam;
             if (competition.Mode == GameMode.Ctf && !usesPerTeamRuntimeFlag)
                 continue;

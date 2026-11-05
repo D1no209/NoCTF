@@ -181,8 +181,6 @@ public sealed record ScoreboardTeamResponse(
     IReadOnlyList<ScoreboardChallengeTotalResponse> ChallengeTotals,
     IReadOnlyList<ScoreboardSlotResponse> Slots)
 {
-    public long TheoryScore { get; init; }
-    public bool HasTheorySubmission { get; init; }
 }
 
 public sealed record ScoreboardTrackResponse(
@@ -207,7 +205,6 @@ public sealed record ScoreboardSnapshotResponse(
     IReadOnlyList<ScoreboardChallengeResponse> Challenges,
     IReadOnlyList<ScoreboardTeamResponse> Teams)
 {
-    public bool TheoryEnabled { get; init; }
     public IReadOnlyList<ScoreboardTrackResponse> Tracks { get; init; } = [];
     public bool TracksEnabled { get; init; } = true;
     public LeaderboardVisibilityProtocol Visibility { get; init; }
@@ -252,7 +249,6 @@ internal static partial class ScoreboardProtocolMapper
                 track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard,
                 track.IsViewerTrack)).ToArray(),
             TracksEnabled = value.TracksEnabled,
-            TheoryEnabled = value.TheoryEnabled,
             Visibility = CompetitionProtocolMapper.ToProtocol(value.Visibility),
             DataScope = ToProtocol(value.DataScope),
             DataAsOf = value.DataAsOf,
@@ -349,8 +345,6 @@ internal static partial class ScoreboardProtocolMapper
                 })
                 .ToArray())
         {
-            TheoryScore = value.TheoryScore,
-            HasTheorySubmission = value.HasTheorySubmission
         };
     }
 

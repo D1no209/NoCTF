@@ -34,7 +34,7 @@ Attachment 属于 Challenge 模板。文件内容、显示名称和 MIME 都不�
 申请与上传分离：
 
 1. 申请防御 API 先创建一个干净、无公开入口的 `AwdpTarget`；Queued、Provisioning 或 Running 时均可选择 Patch。
-2. multipart 上传 API 在一个 PostgreSQL 临界区内把单文件、PatchUpload、Pending FixAttempt 与该 Target 原子绑定；Target Running 后再发布唯一一次 `RunAwdpFixVerification`。
+2. multipart 上传 API 在一个 PostgreSQL 临界区内把单文件、PatchUpload、Pending FixAttempt 与该 Target 原子绑定；Target Running 后再发布唯一一次 `StartFixExecution`。
 
 一个 AwdpTarget 最多绑定一个 PatchUpload/FixAttempt。并发上传只有一个能消费 Target；消费后不可替换、删除或再次验证，随 Competition 最终硬删除。队伍再次尝试必须申请新的干净 Target。
 

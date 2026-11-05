@@ -19,7 +19,6 @@ public sealed class ChallengeManagementStore(
     IPostCommitMessagePublisher outbox,
     IChallengeRuntimeTemplateCatalog runtimeTemplates,
     ICompetitionEventRecorder? eventRecorder = null,
-    IExperimentalFeatureReader? experimentalFeatures = null,
     NoCTF.Application.Challenges.Configuration.IChallengeMaterialMutationGate? material = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
@@ -97,24 +96,21 @@ public sealed class ChallengeManagementStore(
             ct);
         if (template is null || template.DeletedAt is not null || template.CatalogScope != command.MaterialScope)
             return new(null, ChallengeMutationFailure.TemplateNotFound);
-        if (template.Mode != competitionMode)
-            return new(null, ChallengeMutationFailure.TemplateModeMismatch);
-        if (GetInteractionKind(template.Definition)
-                == CtfInteractionKind.PatchVerification
-            && !(await IsPatchVerificationEnabledAsync(ct)))
-        {
-            return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
-        }
+        if (template.Definition is null) return new(null, ChallengeMutationFailure.TemplateNotFound);
+        var missingCapabilities = GameModeChallengeConfigurationCatalog.RequiredCapabilities(rules)
+            .Except(template.Definition.Capabilities.Select(capability => capability.Kind)).ToArray();
+        if (missingCapabilities.Length > 0)
+            return new(null, ChallengeMutationFailure.RequiredCapabilitiesMissing) { MissingCapabilities = missingCapabilities };
         var entityId = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
-        if (rules.Mode != template.Mode)
-            return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        if (rules.Mode != competitionMode)
+            return new(null, ChallengeMutationFailure.CompetitionModeMismatch);
         var conflict = await FindCompetitionChallengeConflictAsync(
             entityId, command.CompetitionId, command.ChallengeId, command.Order,
             includeIdConflict: false, ct);
         if (conflict is not null)
             return new(null, conflict.Value);
         rules.CompetitionChallengeId = entityId;
-        var entity = CompetitionChallengeGeneratedCatalog.Create(template.Mode);
+        var entity = CompetitionChallengeGeneratedCatalog.Create(competitionMode);
         entity.Id = entityId;
         entity.CompetitionId = command.CompetitionId;
         entity.ChallengeId = command.ChallengeId;
@@ -218,10 +214,6 @@ public sealed class ChallengeManagementStore(
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
-                db.Set<CtfChallengeDefinition>().AsNoTracking()
-                    .Where(definition => definition.ChallengeId == item.Template.Id)
-                    .Select(definition => definition.InteractionKind)
-                    .FirstOrDefault(),
                 item.Instance.DirectionId,
                 item.Instance.Direction != null ? item.Instance.Direction.Icon : null)
             {
@@ -271,15 +263,14 @@ public sealed class ChallengeManagementStore(
         {
             var definition = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.ChallengeId)
-                .Select(challenge => new { challenge.Mode, challenge.Definition })
+                .Select(challenge => challenge.Definition!)
                 .AsSplitQuery()
                 .SingleAsync(ct);
-            if (GetInteractionKind(definition.Definition)
-                    == CtfInteractionKind.PatchVerification
-                && !(await IsPatchVerificationEnabledAsync(ct)))
-            {
-                return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
-            }
+            if (definition is null) return new(null, ChallengeMutationFailure.TemplateNotFound);
+            var missingCapabilities = GameModeChallengeConfigurationCatalog.RequiredCapabilities(entity.Rules!)
+                .Except(definition.Capabilities.Select(capability => capability.Kind)).ToArray();
+            if (missingCapabilities.Length > 0)
+                return new(null, ChallengeMutationFailure.RequiredCapabilitiesMissing) { MissingCapabilities = missingCapabilities };
         }
         if (command.Tags is not null) CompetitionChallengeTags.Replace(entity.Tags, command.Tags);
         entity.CustomTitle = command.CustomTitle;
@@ -394,18 +385,21 @@ public sealed class ChallengeManagementStore(
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
         {
-            var templateMode = await db.Challenges.AsNoTracking()
+            var definition = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.ChallengeId)
-                .Select(challenge => (GameMode?)challenge.Mode)
+                .Select(challenge => challenge.Definition)
                 .SingleOrDefaultAsync(ct);
-            if (templateMode is null)
+            if (definition is null)
                 return ChallengeMutationFailure.TemplateNotFound;
             var competitionMode = await db.Competitions.AsNoTracking()
                 .Where(competition => competition.Id == competitionId)
                 .Select(competition => competition.Mode)
                 .SingleAsync(ct);
-            if (templateMode != competitionMode)
-                return ChallengeMutationFailure.TemplateModeMismatch;
+            if (entity.Mode != competitionMode)
+                return ChallengeMutationFailure.CompetitionModeMismatch;
+            if (GameModeChallengeConfigurationCatalog.RequiredCapabilities(entity.Rules!)
+                .Any(required => !definition.Capabilities.Any(capability => capability.Kind == required)))
+                return ChallengeMutationFailure.RequiredCapabilitiesMissing;
         }
 
         entity.DeletedAt = restore ? null : now;
@@ -482,11 +476,9 @@ public sealed class ChallengeManagementStore(
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
                 item.Template.Definition != null && item.Template.Definition.Runtime != null,
-                item.Template.Definition != null && item.Template.Definition.Runtime != null
-                    && item.Template.Definition.Runtime.FlagSource != PersistedRuntimeFlagSource.Static,
-                item.Template.Definition is CtfChallengeDefinition
-                    ? ((CtfChallengeDefinition)item.Template.Definition).InteractionKind
-                    : CtfInteractionKind.FlagSubmission,
+                item.Instance.Rules is CtfCompetitionChallengeRules && ((CtfCompetitionChallengeRules)item.Instance.Rules).Runtime.FlagSource != PersistedRuntimeFlagSource.Static
+                    || item.Instance.Rules is AwdCompetitionChallengeRules && ((AwdCompetitionChallengeRules)item.Instance.Rules).Runtime.FlagSource != PersistedRuntimeFlagSource.Static
+                    || item.Instance.Rules is AwdpCompetitionChallengeRules && ((AwdpCompetitionChallengeRules)item.Instance.Rules).Runtime.FlagSource != PersistedRuntimeFlagSource.Static,
                 item.Template.CreatedAt,
                 item.Instance.UpdatedAt,
                 item.Instance.DirectionId,
@@ -499,7 +491,7 @@ public sealed class ChallengeManagementStore(
 
     private ChallengeView Map(CompetitionChallenge instance, Challenge template)
     {
-        var runtime = runtimeTemplates.Get(template.Definition);
+        var runtime = runtimeTemplates.Get(template.Definition, instance.Rules!);
         return new(
             instance.Id,
             instance.CompetitionId,
@@ -520,8 +512,7 @@ public sealed class ChallengeManagementStore(
             TimingRecalculationPending = instance.TimingRevision != instance.AppliedTimingRevision,
             DirectionId = instance.DirectionId,
             DirectionIcon = instance.Direction?.Icon,
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
-            InteractionKind = GetInteractionKind(template.Definition)
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
         };
     }
 
@@ -547,8 +538,7 @@ public sealed class ChallengeManagementStore(
             OpeningState = projection.OpeningState, TimingRecalculationPending = projection.TimingRecalculationPending,
             DirectionId = projection.DirectionId,
             DirectionIcon = projection.DirectionIcon,
-            UsesDynamicFlag = projection.UsesDynamicFlag,
-            InteractionKind = projection.InteractionKind
+            UsesDynamicFlag = projection.UsesDynamicFlag
         };
     }
 
@@ -565,15 +555,6 @@ public sealed class ChallengeManagementStore(
             .OrderByDescending(item => item.NormalizedName == "MISC").ThenBy(item => item.Position).FirstAsync(ct);
     }
 
-    private static CtfInteractionKind GetInteractionKind(ChallengeDefinition? definition) =>
-        definition is CtfChallengeDefinition ctf
-            ? ctf.InteractionKind
-            : CtfInteractionKind.FlagSubmission;
-
-    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
-
     private sealed record ChallengeProjection(
         Guid Id,
         Guid CompetitionId,
@@ -587,7 +568,6 @@ public sealed class ChallengeManagementStore(
         DateTimeOffset? DeletedAt,
         bool HasRuntime,
         bool UsesDynamicFlag,
-        CtfInteractionKind InteractionKind,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         Guid? DirectionId,

@@ -229,7 +229,7 @@ public sealed class CompetitionQuestionPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = ids.ChallengeId,
                     OwnerId = ids.AuthorId,

@@ -122,7 +122,6 @@ export function useCompetitionsByIdLeaderboardPage() {
   }
 
   const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
-  const theoryEnabled = computed(() => board.snapshot.value?.theoryEnabled === true)
   const matrixColumns = computed(() => filteredColumnGroups.value.flatMap(group => group.columns.map(column => ({
     key: `${group.competitionChallengeId}:${column.index}`,
     groupKey: group.competitionChallengeId,
@@ -270,7 +269,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       translate("common.label.team"),
       ...(tracksEnabled.value && selectedAllTracks.value ? [translate("common.label.tracks")] : []),
       translate("common.label.totalScore"),
-      ...(theoryEnabled.value ? [translate("theory.theoryScore")] : []),
       ...flatColumns.value.map((column) => {
         const challenge = board.challengesById.value.get(column.competitionChallengeId ?? '')
         return `${challenge?.title ?? translate("common.label.unknownQuestion")} · ${roundLabel(column)}`
@@ -281,7 +279,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       displayTeamName(team),
       ...(tracksEnabled.value && selectedAllTracks.value ? [trackName(team.trackKey)] : []),
       team.totalScore ?? 0,
-      ...(theoryEnabled.value ? [team.theoryScore ?? 0] : []),
     ])
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -543,7 +540,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       hasLeaderboardFilters,
       clearLeaderboardFilters,
       isCtf,
-      theoryEnabled,
       trends,
       trendsLoading,
       trendsError,

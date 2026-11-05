@@ -35,7 +35,7 @@ public sealed class UploadPatchEndpointTests
         form.Add(new ByteArrayContent([1, 2]), "file", "fix.tar.gz");
 
         using var response = await client.PostAsync(
-            $"/api/v1/competitions/{CompetitionId}/challenges/{CompetitionChallengeId}/awdp-defense-targets/{RuntimeInstanceId}/fix",
+            $"/api/v1/competitions/{CompetitionId}/challenges/{CompetitionChallengeId}/runtimes/{RuntimeInstanceId}/fixes",
             form);
         var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
 

@@ -21,6 +21,8 @@ public sealed class LiveSoloRuntimeStore(NoCtfDbContext db, IExecutionScopeAcces
             .SingleOrDefaultAsync(ct);
         if (team is not Guid teamId || entry == Guid.Empty || !await access.CanAccessAsync(new(request.QuestionId, request.CompetitionId,
             entry, teamId, request.ActorId, ExecutionScopeOperation.Read, clock.GetUtcNow()), ct)) return null;
+        if (!await db.Set<NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules>().AnyAsync(rules => rules.CompetitionChallengeId == entry
+            && rules.CompletionKind == NoCTF.Domain.LiveSolo.LiveSoloCompletionKind.Break, ct)) return null;
         return new(teamId, entry);
     }
     public async Task<RuntimeInstanceView?> ReadAsync(LiveSoloResourceRequest request, CancellationToken ct)

@@ -94,7 +94,7 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
                 .Join(db.CompetitionChallenges, q => q.CompetitionChallengeId, c => c.Id, (q, c) => new { Question = q, c.ChallengeId })
                 .Join(db.Challenges, x => x.ChallengeId, c => c.Id, (x, c) => new LiveSoloProgramFrameQuestion { FrameId = frame.Id,
                     Position = x.Question.Position, RoundQuestionId = x.Question.Id, CompetitionChallengeId = x.Question.CompetitionChallengeId,
-                    CanonicalChallengeId = db.LiveSoloChallengeSources.Where(s => s.ChallengeId == c.Id).Select(s => (Guid?)s.CanonicalChallengeId).FirstOrDefault() ?? c.Id,
+                    CanonicalChallengeId = db.ChallengeSources.Where(s => s.ChallengeId == c.Id).Select(s => (Guid?)s.CanonicalChallengeId).FirstOrDefault() ?? c.Id,
                     HasStaticAnswer = db.ChallengeFlags.Any(flag => flag.DeletedAt == null && (flag.Type == NoCTF.Domain.Challenges.ChallengeFlagType.Template && flag.ChallengeId == c.Id
                         || flag.Type == NoCTF.Domain.Challenges.ChallengeFlagType.Competition && flag.CompetitionChallengeId == x.Question.CompetitionChallengeId
                         || flag.Type == NoCTF.Domain.Challenges.ChallengeFlagType.Team && flag.CompetitionChallengeId == x.Question.CompetitionChallengeId

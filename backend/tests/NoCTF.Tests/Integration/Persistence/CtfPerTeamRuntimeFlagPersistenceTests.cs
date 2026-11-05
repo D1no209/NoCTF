@@ -1,837 +1,131 @@
-using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using DotNet.Testcontainers.Builders;
-using NATS.Client.Core;
-using NoCTF.Application.Challenges.Flags;
-using NoCTF.Application.Competitions.Awd;
-using NoCTF.Application.Competitions.Koh;
-using NoCTF.Application.Messaging;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
-using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
-using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Challenges.Flags;
-using NoCTF.Infrastructure.Runtime.Capacity;
-using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Runtime.Instances;
-using NoCTF.Worker;
-using Testcontainers.PostgreSql;
-using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Infrastructure.Runtime.Placement;
+using NoCTF.Worker.Runtime;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
-[Category("Integration")]
+[Category("Integration"), NotInParallel]
 public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 {
-    [Test]
-    [Timeout(300_000)]
-    public async Task Team_runtime_list_returns_only_current_active_instances_for_the_member(
-        CancellationToken cancellationToken)
+    [Test, Timeout(300_000)]
+    public async Task Accepted_start_and_reset_use_one_team_flag_and_distinct_real_runtime_uuids(CancellationToken ct)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_team_runtime_list")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var fixture = await SeedAsync(options, cancellationToken);
-            var otherUserId = Guid.CreateVersion7();
-            var otherTeamId = Guid.CreateVersion7();
-            var runningId = Guid.CreateVersion7();
-            var queuedId = Guid.CreateVersion7();
-            var otherRuntimeId = Guid.CreateVersion7();
-            await using var db = new NoCtfDbContext(options);
-            db.Users.Add(new User
-            {
-                Id = otherUserId,
-                UserName = "other-player",
-                NormalizedUserName = "OTHER-PLAYER",
-                Email = "other-player@example.test",
-                PasswordHash = "test",
-                CreatedAt = fixture.Now,
-                UpdatedAt = fixture.Now
-            });
-            db.Teams.Add(new Team
-            {
-                Id = otherTeamId,
-                CompetitionId = fixture.CompetitionId,
-                Name = "Other Team",
-                CaptainId = otherUserId,
-                MemberIds = [otherUserId],
-                InvitationToken = new string('b', 32),
-                RegistrationStatus = TeamRegistrationStatus.Approved,
-                RegisteredAt = fixture.Now
-            });
-            db.RuntimeInstances.AddRange(
-                new PlayerRuntimeInstance
-                {
-                    Id = runningId,
-                    CompetitionId = fixture.CompetitionId,
-                    CompetitionChallengeId = fixture.StartChallengeId,
-                    TeamId = fixture.TeamId,
-                    RuntimeKind = RuntimeKind.Container,
-                    RuntimeProvider = RuntimeProvider.Docker,
-                    State = RuntimeState.Running,
-                    CreatedAt = fixture.Now.AddMinutes(-2),
-                    ExpiresAt = fixture.Now.AddHours(1)
-                },
-                new PlayerRuntimeInstance
-                {
-                    Id = queuedId,
-                    CompetitionId = fixture.CompetitionId,
-                    CompetitionChallengeId = fixture.BatchChallengeId,
-                    TeamId = fixture.TeamId,
-                    RuntimeKind = RuntimeKind.Container,
-                    RuntimeProvider = RuntimeProvider.Docker,
-                    State = RuntimeState.Queued,
-                    CreatedAt = fixture.Now.AddMinutes(-1)
-                },
-                new PlayerRuntimeInstance
-                {
-                    Id = otherRuntimeId,
-                    CompetitionId = fixture.CompetitionId,
-                    CompetitionChallengeId = fixture.StartChallengeId,
-                    TeamId = otherTeamId,
-                    RuntimeKind = RuntimeKind.Container,
-                    RuntimeProvider = RuntimeProvider.Docker,
-                    State = RuntimeState.Running,
-                    CreatedAt = fixture.Now,
-                    ExpiresAt = fixture.Now.AddHours(1)
-                });
-            await db.SaveChangesAsync(cancellationToken);
-            var store = new RuntimeInstanceStore(
-                db,
-                new ChallengeRuntimeTemplateCatalog(),
-                new FixedRuntimePlacementPolicy(),
-                new PerTeamRuntimeFlagStore(db),
-                new RecordingOutbox());
-
-            var page = await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, fixture.UserId, 0, 1, true, cancellationToken);
-            await Assert.That(page).IsNotNull();
-            await Assert.That(page!.Total).IsEqualTo(2);
-            await Assert.That(page.Items.Single().Runtime.Id).IsEqualTo(queuedId);
-            await Assert.That(page.Items.Single().ChallengeTitle).IsEqualTo("Batch");
-            var nextPage = await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, fixture.UserId, 1, 1, true, cancellationToken);
-            await Assert.That(nextPage!.Items.Single().Runtime.Id).IsEqualTo(runningId);
-            var otherPage = await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, otherUserId, 0, 10, true, cancellationToken);
-            await Assert.That(otherPage!.Items.Single().Runtime.Id).IsEqualTo(otherRuntimeId);
-
-            var prior = await db.RuntimeInstances.SingleAsync(
-                instance => instance.Id == runningId, cancellationToken);
-            prior.State = RuntimeState.Stopping;
-            var replacementId = Guid.CreateVersion7();
-            db.RuntimeInstances.Add(new PlayerRuntimeInstance
-            {
-                Id = replacementId,
-                CompetitionId = fixture.CompetitionId,
-                CompetitionChallengeId = fixture.StartChallengeId,
-                TeamId = fixture.TeamId,
-                RuntimeKind = RuntimeKind.Container,
-                RuntimeProvider = RuntimeProvider.Docker,
-                State = RuntimeState.Queued,
-                CreatedAt = fixture.Now
-            });
-            await db.SaveChangesAsync(cancellationToken);
-            var afterReset = await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, fixture.UserId, 0, 10, true, cancellationToken);
-            await Assert.That(afterReset!.Items.Select(item => item.Runtime.Id))
-                .IsEquivalentTo([queuedId, replacementId]);
-            await Assert.That(await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, Guid.CreateVersion7(), 0, 10, true, cancellationToken)).IsNull();
-            var team = await db.Teams.SingleAsync(
-                item => item.Id == fixture.TeamId, cancellationToken);
-            team.IsBanned = true;
-            await db.SaveChangesAsync(cancellationToken);
-            await Assert.That(await store.ListTeamRuntimesAsync(
-                fixture.CompetitionId, fixture.UserId, 0, 10, true, cancellationToken)).IsNull();
-        });
+        await using var fixture = await RuntimeExecutionFixture.CreateAsync(ct);
+        var scope = await SeedAsync(fixture, ct);
+        var store = Store(fixture);
+        var command = new RuntimeMutationCommand(fixture.Application.CompetitionId, scope.ChallengeId, fixture.Application.OwnerId, RuntimeAction.Start, null, DateTimeOffset.UtcNow);
+        var started = await store.MutatePlayerRuntimeAsync(command, ct);
+        await Assert.That(started.Failure).IsNull();
+        var flag = await fixture.Db.ChallengeFlags.SingleAsync(value => value.CompetitionChallengeId == scope.ChallengeId, ct);
+        var first = await ProvisionAsync(fixture, scope.ChallengeId, started.Runtime!.Id, flag.Flag, ct);
+        var receipt = (ContainerRuntimeReceiptData)first.ProviderReceipt;
+        var environment = await fixture.Providers.Runtime(RuntimeProvider.Docker).ExecAsync(receipt.ToReceipt(), "main",
+            ["/bin/sh", "-c", "test \"$CHALLENGE_FLAG\" = \"$1\"", "check-flag", flag.Flag], TimeSpan.FromSeconds(5), ct);
+        await Assert.That(environment.ExitCode).IsEqualTo(0);
+        var reset = await store.MutatePlayerRuntimeAsync(command with { Action = RuntimeAction.Reset, Now = DateTimeOffset.UtcNow }, ct);
+        await Assert.That(reset.Failure).IsNull();
+        await Assert.That(reset.Runtime!.Id == started.Runtime.Id).IsFalse();
+        await Assert.That(await fixture.Db.ChallengeFlags.CountAsync(value => value.CompetitionChallengeId == scope.ChallengeId, ct)).IsEqualTo(1);
+        await Assert.That((await fixture.Db.ChallengeFlags.AsNoTracking().SingleAsync(value => value.Id == flag.Id, ct)).Flag).IsEqualTo(flag.Flag);
+        var second = await ProvisionAsync(fixture, scope.ChallengeId, reset.Runtime.Id, flag.Flag, ct);
+        await Assert.That(second.RuntimeInstanceId).IsEqualTo(reset.Runtime.Id);
+        await Assert.That((await fixture.Db.RuntimeInstances.AsNoTracking().SingleAsync(value => value.Id == first.RuntimeInstanceId, ct)).State).IsEqualTo(RuntimeState.Stopping);
+        var page = await store.ListTeamRuntimesAsync(fixture.Application.CompetitionId, fixture.Application.OwnerId, 0, 10, true, ct);
+        await Assert.That(page!.Items.Select(value => value.Runtime.Id)).IsEquivalentTo(new[] { reset.Runtime.Id });
     }
 
-    [Test]
-    [Timeout(300_000)]
-    public async Task Running_runtime_extends_only_in_final_ten_minutes_without_losing_existing_time(
-        CancellationToken cancellationToken)
+    [Test, Timeout(300_000)]
+    public async Task Current_runtime_lists_are_member_scoped_and_renewal_preserves_unspent_time(CancellationToken ct)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_ctf_runtime_renewal_window")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var fixture = await SeedAsync(options, cancellationToken);
-            var runtimeId = Guid.CreateVersion7(fixture.Now);
-            await using var db = new NoCtfDbContext(options);
-            db.RuntimeInstances.Add(new PlayerRuntimeInstance
-            {
-                Id = runtimeId,
-                CompetitionId = fixture.CompetitionId,
-                CompetitionChallengeId = fixture.StartChallengeId,
-                TeamId = fixture.TeamId,
-                RuntimeKind = RuntimeKind.Container,
-                RuntimeProvider = RuntimeProvider.Docker,
-                State = RuntimeState.Running,
-                CreatedAt = fixture.Now.AddMinutes(-1),
-                RunningAt = fixture.Now.AddMinutes(-1),
-                ExpiresAt = fixture.Now.AddMinutes(52)
-            });
-            await db.SaveChangesAsync(cancellationToken);
-            var store = new RuntimeInstanceStore(
-                db,
-                new ChallengeRuntimeTemplateCatalog(),
-                new FixedRuntimePlacementPolicy(),
-                new PerTeamRuntimeFlagStore(db),
-                new RecordingOutbox());
-
-            var result = await store.MutatePlayerRuntimeAsync(new(
-                fixture.CompetitionId,
-                fixture.StartChallengeId,
-                fixture.UserId,
-                RuntimeAction.Extend,
-                TimeSpan.FromMinutes(30),
-                fixture.Now), cancellationToken);
-
-            await Assert.That(result.Failure).IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
-            await Assert.That(await db.RuntimeInstances.AsNoTracking()
-                .Where(runtime => runtime.Id == runtimeId)
-                .Select(runtime => runtime.ExpiresAt)
-                .SingleAsync(cancellationToken))
-                .IsEqualTo(fixture.Now.AddMinutes(52));
-
-            var tracked = await db.RuntimeInstances.SingleAsync(
-                runtime => runtime.Id == runtimeId, cancellationToken);
-            tracked.ExpiresAt = fixture.Now.AddMinutes(9);
-            await db.SaveChangesAsync(cancellationToken);
-
-            var nearExpiry = await store.MutatePlayerRuntimeAsync(new(
-                fixture.CompetitionId,
-                fixture.StartChallengeId,
-                fixture.UserId,
-                RuntimeAction.Extend,
-                TimeSpan.FromMinutes(30),
-                fixture.Now), cancellationToken);
-
-            await Assert.That(nearExpiry.Failure).IsNull();
-            await Assert.That(nearExpiry.Runtime!.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(39));
-            var repeated = await store.MutatePlayerRuntimeAsync(new(
-                fixture.CompetitionId,
-                fixture.StartChallengeId,
-                fixture.UserId,
-                RuntimeAction.Extend,
-                TimeSpan.FromMinutes(30),
-                fixture.Now), cancellationToken);
-            await Assert.That(repeated.Failure)
-                .IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
-        });
+        await using var fixture = await RuntimeExecutionFixture.CreateAsync(ct);
+        var scope = await SeedAsync(fixture, ct);
+        var store = Store(fixture); var now = DateTimeOffset.UtcNow;
+        var command = new RuntimeMutationCommand(fixture.Application.CompetitionId, scope.ChallengeId, fixture.Application.OwnerId, RuntimeAction.Start, null, now);
+        var started = await store.MutatePlayerRuntimeAsync(command, ct);
+        await Assert.That(started.Failure).IsNull();
+        var flag = await fixture.Db.ChallengeFlags.SingleAsync(value => value.CompetitionChallengeId == scope.ChallengeId, ct);
+        await ProvisionAsync(fixture, scope.ChallengeId, started.Runtime!.Id, flag.Flag, ct);
+        await Assert.That((await store.MutatePlayerRuntimeAsync(command with { Action = RuntimeAction.Extend, Extension = TimeSpan.FromMinutes(30), Now = now.AddMinutes(1) }, ct)).Failure)
+            .IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
+        var runtime = await fixture.Db.RuntimeInstances.SingleAsync(value => value.Id == started.Runtime.Id, ct);
+        var expires = runtime.ExpiresAt!.Value;
+        var extended = await store.MutatePlayerRuntimeAsync(command with { Action = RuntimeAction.Extend, Extension = TimeSpan.FromMinutes(30), Now = expires.AddMinutes(-9) }, ct);
+        await Assert.That(extended.Failure).IsNull();
+        await Assert.That(extended.Runtime!.ExpiresAt).IsEqualTo(expires.AddMinutes(30));
+        await Assert.That((await store.ListTeamRuntimesAsync(fixture.Application.CompetitionId, scope.OtherUserId, 0, 10, true, ct))!.Items).IsEmpty();
+        await Assert.That(await store.ListTeamRuntimesAsync(fixture.Application.CompetitionId, Guid.NewGuid(), 0, 10, true, ct)).IsNull();
     }
 
-    [Test]
-    [Timeout(300_000)]
-    public async Task Start_dispatch_batch_generation_and_reset_reuse_one_fixed_team_flag(
-        CancellationToken cancellationToken)
+    [Test, Timeout(300_000)]
+    public async Task Batch_generation_retains_existing_flags_and_uses_new_rules_for_new_participants(CancellationToken ct)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_ctf_runtime_flags")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var fixture = await SeedAsync(options, cancellationToken);
-            var templates = new ChallengeRuntimeTemplateCatalog();
-            var outbox = new RecordingOutbox();
-
-            await using var db = new NoCtfDbContext(options);
-            var runtimeFlags = new PerTeamRuntimeFlagStore(db);
-            var runtimes = new RuntimeInstanceStore(
-                db,
-                templates,
-                new FixedRuntimePlacementPolicy(),
-                runtimeFlags,
-                outbox);
-
-            var started = await runtimes.MutatePlayerRuntimeAsync(
-                new(
-                    fixture.CompetitionId,
-                    fixture.StartChallengeId,
-                    fixture.UserId,
-                    RuntimeAction.Start,
-                    null,
-                    fixture.Now),
-                cancellationToken);
-
-            await Assert.That(started.Failure).IsNull();
-            await Assert.That(started.Runtime).IsNotNull();
-            var initialFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
-                flag => flag.CompetitionChallengeId == fixture.StartChallengeId
-                    && flag.TeamId == fixture.TeamId
-                    && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
-                    && flag.SpecificationId == fixture.StartChallengeId,
-                cancellationToken);
-            await Assert.That(initialFlag.Flag).StartsWith("challenge{");
-
-            var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
-            await BackendMessageOperations.DispatchRuntimeAsync(
-                dispatch,
-                db,
-                templates,
-                new FixedRuntimePlacementPolicy(),
-                new FixedCapacityGate("runner-1"),
-                outbox,
-                TimeProvider.System,
-                cancellationToken);
-            var claim = outbox.RunnerNodeMessages.OfType<ProvisionContainerRuntime>().Single();
-            await Assert.That(claim.Definition.Services[0].Environment!["CHALLENGE_FLAG"])
-                .IsEqualTo(initialFlag.Flag);
-
-            var generator = new MissingFlagGenerator(
-                db,
-                templates,
-                runtimeFlags);
-            var failures = await generator.GenerateAsync(
-                fixture.CompetitionId,
-                fixture.Now.AddSeconds(1),
-                cancellationToken);
-
-            await Assert.That(failures).IsEmpty();
-            await Assert.That(await db.ChallengeFlags.AsNoTracking().CountAsync(
-                    flag => flag.TeamId == fixture.TeamId
-                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition,
-                    cancellationToken))
-                .IsEqualTo(2);
-            await Assert.That(await db.ChallengeFlags.AsNoTracking().AnyAsync(
-                    flag => flag.CompetitionChallengeId == fixture.BatchChallengeId
-                        && flag.TeamId == fixture.TeamId
-                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition,
-                    cancellationToken))
-                .IsTrue();
-            var batchFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
-                flag => flag.CompetitionChallengeId == fixture.BatchChallengeId
-                    && flag.TeamId == fixture.TeamId
-                    && flag.SpecificationKind == SpecificationKind.RuntimeDefinition,
-                cancellationToken);
-            await Assert.That(batchFlag.Flag).StartsWith("competition{");
-            await Assert.That(await db.ChallengeFlags.AsNoTracking().AnyAsync(
-                    flag => flag.CompetitionChallengeId == fixture.StaticChallengeId
-                        && flag.TeamId == fixture.TeamId,
-                    cancellationToken))
-                .IsFalse();
-
-            var competition = await db.Competitions.SingleAsync(
-                item => item.Id == fixture.CompetitionId,
-                cancellationToken);
-            competition.ModeConfiguration = TestConfigurations.Competition(
-                GameMode.Ctf,
-                JsonSerializer.Serialize(
-                new CtfConfiguration(
-                    new(500, 100, 10),
-                    [],
-                    FlagTemplate: new("changed", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-            var futureUserId = Guid.CreateVersion7();
-            var futureTeamId = Guid.CreateVersion7();
-            db.Users.Add(new User
-            {
-                Id = futureUserId,
-                UserName = "future-player",
-                NormalizedUserName = "FUTURE-PLAYER",
-                Email = "future-player@example.test",
-                PasswordHash = "test",
-                CreatedAt = fixture.Now.AddSeconds(2),
-                UpdatedAt = fixture.Now.AddSeconds(2)
-            });
-            db.Teams.Add(new Team
-            {
-                Id = futureTeamId,
-                CompetitionId = fixture.CompetitionId,
-                Name = "Future",
-                CaptainId = futureUserId,
-                MemberIds = [futureUserId],
-                InvitationToken = new string('b', 32),
-                RegistrationStatus = TeamRegistrationStatus.Approved,
-                RegisteredAt = fixture.Now.AddSeconds(2)
-            });
-            await db.SaveChangesAsync(cancellationToken);
-
-            var existingAfterConfigurationChange = await runtimeFlags.EnsureAsync(
-                fixture.CompetitionId,
-                fixture.BatchChallengeId,
-                fixture.TeamId,
-                fixture.Now.AddSeconds(2),
-                cancellationToken);
-            var futureFlag = await runtimeFlags.EnsureAsync(
-                fixture.CompetitionId,
-                fixture.BatchChallengeId,
-                futureTeamId,
-                fixture.Now.AddSeconds(2),
-                cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
-
-            await Assert.That(existingAfterConfigurationChange).IsEqualTo(batchFlag.Flag);
-            await Assert.That(futureFlag).StartsWith("changed{");
-
-            var reset = await runtimes.MutatePlayerRuntimeAsync(
-                new(
-                    fixture.CompetitionId,
-                    fixture.StartChallengeId,
-                    fixture.UserId,
-                    RuntimeAction.Reset,
-                    null,
-                    fixture.Now.AddSeconds(2)),
-                cancellationToken);
-
-            await Assert.That(reset.Failure).IsNull();
-            await Assert.That(reset.Runtime).IsNotNull();
-            await Assert.That(reset.Runtime!.Id).IsNotEqualTo(started.Runtime!.Id);
-            var resetFlags = await db.ChallengeFlags.AsNoTracking()
-                .Where(flag => flag.CompetitionChallengeId == fixture.StartChallengeId
-                    && flag.TeamId == fixture.TeamId
-                    && flag.SpecificationKind == SpecificationKind.RuntimeDefinition)
-                .Select(flag => flag.Flag)
-                .ToArrayAsync(cancellationToken);
-            await Assert.That(resetFlags).IsEquivalentTo([initialFlag.Flag]);
-        });
+        await using var fixture = await RuntimeExecutionFixture.CreateAsync(ct);
+        var scope = await SeedAsync(fixture, ct);
+        var templates = new ChallengeRuntimeTemplateCatalog(); var flags = new PerTeamRuntimeFlagStore(fixture.Db);
+        var generator = new MissingFlagGenerator(fixture.Db, templates, flags);
+        await Assert.That(await generator.GenerateAsync(fixture.Application.CompetitionId, DateTimeOffset.UtcNow, ct)).IsEmpty();
+        var existing = await fixture.Db.ChallengeFlags.SingleAsync(value => value.CompetitionChallengeId == scope.ChallengeId && value.TeamId == scope.TeamId, ct);
+        var rules = (CtfCompetitionChallengeRules)(await fixture.Db.CompetitionChallenges.SingleAsync(value => value.Id == scope.ChallengeId, ct)).Rules!;
+        rules.FlagTemplate.Header = "updated";
+        var nextUser = new User { Id = Guid.NewGuid(), UserName = "next", NormalizedUserName = "NEXT", Email = "next@example.test", AccountStatus = UserAccountStatus.Active };
+        var nextTeam = new Team { Id = Guid.NewGuid(), CompetitionId = fixture.Application.CompetitionId, CaptainId = nextUser.Id,
+            MemberIds = [nextUser.Id], Name = "Next", InvitationToken = new string('n', 32), RegistrationStatus = TeamRegistrationStatus.Approved };
+        fixture.Db.Users.Add(nextUser); fixture.Db.Teams.Add(nextTeam); await fixture.Db.SaveChangesAsync(ct);
+        var retained = await flags.EnsureAsync(fixture.Application.CompetitionId, scope.ChallengeId, scope.TeamId, DateTimeOffset.UtcNow, ct);
+        var generated = await flags.EnsureAsync(fixture.Application.CompetitionId, scope.ChallengeId, nextTeam.Id, DateTimeOffset.UtcNow, ct);
+        await fixture.Db.SaveChangesAsync(ct);
+        await Assert.That(retained).IsEqualTo(existing.Flag);
+        await Assert.That(generated.StartsWith("updated{", StringComparison.Ordinal)).IsTrue();
     }
 
-    [Test]
-    [Timeout(300_000)]
-    public async Task Two_runtimes_are_claimed_by_distinct_runners_and_sent_only_to_node_queues(
-        CancellationToken cancellationToken)
+    private static async Task<RuntimeProvisioned> ProvisionAsync(RuntimeExecutionFixture fixture, Guid challengeId, Guid runtimeId, string flag, CancellationToken ct)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_runtime_node_routing")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await using var nats = new ContainerBuilder(
-                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
-                .WithPortBinding(4222, assignRandomHostPort: true).WithCommand("-js")
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222))
-                .Build();
-            await Task.WhenAll(postgres.StartAsync(cancellationToken),
-                nats.StartAsync(cancellationToken));
-            await using var connection = new NatsConnection(new NatsOpts
-            {
-                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
-            });
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var fixture = await SeedAsync(options, cancellationToken);
-            var secondUserId = Guid.CreateVersion7();
-            var secondTeamId = Guid.CreateVersion7();
-            await using var db = new NoCtfDbContext(options);
-            db.Users.Add(new User
-            {
-                Id = secondUserId,
-                UserName = "second-player",
-                NormalizedUserName = "SECOND-PLAYER",
-                Email = "second-player@example.test",
-                PasswordHash = "test",
-                CreatedAt = fixture.Now,
-                UpdatedAt = fixture.Now
-            });
-            db.Teams.Add(new Team
-            {
-                Id = secondTeamId,
-                CompetitionId = fixture.CompetitionId,
-                Name = "Second",
-                CaptainId = secondUserId,
-                MemberIds = [secondUserId],
-                InvitationToken = new string('c', 32),
-                RegistrationStatus = TeamRegistrationStatus.Approved,
-                RegisteredAt = fixture.Now
-            });
-            await db.SaveChangesAsync(cancellationToken);
-
-            var templates = new ChallengeRuntimeTemplateCatalog();
-            var outbox = new RecordingOutbox();
-            var runtimes = new RuntimeInstanceStore(
-                db,
-                templates,
-                new FixedRuntimePlacementPolicy(),
-                new PerTeamRuntimeFlagStore(db),
-                outbox);
-            var first = await runtimes.MutatePlayerRuntimeAsync(
-                new(
-                    fixture.CompetitionId,
-                    fixture.StartChallengeId,
-                    fixture.UserId,
-                    RuntimeAction.Start,
-                    null,
-                    fixture.Now),
-                cancellationToken);
-            var second = await runtimes.MutatePlayerRuntimeAsync(
-                new(
-                    fixture.CompetitionId,
-                    fixture.StartChallengeId,
-                    secondUserId,
-                    RuntimeAction.Start,
-                    null,
-                    fixture.Now),
-                cancellationToken);
-            await Assert.That(first.Failure).IsNull();
-            await Assert.That(second.Failure).IsNull();
-
-            var registry = new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System);
-            await using var ownerA = await new NatsClusterLeaseManager(connection)
-                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-a"),
-                    "runner-a", cancellationToken);
-            await using var ownerB = await new NatsClusterLeaseManager(connection)
-                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-b"),
-                    "runner-b", cancellationToken);
-            await Assert.That(ownerA).IsNotNull();
-            await Assert.That(ownerB).IsNotNull();
-            var runnerCapacity = new RuntimeResourceLimits(
-                512 * 1024 * 1024,
-                500,
-                256);
-            foreach (var runnerId in new[] { "runner-a", "runner-b" })
-            {
-                await registry.PublishHeartbeatAsync("tests", runnerId,
-                    RuntimeProvider.Docker, TimeSpan.FromMinutes(2), cancellationToken);
-                var registered = await registry.RegisterAsync(
-                    CurrentRunnerRegistration.Create(
-                        "tests",
-                        runnerId,
-                        new(
-                            runnerCapacity.MemoryBytes,
-                            runnerCapacity.CpuMillicores,
-                            runnerCapacity.PidsLimit),
-                        timeToLive: TimeSpan.FromMinutes(2),
-                        resourceDomainFencingToken: runnerId == "runner-a"
-                            ? ownerA!.FencingToken : ownerB!.FencingToken),
-                    cancellationToken);
-                await Assert.That(registered)
-                    .IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
-            }
-
-            using var cacheServices = new ServiceCollection()
-                .AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
-            var capacity = new PersistedRunnerCapacityGate(db, registry,
-                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox,
-                new RunnerCapacityLedgerCoordinator());
-            var dispatches = outbox.Published.OfType<DispatchRuntime>().ToArray();
-            await Assert.That(dispatches).Count().IsEqualTo(2);
-            foreach (var dispatch in dispatches)
-            {
-                await BackendMessageOperations.DispatchRuntimeAsync(
-                    dispatch,
-                    db,
-                    templates,
-                    new FixedRuntimePlacementPolicy(),
-                    capacity,
-                    outbox,
-                    TimeProvider.System,
-                    cancellationToken);
-            }
-
-            var provisions = outbox.RunnerNodeMessages
-                .OfType<ProvisionContainerRuntime>()
-                .ToArray();
-            await Assert.That(provisions).Count().IsEqualTo(2);
-            await Assert.That(provisions.Select(item => item.RunnerId).Distinct())
-                .Count()
-                .IsEqualTo(2);
-            await Assert.That(provisions
-                    .Select(item => RunnerNodeQueueName.FromRunnerId(item.RunnerId))
-                    .Distinct())
-                .Count()
-                .IsEqualTo(2);
-            var assignments = await db.RuntimeInstances.AsNoTracking()
-                .Where(item => item.Id == first.Runtime!.Id || item.Id == second.Runtime!.Id)
-                .Select(item => new { item.Id, item.RunnerId, item.State })
-                .ToArrayAsync(cancellationToken);
-            await Assert.That(assignments.Select(item => item.RunnerId).Distinct())
-                .Count()
-                .IsEqualTo(2);
-            await Assert.That(assignments.All(item => item.State == RuntimeState.Provisioning))
-                .IsTrue();
-        });
+        var runtime = await fixture.Db.RuntimeInstances.SingleAsync(value => value.Id == runtimeId, ct);
+        var entry = await fixture.Db.CompetitionChallenges.AsSplitQuery().SingleAsync(value => value.Id == challengeId, ct);
+        var definition = (await fixture.Db.Challenges.AsSplitQuery().SingleAsync(value => value.Id == entry.ChallengeId, ct)).Definition!;
+        var template = new ChallengeRuntimeTemplateCatalog().Get(definition, entry.Rules!)!;
+        var message = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(runtime, RuntimeExecutionFixture.RunnerId, GameMode.Ctf, template, definition, flag);
+        await fixture.ClaimAsync(message, ct);
+        var provisioned = await fixture.Handler.ProvisionContainerAsync(message, ct) as RuntimeProvisioned
+            ?? throw new InvalidOperationException("The team Runtime did not start.");
+        await fixture.PersistAsync(provisioned, ct); return provisioned;
     }
 
-    private static async Task<Fixture> SeedAsync(
-        DbContextOptions<NoCtfDbContext> options,
-        CancellationToken cancellationToken)
+    private static RuntimeInstanceStore Store(RuntimeExecutionFixture fixture) => new(fixture.Db, new ChallengeRuntimeTemplateCatalog(),
+        new ConfiguredRuntimePlacementPolicy(Options.Create(new RuntimePlacementOptions { RunnerPool = RuntimeExecutionFixture.Pool })),
+        new PerTeamRuntimeFlagStore(fixture.Db), fixture.Application.Publisher, new CompetitionEventStore(fixture.Db, fixture.Application.Publisher));
+
+    private static async Task<Scope> SeedAsync(RuntimeExecutionFixture fixture, CancellationToken ct)
     {
-        await using var db = new NoCtfDbContext(options);
-        await db.Database.EnsureCreatedAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
-        var userId = Guid.CreateVersion7(now);
-        var competitionId = Guid.CreateVersion7(now);
-        var teamId = Guid.CreateVersion7(now);
-        var startChallengeId = Guid.CreateVersion7(now);
-        var batchChallengeId = Guid.CreateVersion7(now);
-        var staticChallengeId = Guid.CreateVersion7(now);
-        db.Users.Add(new User
-        {
-            Id = userId,
-            UserName = "player",
-            NormalizedUserName = "PLAYER",
-            Email = "player@example.test",
-            PasswordHash = "test",
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        db.Competitions.Add(new CtfCompetition
-        {
-            Id = competitionId,
-            Title = "CTF runtime flags",
-            OwnerId = userId,
-            Status = CompetitionStatus.Running,
-            StartAt = now.AddHours(-1),
-            EndAt = now.AddHours(1),
-            FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
-            CreatedAt = now,
-            UpdatedAt = now,
-            ModeConfiguration = TestConfigurations.Competition(
-                GameMode.Ctf,
-                JsonSerializer.Serialize(
-                new CtfConfiguration(
-                    new(500, 100, 10),
-                    [],
-                    FlagTemplate: new("competition", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)))
-        });
-        db.Teams.Add(new Team
-        {
-            Id = teamId,
-            CompetitionId = competitionId,
-            Name = "Team",
-            CaptainId = userId,
-            MemberIds = [userId],
-            InvitationToken = new string('a', 32),
-            RegistrationStatus = TeamRegistrationStatus.Approved,
-            RegisteredAt = now
-        });
-
-        var perTeamRuntime = new ChallengeRuntimeTemplate(
-                        RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/challenge:v1", Environment: new Dictionary<string, string>
-                {
-                    ["CHALLENGE_FLAG"] = "author-value"
-                }, FlagEnvironmentVariableName: "CHALLENGE_FLAG")]),
-            Limits: new(268_435_456, 500, 128),
-            FlagSource: RuntimeFlagSource.PerTeam);
-        var staticRuntime = perTeamRuntime with
-        {
-            Definition = ((ContainerRuntimeDefinition)perTeamRuntime.Definition) with
-            {
-                Services = ((ContainerRuntimeDefinition)perTeamRuntime.Definition).Services.Select(service => service with { FlagEnvironmentVariableName = null }).ToArray()
-            },
-            FlagSource = RuntimeFlagSource.Static
-        };
-        AddChallenge(
-            db,
-            userId,
-            competitionId,
-            startChallengeId,
-            "Start",
-            1,
-            RuntimeConfiguration(perTeamRuntime),
-            new("challenge", "[TEAMHASH]", false),
-            now);
-        AddChallenge(
-            db,
-            userId,
-            competitionId,
-            batchChallengeId,
-            "Batch",
-            2,
-            RuntimeConfiguration(perTeamRuntime),
-            null,
-            now);
-        AddChallenge(
-            db,
-            userId,
-            competitionId,
-            staticChallengeId,
-            "Static",
-            3,
-            RuntimeConfiguration(staticRuntime),
-            null,
-            now);
-        await db.SaveChangesAsync(cancellationToken);
-        return new(
-            now,
-            userId,
-            competitionId,
-            teamId,
-            startChallengeId,
-            batchChallengeId,
-            staticChallengeId);
+        var db = fixture.Db; var competition = await db.Competitions.SingleAsync(value => value.Id == fixture.Application.CompetitionId, ct);
+        competition.RuntimeAccessMode = RuntimeAccessMode.Direct; competition.FlagDerivationSecret = RandomNumberGenerator.GetBytes(32);
+        var template = await db.Challenges.AsSplitQuery().SingleAsync(value => value.Id == fixture.Application.TemplateId, ct);
+        template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = RuntimeExecutionFixture.Image,
+            CpuCores = .1m, MemoryMiB = 64, Commands = [new() { Position = 0, Value = "sleep" }, new() { Position = 1, Value = "3600" }] }] };
+        template.Definition.Break!.EnvironmentTargets.Add(new() { ServiceName = "main", VariableName = "CHALLENGE_FLAG" });
+        var entryId = Guid.NewGuid(); var teamId = Guid.NewGuid(); var otherUserId = Guid.NewGuid();
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge { Id = entryId, CompetitionId = competition.Id, ChallengeId = template.Id, IsPublished = true,
+            Rules = new CtfCompetitionChallengeRules { HasFlagTemplate = true, FlagTemplate = new() { Header = "challenge", BodyTemplate = "[TEAMHASH]" },
+                Runtime = new() { Allocation = PersistedRuntimeAllocation.PerTeam, FlagSource = PersistedRuntimeFlagSource.PerTeam, TtlSeconds = 3600 } } });
+        db.Users.Add(new User { Id = otherUserId, UserName = "other", NormalizedUserName = "OTHER", Email = "other@example.test", AccountStatus = UserAccountStatus.Active });
+        db.Teams.AddRange(new Team { Id = teamId, CompetitionId = competition.Id, CaptainId = fixture.Application.OwnerId, MemberIds = [fixture.Application.OwnerId],
+            Name = "Owner team", InvitationToken = new string('o', 32), RegistrationStatus = TeamRegistrationStatus.Approved },
+            new Team { Id = Guid.NewGuid(), CompetitionId = competition.Id, CaptainId = otherUserId, MemberIds = [otherUserId],
+                Name = "Other team", InvitationToken = new string('t', 32), RegistrationStatus = TeamRegistrationStatus.Approved });
+        await db.SaveChangesAsync(ct); return new(entryId, teamId, otherUserId);
     }
-
-    private static void AddChallenge(
-        NoCtfDbContext db,
-        Guid ownerId,
-        Guid competitionId,
-        Guid competitionChallengeId,
-        string title,
-        int order,
-        string configurationFixture,
-        NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
-        DateTimeOffset now)
-    {
-        var challengeId = Guid.CreateVersion7(now);
-        db.Challenges.Add(new CtfChallenge
-        {
-            Id = challengeId,
-            OwnerId = ownerId,
-            Title = title,
-            Definition = TestConfigurations.Definition(GameMode.Ctf, configurationFixture),
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
-        {
-            Id = competitionChallengeId,
-            CompetitionId = competitionId,
-            ChallengeId = challengeId,
-            Order = order,
-            IsPublished = true,
-            Rules = TestConfigurations.Rules(
-                GameMode.Ctf,
-                JsonSerializer.Serialize(
-                new CtfChallengeConfiguration(
-                    null,
-                    null,
-                    FlagTemplate: flagTemplate),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
-            UpdatedAt = now
-        });
-    }
-
-    private static string RuntimeConfiguration(ChallengeRuntimeTemplate runtime) =>
-        JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(
-                null,
-                null,
-                Runtime: runtime),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-    private sealed record Fixture(
-        DateTimeOffset Now,
-        Guid UserId,
-        Guid CompetitionId,
-        Guid TeamId,
-        Guid StartChallengeId,
-        Guid BatchChallengeId,
-        Guid StaticChallengeId);
-
-    private sealed class FixedAwdProvisioner(AwdRuntimeProvisioningOutcome outcome)
-        : IAwdRuntimeProvisioner
-    {
-        public Task<AwdRuntimeProvisioningOutcome> EnsureAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult(outcome);
-    }
-
-    private sealed class FixedKohProvisioner(KohRuntimeProvisioningOutcome outcome)
-        : IKohRuntimeProvisioner
-    {
-        public Task<KohRuntimeProvisioningOutcome> EnsureAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult(outcome);
-    }
-
-    private sealed class RecordingOutbox : IPostCommitMessagePublisher
-    {
-        public List<object> Published { get; } = [];
-        public List<object> RunnerNodeMessages { get; } = [];
-
-        public ValueTask PublishAsync<T>(T message)
-        {
-            Published.Add(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            throw new NotSupportedException();
-
-        public ValueTask PublishToRunnerNodeAsync<T>(T message)
-            where T : IRunnerNodeMessage
-        {
-            RunnerNodeMessages.Add(message);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleToRunnerNodeAsync<T>(
-            T message,
-            DateTimeOffset scheduledAt)
-            where T : IRunnerNodeMessage =>
-            throw new NotSupportedException();
-
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
-    }
-
-    private sealed class FixedCapacityGate(string runnerId) : IRunnerCapacityGate
-    {
-        public Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
-            string runnerPool,
-            string candidateRunnerId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(RunnerHeartbeatStatus.Online);
-
-        public Task<RunnerPoolInventory> GetPoolInventoryAsync(
-            string runnerPool,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new RunnerPoolInventory(
-                RunnerPoolInventoryAvailability.Available,
-                [runnerId]));
-
-        public Task<RunnerCapacityClaim> TryClaimAsync(
-            RunnerCapacityRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new RunnerCapacityClaim(
-                RunnerCapacityAvailability.Claimed,
-                runnerId,
-                RunnerCapacityClaimState.Acquired));
-
-        public Task<RunnerCapacityClaim> TryClaimForRunnerAsync(
-            RunnerCapacityRequest request,
-            string candidateRunnerId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new RunnerCapacityClaim(
-                RunnerCapacityAvailability.Claimed,
-                candidateRunnerId,
-                RunnerCapacityClaimState.AlreadyOwned));
-
-        public Task<RunnerCapacityReleaseOutcome> ReleaseAsync(
-            Guid runtimeInstanceId,
-            string candidateRunnerId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(RunnerCapacityReleaseOutcome.Released);
-    }
+    private sealed record Scope(Guid ChallengeId, Guid TeamId, Guid OtherUserId);
 }

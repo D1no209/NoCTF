@@ -131,7 +131,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             var nextOrder = await db.CompetitionChallenges.AsNoTracking()
                 .Where(challenge => challenge.CompetitionId == fixture.ValidScope.CompetitionId)
                 .MaxAsync(challenge => challenge.Order, cancellationToken) + 1;
-            db.Challenges.Add(new AwdChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = templateId,
                 OwnerId = ownerId,
@@ -346,7 +346,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             UpdatedAt = now,
             DeletedAt = competitionDeletedAt
         });
-        db.Challenges.Add(new AwdChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = userId,

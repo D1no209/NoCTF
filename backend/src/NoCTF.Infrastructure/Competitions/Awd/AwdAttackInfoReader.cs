@@ -46,13 +46,13 @@ public sealed class AwdAttackInfoReader(NoCtfDbContext db) : IAwdAttackInfoReade
             && issue.RoundNumber <= round.Number && issue.ActiveStartTicks <= activeTicks
             && (issue.ExpiryRound == null || round.Number < issue.ExpiryRound)
             && (issue.ActiveExpiryTicks == null || activeTicks < issue.ActiveExpiryTicks)
-            && issue.PublicLocator != null && issue.PublicLocator != ""
-            && db.ChallengeFlags.Any(flag => flag.Id == issue.FlagId && flag.DeletedAt == null))
-            .Join(db.Set<AwdRoundStoreBudget>(), issue => new { issue.RulesId, issue.StoreId },
-                store => new { store.RulesId, store.StoreId }, (issue, store) => new
+            && db.ChallengeFlags.Any(flag => flag.Id == issue.FlagId && flag.DeletedAt == null && flag.PublicLocator != null && flag.PublicLocator != ""))
+            .Join(db.ChallengeFlags.AsNoTracking().IgnoreAutoIncludes(), issue => issue.FlagId, flag => flag.Id, (issue, flag) => new { Issue = issue, flag.PublicLocator })
+            .Join(db.Set<AwdRoundStoreBudget>(), item => new { item.Issue.RulesId, item.Issue.StoreId },
+                store => new { store.RulesId, store.StoreId }, (item, store) => new
                 {
-                    issue.FlagId, issue.RoundNumber, issue.StoreId, StoreName = store.Name, issue.Ordinal,
-                    issue.PublicLocator, issue.IssuedAt, issue.ExpiryRound, issue.ActiveExpiryTicks
+                    item.Issue.FlagId, item.Issue.RoundNumber, item.Issue.StoreId, StoreName = store.Name, item.Issue.Ordinal,
+                    item.PublicLocator, item.Issue.IssuedAt, item.Issue.ExpiryRound, item.Issue.ActiveExpiryTicks
                 });
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(item => item.RoundNumber).ThenBy(item => item.StoreName)

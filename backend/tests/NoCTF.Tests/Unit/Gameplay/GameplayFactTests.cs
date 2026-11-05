@@ -9,13 +9,13 @@ namespace NoCTF.Tests.Unit.Gameplay;
 public sealed class GameplayFactTests
 {
     [Test]
-    [Arguments(GameplayFactKind.FlagAttempt, GameplayFactResult.Correct)]
+    [Arguments(GameplayFactKind.BreakAttempt, GameplayFactResult.Correct)]
     [Arguments(GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong)]
     [Arguments(GameplayFactKind.FixAttempt, GameplayFactResult.Rejected)]
     [Arguments(GameplayFactKind.HintUnlock, GameplayFactResult.Unlocked)]
     [Arguments(GameplayFactKind.ManualAdjustment, GameplayFactResult.Applied)]
-    [Arguments(GameplayFactKind.AwdServiceTransition, GameplayFactResult.ServiceDown)]
-    [Arguments(GameplayFactKind.KohControlObservation, GameplayFactResult.Controlled)]
+    [Arguments(GameplayFactKind.CheckObservation, GameplayFactResult.ServiceDown)]
+    [Arguments(GameplayFactKind.ControlObservation, GameplayFactResult.Controlled)]
     public async Task Kinds_and_results_are_stable(GameplayFactKind kind, GameplayFactResult result)
     {
         await Assert.That(Enum.IsDefined(kind)).IsTrue();
@@ -52,7 +52,7 @@ public sealed class GameplayFactTests
             GameMode.Ctf,
             [new(teamId, "team", false, false, at.AddMinutes(-1))],
             [
-                new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.FlagAttempt, at,
+                new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.BreakAttempt, at,
                     GameplayFactState.Completed, GameplayFactResult.Correct, null),
                 new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ManualAdjustment, at.AddSeconds(1),
                     GameplayFactState.Completed, GameplayFactResult.Applied, null, Value: "25")
@@ -74,9 +74,9 @@ public sealed class GameplayFactTests
         var at = DateTimeOffset.Parse("2026-08-10T00:00:00Z");
         var facts = new[]
         {
-            new LeaderboardGameplayFact(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.KohControlObservation,
+            new LeaderboardGameplayFact(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ControlObservation,
                 at, GameplayFactState.Completed, GameplayFactResult.Controlled, null),
-            new LeaderboardGameplayFact(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.KohControlObservation,
+            new LeaderboardGameplayFact(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ControlObservation,
                 at.AddSeconds(1), GameplayFactState.Completed, GameplayFactResult.Controlled, null)
         };
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Koh,

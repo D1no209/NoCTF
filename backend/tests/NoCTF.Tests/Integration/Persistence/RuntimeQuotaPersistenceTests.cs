@@ -530,7 +530,7 @@ public sealed class RuntimeQuotaPersistenceTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/quota:v1")]),
             new RuntimeResourceLimits(67_108_864, 100, 64));
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = templateId,
             OwnerId = ownerId,

@@ -15,7 +15,9 @@ public enum ClusterScheduleKind
     LiveSoloMedia,
     LiveSoloCapture,
     ChallengeTiming,
-    Theory
+    Questionnaire,
+    TemplateCapabilityTestRecovery,
+    FixExecutionRecovery
 }
 
 public sealed record ClusterScheduleEntry(
@@ -193,6 +195,8 @@ internal static class ClusterScheduleMessageClock
             new NoCTF.Application.Messaging.DispatchQueuedRuntimes(dueAt),
         NoCTF.Application.Messaging.DispatchPendingGameplayFacts =>
             new NoCTF.Application.Messaging.DispatchPendingGameplayFacts(dueAt),
+        NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests value => value,
+        NoCTF.Application.Messaging.RecoverFixExecutions value => value,
         NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => value with { At = dueAt },
         NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => value,
         NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => value,
@@ -200,8 +204,8 @@ internal static class ClusterScheduleMessageClock
         NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => value,
         NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => value,
         NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => value,
-        NoCTF.Application.Theory.Papers.SweepTheoryActivity value => value,
-        NoCTF.Application.Theory.Activities.ApplyTheoryCorrection value => value,
+        NoCTF.Application.Questionnaires.Sessions.SweepQuestionnaireActivity value => value,
+        NoCTF.Application.Questionnaires.Activities.ApplyQuestionnaireCorrection value => value,
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,

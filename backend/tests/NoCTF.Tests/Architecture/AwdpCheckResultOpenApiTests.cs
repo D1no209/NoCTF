@@ -5,21 +5,21 @@ namespace NoCTF.Tests.Architecture;
 public sealed class AwdpCheckResultOpenApiTests
 {
     [Test]
-    public async Task Awdp_check_result_outcome_is_documented_as_the_three_public_strings()
+    public async Task Fix_check_callbacks_require_explicit_probe_identity_and_result()
     {
         using var swagger = await ReadSwaggerAsync();
-        var schema = swagger.RootElement
+        var schemas = swagger.RootElement
             .GetProperty("components")
-            .GetProperty("schemas")
-            .GetProperty("NoCTFAPIEndpointsInternalAwdpFixResultOutcome");
-
-        await Assert.That(schema.GetProperty("type").GetString()).IsEqualTo("string");
-        await Assert.That(schema.GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray())
-            .IsEquivalentTo([
-                "ExploitSucceeded",
-                "DefenseSucceeded",
-                "ServiceAbnormal"
-            ]);
+            .GetProperty("schemas");
+        var request = schemas.GetProperty("NoCTFAPIEndpointsInternalRecordCheckResultRequest");
+        await Assert.That(request.GetProperty("properties").TryGetProperty("outcome", out _)).IsFalse();
+        var probe = schemas.GetProperty("NoCTFAPIEndpointsInternalCheckProbeEvidenceRequest");
+        await Assert.That(probe.GetProperty("required").EnumerateArray().Select(value => value.GetString())).Contains("kind");
+        await Assert.That(probe.GetProperty("required").EnumerateArray().Select(value => value.GetString())).Contains("result");
+        var kinds = schemas.GetProperty("NoCTFDomainChallengesCapabilitiesCheckItemKind");
+        await Assert.That(kinds.GetProperty("type").GetString()).IsEqualTo("string");
+        await Assert.That(kinds.GetProperty("enum").EnumerateArray().Select(value => value.GetString()!)).IsEquivalentTo(new[]
+            { "Connection", "Functionality", "Vulnerability", "FlagWrite", "CurrentFlagRead", "HistoricalFlagRead" });
     }
 
     private static async Task<JsonDocument> ReadSwaggerAsync()

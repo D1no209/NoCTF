@@ -11,6 +11,8 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Awd;
 using System.Text.Json.Serialization;
+using NoCTF.API.Serialization;
+using NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
@@ -57,11 +59,11 @@ public sealed class CompetitionChallengeRulesContract
 }
 public sealed class CtfCompetitionChallengeRulesContract
 {
+    public CompetitionChallengeRuntimeRulesContract? Runtime { get; set; }
     public CtfScoreSettlementModeProtocol? ScoreSettlementMode { get; set; }
     public ScoreCurveContract? ScoreCurve { get; set; }
     public IReadOnlyList<BloodRewardContract>? BloodRewards { get; set; }
     public int? MaxFlagAttempts { get; set; }
-    public int? MaxPatchAttempts { get; set; }
     public long? WrongSubmissionPenalty { get; set; }
     public FlagTemplateContract? FlagTemplate { get; set; }
 }
@@ -183,6 +185,8 @@ public sealed record AwdStoreRuleContract(Guid StoreId, decimal Weight = 1m, int
 
 public sealed class AwdCompetitionChallengeRulesContract
 {
+    public CompetitionChallengeRuntimeRulesContract? Runtime { get; set; }
+    public bool AllowFixSubmissions { get; set; }
     public AwdRuleOverridesContract? Overrides { get; set; }
     public IReadOnlyList<AwdStoreRuleContract> StoreRules { get; set; } = [];
     public AwdAttackRewardModeProtocol? AttackRewardMode { get; set; }
@@ -195,6 +199,7 @@ public sealed class AwdCompetitionChallengeRulesContract
 }
 public sealed class AwdpCompetitionChallengeRulesContract
 {
+    public CompetitionChallengeRuntimeRulesContract? Runtime { get; set; }
     public ScoreCurveContract? BreakScoreCurve { get; set; }
     public ScoreCurveContract? FixScoreCurve { get; set; }
     public int? MaxBreakSubmissions { get; set; }
@@ -208,11 +213,19 @@ public sealed class AwdpCompetitionChallengeRulesContract
 }
 public sealed class KohCompetitionChallengeRulesContract
 {
+    public CompetitionChallengeRuntimeRulesContract? Runtime { get; set; }
     public int? PollIntervalSeconds { get; set; }
     public long? ControlPointsPerInterval { get; set; }
 }
 
-public sealed class LiveSoloCompetitionChallengeRulesContract;
+public sealed class LiveSoloCompetitionChallengeRulesContract
+{
+    public CompetitionChallengeRuntimeRulesContract? Runtime { get; set; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.LiveSolo.LiveSoloCompletionKind>))]
+    public NoCTF.Domain.LiveSolo.LiveSoloCompletionKind CompletionKind { get; set; }
+}
+
+public sealed record CompetitionChallengeRuntimeRulesContract(RuntimeAllocationProtocol Allocation, RuntimeFlagSourceProtocol FlagSource, int? TtlSeconds);
 
 public static class CompetitionChallengeRulesContractMapper
 {
@@ -239,7 +252,7 @@ public static class CompetitionChallengeRulesContractMapper
             GameModeProtocol.Awdp => contract.Awdp is not null
                 && ValidFlagTemplate(contract.Awdp.FlagTemplate),
             GameModeProtocol.Koh => contract.Koh is not null,
-            GameModeProtocol.LiveSolo => contract.LiveSolo is not null,
+            GameModeProtocol.LiveSolo => contract.LiveSolo is not null && Enum.IsDefined(contract.LiveSolo.CompletionKind),
             _ => false
         });
     }
@@ -267,68 +280,72 @@ public static class CompetitionChallengeRulesContractMapper
         {
             Mode = (GameModeProtocol)value.Mode
         };
-        var flagTemplate = value.HasFlagTemplate
-            ? new FlagTemplateContract(value.FlagTemplate.Header,
-                value.FlagTemplate.BodyTemplate, value.FlagTemplate.LeetLiteralText)
+        var flagTemplate = value is IChallengeFlagTemplateOverride { HasFlagTemplate: true } flags
+            ? new FlagTemplateContract(flags.FlagTemplate.Header,
+                flags.FlagTemplate.BodyTemplate, flags.FlagTemplate.LeetLiteralText)
             : null;
         switch (value)
         {
             case CtfCompetitionChallengeRules ctf:
                 result.Ctf = new CtfCompetitionChallengeRulesContract
                 {
+                    Runtime = RuntimeContract(ctf),
                     ScoreSettlementMode = ctf.ScoreSettlementMode is null ? null : (CtfScoreSettlementModeProtocol)ctf.ScoreSettlementMode.Value,
-                    ScoreCurve = value.HasScoreCurve ? Curve(value.ScoreCurve) : null,
-                    BloodRewards = value.BloodRewards.Count == 0 ? null : value.BloodRewards
+                    ScoreCurve = ctf.HasScoreCurve ? Curve(ctf.ScoreCurve) : null,
+                    BloodRewards = ctf.BloodRewards.Count == 0 ? null : ctf.BloodRewards
                         .OrderBy(item => item.Position)
                         .Select(item => new BloodRewardContract(
                             (BloodRewardPolicyProtocol)item.Policy, item.Value)).ToArray(),
-                    MaxFlagAttempts = value.MaxFlagAttempts,
-                    MaxPatchAttempts = value.MaxPatchAttempts,
-                    WrongSubmissionPenalty = value.WrongSubmissionPenalty,
+                    MaxFlagAttempts = ctf.MaxFlagAttempts,
+                    WrongSubmissionPenalty = ctf.WrongSubmissionPenalty,
                     FlagTemplate = flagTemplate
                 };
                 break;
             case AwdCompetitionChallengeRules awd:
                 result.Awd = new AwdCompetitionChallengeRulesContract
                 {
+                    Runtime = RuntimeContract(awd),
+                    AllowFixSubmissions = awd.AllowFixSubmissions,
                     Overrides = AwdRuleOverridesContract.FromDomain(awd.AwdOverrides),
                     StoreRules = awd.StoreRules.OrderBy(item => item.StoreId)
                         .Select(item => new AwdStoreRuleContract(item.StoreId, item.Weight, item.FlagsPerIssue)).ToArray(),
-                    AttackRewardMode = value.AttackRewardMode is null
-                        ? null : (AwdAttackRewardModeProtocol)value.AttackRewardMode.Value,
-                    AttackPoints = value.AttackPoints,
-                    VictimDefensePoolPoints = value.VictimDefensePoolPoints,
-                    CheckerIntervalSeconds = value.CheckerIntervalSeconds,
-                    ServiceHealthyPoints = value.ServiceHealthyPoints,
-                    ServiceUnhealthyPenalty = value.ServiceUnhealthyPenalty,
+                    AttackRewardMode = awd.AttackRewardMode is null
+                        ? null : (AwdAttackRewardModeProtocol)awd.AttackRewardMode.Value,
+                    AttackPoints = awd.AttackPoints,
+                    VictimDefensePoolPoints = awd.VictimDefensePoolPoints,
+                    CheckerIntervalSeconds = awd.CheckerIntervalSeconds,
+                    ServiceHealthyPoints = awd.ServiceHealthyPoints,
+                    ServiceUnhealthyPenalty = awd.ServiceUnhealthyPenalty,
                     FlagTemplate = flagTemplate
                 };
                 break;
-            case AwdpCompetitionChallengeRules:
+            case AwdpCompetitionChallengeRules awdp:
                 result.Awdp = new AwdpCompetitionChallengeRulesContract
                 {
-                    BreakScoreCurve = value.HasBreakScoreCurve ? Curve(value.BreakScoreCurve) : null,
-                    FixScoreCurve = value.HasFixScoreCurve ? Curve(value.FixScoreCurve) : null,
-                    MaxBreakSubmissions = value.MaxBreakSubmissions,
-                    MaxFixSubmissions = value.MaxFixSubmissions,
-                    RequireBreakBeforeFix = value.RequireBreakBeforeFix,
-                    FlagWrongPenalty = value.FlagWrongPenalty,
-                    ExploitSucceededPenalty = value.ExploitSucceededPenalty,
-                    ServiceAbnormalPenalty = value.ServiceAbnormalPenalty,
-                    EvaluationDispatchMode = value.EvaluationDispatchMode is null
-                        ? null : (EvaluationDispatchModeProtocol)value.EvaluationDispatchMode.Value,
+                    Runtime = RuntimeContract(awdp),
+                    BreakScoreCurve = awdp.HasBreakScoreCurve ? Curve(awdp.BreakScoreCurve) : null,
+                    FixScoreCurve = awdp.HasFixScoreCurve ? Curve(awdp.FixScoreCurve) : null,
+                    MaxBreakSubmissions = awdp.MaxBreakSubmissions,
+                    MaxFixSubmissions = awdp.MaxFixSubmissions,
+                    RequireBreakBeforeFix = awdp.RequireBreakBeforeFix,
+                    FlagWrongPenalty = awdp.FlagWrongPenalty,
+                    ExploitSucceededPenalty = awdp.ExploitSucceededPenalty,
+                    ServiceAbnormalPenalty = awdp.ServiceAbnormalPenalty,
+                    EvaluationDispatchMode = awdp.EvaluationDispatchMode is null
+                        ? null : (EvaluationDispatchModeProtocol)awdp.EvaluationDispatchMode.Value,
                     FlagTemplate = flagTemplate
                 };
                 break;
-            case KohCompetitionChallengeRules:
+            case KohCompetitionChallengeRules koh:
                 result.Koh = new KohCompetitionChallengeRulesContract
                 {
-                    PollIntervalSeconds = value.PollIntervalSeconds,
-                    ControlPointsPerInterval = value.ControlPointsPerInterval
+                    Runtime = RuntimeContract(koh),
+                    PollIntervalSeconds = koh.PollIntervalSeconds,
+                    ControlPointsPerInterval = koh.ControlPointsPerInterval
                 };
                 break;
-            case NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules:
-                result.LiveSolo = new LiveSoloCompetitionChallengeRulesContract();
+            case NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules solo:
+                result.LiveSolo = new LiveSoloCompetitionChallengeRulesContract { CompletionKind = solo.CompletionKind, Runtime = RuntimeContract(solo) };
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported rules {value.GetType().Name}.");
@@ -356,11 +373,11 @@ public static class CompetitionChallengeRulesContractMapper
                         Value = reward.Value
                     }).ToList(),
                 MaxFlagAttempts = value.Ctf.MaxFlagAttempts,
-                MaxPatchAttempts = value.Ctf.MaxPatchAttempts,
                 WrongSubmissionPenalty = value.Ctf.WrongSubmissionPenalty
             },
             GameModeProtocol.Awd => new AwdCompetitionChallengeRules
             {
+                AllowFixSubmissions = value.Awd!.AllowFixSubmissions,
                 AwdOverrides = value.Awd!.Overrides?.ToDomain() ?? new(),
                 StoreRules = value.Awd.StoreRules.Select(item => new AwdStoreRule
                 {
@@ -397,10 +414,26 @@ public static class CompetitionChallengeRulesContractMapper
                 PollIntervalSeconds = value.Koh!.PollIntervalSeconds,
                 ControlPointsPerInterval = value.Koh.ControlPointsPerInterval
             },
-            GameModeProtocol.LiveSolo => new NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules(),
+            GameModeProtocol.LiveSolo => new NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules { CompletionKind = value.LiveSolo!.CompletionKind },
             _ => throw new InvalidOperationException("Unsupported rules mode.")
         };
         result.CompetitionChallengeId = competitionChallengeId;
+        var runtime = value.Mode switch
+        {
+            GameModeProtocol.Ctf => value.Ctf!.Runtime,
+            GameModeProtocol.Awd => value.Awd!.Runtime,
+            GameModeProtocol.Awdp => value.Awdp!.Runtime,
+            GameModeProtocol.Koh => value.Koh!.Runtime,
+            GameModeProtocol.LiveSolo => value.LiveSolo!.Runtime,
+            _ => throw new InvalidOperationException("Unsupported runtime rules mode.")
+        };
+        if (result is IChallengeRuntimeRules runtimeRules && runtime is not null)
+            runtimeRules.Runtime = new()
+            {
+                Allocation = (PersistedRuntimeAllocation)runtime.Allocation,
+                FlagSource = (PersistedRuntimeFlagSource)runtime.FlagSource,
+                TtlSeconds = runtime.TtlSeconds
+            };
         var flagTemplate = value.Mode switch
         {
             GameModeProtocol.Ctf => value.Ctf!.FlagTemplate,
@@ -408,10 +441,10 @@ public static class CompetitionChallengeRulesContractMapper
             GameModeProtocol.Awdp => value.Awdp!.FlagTemplate,
             _ => null
         };
-        result.HasFlagTemplate = flagTemplate is not null;
-        if (flagTemplate is not null)
+        if (result is IChallengeFlagTemplateOverride flagRules)
         {
-            result.FlagTemplate = new FlagTemplateValue
+            flagRules.HasFlagTemplate = flagTemplate is not null;
+            if (flagTemplate is not null) flagRules.FlagTemplate = new FlagTemplateValue
             {
                 Header = flagTemplate.Header,
                 BodyTemplate = flagTemplate.BodyTemplate,
@@ -420,6 +453,9 @@ public static class CompetitionChallengeRulesContractMapper
         }
         return result;
     }
+
+    private static CompetitionChallengeRuntimeRulesContract RuntimeContract(IChallengeRuntimeRules rules) =>
+        new((RuntimeAllocationProtocol)rules.Runtime.Allocation, (RuntimeFlagSourceProtocol)rules.Runtime.FlagSource, rules.Runtime.TtlSeconds);
 
     private static ScoreCurveContract Curve(ScoreCurveValue value) => new(
         value.InitialPoints, value.MinimumPoints, value.DecayTeamCount,

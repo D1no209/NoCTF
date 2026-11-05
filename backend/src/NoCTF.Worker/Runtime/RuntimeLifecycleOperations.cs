@@ -105,8 +105,8 @@ internal static partial class BackendMessageOperations
                 && (instance.State == RuntimeState.Queued
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running
-                    || ((instance.Purpose == RuntimePurpose.AwdpTarget
-                            || instance.Purpose == RuntimePurpose.PatchVerificationTarget)
+                    || ((instance.Purpose == RuntimePurpose.FixTarget
+                            || instance.Purpose == RuntimePurpose.ScopedFixTarget)
                         && instance.GameplayFactId != null)))
             .OrderBy(instance => instance.CreatedAt)
             .AsSplitQuery()
@@ -244,12 +244,12 @@ internal static partial class BackendMessageOperations
                         fact.CompetitionId == instance.CompetitionId
                         && fact.CompetitionChallengeId == instance.CompetitionChallengeId
                         && fact.TeamId == instance.TeamId
-                        && fact.Kind == GameplayFactKind.FlagAttempt
+                        && fact.Kind == GameplayFactKind.BreakAttempt
                         // Historical solves must not reclaim a subsequently opened instance.
                         && fact.OccurredAt >= instance.CreatedAt
                         && fact.State == GameplayFactState.Completed
                         && fact.Result == GameplayFactResult.Correct)
-                    || instance.Purpose == RuntimePurpose.AwdpAttack
+                    || instance.Purpose == RuntimePurpose.AttackTarget
                     && db.GameplayFacts.Any(fact =>
                         fact.CompetitionId == instance.CompetitionId
                         && fact.CompetitionChallengeId == instance.CompetitionChallengeId

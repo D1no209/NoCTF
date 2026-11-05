@@ -48,7 +48,6 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
         var participantBindingIndexes = await db.Set<ChallengeRuntimeUrlBinding>()
             .AsNoTracking()
             .Where(binding => binding.ChallengeId == challengeId.Value
-                && !binding.IsControlCheck
                 && binding.Exposure == PersistedRuntimeExposure.Participants)
             .Select(binding => binding.Position)
             .ToArrayAsync(ct);

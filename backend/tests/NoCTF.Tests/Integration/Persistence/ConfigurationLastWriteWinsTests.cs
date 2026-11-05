@@ -146,7 +146,7 @@ public sealed class ConfigurationLastWriteWinsTests
             await using var verifyDb = new NoCtfDbContext(options);
             var persisted = await verifyDb.CompetitionChallenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
-            await Assert.That(persisted.Rules!.ScoreCurve.InitialPoints).IsEqualTo(700);
+            await Assert.That(((CtfCompetitionChallengeRules)persisted.Rules!).ScoreCurve.InitialPoints).IsEqualTo(700);
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
             await Assert.That(((CtfCompetitionModeConfiguration)persistedCompetition.ModeConfiguration!)
@@ -188,7 +188,7 @@ public sealed class ConfigurationLastWriteWinsTests
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,

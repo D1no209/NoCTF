@@ -62,21 +62,21 @@ Competition 以普通列 `TracksEnabled` 显式启停赛道，并以带 `Positio
 
 ### Challenge 与 CompetitionChallenge
 
-`Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
+`Challenge` 是全局可复用题库模板，保存题面、方向、附件、可选 Runtime 定义以及 Break、Fix、Check、Control、Questionnaire 中的一至五项能力。每项能力拥有独立强类型配置。模板不包含 GameMode、比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。能力定义及调用矩阵见 [题库能力](challenge-capabilities.md)。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、typed mode-specific rules TPH 和关系化 Hint。CTF/AWD/AWDP/KoH 还可配置开放、计分结束与提交截止时间；当前实现与验证见[题目时间配置](challenge-timing-status.md)。题目分值完全由 Rules leaf 与其关系子项决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选展示名称、Order、IsPublished、模式规则 TPH 和关系化 Hint。其实例模式与 Competition 一致，部署时校验题库能力。CTF/AWD/AWDP/KoH 还可配置开放、计分结束与提交截止时间；见 [题目时间配置](challenge-timing-status.md)。题目分值由规则决定。展示名称为空时实时使用 Challenge.Title。活动 Runtime 和在途执行依赖的技术配置受到修改保护；下一次 Start 或新 UUID Reset 读取最新定义。
 
-### 独立理论答题
+### Questionnaire
 
-理论题、不可变版本、选项、题源及授权独立于 `Challenge`。理论活动冻结候选版本和组卷规则，CTF/AWD/AWDP 可关联一个活动，既有比赛默认没有活动；独立练习和测验不要求比赛。
+Questionnaire 能力在 Challenge 中保存整份问卷。内容版本不可变，活动发布时固定候选版本，发卷时固定实际内容和顺序。独立考试、练习以用户为参与者。
 
-发卷以规范题源去重，选项排列持久化。队伍共享作答，答案保存不判分，交卷或超时后统一判分。参与者永远只获得总分，不返回逐题判定或解析。理论成绩使用最高／最后／累计策略并作为独立分项加入排行；暂停补时、封榜和资格继续统一生效。完整入口与验证记录见 [理论答题](theory-status.md)。
+发卷以规范题源去重，选项排列持久化。答案保存不判分，交卷或超时后统一判分。参与者只获得授权的成绩投影。活动成绩支持最高、最近或累计策略，并拥有独立排行榜。流程见 [Questionnaire](questionnaire.md)。
 
 ### GameplayFact
 
 GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当前唯一判定。Flag/Break 保存原文和 Hash，Fix/Hint/AWD Round 使用多态 Reference；ManualAdjustment 保存 canonical Int32 Value。重判覆盖同一行的 Result/FailureCode，不保留旧判定，也不保存分数。
 
-实践行为要求 `CompetitionChallengeId` 且不能关联理论试卷；`TheoryPaperSubmission` 要求真实、唯一的 `TheoryPaperId`，同时 `CompetitionChallengeId` 为空。理论逐题权威判定保存在试卷题目，分数从该判定派生；独立活动不产生比赛事实。理论事实不进入 Flag/Fix 列表、次数、作弊证据或通用重判。
+实践能力行为要求真实 CompetitionId 和 CompetitionChallengeId。独立 QuestionnaireAttempt 关联真实 QuestionnaireAssignment，CompetitionId、CompetitionChallengeId 和 TeamId 均为空。能力当前结果和关系型证据与当前判定一致保存，成绩可从这些记录重建。独立活动事实不进入比赛查询、计分、Webhook 或比赛通知。
 
 ### RuntimeInstance
 
@@ -117,7 +117,7 @@ Competition 聚合与必要的 Serializable 事务内：
 
 1. 重读状态与 StartAt/EndAt；只接受 Visible/Published，EndAt 必须仍在未来；
 2. 校验 typed Competition configuration、至少一个已发布且未删除的 CompetitionChallenge、所有实例模板存在且未删除；
-3. 校验每个已发布题的 leaf mode、typed Definition/Rules、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
+3. 校验每个已发布题的能力组合、强类型定义与比赛规则、Flag、附件、Runtime、Checker 及访问入口；
 4. 校验所有 Approved Team 未删除/未 Ban 且 TeamMember/Captain 关系有效；
 5. CTF：Static 题至少有一个可用通用 Flag或合法 RandomOne 候选；PerTeam 只验证模板，Flag 仍在各队 Runtime Start 前按需确认/生成；
 6. AWD：仅 Container，平台部署的 Runtime provider/runner pool 可用，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；

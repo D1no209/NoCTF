@@ -13,7 +13,8 @@ namespace NoCTF.API.Endpoints.LiveSolo;
 public sealed record LiveSoloPoolQuestionResponse(Guid Id, Guid ChallengeId, string Title, string? Description, string Direction,
     Guid ConcurrencyStamp, Guid MaterialStamp,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloMaterialOwnership>))] LiveSoloMaterialOwnership Ownership,
-    Guid? SourceTemplateId, ChallengeDefinitionContract? Definition, IReadOnlyList<Guid> QuestionGroupIds, IReadOnlyList<ChallengeAttachmentResponse> Attachments, IReadOnlyList<ChallengeFlagResponse> Flags, bool CanEditContent);
+    Guid? SourceTemplateId, ChallengeDefinitionContract? Definition, IReadOnlyList<Guid> QuestionGroupIds, IReadOnlyList<ChallengeAttachmentResponse> Attachments, IReadOnlyList<ChallengeFlagResponse> Flags, bool CanEditContent,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloCompletionKind>))] LiveSoloCompletionKind CompletionKind);
 public sealed record LiveSoloQuestionPoolResponse(IReadOnlyList<LiveSoloPoolQuestionResponse> Items, bool CanManage);
 public sealed record LiveSoloPoolFailureResponse(
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloPoolFailure>))] LiveSoloPoolFailure Code)
@@ -25,7 +26,7 @@ internal static class LiveSoloPoolProtocol
 {
     public static LiveSoloPoolQuestionResponse Question(LiveSoloPoolQuestion value, bool configuration = true) => new(value.Id,
         value.ChallengeId, value.Title, value.Description, value.Direction, value.ConcurrencyStamp, value.MaterialStamp,
-        value.Ownership, value.SourceTemplateId, configuration ? ChallengeDefinitionContractMapper.FromDomain(value.Definition) : null, value.QuestionGroupIds, value.Attachments.Select(x => ChallengeAttachmentMapping.ToResponse(x)).ToArray(), configuration ? value.Flags.Select(ChallengeFlagMapping.ToResponse).ToArray() : [], configuration && value.CanEditContent);
+        value.Ownership, value.SourceTemplateId, configuration ? ChallengeDefinitionContractMapper.FromDomain(value.Definition) : null, value.QuestionGroupIds, value.Attachments.Select(x => ChallengeAttachmentMapping.ToResponse(x)).ToArray(), configuration ? value.Flags.Select(ChallengeFlagMapping.ToResponse).ToArray() : [], configuration && value.CanEditContent, value.CompletionKind);
     public static Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult> Mutation(LiveSoloPoolResult value) => value.Failure switch
     {
         null when value.Question is not null => TypedResults.Ok(Question(value.Question)),

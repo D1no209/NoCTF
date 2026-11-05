@@ -33,8 +33,7 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Challenge>()
             .WithMany()
-            .HasForeignKey(item => new { item.ChallengeId, item.Mode })
-            .HasPrincipalKey(challenge => new { challenge.Id, challenge.Mode })
+            .HasForeignKey(item => item.ChallengeId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(item => item.Direction).WithMany()
             .HasForeignKey(item => new { item.CompetitionId, item.DirectionId })

@@ -7,7 +7,8 @@ public enum RuntimeWorkloadKind : short
     Runtime,
     VerificationTarget,
     AwdChecker,
-    PatchChecker
+    PatchChecker,
+    TemplateChecker
 }
 
 public enum RunnerAdmissionState : short
@@ -40,7 +41,7 @@ public readonly record struct RuntimeWorkloadIdentity(
     Guid OperationId)
 {
     [JsonIgnore]
-    public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker;
+    public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker;
 
     // Text is used only at external provider and diagnostic boundaries.
     [JsonIgnore]
@@ -78,7 +79,8 @@ public sealed record RuntimeCapacityAllocation(
         ArgumentException.ThrowIfNullOrWhiteSpace(ResourceDomain);
         ArgumentException.ThrowIfNullOrWhiteSpace(RunnerId);
         if (ResourceDomain.Length > 256 || RunnerId.Length > 128
-            || Identity.IsAuxiliary && GameplayFactId is null
+            || Identity.IsAuxiliary && Identity.Kind != RuntimeWorkloadKind.TemplateChecker && GameplayFactId is null
+            || Identity.Kind == RuntimeWorkloadKind.TemplateChecker && GameplayFactId is not null
             || GameplayFactId == Guid.Empty)
             throw new InvalidOperationException("Invalid capacity allocation owner or fact identity.");
         Budget.Validate();

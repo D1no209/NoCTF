@@ -576,7 +576,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     TeamRegistrationStatus.Approved,
                     false,
                     now));
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,

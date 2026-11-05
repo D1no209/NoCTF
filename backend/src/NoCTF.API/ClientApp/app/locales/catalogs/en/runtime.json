@@ -72,7 +72,7 @@
   "runtime.label.accessEntrance": "access entrance",
   "runtime.runtime.label.oneTimeFixVerification": "One-time Fix verification target",
   "runtime.runtime.label.oneTimeFixVerification.adminRuntime": "One-time Fix verification target · {team}",
-  "runtime.runtime.description.awdpAttackRuntimeBound": "AWDP attack runtime without a bound team",
+  "runtime.runtime.description.awdpAttackRuntimeBound": "Attack environment without a bound team",
   "runtime.runtimeCard.description.environmentStatusUpdateTimed": "The environment status update timed out, please refresh manually later.",
   "runtime.urlBinding.description.visibleTeamItself": "Only visible to the team itself",
   "runtime.label.staticFlagTemplatePreset": "Static Flag (template preset)",
@@ -175,5 +175,6 @@
   "runtime.defaults.checkerTimeoutSeconds": "60",
   "runtime.label.compose": "Compose",
   "runtime.terminate.reasonLimitSuffix": "/512",
-  "runtime.label.service": "service"
+  "runtime.label.service": "service",
+  "runtime.label.runtimeAllocation": "Environment allocation"
 }

@@ -4,8 +4,7 @@ namespace NoCTF.Tests.Architecture;
 
 public class AdminOpenApiRulesTests
 {
-    // This existing endpoint moved into the bank administration route without changing its SDK contract.
-    private const string LiveSoloCopyRoute = "POST /api/v1/admin/challenges/live-solo/copies";
+    private const string TemplateCopyRoute = "POST /api/v1/admin/challenges/copies";
 
     [Test]
     public async Task Patch_download_contract_declares_binary_bytes_and_authenticated_error_responses()
@@ -40,13 +39,11 @@ public class AdminOpenApiRulesTests
                     operation.Value)))
             .ToArray();
 
-        await Assert.That(operations).Count().IsEqualTo(158);
+        await Assert.That(operations).Count().IsEqualTo(174);
         await Assert.That(operations
             .Where(operation => !operation.Value.TryGetProperty("operationId", out var id)
                 || id.GetString() is not { } value
-                || (operation.Route == LiveSoloCopyRoute
-                    ? value != "CopyLiveSoloTemplate"
-                    : !value.StartsWith("Admin", StringComparison.Ordinal)))
+                || !value.StartsWith("Admin", StringComparison.Ordinal))
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
         await Assert.That(operations
@@ -72,15 +69,15 @@ public class AdminOpenApiRulesTests
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
         await Assert.That(operations
-            .Where(operation => operation.Route != LiveSoloCopyRoute
+            .Where(operation => operation.Route != TemplateCopyRoute
                 && operation.Value.GetProperty("responses").TryGetProperty("422", out _))
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
-        var copyFailure = operations.Single(operation => operation.Route == LiveSoloCopyRoute).Value
+        var copyFailure = operations.Single(operation => operation.Route == TemplateCopyRoute).Value
             .GetProperty("responses").GetProperty("422").GetProperty("content")
             .GetProperty("application/json").GetProperty("schema").GetProperty("$ref").GetString();
         await Assert.That(copyFailure).IsEqualTo(
-            "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse");
+            "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateCopyFailureResponse");
         await Assert.That(operations
             .Where(operation => operation.Value.GetProperty("responses").TryGetProperty("400", out var badRequest)
                 && !HasValidationProblemContent(badRequest))

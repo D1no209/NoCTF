@@ -30,8 +30,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider3 = __timeProvider3;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -47,13 +45,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await NoCTF.Worker.CompetitionNotificationMessageHandlers.Handle(teamBanCorrected, competitionNotificationDelivery, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: TeamBanCorrectedHandler225432353
     
     
 }
-

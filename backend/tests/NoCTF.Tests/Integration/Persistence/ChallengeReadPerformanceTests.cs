@@ -108,7 +108,7 @@ public sealed class ChallengeReadPerformanceTests
         {
             var challengeId = Guid.CreateVersion7();
             if (index == 0) firstChallengeId = challengeId;
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
@@ -125,13 +125,12 @@ public sealed class ChallengeReadPerformanceTests
         return (ownerId, firstChallengeId);
     }
 
-    private static CtfChallengeDefinition RichDefinition() => new()
+    private static ChallengeDefinition RichDefinition() => new()
     {
+        Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()],
         Runtime = new ContainerChallengeRuntimeTemplate
         {
             Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example.test/challenge:current" }],
-            Allocation = PersistedRuntimeAllocation.PerTeam,
-            FlagSource = PersistedRuntimeFlagSource.PerTeam,
             UrlBindings = [
                 new() { Position = 0, UrlTemplate = "http://{HOST}:{PORT}", ContainerPort = 80 },
                 new() { Position = 1, UrlTemplate = "tcp://{HOST}:{PORT}", ContainerPort = 443 }
@@ -151,7 +150,7 @@ public sealed class ChallengeReadPerformanceTests
             .Select(challenge => new ChallengeTemplateView(
                 challenge.Id, challenge.OwnerId,
                 challenge.Managers.Select(manager => manager.UserId).ToArray(),
-                challenge.Mode, challenge.Visibility, challenge.Title,
+                challenge.Definition!.Capabilities.Select(capability => capability.Kind).ToArray(), challenge.Visibility, challenge.Title,
                 challenge.Description, challenge.Direction, challenge.Definition!,
                 challenge.DeletedAt, 0, challenge.CreatedAt, challenge.UpdatedAt))
             .ToArrayAsync(ct);
@@ -181,7 +180,7 @@ public sealed class ChallengeReadPerformanceTests
             .Select(challenge => new ChallengeTemplateView(
                 challenge.Id, challenge.OwnerId,
                 challenge.Managers.Select(manager => manager.UserId).ToArray(),
-                challenge.Mode, challenge.Visibility, challenge.Title,
+                challenge.Definition!.Capabilities.Select(capability => capability.Kind).ToArray(), challenge.Visibility, challenge.Title,
                 challenge.Description, challenge.Direction, challenge.Definition!,
                 challenge.DeletedAt, 0, challenge.CreatedAt, challenge.UpdatedAt))
             .SingleAsync(ct);

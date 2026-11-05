@@ -239,8 +239,8 @@ public sealed class LiveSoloDirectionPoolPersistenceTests
         var presets = new List<Guid>();
         for (var i = 0; i < directions.Length; i++)
         {
-            var template = new LiveSoloChallenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Draw question " + i, Direction = directions[i],
-                Definition = new LiveSoloChallengeDefinition(), CreatedAt = f.Now, UpdatedAt = f.Now };
+            var template = new Challenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Draw question " + i, Direction = directions[i],
+                Definition = TestConfigurations.Definition(NoCTF.Domain.Competitions.GameMode.LiveSolo), CreatedAt = f.Now, UpdatedAt = f.Now };
             var entry = new LiveSoloCompetitionChallenge { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, ChallengeId = template.Id,
                 Rules = new LiveSoloCompetitionChallengeRules(), Order = i + 2, UpdatedAt = f.Now };
             f.Db.Add(template); f.Db.Add(entry);

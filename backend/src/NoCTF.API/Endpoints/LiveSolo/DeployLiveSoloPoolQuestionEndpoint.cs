@@ -3,6 +3,9 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.LiveSolo.Templates;
+using NoCTF.Domain.LiveSolo;
+using NoCTF.API.Serialization;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.LiveSolo;
 
@@ -11,11 +14,13 @@ public sealed class DeployLiveSoloPoolQuestionRequest
     public Guid CompetitionId { get; set; }
     public Guid SourceTemplateId { get; set; }
     public Guid ExpectedSourceStamp { get; set; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloCompletionKind>))]
+    public LiveSoloCompletionKind CompletionKind { get; set; }
 }
 public sealed class DeployLiveSoloPoolQuestionValidator : Validator<DeployLiveSoloPoolQuestionRequest>
 {
     public DeployLiveSoloPoolQuestionValidator()
-    { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.SourceTemplateId).NotEmpty(); RuleFor(x => x.ExpectedSourceStamp).NotEmpty(); }
+    { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.SourceTemplateId).NotEmpty(); RuleFor(x => x.ExpectedSourceStamp).NotEmpty(); RuleFor(x => x.CompletionKind).IsInEnum(); }
 }
 public sealed class DeployLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
     : Endpoint<DeployLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>>
@@ -27,5 +32,5 @@ public sealed class DeployLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPoo
         Summary(x => x.Summary = "Adds an applicable LiveSolo template once, following the bank until competition content is edited.");
     }
     public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(DeployLiveSoloPoolQuestionRequest req, CancellationToken ct) =>
-        LiveSoloPoolProtocol.Mutation(await pool.DeployAsync(new(req.CompetitionId, user.UserId, req.SourceTemplateId, req.ExpectedSourceStamp, clock.GetUtcNow()), ct));
+        LiveSoloPoolProtocol.Mutation(await pool.DeployAsync(new(req.CompetitionId, user.UserId, req.SourceTemplateId, req.ExpectedSourceStamp, clock.GetUtcNow(), req.CompletionKind), ct));
 }

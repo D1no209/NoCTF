@@ -209,14 +209,14 @@ public sealed class AwdRoundCoordinator(
             : new PerTeamFlagTemplate(previous.FlagHeader, previous.FlagBodyTemplate, false);
         if (!AwdFlagGenerator.IsValidTemplate(flagTemplate)) throw new InvalidOperationException("AWD flag template is insecure.");
         var stores = previous is null
-            ? ((AwdChallengeDefinition)template.Definition!).FlagStores.Select(store =>
+            ? template.Definition!.Break!.FlagStores.Select(store =>
             {
                 var overrideRule = ((AwdCompetitionChallengeRules)challenge.Rules!).StoreRules.SingleOrDefault(rule => rule.StoreId == store.Id);
                 return new AwdRoundStoreBudget
                 {
                     StoreId = store.Id, Name = store.Name, Weight = overrideRule?.Weight ?? 1m,
                     FlagsPerIssue = overrideRule?.FlagsPerIssue ?? effective.Options.FlagsPerStore,
-                    DeliveryMode = store.DeliveryMode, InjectionCommand = store.InjectionCommand,
+                    DeliveryMode = (AwdFlagDeliveryMode)store.DeliveryKind, InjectionCommand = store.InjectionCommand,
                     TargetServiceName = store.TargetServiceName, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
                     PreservesHistoricalFlags = store.PreservesHistoricalFlags
                 };

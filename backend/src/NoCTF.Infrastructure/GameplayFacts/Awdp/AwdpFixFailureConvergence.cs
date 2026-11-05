@@ -5,6 +5,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Awdp;
 
@@ -30,8 +31,8 @@ public static class AwdpFixFailureConvergence
         AwdpFixRuntimeCleanupMode cleanupMode,
         CancellationToken cancellationToken)
     {
-        if (runtime.Purpose is not (RuntimePurpose.AwdpTarget
-                or RuntimePurpose.PatchVerificationTarget)
+        if (runtime.Purpose is not (RuntimePurpose.FixTarget
+                or RuntimePurpose.ScopedFixTarget)
             || runtime.GameplayFactId is not Guid gameplayFactId)
             return new(false, false, false);
 
@@ -46,17 +47,46 @@ public static class AwdpFixFailureConvergence
             || fact.TeamId != runtime.TeamId)
             return new(false, false, false);
 
+        if (runtime.State == RuntimeState.Stopped && fact.State == GameplayFactState.Processing
+            && fact.Result is not null && fact.FixExecution is { Phase: FixExecutionPhase.Finalizing, WorkCompletedAt: not null, ExecutionFailure: null })
+        {
+            await outbox.PublishAsync(new FinalizeFixExecution(fact.Id, runtime.Id));
+            return new(false, false, false);
+        }
+
         var factConverged = fact.State is GameplayFactState.Pending
-            or GameplayFactState.Processing;
+            or GameplayFactState.Queued or GameplayFactState.Processing;
         if (factConverged)
         {
+            if (fact.FixExecution is { } execution)
+            {
+                execution.FailedPhase ??= execution.Phase;
+                execution.ExecutionFailure ??= runtime.FailureCode == RuntimeFailureCode.CleanupFailed
+                    ? CapabilityExecutionFailure.ResourceCleanupFailed : CapabilityExecutionFailure.ExecutionInterrupted;
+                if (execution.Phase == FixExecutionPhase.Checking && !fact.CapabilityOutcomes.Any(outcome => outcome.Kind == ChallengeCapabilityKind.Check))
+                    fact.CapabilityOutcomes.Add(new CheckOutcome
+                    {
+                        GameplayFactId = fact.Id, RuntimeInstanceId = runtime.Id, ObservedAt = failedAt,
+                        ExecutionState = CapabilityExecutionState.PlatformFailed, ExecutionFailure = execution.ExecutionFailure
+                    });
+                if (execution.Phase is FixExecutionPhase.Queued or FixExecutionPhase.Applying
+                    && !fact.CapabilityOutcomes.Any(outcome => outcome.Kind == ChallengeCapabilityKind.Fix))
+                    fact.CapabilityOutcomes.Add(new FixOutcome
+                    {
+                        GameplayFactId = fact.Id, RuntimeInstanceId = runtime.Id, ObservedAt = failedAt,
+                        ExecutionState = CapabilityExecutionState.PlatformFailed, ExecutionFailure = execution.ExecutionFailure
+                    });
+            }
             fact.State = GameplayFactState.PlatformFailed;
             fact.Result = null;
-            fact.FailureCode = runtime.Purpose == RuntimePurpose.AwdpTarget
+            fact.FailureCode = runtime.Purpose == RuntimePurpose.FixTarget
                 ? GameplayFactFailureCode.AwdpPlatformFailed
-                : GameplayFactFailureCode.PatchVerificationPlatformFailed;
+                : GameplayFactFailureCode.FixPlatformFailure;
             fact.UpdatedAt = failedAt;
             await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
+            var roundId = await db.LiveSoloSubmissions.Where(submission => submission.GameplayFactId == fact.Id)
+                .Select(submission => (Guid?)submission.RoundId).SingleOrDefaultAsync(cancellationToken);
+            if (roundId is Guid scopedRound) await outbox.PublishAsync(new NoCTF.Application.LiveSolo.Rounds.ResolveLiveSoloSubmissionResults(scopedRound));
             await RecordFactEventsAsync(
                 fact,
                 runtime,
@@ -65,12 +95,18 @@ public static class AwdpFixFailureConvergence
                 cancellationToken);
         }
 
+        if (fact.FixExecution is { } details)
+        {
+            details.Phase = runtime.State == RuntimeState.Stopped ? FixExecutionPhase.Finished : FixExecutionPhase.Finalizing;
+            if (runtime.State == RuntimeState.Stopped) details.FinalizedAt = runtime.StoppedAt ?? failedAt;
+        }
+
         var runtimeStateChanged = false;
         var cleanupRequested = false;
         if (cleanupMode == AwdpFixRuntimeCleanupMode.EnsureStop
-            && runtime.State is RuntimeState.Running or RuntimeState.Stopping)
+            && runtime.State is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping)
         {
-            if (runtime.State == RuntimeState.Running)
+            if (runtime.State != RuntimeState.Stopping)
             {
                 runtime.State = RuntimeState.Stopping;
                 runtimeStateChanged = true;
@@ -102,7 +138,7 @@ public static class AwdpFixFailureConvergence
         CancellationToken cancellationToken)
     {
         await events.RecordAsync(new(
-            fact.CompetitionId,
+            fact.CompetitionId!.Value,
             CompetitionEventKind.GameplayFactAdjudicated,
             CompetitionEventLevel.Error,
             CompetitionEventVisibility.Team,
@@ -116,14 +152,14 @@ public static class AwdpFixFailureConvergence
             GameplayFactState: fact.State,
             RuntimeState: runtime.State), cancellationToken);
 
-        if (runtime.Purpose != RuntimePurpose.AwdpTarget)
+        if (runtime.Purpose != RuntimePurpose.FixTarget)
             return;
 
         if (fact.ReferenceId is not Guid patchUploadId
             || fact.TeamId is not Guid teamId)
             return;
         await events.RecordAsync(new(
-            fact.CompetitionId,
+            fact.CompetitionId!.Value,
             CompetitionEventKind.AwdpFixResolved,
             CompetitionEventLevel.Error,
             CompetitionEventVisibility.Public,

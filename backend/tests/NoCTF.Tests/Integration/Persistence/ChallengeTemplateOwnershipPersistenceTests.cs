@@ -104,7 +104,7 @@ public sealed class ChallengeTemplateOwnershipPersistenceTests
         UpdatedAt = now
     };
 
-    private static CtfChallenge Template(Guid ownerId, string title, string direction, DateTimeOffset now) => new()
+    private static Challenge Template(Guid ownerId, string title, string direction, DateTimeOffset now) => new()
     {
         Id = Guid.CreateVersion7(),
         OwnerId = ownerId,

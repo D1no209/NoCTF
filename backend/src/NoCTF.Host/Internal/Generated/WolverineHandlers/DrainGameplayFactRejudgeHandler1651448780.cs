@@ -26,8 +26,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider = timeProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -42,13 +40,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await gameplayFactDrainMessageHandler.Handle(drainGameplayFactRejudge, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: DrainGameplayFactRejudgeHandler1651448780
     
     
 }
-

@@ -66,24 +66,24 @@ public sealed class AwdAttackEvaluationTests
         await Assert.That(Evaluate(fact, flag, rules).AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.NotScorable);
         rules.Teams.RemoveAt(1);
         await Assert.That(Evaluate(fact, flag, rules).AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.NotScorable);
-        var missing = new AwdGameplayFactEvaluator().Evaluate(new(fact, [], [flag], null,
+        var missing = new BreakCapabilityEvaluator(new AwdGameplayFactEvaluator()).Evaluate(new(fact, [], [flag], null,
             new AwdCompetitionModeConfiguration(), new AwdCompetitionChallengeRules()));
         await Assert.That(missing.AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.SystemError);
     }
 
-    private static AwdRoundRules IssuanceRules(FlagAttemptGameplayFact fact, ChallengeFlag flag) => new()
+    private static AwdRoundRules IssuanceRules(BreakAttemptGameplayFact fact, ChallengeFlag flag) => new()
     {
-        Id = flag.AwdIssue?.RulesId ?? Guid.NewGuid(), CompetitionId = fact.CompetitionId,
+        Id = flag.AwdIssue?.RulesId ?? Guid.NewGuid(), CompetitionId = fact.CompetitionId!.Value,
         CompetitionChallengeId = fact.CompetitionChallengeId!.Value,
         Teams = [new() { TeamId = flag.TeamId!.Value }, new() { TeamId = fact.TeamId!.Value }]
     };
 
-    private static GameplayFactDecision Evaluate(FlagAttemptGameplayFact fact, ChallengeFlag flag, AwdRoundRules? rules = null) =>
-        new AwdGameplayFactEvaluator().Evaluate(new(fact, [], [flag], null,
+    private static GameplayFactDecision Evaluate(BreakAttemptGameplayFact fact, ChallengeFlag flag, AwdRoundRules? rules = null) =>
+        new BreakCapabilityEvaluator(new AwdGameplayFactEvaluator()).Evaluate(new(fact, [], [flag], null,
             new AwdCompetitionModeConfiguration(), new AwdCompetitionChallengeRules(),
             AwdIssuanceRules: [rules ?? IssuanceRules(fact, flag)]));
 
-    private static (FlagAttemptGameplayFact Fact, ChallengeFlag Flag) Pair()
+    private static (BreakAttemptGameplayFact Fact, ChallengeFlag Flag) Pair()
     {
         var now = DateTimeOffset.UtcNow;
         var competition = Guid.NewGuid();
@@ -98,7 +98,8 @@ public sealed class AwdAttackEvaluationTests
                 State = AwdFlagIssueState.Issued, DeliveryState = AwdFlagDeliveryState.Unconfirmed,
                 IssuedAt = now.AddMinutes(-6), ActiveStartTicks = 0 }
         };
-        var fact = new FlagAttemptGameplayFact
+        flag.FlagSha256 = NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash(flag.Flag);
+        var fact = new BreakAttemptGameplayFact
         {
             Id = Guid.NewGuid(), CompetitionId = competition, CompetitionChallengeId = question,
             TeamId = Guid.NewGuid(), Value = flag.Flag, OccurredAt = now,

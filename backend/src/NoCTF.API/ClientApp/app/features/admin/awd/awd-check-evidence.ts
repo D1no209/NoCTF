@@ -41,6 +41,7 @@ const labels = {
   InvalidEvidence: 'administration.awd.check.InvalidEvidence',
   RuntimeSuperseded: 'administration.awd.check.RuntimeSuperseded',
   LateReceipt: 'administration.awd.check.LateReceipt',
+  PlayerMaintenance: 'administration.awd.check.PlayerMaintenance',
 } satisfies Record<CheckValue, MessageKey>
 export function awdCheckLabel(value?: CheckValue | null) { return translate(labels[value ?? 'Unknown']) }
 

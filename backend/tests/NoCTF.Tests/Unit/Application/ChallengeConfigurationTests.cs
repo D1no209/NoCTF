@@ -1,148 +1,44 @@
+using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
-using NoCTF.Domain.Competitions;
+using NoCTF.Application.Challenges.Management;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
 
-public class ChallengeConfigurationTests
+[Category("Integration")]
+public sealed class ChallengeConfigurationTests
 {
-    [Test]
-    [Arguments(CompetitionStatus.Running)]
-    [Arguments(CompetitionStatus.Paused)]
-    [Arguments(CompetitionStatus.Finished)]
-    public async Task UpdateChallengeConfiguration_IsAllowedInEveryLifecycleState(
-        CompetitionStatus status)
+    [Test, Timeout(300_000), Arguments(CompetitionStatus.Draft), Arguments(CompetitionStatus.Running), Arguments(CompetitionStatus.Paused), Arguments(CompetitionStatus.Finished)]
+    public async Task Rule_updates_persist_current_values_across_lifecycle_states(CompetitionStatus status, CancellationToken ct)
     {
-        var store = new Store(View(status));
-        var useCase = new UpdateChallengeConfiguration(
-            store,
-            new Catalog());
-
-        var result = await useCase.ExecuteAsync(
-            store.Current!.CompetitionId,
-            store.Current.CompetitionChallengeId,
-            Rules(1),
-            DateTimeOffset.UtcNow);
-
-        await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.UpdateCalls).IsEqualTo(1);
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(status, ct);
+        var created = await new CreateChallenge(fixture.Challenges, fixture.Catalog).ExecuteAsync(new(null, fixture.CompetitionId, fixture.TemplateId, 0, fixture.Now), ct);
+        await Assert.That(created.Failure).IsNull();
+        var entryId = created.Challenge!.Id;
+        var update = new UpdateChallengeConfiguration(fixture.Configurations, fixture.Catalog);
+        var first = await update.ExecuteAsync(fixture.CompetitionId, entryId, new CtfCompetitionChallengeRules { MaxFlagAttempts = 2 }, fixture.Now.AddSeconds(1), ct);
+        var last = await update.ExecuteAsync(fixture.CompetitionId, entryId, new CtfCompetitionChallengeRules { MaxFlagAttempts = 3 }, fixture.Now.AddSeconds(2), ct);
+        await Assert.That(first.ErrorMessage).IsNull(); await Assert.That(last.ErrorMessage).IsNull();
+        await Assert.That(first.Succeeded).IsTrue(); await Assert.That(last.Succeeded).IsTrue();
+        fixture.Db.ChangeTracker.Clear();
+        var current = await fixture.Configurations.FindAsync(fixture.CompetitionId, entryId, ct);
+        await Assert.That(((CtfCompetitionChallengeRules)current!.Rules).MaxFlagAttempts).IsEqualTo(3);
+        await fixture.AssertPublishedEventsAsync(ct);
     }
 
-    [Test]
-    public async Task UpdateChallengeConfiguration_InvalidModeConfiguration_IsRejectedBeforeWrite()
+    [Test, Timeout(300_000)]
+    public async Task Invalid_configuration_does_not_change_rules_or_append_events(CancellationToken ct)
     {
-        var store = new Store(View(CompetitionStatus.Draft));
-        var useCase = new UpdateChallengeConfiguration(
-            store,
-            new Catalog(["invalid challenge configuration"]));
-
-        var result = await useCase.ExecuteAsync(
-            store.Current!.CompetitionId,
-            store.Current.CompetitionChallengeId,
-            Rules(2),
-            DateTimeOffset.UtcNow);
-
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
+        var created = await new CreateChallenge(fixture.Challenges, fixture.Catalog).ExecuteAsync(new(null, fixture.CompetitionId, fixture.TemplateId, 0, fixture.Now), ct);
+        var before = await fixture.Db.CompetitionEvents.CountAsync(ct);
+        var result = await new UpdateChallengeConfiguration(fixture.Configurations, fixture.Catalog).ExecuteAsync(fixture.CompetitionId,
+            created.Challenge!.Id, new CtfCompetitionChallengeRules { MaxFlagAttempts = -1 }, fixture.Now.AddSeconds(1), ct);
         await Assert.That(result.FailureCode).IsEqualTo(ChallengeConfigurationFailureCode.InvalidConfiguration);
-        await Assert.That(store.UpdateCalls).IsEqualTo(0);
+        fixture.Db.ChangeTracker.Clear();
+        var current = await fixture.Configurations.FindAsync(fixture.CompetitionId, created.Challenge.Id, ct);
+        await Assert.That(((CtfCompetitionChallengeRules)current!.Rules).MaxFlagAttempts).IsNull();
+        await Assert.That(await fixture.Db.CompetitionEvents.CountAsync(ct)).IsEqualTo(before);
     }
-
-    [Test]
-    public async Task UpdateChallengeConfiguration_RepeatedWritesUseLastValue()
-    {
-        var store = new Store(View(CompetitionStatus.Published));
-        var useCase = new UpdateChallengeConfiguration(
-            store,
-            new Catalog());
-
-        var first = await useCase.ExecuteAsync(
-            store.Current!.CompetitionId,
-            store.Current.CompetitionChallengeId,
-            Rules(1),
-            DateTimeOffset.UtcNow);
-        var second = await useCase.ExecuteAsync(
-            store.Current!.CompetitionId,
-            store.Current.CompetitionChallengeId,
-            Rules(3),
-            DateTimeOffset.UtcNow.AddSeconds(1));
-
-        await Assert.That(first.Succeeded).IsTrue();
-        await Assert.That(second.Succeeded).IsTrue();
-        await Assert.That(store.Current!.Rules.MaxFlagAttempts).IsEqualTo(3);
-    }
-
-    [Test]
-    public async Task UpdateChallengeConfiguration_Success_PersistsConfiguration()
-    {
-        var current = View(CompetitionStatus.Draft);
-        var store = new Store(current);
-        var useCase = new UpdateChallengeConfiguration(store, new Catalog());
-
-        var result = await useCase.ExecuteAsync(
-            current.CompetitionId,
-            current.CompetitionChallengeId,
-            Rules(1),
-            DateTimeOffset.UtcNow);
-
-        await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.UpdateCalls).IsEqualTo(1);
-    }
-
-    private static ChallengeConfigurationView View(CompetitionStatus status) => new(
-        Guid.NewGuid(),
-        Guid.NewGuid(),
-        GameMode.Ctf,
-        Rules(1),
-        new CtfCompetitionModeConfiguration(),
-        status,
-        2,
-        DateTimeOffset.UtcNow,
-        new CtfChallengeDefinition());
-
-    private sealed class Store(ChallengeConfigurationView? current) : IChallengeConfigurationStore
-    {
-        public ChallengeConfigurationView? Current { get; private set; } = current;
-        public int UpdateCalls { get; private set; }
-
-        public Task<ChallengeConfigurationView?> FindAsync(
-            Guid competitionId,
-            Guid challengeId,
-            CancellationToken cancellationToken) => Task.FromResult(Current);
-
-        public Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
-            Guid competitionId,
-            Guid challengeId,
-            CompetitionChallengeRules rules,
-            DateTimeOffset updatedAt,
-            CancellationToken cancellationToken, NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit? audit = null)
-        {
-            UpdateCalls++;
-            Current = Current is null
-                ? null
-                : Current with { Rules = rules, UpdatedAt = updatedAt };
-            return Task.FromResult(Current is null
-                ? new ChallengeConfigurationUpdateResult(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound)
-                : new ChallengeConfigurationUpdateResult(Current));
-        }
-    }
-
-    private sealed class Catalog(IReadOnlyList<string>? errors = null) : IChallengeConfigurationCatalog
-    {
-        public CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid id) => Rules(1);
-        public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid id) =>
-            new CtfChallengeDefinition { ChallengeId = id };
-        public IReadOnlyList<string> Validate(
-            GameMode mode,
-            CompetitionChallengeRules rules,
-            CompetitionModeConfiguration competitionConfiguration,
-            int eligibleTeamCount) => errors ?? [];
-        public IReadOnlyList<string> ValidateDefinition(
-            GameMode mode,
-            ChallengeDefinition definition) => errors ?? [];
-    }
-
-    private static CtfCompetitionChallengeRules Rules(int attempts) => new()
-    {
-        MaxFlagAttempts = attempts
-    };
-
 }

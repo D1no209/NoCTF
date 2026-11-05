@@ -30,7 +30,7 @@ public sealed class DockerContainerRuntime(DockerContainerLifecycle containers, 
         }
         var network = await containers.CreateIsolatedNetworkAsync(new(new(request.OperationId), request.Purpose,
             request.EgressPolicy, [], request.Purpose == ContainerNetworkPurpose.AwdpVerification
-                ? request.Services.Single().InternalPorts!.Single() : null), cancellationToken);
+                ? request.Services.SelectMany(service => service.InternalPorts ?? []).Distinct().ToArray() : null), cancellationToken);
         return new(network, network);
     }
 

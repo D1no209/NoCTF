@@ -37,8 +37,7 @@ internal sealed class HintBalanceReader(NoCtfDbContext db)
             .Where(item => item.CompetitionId == fact.CompetitionId)
             .Select(item => new { Fact = new LeaderboardChallengeFact(item.Id, "", "", false, item.Rules, item.Order,
                 item.IsPublished, null,
-                db.Set<CtfChallengeDefinition>().Where(definition => definition.ChallengeId == item.ChallengeId)
-                    .Select(definition => definition.InteractionKind).FirstOrDefault(), null,
+                null,
                 new ChallengeTiming(item.AutoOpenAt, item.ScoringEndsAt, item.SubmissionDeadlineAt)),
                 Tags = item.Tags.Select(tag => tag.Name).ToArray() })
             .AsSplitQuery().ToArrayAsync(ct);
@@ -60,22 +59,21 @@ internal sealed class HintBalanceReader(NoCtfDbContext db)
             var window = CompetitionOfficialWindow.Resolve(competition.StartAt, competition.EndAt, lifecycle);
             teamFacts = teamFacts.Where(team => team.RegisteredAt < window.EndAt).ToArray();
         }
-        var rows = await LeaderboardFactProjectionReader.ReadAsync(db, fact.CompetitionId, competition.Mode, status,
+        var rows = await LeaderboardFactProjectionReader.ReadAsync(db, fact.CompetitionId!.Value, competition.Mode, status,
             competition.ModeConfiguration, competition.StartAt, competition.EndAt, lifecycle, now, costs, teamFacts,
             null, null, challenges, ct, scoringTeamId: fact.TeamId, excludedFactId: fact.Id);
         var unlocks = await db.WriteUpUnlockReceipts.AsNoTracking().Where(item => item.CompetitionId == fact.CompetitionId
                 && (competition.Mode == GameMode.Ctf || item.TeamId == fact.TeamId) && item.UnlockedAt <= now)
             .Select(item => new LeaderboardWriteUpUnlock(item.GameplayFactId, item.TeamId, item.CompetitionChallengeId,
                 item.DeductionPercent, item.UnlockedAt)).ToArrayAsync(ct);
-        var theory = await NoCTF.Infrastructure.Theory.Scoring.TheoryScoreReader.ReadAsync(db, fact.CompetitionId, now, ct, fact.TeamId);
         var floor = competition.Mode == GameMode.Awd
             ? await db.AwdRoundRules.AsNoTracking().Where(item => item.CompetitionId == fact.CompetitionId && item.EffectiveAt <= now)
                 .OrderByDescending(item => item.EffectiveAt).ThenByDescending(item => item.Revision)
                 .Select(item => item.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null;
-        var input = new LeaderboardProjectionInput(fact.CompetitionId, competition.Mode, teamFacts, rows.Aggregate,
+        var input = new LeaderboardProjectionInput(fact.CompetitionId!.Value, competition.Mode, teamFacts, rows.Aggregate,
             challenges, competition.ModeConfiguration, competition.StartAt, lifecycle, ProjectedAt: now,
             CompetitionStatus: status, AwdAggregates: rows.AwdAggregates, WriteUpUnlocks: unlocks,
-            AwdRoundScores: rows.AwdRoundScores, AwdMinimumTotalScore: floor, TheoryScores: theory.Scores);
+            AwdRoundScores: rows.AwdRoundScores, AwdMinimumTotalScore: floor);
         return new TeamScoreCalculator(new LeaderboardProjectorCatalog()).Calculate(input, fact.TeamId!.Value);
     }
 }

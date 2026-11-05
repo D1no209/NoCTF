@@ -245,9 +245,9 @@ public sealed partial class AwdRoundCoordinationTests
         MutableTimeProvider clock, RecordingOutbox outbox, CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        var definition = (AwdChallengeDefinition)(await db.Challenges.SingleAsync(ct)).Definition!;
-        definition.Checker!.TargetServiceName = "main";
-        definition.FlagStores.Single().DeliveryMode = AwdFlagDeliveryMode.BusinessChecker;
+        var definition = (await db.Challenges.SingleAsync(ct)).Definition!;
+        definition.Check!.TargetServiceName = "main";
+        definition.Break!.FlagStores.Single().DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker;
         await db.SaveChangesAsync(ct);
         var rounds = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, clock, Secrets());
         await rounds.AdvanceAsync(new(fixture.CompetitionId, clock.UtcNow), ct);

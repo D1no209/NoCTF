@@ -3,7 +3,8 @@ import { toRefs } from 'vue'
 import type { LiveSoloQuestionsState } from '~/features/live-solo/useLiveSoloQuestions'
 const props = defineProps<{ state: LiveSoloQuestionsState }>()
 const { loading, error, current, selected, options, select, input, inputPending, submit, mayStartRuntime, feedback, attachments, runtime, hints,
-  resourceError, downloading, download, runtimeBusy, environment, RuntimeAccess, canSubmit, statusTimedOut, retryStatus, dockSelector } = toRefs(props.state)
+  resourceError, downloading, download, runtimeBusy, environment, RuntimeAccess, canSubmit, canSubmitFix, FixSubmit, refreshQuestions,
+  competitionId, matchId, roundId, statusTimedOut, retryStatus, dockSelector } = toRefs(props.state)
 </script>
 <template>
   <section class="flex min-w-0 flex-col gap-4">
@@ -16,7 +17,9 @@ const { loading, error, current, selected, options, select, input, inputPending,
         <section v-if="hints.length" class="flex max-w-[75ch] flex-col gap-3"><h4 class="font-semibold">{{ $t('liveSolo.hints.title') }}</h4><Badge variant="secondary">{{ $t('liveSolo.hints.free') }}</Badge><MarkdownQuote v-for="hint in hints" :key="hint.id" :source="hint.content ?? ''" /></section>
         <div class="grid min-w-0 items-start gap-6"><div v-if="runtime" class="flex min-w-0 flex-1 flex-col gap-3"><Badge variant="secondary">{{ runtimeStateLabel(runtime.state) }}</Badge><component :is="RuntimeAccess" v-for="(access, index) in runtime.accesses" :key="index" :access="access" /><div v-if="canSubmit" class="flex flex-wrap gap-2"><Button v-if="mayStartRuntime" :disabled="runtimeBusy" size="sm" variant="outline" @click="environment('Start')">{{ $t('liveSolo.runtime.start') }}</Button><Button v-else :disabled="runtimeBusy" size="sm" variant="outline" @click="environment('Reset')">{{ $t('liveSolo.runtime.reset') }}</Button><Button :disabled="runtimeBusy" size="sm" variant="outline" @click="environment('Stop')">{{ $t('liveSolo.runtime.stop') }}</Button></div></div>
           <div class="flex min-w-0 flex-wrap gap-2"><Button class="h-auto min-h-10 max-w-full whitespace-normal break-all text-left" v-for="file in attachments?.items" :key="file.id" :disabled="downloading" variant="outline" @click="download(file.id)">{{ file.fileName }}</Button><Button v-if="attachments?.deliveryPolicy === 'RandomOnePerTeam'" :disabled="downloading" variant="outline" @click="download()">{{ $t('liveSolo.attachment') }}</Button></div></div>
-        <Teleport defer :to="dockSelector"><TerminalCommand v-model="input" :label="$t('liveSolo.flag')" :placeholder="$t('liveSolo.flag')" :disabled="!canSubmit" :pending="inputPending" @submit="submit" /><p v-if="feedback" class="px-2 text-sm" role="status">{{ $message(feedback) }}</p><Button v-if="statusTimedOut" size="sm" variant="outline" @click="retryStatus">{{ $t('common.label.retry') }}</Button></Teleport>
+        <component :is="FixSubmit" v-if="current.completionKind === 'FixAndCheck'" :key="current.id" :competition-id="competitionId"
+          :match-id="matchId" :round-id="roundId" :question="current" :can-submit="canSubmitFix" @changed="refreshQuestions" />
+        <Teleport v-else-if="current.completionKind === 'Break'" defer :to="dockSelector"><TerminalCommand v-model="input" :label="$t('liveSolo.flag')" :placeholder="$t('liveSolo.flag')" :disabled="!canSubmit" :pending="inputPending" @submit="submit" /><p v-if="feedback" class="px-2 text-sm" role="status">{{ $message(feedback) }}</p><Button v-if="statusTimedOut" size="sm" variant="outline" @click="retryStatus">{{ $t('common.label.retry') }}</Button></Teleport>
       </template>
     </template>
   </section>

@@ -9,7 +9,10 @@ namespace NoCTF.GameModes.Registration;
 public sealed class ChallengeRuntimeTemplateCatalog : IChallengeRuntimeTemplateCatalog
 {
     public ChallengeRuntimeTemplate? Get(ChallengeDefinition? definition) =>
-        TypedGameModeConfiguration.Runtime(definition?.Runtime);
+        TypedGameModeConfiguration.Runtime(definition);
+
+    public ChallengeRuntimeTemplate? Get(ChallengeDefinition? definition, CompetitionChallengeRules rules) =>
+        TypedGameModeConfiguration.Runtime(definition, rules);
 }
 
 internal static class ChallengeRuntimeTemplateValidator
@@ -33,8 +36,6 @@ internal static class ChallengeRuntimeTemplateValidator
                 errors.AddRange(ContainerRuntimeDefinitionPolicy.Validate(container, runtime.UrlBindings, runtime.ControlCheckUrlBinding, internalEndpointBinding));
                 if (runtime.FlagSource == RuntimeFlagSource.PerTeam && !container.Services.Any(service => service.FlagEnvironmentVariableName is not null))
                     errors.Add("PerTeam runtimes require at least one Flag environment target.");
-                if (runtime.FlagSource != RuntimeFlagSource.PerTeam && container.Services.Any(service => service.FlagEnvironmentVariableName is not null))
-                    errors.Add("Flag environment targets are only supported for PerTeam runtimes.");
                 break;
         }
         if (runtime.TtlSeconds is <= 0 or > 604800)

@@ -38,7 +38,7 @@ public sealed class LiveSoloSelectionAndPreparationTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
-            f.Db.LiveSoloChallengeSources.Add(new() { ChallengeId = f.Templates[1].Id, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
+            f.Db.ChallengeSources.Add(new() { ChallengeId = f.Templates[1].Id, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
             await f.Db.SaveChangesAsync(ct); await f.PrepareAsync(ct);
             var round = await f.Db.LiveSoloRounds.Include(x => x.SelectionRisks).Include(x => x.SelectionAudits).SingleAsync(ct);
             await Assert.That(round.SelectionKind).IsEqualTo(LiveSoloQuestionSelectionKind.StaffSpecified);

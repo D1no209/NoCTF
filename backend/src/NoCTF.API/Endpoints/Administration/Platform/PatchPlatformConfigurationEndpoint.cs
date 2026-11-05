@@ -82,17 +82,11 @@ public sealed class PlatformHumanVerificationPatchRequest
     public required string[] TurnstileAllowedHostnames { get; set; }
 }
 
-public sealed class PlatformExperimentalFeaturesPatchRequest
-{
-    public required bool CtfPatchVerificationEnabled { get; set; }
-}
-
 public sealed class PatchPlatformConfigurationRequest
 {
     public PlatformBrandingPatchRequest? Branding { get; set; }
     public PlatformHumanVerificationPatchRequest? HumanVerification { get; set; }
     public PlatformEmailVerificationPatchRequest? EmailVerification { get; set; }
-    public PlatformExperimentalFeaturesPatchRequest? ExperimentalFeatures { get; set; }
     public PlatformLiveSoloVideoPatchRequest? LiveSoloVideo {get;set;}
 }
 public sealed class PlatformLiveSoloVideoPatchRequest
@@ -110,7 +104,6 @@ internal enum PlatformConfigurationPatchSection
     Branding = 1 << 0,
     HumanVerification = 1 << 1,
     EmailVerification = 1 << 2,
-    ExperimentalFeatures = 1 << 3,
     LiveSoloVideo=1<<4
 }
 
@@ -122,7 +115,7 @@ public sealed class PatchPlatformConfigurationValidator
         RuleFor(request => request).Must(request => request.Branding is not null
             || request.HumanVerification is not null
             || request.EmailVerification is not null
-            || request.ExperimentalFeatures is not null||request.LiveSoloVideo is not null)
+            || request.LiveSoloVideo is not null)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration));
         RuleFor(request => request.Branding!.Name).NotEmpty()
             .MaximumLength(PlatformConfigurationRules.MaximumNameLength)
@@ -175,7 +168,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumFramesPerSecond))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumBitrateBitsPerSecond))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoPolicyStamp))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
@@ -236,7 +228,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumFramesPerSecond))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumBitrateBitsPerSecond))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoPolicyStamp))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
@@ -312,7 +303,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             EmailSmtpFromAddress = email.SmtpFromAddress,
             EmailSmtpFromName = email.SmtpFromName,
             EmailSmtpTimeoutSeconds = email.SmtpTimeoutSeconds,
-            CtfPatchVerificationEnabled = branding.CtfPatchVerificationEnabled,
             UpdatedAt = branding.UpdatedAt
         };
         if ((sections & PlatformConfigurationPatchSection.Branding) != 0)
@@ -388,14 +378,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
                         .Rollback(Invalid(string.Join(" ", result.Errors)));
                 }
             }
-            if ((sections & PlatformConfigurationPatchSection.ExperimentalFeatures) != 0)
-            {
-                await configuration.UpdateExperimentalFeaturesAsync(
-                    request.ExperimentalFeatures!.CtfPatchVerificationEnabled,
-                    timeProvider.GetUtcNow(),
-                    transactionCt);
-            }
-
             var response = await LoadResponseAsync(transactionCt);
             if((sections&PlatformConfigurationPatchSection.LiveSoloVideo)!=0)
             {
@@ -421,7 +403,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(
                 await emailVerification.GetAsync(ct)),
-            new(current.CtfPatchVerificationEnabled),current.LiveSoloVideo);
+            current.LiveSoloVideo);
     }
 
     private static PlatformConfigurationPatchSection ResolveSections(
@@ -432,8 +414,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             : PlatformConfigurationPatchSection.HumanVerification)
         | (request.EmailVerification is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.EmailVerification)
-        | (request.ExperimentalFeatures is null ? PlatformConfigurationPatchSection.None
-            : PlatformConfigurationPatchSection.ExperimentalFeatures)
         |(request.LiveSoloVideo is null?PlatformConfigurationPatchSection.None:PlatformConfigurationPatchSection.LiveSoloVideo);
 
     private static ProblemHttpResult Invalid(string detail) => ApiProblems.Problem(

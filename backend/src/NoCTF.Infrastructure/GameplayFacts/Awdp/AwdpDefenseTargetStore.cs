@@ -108,7 +108,7 @@ public sealed class AwdpDefenseTargetStore(
             instance.CompetitionId == competitionId
             && instance.CompetitionChallengeId == competitionChallengeId
             && instance.TeamId == scope.TeamId
-            && instance.Purpose == RuntimePurpose.AwdpTarget
+            && instance.Purpose == RuntimePurpose.FixTarget
             && (instance.State == RuntimeState.Queued
                 || instance.State == RuntimeState.Provisioning
                 || instance.State == RuntimeState.Running
@@ -125,7 +125,7 @@ public sealed class AwdpDefenseTargetStore(
         {
             if (context.Competition.ModeConfiguration is not AwdpCompetitionModeConfiguration competitionConfiguration
                 || context.Challenge.Rules is not AwdpCompetitionChallengeRules challengeRules
-                || context.Template.Definition is not AwdpChallengeDefinition definition)
+                || context.Template.Definition is not ChallengeDefinition { Break: not null, Fix: not null, Check: not null } definition)
                 return new(AwdpDefenseTargetRequestState.InvalidConfiguration);
             var configuration = AwdpConfigurationResolver.Resolve(
                 competitionConfiguration,
@@ -208,7 +208,7 @@ public sealed class AwdpDefenseTargetStore(
                     instance.CompetitionId == competitionId
                     && instance.CompetitionChallengeId == competitionChallengeId
                     && instance.TeamId == scope.TeamId
-                    && instance.Purpose == RuntimePurpose.AwdpTarget
+                    && instance.Purpose == RuntimePurpose.FixTarget
                     && (instance.State == RuntimeState.Queued
                         || instance.State == RuntimeState.Provisioning
                         || instance.State == RuntimeState.Running

@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Notifications;
+using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runner.Messages;
 using System;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace Internal.Generated.WolverineHandlers
 {
@@ -19,11 +21,15 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdFlagInjectionHandler> _loggerOfAwdFlagInjectionHandler;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator _runnerResourceMutationCoordinator;
         private readonly NoCTF.Runner.Messages.IAwdFlagInjectionExecutor _awdFlagInjectionExecutor;
         private readonly NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader _awdFlagInjectionWorkReader;
         private readonly System.TimeProvider _timeProvider;
+        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public InjectAwdFlagHandler2075874813(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdFlagInjectionHandler> loggerOfAwdFlagInjectionHandler, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Runner.Messages.IAwdFlagInjectionExecutor awdFlagInjectionExecutor, NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader awdFlagInjectionWorkReader, System.TimeProvider timeProvider)
+        public InjectAwdFlagHandler2075874813(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdFlagInjectionHandler> loggerOfAwdFlagInjectionHandler, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Messages.IAwdFlagInjectionExecutor awdFlagInjectionExecutor, NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader awdFlagInjectionWorkReader, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -31,24 +37,27 @@ namespace Internal.Generated.WolverineHandlers
             _loggerOfAwdFlagInjectionHandler = loggerOfAwdFlagInjectionHandler;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
             _notificationChangePublisher = notificationChangePublisher;
+            _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
+            _runnerResourceMutationCoordinator = runnerResourceMutationCoordinator;
             _awdFlagInjectionExecutor = awdFlagInjectionExecutor;
             _awdFlagInjectionWorkReader = awdFlagInjectionWorkReader;
             _timeProvider = timeProvider;
+            _fusionCacheProvider = fusionCacheProvider;
         }
-
-
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
             // The actual message body
             var injectAwdFlag = (NoCTF.Application.Messaging.InjectAwdFlag)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Runner.Messages.AwdFlagInjectionHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Runner.Messages.AwdFlagInjectionHandler");
-            var awdFlagInjectionHandler = new NoCTF.Runner.Messages.AwdFlagInjectionHandler(_awdFlagInjectionWorkReader, _awdFlagInjectionExecutor, wolverinePostCommitMessagePublisher, _optionsOfRunnerOptions, _timeProvider, _loggerOfAwdFlagInjectionHandler);
+            var awdFlagInjectionHandler = new NoCTF.Runner.Messages.AwdFlagInjectionHandler(_awdFlagInjectionWorkReader, _awdFlagInjectionExecutor, wolverinePostCommitMessagePublisher, _optionsOfRunnerOptions, _timeProvider, _runnerResourceMutationCoordinator, persistedRunnerCapacityGate, _loggerOfAwdFlagInjectionHandler);
             
             // The actual message execution
             var outgoing1 = await awdFlagInjectionHandler.Handle(injectAwdFlag, cancellation).ConfigureAwait(false);
@@ -56,13 +65,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // Outgoing, cascaded message
             await context.EnqueueCascadingAsync(outgoing1).ConfigureAwait(false);
-
         }
-
     }
 
     // END: InjectAwdFlagHandler2075874813
     
     
 }
-

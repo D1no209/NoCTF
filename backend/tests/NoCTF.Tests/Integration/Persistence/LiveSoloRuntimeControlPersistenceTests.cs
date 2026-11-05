@@ -100,8 +100,9 @@ public sealed class LiveSoloRuntimeControlPersistenceTests
     {
         await fixture.PrepareAsync(ct); await fixture.StartAsync(ct);
         // This fixture tests relational authorization/control, while real provider isolation has separate Docker tests.
-        fixture.Templates[0].Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Allocation = PersistedRuntimeAllocation.PerTeam,
-            FlagSource = PersistedRuntimeFlagSource.Static, Services = [new() { Name = "web", Image = "example/web:test" }] };
+        fixture.Templates[0].Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "web", Image = "example/web:test" }] };
+        ((NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules)fixture.Entries[0].Rules!).Runtime = new()
+            { Allocation = PersistedRuntimeAllocation.PerTeam, FlagSource = PersistedRuntimeFlagSource.Static };
         await fixture.Db.SaveChangesAsync(ct);
     }
     private static LiveSoloResourceRequest Request(LiveSoloMatchPersistenceTests.Fixture fixture) => new(fixture.Competition.Id, fixture.Match.Id,

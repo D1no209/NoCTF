@@ -20,8 +20,7 @@ public sealed class ListChallengesEndpoint(
     ICompetitionChallengeReadAccess readAccess,
     IProgressionChallengeAccess progressionAccess,
     IUserContext user,
-    TimeProvider timeProvider,
-    IExperimentalFeatureReader? experimentalFeatures = null) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
+    TimeProvider timeProvider) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -50,12 +49,6 @@ public sealed class ListChallengesEndpoint(
             includeUnpublished: false,
             includeDeleted: false,
             ct);
-        if (visibility.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused)
-            && !(await IsPatchVerificationEnabledAsync(ct)))
-        {
-            items = items.Where(item =>
-                item.InteractionKind != CtfInteractionKind.PatchVerification).ToArray();
-        }
         var response = ChallengeMapper.ToListResponse(
             items, visibility.Visibility, visibility.DataScope);
         var now = timeProvider.GetUtcNow();
@@ -87,7 +80,4 @@ public sealed class ListChallengesEndpoint(
         });
     }
 
-    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
 }

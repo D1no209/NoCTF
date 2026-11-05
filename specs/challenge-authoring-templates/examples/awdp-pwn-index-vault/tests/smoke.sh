@@ -35,7 +35,7 @@ wait_callback() {
 
 last_outcome() {
     docker exec "${callback}" python -c \
-        "from urllib.request import urlopen; import json; print(json.load(urlopen('http://127.0.0.1:8080/last', timeout=1))['outcome'])"
+        "from urllib.request import urlopen; import json; probes={p['kind']:p['result'] for p in json.load(urlopen('http://127.0.0.1:8080/last', timeout=1))['probes']}; print('ServiceAbnormal' if probes['Functionality'] != 'Passed' else 'ExploitSucceeded' if probes['Vulnerability'] != 'Passed' else 'DefenseSucceeded')"
 }
 
 run_checker_expect() {
@@ -63,8 +63,8 @@ restart_target() {
 apply_fix_archive() {
     archive="$1"
     docker exec "${target}" /bin/sh -c 'rm -rf /noctf/fix/*'
-    docker cp "${archive}" "${target}:/tmp/fix.tar.gz"
-    docker exec "${target}" tar -xzf /tmp/fix.tar.gz -C /noctf/fix
+    docker cp "${archive}" "${target}:/noctf/fix.tar.gz"
+    docker exec "${target}" tar -xzf /noctf/fix.tar.gz -C /noctf/fix
     docker exec "${target}" /bin/sh /noctf/fix/fix.sh
 }
 

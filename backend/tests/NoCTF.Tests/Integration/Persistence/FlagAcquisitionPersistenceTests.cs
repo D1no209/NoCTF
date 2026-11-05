@@ -44,9 +44,9 @@ public sealed class FlagAcquisitionPersistenceTests
         db.Competitions.Add(new CtfCompetition { Id = competitionId, OwnerId = users[0], Title = "Acquisition", Status = CompetitionStatus.Running,
             StartAt = now.AddHours(-1), EndAt = now.AddHours(1), ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32], CreatedAt = now, UpdatedAt = now });
-        db.Challenges.Add(new CtfChallenge { Id = templateId, OwnerId = users[0], Title = "Static", Direction = "Web", CreatedAt = now, UpdatedAt = now,
-            Definition = new CtfChallengeDefinition { Runtime = new ContainerChallengeRuntimeTemplate
-            { Allocation = PersistedRuntimeAllocation.PerTeam, FlagSource = PersistedRuntimeFlagSource.Static,
+        db.Challenges.Add(new Challenge { Id = templateId, OwnerId = users[0], Title = "Static", Direction = "Web", CreatedAt = now, UpdatedAt = now,
+            Definition = new ChallengeDefinition { Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()], Runtime = new ContainerChallengeRuntimeTemplate
+            {
                 Services = [new() { Name = "app", Image = "test.invalid/static:1" }] } } });
         db.CompetitionChallenges.Add(new CtfCompetitionChallenge { Id = ccId, CompetitionId = competitionId, ChallengeId = templateId,
             Rules = TestConfigurations.Rules(GameMode.Ctf), IsPublished = true, UpdatedAt = now });
@@ -65,7 +65,7 @@ public sealed class FlagAcquisitionPersistenceTests
             var snapshot = (await intake.LoadAdmissionAsync(competitionId, ccId, userId, ct))!;
             var id = Guid.NewGuid();
             var accepted = await intake.TryAcceptFlagAsync(new(id, competitionId, snapshot.TeamId, ccId, userId,
-                GameplayFactKind.FlagAttempt, "flag{test}", NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash("flag{test}"), at), snapshot, null, ct);
+                GameplayFactKind.BreakAttempt, "flag{test}", NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash("flag{test}"), at), snapshot, null, ct);
             await Assert.That(accepted.State).IsEqualTo(GameplayFactAcceptanceState.Created);
             db.ChangeTracker.Clear();
             return await db.GameplayFacts.SingleAsync(fact => fact.Id == id, ct);
@@ -102,7 +102,7 @@ public sealed class FlagAcquisitionPersistenceTests
         var other = await Submit(users[2], now.AddMinutes(1));
         await Assert.That(other.AcquisitionEvidence!.MissingEvidence).IsEqualTo(GameplayFactFailureCode.StaticFlagWithoutContainerAndAttachment);
         db.ChangeTracker.Clear();
-        var legacy = GameplayFactGeneratedCatalog.Create(GameplayFactKind.FlagAttempt);
+        var legacy = GameplayFactGeneratedCatalog.Create(GameplayFactKind.BreakAttempt);
         legacy.Id = Guid.NewGuid(); legacy.CompetitionId = competitionId; legacy.CompetitionChallengeId = ccId; legacy.TeamId = otherTeamId;
         legacy.ActorUserId = users[2]; legacy.Value = "wrong"; legacy.Result = GameplayFactResult.Wrong;
         legacy.State = GameplayFactState.Completed; legacy.OccurredAt = legacy.UpdatedAt = now.AddMinutes(-1);

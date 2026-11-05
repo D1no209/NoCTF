@@ -13,8 +13,9 @@ public enum LiveSoloPoolFailure : short
 
 public sealed record LiveSoloPoolQuestion(Guid Id, Guid ChallengeId, string Title, string? Description, string Direction,
     Guid ConcurrencyStamp, Guid MaterialStamp, LiveSoloMaterialOwnership Ownership, Guid? SourceTemplateId,
-    LiveSoloChallengeDefinition Definition, IReadOnlyList<Guid> QuestionGroupIds)
+    ChallengeDefinition Definition, IReadOnlyList<Guid> QuestionGroupIds)
 {
+    public LiveSoloCompletionKind CompletionKind { get; init; }
     public bool CanEditContent { get; init; } = true;
     public IReadOnlyList<ChallengeAttachmentView> Attachments { get; init; } = [];
     public IReadOnlyList<ChallengeFlagView> Flags { get; init; } = [];
@@ -22,13 +23,14 @@ public sealed record LiveSoloPoolQuestion(Guid Id, Guid ChallengeId, string Titl
 public interface ILiveSoloPoolOperation { LiveSoloPoolFailure? Failure { get; } }
 public sealed record LiveSoloPoolResult(LiveSoloPoolQuestion? Question, LiveSoloPoolFailure? Failure = null) : ILiveSoloPoolOperation;
 public sealed record CreateLiveSoloPoolQuestion(Guid CompetitionId, Guid ActorId, string Title, string? Description,
-    string Direction, LiveSoloChallengeDefinition Definition, DateTimeOffset Now);
-public sealed record DeployLiveSoloPoolQuestion(Guid CompetitionId, Guid ActorId, Guid SourceTemplateId, Guid ExpectedSourceStamp, DateTimeOffset Now);
+    string Direction, ChallengeDefinition Definition, DateTimeOffset Now, LiveSoloCompletionKind CompletionKind = LiveSoloCompletionKind.Break);
+public sealed record DeployLiveSoloPoolQuestion(Guid CompetitionId, Guid ActorId, Guid SourceTemplateId, Guid ExpectedSourceStamp, DateTimeOffset Now,
+    LiveSoloCompletionKind CompletionKind = LiveSoloCompletionKind.Break);
 public sealed record EditLiveSoloPoolQuestion(Guid CompetitionId, Guid CompetitionChallengeId, Guid ActorId,
     Guid ExpectedStamp, Guid ExpectedMaterialStamp, string Title, string? Description, string Direction,
-    LiveSoloChallengeDefinition Definition, DateTimeOffset Now,
+    ChallengeDefinition Definition, DateTimeOffset Now,
     IReadOnlyList<LiveSoloPoolFlagInput>? Flags = null, IReadOnlyList<Guid>? RemovedAttachmentIds = null,
-    IReadOnlyList<LiveSoloPoolUploadedAttachment>? AddedAttachments = null);
+    IReadOnlyList<LiveSoloPoolUploadedAttachment>? AddedAttachments = null, LiveSoloCompletionKind CompletionKind = LiveSoloCompletionKind.Break);
 public sealed record LiveSoloPoolFlagInput(string Flag, ChallengeFlagMatchKind MatchKind);
 public sealed record LiveSoloPoolUploadedAttachment(Guid FileId, string? ExactFlag = null);
 public sealed record ExportLiveSoloPoolQuestion(Guid CompetitionId, Guid CompetitionChallengeId, Guid ActorId,

@@ -38,14 +38,15 @@ public sealed partial class AwdRoundCoordinationTests
         foreach (var issue in issues)
         {
             issue.State = AwdFlagIssueState.Issued;
-            issue.PublicLocator = "user/public-target";
-            issue.ProtectedReadContext = "PRIVATE-CHECKER-CONTEXT";
+            var flag = await db.ChallengeFlags.SingleAsync(item => item.Id == issue.FlagId, ct);
+            flag.PublicLocator = "user/public-target";
+            flag.ProtectedReadContext = System.Text.Encoding.UTF8.GetBytes("PRIVATE-CHECKER-CONTEXT");
         }
         issues[0].ActiveExpiryTicks = issues[0].ActiveStartTicks + TimeSpan.FromSeconds(10).Ticks;
         issues[2].ActiveExpiryTicks = issues[2].ActiveStartTicks;
         issues[3].ExpiryRound = 1;
         issues[4].State = AwdFlagIssueState.Revoked;
-        issues[5].PublicLocator = null;
+        (await db.ChallengeFlags.SingleAsync(item => item.Id == issues[5].FlagId, ct)).PublicLocator = null;
         issues[6].IssuedAt = fixture.Now.AddHours(1);
         var deletedFlag = await db.ChallengeFlags.SingleAsync(item => item.Id == issues[7].FlagId, ct);
         deletedFlag.DeletedAt = fixture.Now;

@@ -25,14 +25,7 @@ public static class CtfCompletionEligibility
     public static CompetitionTrackDefinition Track(CompetitionTrackConfiguration configuration, string key) =>
         configuration.Find(key) ?? configuration.DefaultTrack;
 
-    public static GameplayFactKind CompletionKind(CtfInteractionKind interaction) => interaction switch
-    {
-        CtfInteractionKind.FlagSubmission => GameplayFactKind.FlagAttempt,
-        CtfInteractionKind.PatchVerification => GameplayFactKind.FixAttempt,
-        _ => throw new InvalidOperationException("Unknown CTF interaction kind.")
-    };
-
-    public static bool Matches(GameplayFactKind kind, CtfInteractionKind interaction) => kind == CompletionKind(interaction);
+    public static bool Matches(GameplayFactKind kind) => kind == GameplayFactKind.BreakAttempt;
 
     public static Expression<Func<GameplayFact, bool>> Before(DateTimeOffset at, Guid id) =>
         fact => fact.OccurredAt < at || fact.OccurredAt == at && fact.Id.CompareTo(id) < 0;

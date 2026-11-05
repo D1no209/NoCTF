@@ -39,6 +39,7 @@ public sealed class RuntimeProviderHandler(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
     {
+        using var targetMutation = mutations is null ? null : await mutations.EnterRuntimeAsync(message.RuntimeInstanceId, cancellationToken);
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
@@ -91,6 +92,7 @@ public sealed class RuntimeProviderHandler(
         ForceTerminateRuntime message,
         CancellationToken cancellationToken)
     {
+        using var targetMutation = mutations is null ? null : await mutations.EnterRuntimeAsync(message.RuntimeInstanceId, cancellationToken);
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         var started = Stopwatch.GetTimestamp();
@@ -707,6 +709,12 @@ internal static class RuntimeWriteBackOperations
         instance.FailureCode = null;
         instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
+        if (instance.Purpose is RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget && instance.GameplayFactId is Guid fixId)
+        {
+            var deadline = await db.GameplayFacts.Where(fact => fact.Id == fixId && fact.FixExecution != null)
+                .Select(fact => (DateTimeOffset?)fact.FixExecution!.Deadline).SingleOrDefaultAsync(cancellationToken);
+            if (deadline is { } required && (instance.ExpiresAt is null || instance.ExpiresAt < required)) instance.ExpiresAt = required;
+        }
         await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
         await StartChallengeTestFlagDeliveryAsync(
             db, outbox, instance, message.RunnerId, runningAt, cancellationToken);
@@ -1219,7 +1227,7 @@ internal static class RuntimeWriteBackOperations
         NoCtfDbContext db,
         RuntimeInstance instance,
         CancellationToken cancellationToken) =>
-        instance.Purpose is RuntimePurpose.Player or RuntimePurpose.AwdpAttack
+        instance.Purpose is RuntimePurpose.Player or RuntimePurpose.AttackTarget
             ? db.Competitions.AsNoTracking().AnyAsync(
                 competition => competition.Id == instance.CompetitionId
                     && competition.Mode == GameMode.Awdp,

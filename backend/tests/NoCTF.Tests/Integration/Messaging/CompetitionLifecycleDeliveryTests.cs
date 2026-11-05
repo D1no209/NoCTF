@@ -279,7 +279,7 @@ public sealed class CompetitionLifecycleDeliveryTests
                 now.AddMinutes(-1), now.AddHours(1), now),
             Competition(runningId, ownerId, CompetitionStatus.Running,
                 now.AddHours(-1), now.AddMinutes(-1), now));
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,

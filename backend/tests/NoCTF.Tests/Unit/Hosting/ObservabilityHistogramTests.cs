@@ -34,11 +34,11 @@ public sealed class ObservabilityHistogramTests
         NoCtfTelemetry.RecordLeaderboardProjection("histogram-test", "success", 0.012, 12, 40);
         NoCtfTelemetry.RecordSchedulerRebuild("histogram-test", 0.012, 40);
         NoCtfTelemetry.RecordSchedulerDispatch("histogram-test", "success", 0.012);
-        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FlagAttempt, 4);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 4);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 2);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
         NoCtfTelemetry.RecordGameplayFactProcessing(
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             GameplayFactState.Completed,
             GameplayFactResult.Correct,
             0.012);
@@ -48,7 +48,7 @@ public sealed class ObservabilityHistogramTests
             GameplayFactResult.Wrong,
             0.04);
         NoCtfTelemetry.RecordGameplayFactProcessing(
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             GameplayFactState.PlatformFailed,
             null,
             0.8);
@@ -108,9 +108,6 @@ public sealed class ObservabilityHistogramTests
         var submissionLines = exported.Split('\n').Where(line => line.StartsWith(
             "noctf_gameplay_fact_submissions_total{",
             StringComparison.Ordinal)).ToArray();
-        await Assert.That(submissionLines.Any(line => line.Contains(
-            "kind=\"flag\"",
-            StringComparison.Ordinal))).IsTrue();
         await Assert.That(submissionLines.Any(line => line.Contains(
             "kind=\"break\"",
             StringComparison.Ordinal))).IsTrue();

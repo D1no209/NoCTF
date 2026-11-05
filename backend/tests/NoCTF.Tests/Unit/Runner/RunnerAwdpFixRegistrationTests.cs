@@ -9,6 +9,9 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Infrastructure.Challenges.Capabilities;
+using NoCTF.Runner.Challenges.Capabilities;
 
 namespace NoCTF.Tests.Unit.Runner;
 
@@ -46,10 +49,10 @@ public sealed class RunnerAwdpFixRegistrationTests
         await using var provider = services.BuildServiceProvider(validateScopes: true);
         await using var scope = provider.CreateAsyncScope();
 
-        var fence = scope.ServiceProvider.GetRequiredService<IAwdpFixExecutionFence>();
-        var reader = scope.ServiceProvider.GetRequiredService<IAwdpFixWorkReader>();
+        var fence = scope.ServiceProvider.GetRequiredService<IFixExecutionFence>();
+        var reader = scope.ServiceProvider.GetRequiredService<IFixExecutionWorkReader>();
 
-        await Assert.That(fence).IsTypeOf<AwdpFixExecutionFence>();
-        await Assert.That(reader).IsTypeOf<AwdpFixWorkReader>();
+        await Assert.That(fence).IsTypeOf<FixExecutionFence>();
+        await Assert.That(reader).IsTypeOf<FixExecutionWorkReader>();
     }
 }

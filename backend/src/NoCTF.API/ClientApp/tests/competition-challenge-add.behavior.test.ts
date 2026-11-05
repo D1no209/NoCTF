@@ -58,7 +58,7 @@ describe('adding competition challenges after soft deletion', () => {
 
   test('question bank placement reserves deleted positions without displaying them as active placements', async () => {
     const app = await harness('../app/features/admin/useChallengeCompetitionPlacements.ts', 'useChallengeCompetitionPlacements',
-      { challengeId: 'new-template', mode: 'Ctf', disabled: false })
+      { challengeId: 'new-template', capabilities: ['Break'], disabled: false })
     try {
       await app.state.load()
       expect(app.reads[0].query.includeDeleted).toBe(true)

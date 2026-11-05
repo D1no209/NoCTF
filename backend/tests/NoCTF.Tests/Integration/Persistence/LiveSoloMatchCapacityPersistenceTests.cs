@@ -127,8 +127,8 @@ public sealed class LiveSoloMatchCapacityPersistenceTests
         }
         // Capacity assertions use independent material; sharing an active question is now a separate hard exclusion.
         var templateId = Guid.NewGuid(); var entryId = Guid.NewGuid();
-        var template = new NoCTF.Domain.Challenges.LiveSoloChallenge { Id = templateId, OwnerId = fixture.Owner.Id, Title = "Capacity question", Direction = "Web",
-            CreatedAt = fixture.Now, UpdatedAt = fixture.Now, Definition = new LiveSoloChallengeDefinition { ChallengeId = templateId } };
+        var template = new NoCTF.Domain.Challenges.Challenge { Id = templateId, OwnerId = fixture.Owner.Id, Title = "Capacity question", Direction = "Web",
+            CreatedAt = fixture.Now, UpdatedAt = fixture.Now, Definition = TestConfigurations.Definition(NoCTF.Domain.Competitions.GameMode.LiveSolo) };
         var entry = new NoCTF.Domain.Challenges.LiveSoloCompetitionChallenge { Id = entryId, CompetitionId = fixture.Competition.Id, ChallengeId = templateId,
             DirectionId = fixture.Entries[0].DirectionId, Order = await fixture.Db.CompetitionChallenges.MaxAsync(x => x.Order, ct) + 1, UpdatedAt = fixture.Now,
             Rules = new LiveSoloCompetitionChallengeRules { CompetitionChallengeId = entryId } };

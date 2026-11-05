@@ -392,7 +392,7 @@ public sealed class FixArchivePreparerTests
 
     private static string NewRoot()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"noctf-archive-test-{Guid.NewGuid():N}");
+        var path = Path.Combine(AppContext.BaseDirectory, "archive-preparation-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
     }

@@ -16,12 +16,14 @@ public sealed class PendingGameplayFactDispatchHandler(
     TimeProvider clock,
     INatsConnection connection,
     GameplayFactRecoveryCursorStore cursors,
+    NoCTF.Application.Competitions.Awd.Fixes.RecoverPersistentFixes persistentFixes,
     ILogger<PendingGameplayFactDispatchHandler> logger)
 {
     public const int BatchSize = 64;
 
     public async Task Handle(DispatchPendingGameplayFacts message, CancellationToken cancellationToken)
     {
+        await persistentFixes.ExecuteAsync(cancellationToken);
         (GameplayFactRecoveryCursor? Cursor, ulong? Revision) position;
         try
         {
@@ -41,11 +43,10 @@ public sealed class PendingGameplayFactDispatchHandler(
         var queuedCutoff = now.AddSeconds(-10);
         var processingCutoff = now.AddSeconds(-60);
         var query = db.GameplayFacts.AsNoTracking()
-            .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
-                || fact.Kind == GameplayFactKind.BreakAttempt
+            .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
                 || fact.Kind == GameplayFactKind.HintUnlock
                 || fact.Kind == GameplayFactKind.ManualAdjustment
-                || fact.Kind == GameplayFactKind.WriteUpUnlock || fact.Kind == GameplayFactKind.TheoryPaperSubmission)
+                || fact.Kind == GameplayFactKind.WriteUpUnlock)
             .Where(fact => fact.State == GameplayFactState.Queued
                     && fact.UpdatedAt <= queuedCutoff
                 || fact.State == GameplayFactState.Processing

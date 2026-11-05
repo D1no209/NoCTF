@@ -53,7 +53,12 @@ public sealed class LiveSoloStageRule
 }
 
 [PersistentDiscriminator("livesolo")]
-public sealed class LiveSoloChallengeDefinition() : ChallengeDefinition(GameMode.LiveSolo);
+public sealed class LiveSoloCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.LiveSolo), IChallengeFlagTemplateOverride, IChallengeRuntimeRules
+{
+    public CompetitionChallengeRuntimeRules Runtime { get; set; } = new() { TtlSeconds = 3600 };
+    public LiveSoloCompletionKind CompletionKind { get; set; }
+    public FlagTemplateValue FlagTemplate { get; set; } = new();
+    public bool HasFlagTemplate { get; set; }
+}
 
-[PersistentDiscriminator("livesolo")]
-public sealed class LiveSoloCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.LiveSolo);
+public enum LiveSoloCompletionKind : short { Break, FixAndCheck }

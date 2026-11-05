@@ -13,19 +13,13 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
         ChallengeDefinition? challengeDefinition = null) => mode switch
         {
             GameMode.Ctf when challengeRules is CtfCompetitionChallengeRules ctf =>
-                challengeDefinition is CtfChallengeDefinition
-                    { InteractionKind: CtfInteractionKind.PatchVerification }
-                    ? new(false, true, null,
-                        ctf.MaxPatchAttempts
-                            ?? Ctf.Configuration.CtfPatchVerificationConfigurationResolver
-                                .DefaultMaxPatchAttempts)
-                    : new(true, false, ctf.MaxFlagAttempts, null),
-            GameMode.Awd when challengeRules is AwdCompetitionChallengeRules =>
-                new(true, false, null, null),
+                new(challengeDefinition?.Break is not null, false, ctf.MaxFlagAttempts, null),
+            GameMode.Awd when challengeRules is AwdCompetitionChallengeRules awd =>
+                new(challengeDefinition?.Break is not null, awd.AllowFixSubmissions && challengeDefinition?.Fix is not null, null, null),
             GameMode.Awdp when competitionConfiguration is AwdpCompetitionModeConfiguration awdp
                 && challengeRules is AwdpCompetitionChallengeRules rules => new(
-                    true,
-                    true,
+                    challengeDefinition?.Break is not null,
+                    challengeDefinition?.Fix is not null && challengeDefinition.Check is not null,
                     rules.MaxBreakSubmissions ?? awdp.MaxBreakSubmissions,
                     rules.MaxFixSubmissions ?? awdp.MaxFixSubmissions,
                     rules.RequireBreakBeforeFix ?? awdp.RequireBreakBeforeFix),

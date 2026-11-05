@@ -35,7 +35,7 @@ describe('challenge template test runtime', () => {
   test('runs only saved definitions and explains image-cache prewarming', () => {
     expect(page).toContain('const runtimeDefinitionDirty = computed(() => {')
     expect(page).toContain("<component :is=\"ChallengeTestRuntimePanel\"")
-    expect(page).toContain(':definition-dirty="runtimeDefinitionDirty"')
+    expect(page).toContain(':definition-dirty="runtimeDefinitionDirty || capabilityDefinitionDirty"')
     expect(panel).toContain(':disabled="busy || definitionDirty"')
     expect(panel).toContain("runtime.challengeTest.description.stoppingTestInstanceRemoves")
   })

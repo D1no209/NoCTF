@@ -26,6 +26,6 @@ public sealed class RunnerNodeAssignmentGuardTests
             .Throws<InvalidOperationException>();
     }
 
-    private static CleanupAwdpTarget Create(string runnerId) =>
+    private static CleanupFixTarget Create(string runnerId) =>
         new(Guid.CreateVersion7(), runnerId);
 }

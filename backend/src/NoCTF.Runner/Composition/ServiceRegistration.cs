@@ -1,4 +1,6 @@
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Infrastructure.Challenges.Capabilities;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Runtime.Docker.Services;
@@ -11,6 +13,7 @@ using NoCTF.Runtime.Kubernetes;
 using NoCTF.Runtime.Libvirt;
 using k8s;
 using NoCTF.Runner.Messages;
+using NoCTF.Runner.Challenges.Capabilities;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Application.Authentication;
 using NoCTF.Infrastructure.Authentication;
@@ -58,11 +61,11 @@ public static class ServiceRegistration
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.")
             .ValidateOnStart();
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
-        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
+        services.AddScoped<IFixExecutionFence, FixExecutionFence>();
         services.AddNoCtfCaching(configuration, development);
         services.AddHttpClient();
         services.AddHttpClient(
-                AwdpFixArchiveDownloader.ClientName,
+                NoCTF.Runner.Challenges.Capabilities.FixArchiveDownloader.ClientName,
                 client => client.Timeout = Timeout.InfiniteTimeSpan)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
@@ -135,11 +138,17 @@ public static class ServiceRegistration
         services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();
         services.AddScoped<RuntimeStopWriteBackMessageHandler>();
         services.AddScoped<IAwdCheckerExecutor, AwdCheckerExecutor>();
-        services.AddScoped<IAwdpFixWorkReader, AwdpFixWorkReader>();
-        services.AddScoped<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+        services.AddScoped<IFixExecutionWorkReader, FixExecutionWorkReader>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.IFixRuntimeExecutor, NoCTF.Runner.Challenges.Capabilities.RuntimeFixExecutor>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.ExecuteFix>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.IFixExecutionProgressStore, NoCTF.Infrastructure.Challenges.Capabilities.FixExecutionProgressStore>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.ICheckRuntimeExecutor, NoCTF.Runner.Challenges.Capabilities.RuntimeCheckExecutor>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.ExecuteCheck>();
+        services.TryAddScoped<NoCTF.Infrastructure.Challenges.Testing.TemplateCapabilityTestExecutionStore>();
+        services.AddScoped<NoCTF.Runner.Challenges.Capabilities.TemplateCapabilityTestHandler>();
         services.AddSingleton<IAwdpAttackProvisioningPlanReader,
             AwdpAttackProvisioningPlanReader>();
-        services.AddSingleton<AwdpFixArchiveDownloader>();
+        services.AddSingleton<NoCTF.Runner.Challenges.Capabilities.FixArchiveDownloader>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;

@@ -24,7 +24,6 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
 
     public bool HumanVerificationEvaluationEnabled { get; set; } = true;
 
-    public bool CtfPatchVerificationEnabled { get; set; }
     [Range(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumWidth,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumWidth)]
     public int LiveSoloVideoMaximumWidth {get;set;}=NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultWidth;
     [Range(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumHeight,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumHeight)]

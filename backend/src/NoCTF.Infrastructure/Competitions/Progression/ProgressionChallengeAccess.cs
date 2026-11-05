@@ -36,8 +36,7 @@ public sealed class ProgressionChallengeAccess(
                 .Where(fact => fact.CompetitionId == competitionId
                     && fact.TeamId == id
                     && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
-                    && (fact.Kind == GameplayFactKind.FlagAttempt
-                        || fact.Kind == GameplayFactKind.FixAttempt)
+                    && fact.Kind == GameplayFactKind.BreakAttempt
                     && fact.State == GameplayFactState.Completed
                     && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))

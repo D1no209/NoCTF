@@ -26,8 +26,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider = timeProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -43,13 +41,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await runtimeStopWriteBackMessageHandler.Handle(runtimeStopFailed, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: RuntimeStopFailedHandler712631321
     
     
 }
-

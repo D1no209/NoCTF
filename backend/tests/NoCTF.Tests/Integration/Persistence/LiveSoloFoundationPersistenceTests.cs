@@ -16,7 +16,7 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class LiveSoloFoundationPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public async Task Generated_migration_preserves_old_modes_and_scoped_relations_enforce_order_and_active_team_uniqueness(CancellationToken ct)
+    public async Task Initial_baseline_preserves_mode_rows_and_enforces_scoped_order_and_active_team_uniqueness(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -26,11 +26,7 @@ public sealed class LiveSoloFoundationPersistenceTests
                 provider => provider.MigrationsAssembly("NoCTF.Persistence.PostgreSql")).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
             var migrations = db.Database.GetMigrations().ToArray();
-            var foundation = Array.FindIndex(migrations, x => x.Contains("LiveSoloFoundation", StringComparison.Ordinal));
-            await Assert.That(foundation).IsGreaterThan(0);
-            var previous = migrations[foundation - 1];
-            // Seed with the current typed ORM, then use EF's generated downgrade to obtain the historical schema.
-            // The current AWD owned columns cannot be inserted directly into the pre-LiveSolo schema.
+            await Assert.That(migrations).HasSingleItem();
             await db.Database.MigrateAsync(ct);
             var now = DateTimeOffset.UtcNow;
             var user = new User { Id = Guid.NewGuid(), UserName = "livesolo-owner", Email = "livesolo@example.test", PasswordHash = "unused",
@@ -43,14 +39,13 @@ public sealed class LiveSoloFoundationPersistenceTests
                 competition.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(mode, competition.Id); return competition;
             }).ToArray();
             db.Competitions.AddRange(old); await db.SaveChangesAsync(ct);
-            await db.GetService<IMigrator>().MigrateAsync(previous, ct);
             db.ChangeTracker.Clear(); await db.Database.MigrateAsync(ct);
             await Assert.That(await db.Competitions.Select(x => x.Mode).ToArrayAsync(ct)).IsEquivalentTo(old.Select(x => x.Mode));
             var live = new LiveSoloCompetition { Id = Guid.NewGuid(), OwnerId = user.Id, Title = "LiveSolo", StartAt = now, EndAt = now.AddHours(1),
                 CreatedAt = now, UpdatedAt = now, FlagDerivationSecret = new byte[32] };
             live.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(GameMode.LiveSolo, live.Id);
-            var template = new LiveSoloChallenge { Id = Guid.NewGuid(), OwnerId = user.Id, Title = "First Flag", CreatedAt = now, UpdatedAt = now };
-            template.Definition = new LiveSoloChallengeDefinition { ChallengeId = template.Id };
+            var template = new Challenge { Id = Guid.NewGuid(), OwnerId = user.Id, Title = "First Flag", CreatedAt = now, UpdatedAt = now };
+            template.Definition = TestConfigurations.Definition(GameMode.LiveSolo);
             var challenge = new LiveSoloCompetitionChallenge { Id = Guid.NewGuid(), CompetitionId = live.Id, ChallengeId = template.Id,
                 Rules = new LiveSoloCompetitionChallengeRules(), UpdatedAt = now };
             challenge.Rules.CompetitionChallengeId = challenge.Id;
@@ -69,7 +64,7 @@ public sealed class LiveSoloFoundationPersistenceTests
             await db.SaveChangesAsync(ct);
             match.CurrentRoundId = round.Id; await db.SaveChangesAsync(ct);
             var question = round.Questions.Single();
-            var fact = new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = live.Id, CompetitionChallengeId = challenge.Id,
+            var fact = new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = live.Id, CompetitionChallengeId = challenge.Id,
                 TeamId = team.Id, ActorUserId = user.Id, State = GameplayFactState.Queued, OccurredAt = now, UpdatedAt = now };
             db.GameplayFacts.Add(fact); db.LiveSoloSubmissions.Add(new() { GameplayFactId = fact.Id, RoundId = round.Id,
                 RoundQuestionId = question.Id, AdmissionSequence = 1 }); await db.SaveChangesAsync(ct);
@@ -80,7 +75,7 @@ public sealed class LiveSoloFoundationPersistenceTests
             }
             await using (var duplicate = new NoCtfDbContext(options))
             {
-                var otherFact = new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = live.Id,
+                var otherFact = new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = live.Id,
                     CompetitionChallengeId = challenge.Id, TeamId = team.Id, State = GameplayFactState.Queued, OccurredAt = now, UpdatedAt = now };
                 duplicate.GameplayFacts.Add(otherFact); duplicate.LiveSoloSubmissions.Add(new() { GameplayFactId = otherFact.Id,
                     RoundId = round.Id, RoundQuestionId = question.Id, AdmissionSequence = 1 });

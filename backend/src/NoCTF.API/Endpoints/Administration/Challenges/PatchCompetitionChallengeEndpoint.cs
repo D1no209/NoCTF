@@ -24,13 +24,14 @@ public enum CompetitionChallengeConflictCode
     ChallengeTemplateConflict,
     LifecycleStateConflict,
     ChallengeTemplateNotFound,
-    ChallengeTemplateModeMismatch,
-    ExperimentalFeatureDisabled
+    CompetitionModeMismatch,
+    RequiredCapabilitiesMissing
 }
 
 public sealed record CompetitionChallengeConflictResponse(
     [property: Required, JsonRequired] CompetitionChallengeConflictCode Code,
-    string Detail)
+    string Detail,
+    IReadOnlyList<NoCTF.API.Endpoints.Administration.ChallengeBank.ChallengeCapabilityProtocol>? MissingCapabilities = null)
 {
     [Required, JsonRequired]
     public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
@@ -41,7 +42,8 @@ public sealed record CompetitionChallengeConflictResponse(
 internal static class CompetitionChallengeConflictMapper
 {
     public static CompetitionChallengeConflictResponse ToResponse(
-        ChallengeMutationFailure failure) =>
+        ChallengeMutationFailure failure,
+        IReadOnlyList<NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind>? missingCapabilities = null) =>
         new(
             failure switch
             {
@@ -50,11 +52,11 @@ internal static class CompetitionChallengeConflictMapper
                 ChallengeMutationFailure.ChallengeTemplateConflict => CompetitionChallengeConflictCode.ChallengeTemplateConflict,
                 ChallengeMutationFailure.LifecycleStateConflict => CompetitionChallengeConflictCode.LifecycleStateConflict,
                 ChallengeMutationFailure.TemplateNotFound => CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
-                ChallengeMutationFailure.TemplateModeMismatch => CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
-                ChallengeMutationFailure.ExperimentalFeatureDisabled => CompetitionChallengeConflictCode.ExperimentalFeatureDisabled,
+                ChallengeMutationFailure.CompetitionModeMismatch => CompetitionChallengeConflictCode.CompetitionModeMismatch,
+                ChallengeMutationFailure.RequiredCapabilitiesMissing => CompetitionChallengeConflictCode.RequiredCapabilitiesMissing,
                 _ => throw new InvalidOperationException($"Unsupported competition challenge conflict: {failure}.")
             },
-            failure.ToString());
+            failure.ToString(), missingCapabilities?.Select(kind => (NoCTF.API.Endpoints.Administration.ChallengeBank.ChallengeCapabilityProtocol)kind).ToArray());
 }
 
 public sealed class CompetitionChallengePresentationPatchRequest
@@ -312,9 +314,9 @@ public sealed class PatchCompetitionChallengeEndpoint(
                             ChallengeMutationFailure.CompetitionNotFound
                                 or ChallengeMutationFailure.ChallengeNotFound =>
                                 TypedResults.NotFound(),
-                            ChallengeMutationFailure.ChallengeOrderConflict =>
+                            ChallengeMutationFailure.ChallengeOrderConflict or ChallengeMutationFailure.RequiredCapabilitiesMissing =>
                                 TypedResults.Conflict(CompetitionChallengeConflictMapper.ToResponse(
-                                    result.Failure.Value)),
+                                    result.Failure.Value, result.MissingCapabilities)),
                             _ => ApiProblems.Problem(
                                 statusCode: StatusCodes.Status400BadRequest,
                                 title: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeTitleCompetitionChallengeWasUpdated),

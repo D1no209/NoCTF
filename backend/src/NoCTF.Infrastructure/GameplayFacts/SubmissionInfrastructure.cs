@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Infrastructure.Challenges.Capabilities;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.Management;
 using NoCTF.Application.GameplayFacts.PatchUploads;
@@ -11,8 +13,6 @@ using NoCTF.Infrastructure.GameplayFacts.Administration;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.Management;
 using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
-using NoCTF.Application.GameplayFacts.PatchVerification;
-using NoCTF.Infrastructure.GameplayFacts.PatchVerification;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Status;
 using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
@@ -39,9 +39,6 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
-        services.AddScoped<IPatchVerificationTargetStore, PatchVerificationTargetStore>();
-        services.AddScoped<RequestPatchVerificationTarget>();
-        services.AddScoped<GetPatchVerificationState>();
         services.AddScoped<IFixArchiveReader, FixArchiveReader>();
         services.AddScoped<IAdminPatchDownloadStore, AdminPatchDownloadStore>();
         services.AddScoped<AccessAdminPatch>();
@@ -62,8 +59,10 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<GameplayFactProcessor>();
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessorRouter>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
-        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
+        services.AddScoped<IFixExecutionFence, FixExecutionFence>();
         services.AddScoped<RecordInternalResult>();
+        services.AddScoped<NoCTF.Application.GameplayFacts.PatchUploads.IFixUploadTargetAccess, NoCTF.Application.GameplayFacts.PatchUploads.FixUploadTargetAccess>();
+        services.AddScoped<NoCTF.Application.GameplayFacts.PatchUploads.IFixUploadAccessPolicy, NoCTF.Infrastructure.GameplayFacts.PatchUploads.CompetitionFixUploadAccessPolicy>();
         services.AddSingleton<IGameplayFactEvaluatorCatalog, GameModeGameplayFactEvaluatorCatalog>();
         services.AddSingleton<IGameplayFactAdmissionModePolicy, GameModeGameplayFactAdmissionPolicy>();
         return services;

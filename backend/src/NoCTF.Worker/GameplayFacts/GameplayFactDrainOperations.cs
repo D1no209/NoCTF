@@ -81,7 +81,7 @@ internal static partial class BackendMessageOperations
         {
             candidates = candidates.Where(submission =>
                 submission.Result != null
-                && (submission.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt
+                && (submission.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt
                     || submission.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt)
                 && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Queued
                 && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing);

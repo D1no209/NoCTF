@@ -37,6 +37,9 @@ internal static class ChallengeInfrastructure
         services.AddScoped<NoCTF.Application.Challenges.Timing.ManageChallengeTiming>();
         services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingScheduleSource>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
+        services.AddScoped<IChallengeTemplateCopyStore, ChallengeTemplateCopyStore>();
+        services.AddScoped<CopyChallengeTemplate>();
+        services.AddScoped<ChallengeMaterialCloner>();
         services.AddScoped<CreateChallengeTemplate>();
         services.AddScoped<ListChallengeTemplates>();
         services.AddScoped<GetChallengeTemplate>();
@@ -48,6 +51,11 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IChallengeTestRuntimeStore, ChallengeTestRuntimeStore>();
         services.AddScoped<GetChallengeTestRuntime>();
         services.AddScoped<MutateChallengeTestRuntime>();
+        services.AddScoped<ITemplateCapabilityTestStore, TemplateCapabilityTestStore>();
+        services.AddScoped<TestChallengeCapabilities>();
+        services.AddScoped<StartTemplateCapabilityTest>();
+        services.AddScoped<TemplateCapabilityTestExecutionStore>();
+        services.AddScoped<ITemplateCapabilityCheckResultStore>(provider => provider.GetRequiredService<TemplateCapabilityTestExecutionStore>());
         services.AddScoped<IChallengeAttachmentStore, ChallengeAttachmentStore>();
         services.AddScoped<ManageChallengeAttachments>();
         services.AddScoped<GetChallengeAttachments>();
@@ -63,6 +71,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<ReadParticipantChallengeHints>();
         services.AddScoped<CreateChallenge>();
         services.AddScoped<GetChallenge>();
+        services.AddScoped<NoCTF.Application.Challenges.Actions.IAvailableChallengeActionsReader, NoCTF.Infrastructure.Challenges.Actions.AvailableChallengeActionsReader>();
+        services.AddScoped<NoCTF.Application.Challenges.Actions.GetAvailableChallengeActions>();
         services.AddScoped<ListChallenges>();
         services.AddScoped<UpdateChallenge>();
         services.AddScoped<DeleteChallenge>();

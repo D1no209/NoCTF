@@ -16,7 +16,7 @@ internal static class AwdAdjudicationNotification
         db.Notifications.Add(new ManagementFailureNotification
         {
             Id = Guid.CreateVersion7(now), SourceType = NotificationSourceType.System,
-            TargetType = NotificationTargetType.CompetitionCollaborators, TargetId = fact.CompetitionId,
+            TargetType = NotificationTargetType.CompetitionCollaborators, TargetId = fact.CompetitionId!.Value,
             Code = "awd_checker_adjudication_required", CompetitionChallengeId = fact.CompetitionChallengeId,
             RuntimeInstanceId = fact.Awd!.RuntimeId, GameplayFactId = fact.Id,
             RelatedType = EntityReferenceKind.GameplayFact, RelatedId = fact.Id, SentAt = now

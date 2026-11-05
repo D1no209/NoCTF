@@ -207,7 +207,7 @@ describe('competition workspace lightweight reads', () => {
       app.setTeam(approved)
       await app.state.initialize(); await drain()
       expect(app.reads.every(read => read === 'my-standing')).toBe(true)
-      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).toContain('/competitions/competition/theory')
+      expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).not.toContain('/competitions/competition/theory')
       expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).toContain('/competitions/competition/progression')
       app.state.competition.value.features.progressionMapVisible = false
       expect(app.navigation().flatMap((group: any) => group.items).map((item: any) => item.to)).not.toContain('/competitions/competition/progression')

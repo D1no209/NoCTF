@@ -746,7 +746,7 @@ public sealed class LeaderboardEndpointTests
         var facts = Enumerable.Range(0, 3)
             .Select(index => new ScoreboardSlotDetailFact(
                 Guid.CreateVersion7(occurredAt.AddSeconds(-index)),
-                GameplayFactKind.FlagAttempt,
+                GameplayFactKind.BreakAttempt,
                 GameplayFactState.Completed,
                 GameplayFactResult.Wrong,
                 null,
@@ -794,7 +794,7 @@ public sealed class LeaderboardEndpointTests
                         -30))
                 {
                     Source = new(
-                        GameplayFactKind.FlagAttempt,
+                        GameplayFactKind.BreakAttempt,
                         GameplayFactState.Completed,
                         GameplayFactResult.Wrong,
                         null,
@@ -981,7 +981,7 @@ public sealed class LeaderboardEndpointTests
                 new ScoreboardEntryAllocation(publicTeamId, 0, slot.Entries[0])
                 {
                     Source = new(
-                        GameplayFactKind.FlagAttempt,
+                        GameplayFactKind.BreakAttempt,
                         GameplayFactState.Completed,
                         GameplayFactResult.Correct,
                         null,
@@ -1004,7 +1004,7 @@ public sealed class LeaderboardEndpointTests
             [
                 new(
                     publicEntryId,
-                    GameplayFactKind.FlagAttempt,
+                    GameplayFactKind.BreakAttempt,
                     GameplayFactState.Completed,
                     GameplayFactResult.Correct,
                     null,

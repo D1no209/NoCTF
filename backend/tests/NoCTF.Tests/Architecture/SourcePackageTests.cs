@@ -100,7 +100,7 @@ public sealed class SourcePackageTests
 
         public static async Task<SourceFixture> CreateAsync(CancellationToken ct)
         {
-            var root = Path.Combine(Path.GetTempPath(), $"noctf-source-package-{Guid.NewGuid():N}");
+            var root = Path.Combine(AppContext.BaseDirectory, "source-package-tests", $"noctf-source-package-{Guid.NewGuid():N}");
             var repository = Path.Combine(root, "repository");
             Directory.CreateDirectory(repository);
             var fixture = new SourceFixture(root, repository);
@@ -110,7 +110,7 @@ public sealed class SourcePackageTests
                 await File.WriteAllTextAsync(Path.Combine(repository, "LICENSE"), "license fixture\n", ct);
                 await File.WriteAllTextAsync(Path.Combine(repository, "catalog.json"), "{}", ct);
                 await fixture.RunAsync("git", ["add", "LICENSE", "catalog.json"], ct);
-                await fixture.RunAsync("git", ["-c", "user.name=Source package test", "-c",
+                await fixture.RunAsync("git", ["-c", "commit.gpgsign=false", "-c", "user.name=Source package test", "-c",
                     "user.email=source-package@example.test", "commit", "-m", "source fixture"], ct);
                 return fixture;
             }
@@ -139,6 +139,7 @@ public sealed class SourcePackageTests
             {
                 WorkingDirectory = Repository,
                 UseShellExecute = false,
+                CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
@@ -146,7 +147,12 @@ public sealed class SourcePackageTests
             using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start source test.");
             var output = process.StandardOutput.ReadToEndAsync(ct);
             var error = process.StandardError.ReadToEndAsync(ct);
-            await process.WaitForExitAsync(ct);
+            try { await process.WaitForExitAsync(ct); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                throw;
+            }
             var result = new ProcessResult(process.ExitCode, await output, await error);
             if (executable == "git" && result.ExitCode != 0)
                 throw new InvalidOperationException(result.Error);
@@ -156,7 +162,7 @@ public sealed class SourcePackageTests
         public ValueTask DisposeAsync()
         {
             var resolved = Path.GetFullPath(Root);
-            var expectedParent = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar);
+            var expectedParent = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "source-package-tests")).TrimEnd(Path.DirectorySeparatorChar);
             if (!string.Equals(Path.GetDirectoryName(resolved), expectedParent, StringComparison.OrdinalIgnoreCase)
                 || !Path.GetFileName(resolved).StartsWith("noctf-source-package-", StringComparison.Ordinal))
                 throw new InvalidOperationException("Source fixture cleanup left the temporary directory.");

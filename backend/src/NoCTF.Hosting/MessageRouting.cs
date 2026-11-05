@@ -22,10 +22,11 @@ public static class MessageRouting
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.LiveSolo.Rounds.ResolveLiveSoloSubmissionResults>(options, WorkerQueue.Control);
         Route<NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening>(options, WorkerQueue.Control);
         Route<NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.Theory.Papers.SweepTheoryActivity>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.Theory.Activities.ApplyTheoryCorrection>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Questionnaires.Sessions.SweepQuestionnaireActivity>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Questionnaires.Activities.ApplyQuestionnaireCorrection>(options, WorkerQueue.Control);
         options.PublishMessage<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>()
             .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
         options.ConfigureNoCtfInfrastructureRetriesFor<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(
@@ -81,11 +82,15 @@ public static class MessageRouting
         FanOutCompetitionEvents(options);
         Route<ReconcileRunnerAssignments>(options, WorkerQueue.Control);
         Route<BloodAwarded>(options, WorkerQueue.Background);
-        Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay);
-        Route<StartPatchVerification>(options, WorkerQueue.Gameplay);
+        Route<StartFixExecution>(options, WorkerQueue.Gameplay);
+        Route<NoCTF.Application.Challenges.Testing.DispatchTemplateCapabilityTest>(options, WorkerQueue.Gameplay);
+        Route<NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests>(options, WorkerQueue.Control);
         Route<AwdpFixResult>(options, WorkerQueue.Gameplay);
-        Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control);
-        Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);
+        Route<RecoverFixExecution>(options, WorkerQueue.Control);
+        Route<ExpireFixExecution>(options, WorkerQueue.Control);
+        Route<CompleteFixExecutionWork>(options, WorkerQueue.Gameplay);
+        Route<FinalizeFixExecution>(options, WorkerQueue.Control);
+        Route<RecoverFixExecutions>(options, WorkerQueue.Control);
     }
 
     private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue, bool durableOutbox = true)

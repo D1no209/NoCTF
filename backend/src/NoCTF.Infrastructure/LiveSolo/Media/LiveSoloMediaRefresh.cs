@@ -15,7 +15,7 @@ public sealed partial class LiveSoloMediaStore
         try { await RefreshCoreAsync(command, ct); }
         catch(Exception exception) when(IsTransactionConflict(exception))
         {messages.DiscardPendingMessages();throw;}
-        catch (Exception exception) when (!ct.IsCancellationRequested && TransactionFailureClassifier.IsRetryable(exception))
+        catch (Exception exception) when (!ct.IsCancellationRequested && TransactionFailureClassifier.IsDependencyUnavailable(exception))
         {
             messages.DiscardPendingMessages();
             // The durable scheduler carries an opaque immutable room binding. DB loss must not leave an existing raw room authorized.

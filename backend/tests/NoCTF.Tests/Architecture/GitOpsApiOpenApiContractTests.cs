@@ -64,7 +64,7 @@ public sealed class GitOpsApiOpenApiContractTests
             "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
             "get", "200");
         await Assert.That(PropertyNames(challenge))
-            .IsEquivalentTo(["challenge", "mode", "competitionStatus", "rules"]);
+            .IsEquivalentTo(["challenge", "mode", "competitionStatus", "rules", "scorePreset", "effectiveScoring"]);
     }
 
     [Test]
@@ -103,11 +103,8 @@ public sealed class GitOpsApiOpenApiContractTests
         await Assert.That(PropertyNames(createTemplate)).DoesNotContain("definitionJson");
         var definition = ResolveSchema(root,
             createTemplate.GetProperty("properties").GetProperty("definition"));
-        await Assert.That(RequiredPropertyNames(definition)).Contains("mode");
-        await Assert.That(PropertyNames(definition)).Contains("ctf");
-        await Assert.That(PropertyNames(definition)).Contains("awd");
-        await Assert.That(PropertyNames(definition)).Contains("awdp");
-        await Assert.That(PropertyNames(definition)).Contains("koh");
+        await Assert.That(RequiredPropertyNames(definition)).Contains("capabilities");
+        await Assert.That(PropertyNames(definition)).IsEquivalentTo(["runtime", "capabilities"]);
 
         var patchTemplate = RequestSchema(
             root, "/api/v1/admin/challenges/{challengeId}", "patch");

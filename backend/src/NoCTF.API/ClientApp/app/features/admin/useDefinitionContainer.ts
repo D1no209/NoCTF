@@ -1,13 +1,12 @@
 import { computed, ref, toRefs, useId, watch } from 'vue'
-import type { ContainerDefinitionModel, DefinitionModel, GameModeValue, RuntimeServiceModel, RuntimeTemplateModel } from '../../utils/game-config'
+import type { ContainerDefinitionModel, DefinitionModel, RuntimeServiceModel } from '../../utils/game-config'
 import { emptyRuntimeService, runtimeServiceIsReferenced, renameRuntimeService } from '../../utils/game-config'
 import { runtimeTopology } from './runtime-topology'
 
 export function useDefinitionContainer(props: Readonly<{
-  definition: ContainerDefinitionModel; model: DefinitionModel; mode: GameModeValue;
-  flagSource: RuntimeTemplateModel['flagSource']; disabled: boolean; singleServiceOnly: boolean
+  definition: ContainerDefinitionModel; model: DefinitionModel;
+  disabled: boolean; singleServiceOnly: boolean
 }>) {
-  const showFlagEnvironmentVariable = computed(() => props.flagSource === 'PerTeam')
   const selectedServiceIndex = ref(0)
   const fieldId = useId()
   const serviceNameInputId = `${fieldId}-service-name`
@@ -15,7 +14,7 @@ export function useDefinitionContainer(props: Readonly<{
   const selectedService = computed(() => props.definition.services[selectedServiceIndex.value])
   const selectedServiceId = computed(() => `service-${selectedServiceIndex.value}`)
   const topology = computed(() => runtimeTopology(props.definition, props.model.runtime?.urlBindings ?? [],
-    props.model.runtime?.controlCheckUrlBinding ?? null, {
+    props.model.control, {
       unnamedService: index => translate('runtime.label.runtimeUnnamedService', { index }),
       missingImage: translate('runtime.label.runtimeImageSet'),
       missingService: translate('runtime.label.runtimeServiceFound'),
@@ -26,8 +25,7 @@ export function useDefinitionContainer(props: Readonly<{
     const service = selectedService.value
     return !!service && (service.memoryMiB !== null || service.cpuCores !== null
       || service.command.length > 0 || service.arguments.length > 0
-      || Object.keys(service.environment).length > 0 || service.internalPorts.length > 0
-      || !!service.flagEnvironmentVariableName)
+      || Object.keys(service.environment).length > 0 || service.internalPorts.length > 0)
   })
   function selectService(id: string): void {
     const index = props.definition.services.findIndex((_, ordinal) => `service-${ordinal}` === id)
@@ -59,7 +57,7 @@ export function useDefinitionContainer(props: Readonly<{
     const service = props.definition.services[index]
     if (!props.disabled && service) service[key] = value
   }
-  return { ...toRefs(props), showFlagEnvironmentVariable, serviceNameInputId, serviceImageInputId, selectedServiceIndex, selectedService, selectedServiceId,
+  return { ...toRefs(props), serviceNameInputId, serviceImageInputId, selectedServiceIndex, selectedService, selectedServiceId,
     topology, advancedOpen, selectService, addService, canRemove, removeService, renameService, updateService }
 }
 export type DefinitionContainerViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useDefinitionContainer>>

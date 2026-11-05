@@ -84,14 +84,14 @@ describe('isolated Mock API', () => {
     const path = `/api/v1/admin/competitions/${created.id}/challenges`
     const before = await (await send(path + '?includeDeleted=false')).json()
     const projection = projectChallengePlacements(target, before.items, id(3, 2))
-    expect(availablePlacementCompetitions([projection], 'Ctf')).toHaveLength(1)
+    expect(availablePlacementCompetitions([projection], ['Break'])).toHaveLength(1)
     const added = await send(path, 'POST', { challengeId: id(3, 2), customTitle: null, order: projection.nextOrder })
     expect(added.status).toBe(201)
     const after = await (await send(path + '?includeDeleted=false')).json()
     const placed = projectChallengePlacements(target, after.items, id(3, 2))
     expect(placed.instances).toHaveLength(1)
     expect(placed.instances[0]!.id).not.toBe(id(3, 2))
-    expect(availablePlacementCompetitions([placed], 'Ctf')).toHaveLength(0)
+    expect(availablePlacementCompetitions([placed], ['Break'])).toHaveLength(0)
   })
   test('lists only the signed-in team active runtimes with pagination', async () => {
     const { send } = await setup('player')

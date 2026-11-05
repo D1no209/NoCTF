@@ -558,7 +558,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, projectedAt);
             var visibleFact = fixture.Facts[0];
             visibleFact.Result = GameplayFactResult.Correct;
-            var hiddenTemplate = new CtfChallenge
+            var hiddenTemplate = new Challenge
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(40)),
                 OwnerId = owner.Id,
@@ -579,7 +579,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 Rules = TestConfigurations.Clone(fixture.CompetitionChallenge.Rules!),
                 UpdatedAt = projectedAt.AddMinutes(-20)
             };
-            var hiddenFact = new FlagAttemptGameplayFact
+            var hiddenFact = new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(-10)),
                 CompetitionId = fixture.Competition.Id,
@@ -1192,7 +1192,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             await Assert.That(detailIds.Distinct()).Count().IsEqualTo(ctf.Facts.Count);
             await Assert.That(detailIds).IsEquivalentTo(ctf.Facts.Select(fact => fact.Id));
 
-            var futureFact = new FlagAttemptGameplayFact
+            var futureFact = new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(1)),
                 CompetitionId = ctf.Competition.Id,
@@ -1346,7 +1346,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         competition.MaxConcurrentRuntimeInstancesPerTeam = 1;
         competition.CreatedAt = start;
         competition.UpdatedAt = start;
-        var challenge = ChallengeGeneratedCatalog.Create(mode);
+        var challenge = new Challenge();
         challenge.Id = challengeId;
         challenge.OwnerId = ownerId;
         challenge.Visibility = ChallengeVisibility.Private;
@@ -1376,10 +1376,10 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         };
         var kind = mode switch
         {
-            GameMode.Ctf => GameplayFactKind.FlagAttempt,
-            GameMode.Awd => GameplayFactKind.FlagAttempt,
+            GameMode.Ctf => GameplayFactKind.BreakAttempt,
+            GameMode.Awd => GameplayFactKind.BreakAttempt,
             GameMode.Awdp => GameplayFactKind.BreakAttempt,
-            GameMode.Koh => GameplayFactKind.KohControlObservation,
+            GameMode.Koh => GameplayFactKind.ControlObservation,
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         var result = mode == GameMode.Koh

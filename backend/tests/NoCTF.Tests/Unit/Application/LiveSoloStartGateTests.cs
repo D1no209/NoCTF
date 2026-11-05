@@ -17,7 +17,7 @@ public sealed class LiveSoloStartGateTests
         {
             // Pool content is checked for the selected Round; legacy publication must not revive ordinary gates.
             Challenges = [new(Guid.NewGuid(), GameMode.Ctf, new CtfCompetitionChallengeRules(),
-                new CtfChallengeDefinition(), legacyPublished, [-1])]
+                TestConfigurations.Definition(GameMode.Ctf), legacyPublished, [-1])]
         };
         await Assert.That((await Gate(snapshot).ValidateAsync(snapshot.CompetitionId))!.Count).IsEqualTo(0);
     }

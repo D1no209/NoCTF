@@ -29,8 +29,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider = timeProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -41,19 +39,16 @@ namespace Internal.Generated.WolverineHandlers
             // The actual message body
             var awdpFixResult = (NoCTF.Application.GameplayFacts.Processing.AwdpFixResult)context.Envelope.Message;
 
-            System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.AwdpMessageHandler");
-            System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.AwdpMessageHandler");
-            var awdpMessageHandler = new NoCTF.Worker.AwdpMessageHandler(internalResultStore, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider);
+            System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.FixExecutionMessageHandler");
+            System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.FixExecutionMessageHandler");
+            var fixExecutionMessageHandler = new NoCTF.Worker.FixExecutionMessageHandler(internalResultStore, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider);
             
             // The actual message execution
-            await awdpMessageHandler.Handle(awdpFixResult, cancellation).ConfigureAwait(false);
-
+            await fixExecutionMessageHandler.Handle(awdpFixResult, cancellation).ConfigureAwait(false);
         }
-
     }
 
     // END: AwdpFixResultHandler1244579238
     
     
 }
-

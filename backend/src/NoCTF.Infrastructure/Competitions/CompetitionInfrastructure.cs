@@ -60,6 +60,8 @@ internal static class CompetitionInfrastructure
         services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();
         services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
         services.AddScoped<IAwdCheckerCoordinator, AwdCheckerCoordinator>();
+        services.AddScoped<NoCTF.Application.Competitions.Awd.Fixes.IAwdPersistentFixStore, NoCTF.Infrastructure.Competitions.Awd.Fixes.AwdPersistentFixStore>();
+        services.AddScoped<NoCTF.Application.Competitions.Awd.Fixes.RecoverPersistentFixes>();
         services.AddScoped<IAwdCheckerTaskReader, AwdCheckerTaskReader>();
         services.AddScoped<IAwdCheckAdjudicationStore, AwdCheckAdjudicationStore>();
         services.AddScoped<AdjudicateAwdCheck>();
@@ -78,7 +80,7 @@ internal static class CompetitionInfrastructure
         services.AddSingleton<KohProducerConfigurationCatalog>();
         services.AddSingleton<IKohProducerConfigurationCatalog,
             FusionKohProducerConfigurationCatalog>();
-        services.AddHttpClient(HttpKohControlClient.ClientName)
+        services.AddHttpClient(NoCTF.Infrastructure.Challenges.Capabilities.HttpControlObservationClient.ClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false
@@ -95,7 +97,8 @@ internal static class CompetitionInfrastructure
                 retry.DisableForUnsafeHttpMethods();
                 pipeline.AddRetry(retry);
             });
-        services.AddTransient<IKohControlClient, HttpKohControlClient>();
+        services.AddTransient<NoCTF.Application.Challenges.Capabilities.IControlObservationClient, NoCTF.Infrastructure.Challenges.Capabilities.HttpControlObservationClient>();
+        services.AddTransient<NoCTF.Application.Challenges.Capabilities.ObserveControl>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, CompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();

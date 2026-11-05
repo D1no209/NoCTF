@@ -50,4 +50,5 @@ public sealed record RecordKohObservation(
     GameplayFactFailureCode? FailureCode,
     DateTimeOffset RunningSince,
     DateTimeOffset DueAt,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    NoCTF.Domain.Challenges.Capabilities.ControlOutcome Outcome);

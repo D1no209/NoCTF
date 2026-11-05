@@ -50,8 +50,16 @@ public sealed class ChallengeBankStore(
                 UserIds: eligibility.RoleIneligibleUserIds);
         }
 
+        if (command.Definition.Questionnaire is { } questionnaire)
+        {
+            questionnaire.CurrentRevision.Id = Guid.CreateVersion7(command.CreatedAt);
+            questionnaire.CurrentRevisionId = questionnaire.CurrentRevision.Id;
+            questionnaire.CurrentRevision.Number = 1;
+            questionnaire.CurrentRevision.CreatedAt = command.CreatedAt;
+        }
         ChallengeDefinitionGraph.AssignChallengeId(command.Definition, challengeId);
-        var entity = ChallengeGeneratedCatalog.Create(command.Mode);
+        await EnsureQuestionnaireSourcesAsync(command.Definition, ct);
+        var entity = new Challenge();
         entity.Id = challengeId;
         entity.OwnerId = command.OwnerId;
         entity.Visibility = command.Visibility;
@@ -89,7 +97,8 @@ public sealed class ChallengeBankStore(
         var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes().Where(x => x.CatalogScope == ChallengeCatalogScope.QuestionBank);
         if (!query.IncludeDeleted)
             source = source.Where(challenge => challenge.DeletedAt == null);
-        if (query.Mode is { } mode) source = source.Where(challenge => challenge.Mode == mode);
+        foreach (var required in query.RequiredCapabilities ?? [])
+            source = source.Where(challenge => challenge.Definition!.Capabilities.Any(capability => capability.Kind == required));
         if (query.OnlyMine)
             source = source.Where(challenge => challenge.OwnerId == query.ActorId);
 
@@ -154,6 +163,22 @@ public sealed class ChallengeBankStore(
             || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !CanWrite(entity, command.ActorId, command.IsAdministrator))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
+        if (command.Definition.Questionnaire is { } requestedQuestionnaire)
+        {
+            var previous = entity.Definition?.Questionnaire;
+            if (previous is not null && ChallengeDefinitionStructuralComparer.QuestionnaireContentEquals(previous.CurrentRevision, requestedQuestionnaire.CurrentRevision))
+            {
+                requestedQuestionnaire.CurrentRevision = previous.CurrentRevision;
+                requestedQuestionnaire.CurrentRevisionId = previous.CurrentRevisionId;
+            }
+            else
+            {
+                requestedQuestionnaire.CurrentRevision.Id = Guid.CreateVersion7(command.UpdatedAt);
+                requestedQuestionnaire.CurrentRevisionId = requestedQuestionnaire.CurrentRevision.Id;
+                requestedQuestionnaire.CurrentRevision.Number = checked((previous?.CurrentRevision.Number ?? 0) + 1);
+                requestedQuestionnaire.CurrentRevision.CreatedAt = command.UpdatedAt;
+            }
+        }
         if (HasSameEditableContent(entity, command))
         {
             var unchanged = await Project(db.Challenges.AsNoTracking()
@@ -162,60 +187,32 @@ public sealed class ChallengeBankStore(
             await transaction.CommitAsync(ct);
             return new(ChallengeTemplateWriteState.Succeeded, unchanged);
         }
-        if (material is not null) await material.RequireMutableAsync(new(command.ChallengeId, null), ct);
-        if (entity.Mode != command.Mode)
-            return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
-        var currentInteraction = GetInteractionKind(entity.Definition);
-        var requestedInteraction = GetInteractionKind(command.Definition);
-        if (requestedInteraction == CtfInteractionKind.PatchVerification
+        var previousDefinition = entity.Definition!;
+        var runtimeChanged = ChallengeDefinitionStructuralComparer.HasRuntimeChanges(previousDefinition, command.Definition);
+        var changedCapabilities = ChallengeDefinitionStructuralComparer.ChangedExecutionCapabilities(previousDefinition, command.Definition);
+        var displayChanged = entity.Title != command.Title || entity.Description != command.Description
+            || !string.Equals(entity.Direction, command.Direction, StringComparison.OrdinalIgnoreCase);
+        if (material is not null) await material.RequireMutableAsync(new(command.ChallengeId, null,
+            displayChanged ? null : changedCapabilities, runtimeChanged), ct);
+        if (command.Definition.Break is null
             && await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(flag => flag.ChallengeId == command.ChallengeId, ct))
         {
             return new(
                 ChallengeTemplateWriteState.InvalidDefinition,
-                Detail: "PatchVerification challenges cannot contain static or generated flags.");
+                Detail: "Remove the template flags before removing its Break capability.");
         }
-        if (currentInteraction != requestedInteraction)
-        {
-            var referenced = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
-                .AnyAsync(item => item.ChallengeId == command.ChallengeId, ct);
-            var hasTemplateRuntime = await db.RuntimeInstances.AsNoTracking()
-                .AnyAsync(runtime => runtime.ChallengeId == command.ChallengeId, ct);
-            var hasGameplayFact = await db.GameplayFacts.AsNoTracking()
-                .Join(
-                    db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking(),
-                    fact => fact.CompetitionChallengeId,
-                    competitionChallenge => competitionChallenge.Id,
-                    (fact, competitionChallenge) => competitionChallenge.ChallengeId)
-                .AnyAsync(challengeId => challengeId == command.ChallengeId, ct);
-            if (referenced || hasTemplateRuntime || hasGameplayFact)
+        if (await new ChallengeCapabilityUsageGuard(db).CheckAsync(command.ChallengeId, previousDefinition, command.Definition, ct) is { } conflict)
+            return new(conflict, Detail: conflict switch
             {
-                return new(
-                    ChallengeTemplateWriteState.InteractionKindConflict,
-                    Detail: "The CTF interaction kind can change only before the template is referenced or used.");
-            }
-        }
+                ChallengeTemplateWriteState.ReferencedCapabilityConflict => "Referenced capabilities cannot be removed.",
+                ChallengeTemplateWriteState.PendingExecutionConflict => "Wait for the accepted capability executions to finish before changing their definitions.",
+                ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict => "Stop the Runtime using the changed technical configuration before updating it.",
+                _ => throw new ArgumentOutOfRangeException(nameof(conflict), conflict, null)
+            });
         var definitionChanged = !ChallengeDefinitionStructuralComparer.Equals(
             entity.Definition,
             command.Definition);
-        if (definitionChanged
-            && await db.RuntimeInstances.AsNoTracking().AnyAsync(runtime =>
-                (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping)
-                && (runtime.ChallengeId == command.ChallengeId
-                    || runtime.CompetitionChallengeId != null
-                    && db.CompetitionChallenges.IgnoreQueryFilters().Any(reference =>
-                        reference.Id == runtime.CompetitionChallengeId
-                        && reference.ChallengeId == command.ChallengeId)),
-                ct))
-        {
-            return new(
-                ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict,
-                Detail:
-                    "Stop every active Runtime created from this template before changing its technical definition.");
-        }
         var supportsRegularExpression = StaticFlagConfiguration.SupportsRegularExpression(command.Definition, RuntimeTemplates);
         if (!supportsRegularExpression)
         {
@@ -235,7 +232,7 @@ public sealed class ChallengeBankStore(
             {
                 return new(
                     ChallengeTemplateWriteState.InvalidDefinition,
-                    Detail: "Delete or convert regular-expression flags before enabling dynamic flags or changing the game mode.");
+                    Detail: "Delete or convert regular-expression flags before enabling dynamic flags.");
             }
         }
         var descriptionChanged = !string.Equals(
@@ -265,6 +262,7 @@ public sealed class ChallengeBankStore(
                 await db.SaveChangesAsync(ct);
             }
             ChallengeDefinitionGraph.AssignChallengeId(command.Definition, entity.Id);
+            await EnsureQuestionnaireSourcesAsync(command.Definition, ct);
             entity.Definition = command.Definition;
             db.Add(command.Definition);
         }
@@ -519,17 +517,11 @@ public sealed class ChallengeBankStore(
     private static bool HasSameEditableContent(
         Challenge entity,
         UpdateChallengeTemplateCommand command) =>
-        entity.Mode == command.Mode
-        && entity.Visibility == command.Visibility
+        entity.Visibility == command.Visibility
         && string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
         && string.Equals(entity.Description, command.Description, StringComparison.Ordinal)
         && string.Equals(entity.Direction, command.Direction, StringComparison.OrdinalIgnoreCase)
         && ChallengeDefinitionStructuralComparer.Equals(entity.Definition, command.Definition);
-
-    private static CtfInteractionKind GetInteractionKind(ChallengeDefinition? definition) =>
-        definition is CtfChallengeDefinition ctf
-            ? ctf.InteractionKind
-            : CtfInteractionKind.FlagSubmission;
 
     private static IQueryable<Challenge> Authorized(
         IQueryable<Challenge> query,
@@ -565,7 +557,7 @@ public sealed class ChallengeBankStore(
             challenge.Id,
             challenge.OwnerId,
             challenge.Managers.Select(manager => manager.UserId).ToArray(),
-            challenge.Mode,
+            challenge.Definition!.Capabilities.Select(item => item.Kind).ToArray(),
             challenge.Visibility,
             challenge.Title,
             challenge.Description,
@@ -580,21 +572,27 @@ public sealed class ChallengeBankStore(
     private IQueryable<ChallengeTemplateSummaryView> ProjectSummary(IQueryable<Challenge> source) =>
         source.Select(challenge => new ChallengeTemplateSummaryView(
             challenge.Id,
-            challenge.Mode,
+            challenge.Definition!.Capabilities.Select(item => item.Kind).ToArray(),
             challenge.Visibility,
             challenge.Title,
             challenge.Direction,
             challenge.DeletedAt,
             db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
                 item.ChallengeId == challenge.Id && item.DeletedAt == null),
-            challenge.UpdatedAt,
-            db.Set<CtfChallengeDefinition>().AsNoTracking()
-                .Where(definition => definition.ChallengeId == challenge.Id)
-                .Select(definition => definition.InteractionKind)
-                .FirstOrDefault()) { ConcurrencyStamp = challenge.ConcurrencyStamp });
+            challenge.UpdatedAt) { ConcurrencyStamp = challenge.ConcurrencyStamp });
 
     private sealed record PublishedChallengeReference(
         Guid CompetitionId,
         Guid Id);
+
+    private async Task EnsureQuestionnaireSourcesAsync(ChallengeDefinition definition, CancellationToken ct)
+    {
+        if (definition.Questionnaire is not { } questionnaire) return;
+        var sources = questionnaire.CurrentRevision.Questions.Select(question => question.SourceId).Distinct().ToArray();
+        var existing = await db.Set<NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource>().Where(source => sources.Contains(source.Id))
+            .Select(source => source.Id).ToArrayAsync(ct);
+        foreach (var source in sources.Except(existing))
+            db.Add(new NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource { Id = source });
+    }
 
 }

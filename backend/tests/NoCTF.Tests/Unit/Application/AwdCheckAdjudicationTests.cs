@@ -16,12 +16,12 @@ public sealed class AwdCheckAdjudicationTests
         int observedSeconds, bool accepted)
     {
         var start = DateTimeOffset.UtcNow;
-        var fact = new AwdServiceTransitionGameplayFact { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(),
+        var fact = new CheckObservationGameplayFact { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(),
             Awd = new() { Settlement = AwdSettlementState.PendingAdjudication,
                 Health = AwdHealth.InternalError, ManifestComplete = manifest, EvidenceComplete = reported,
                 AttemptId = Guid.NewGuid(), AttemptStartedAt = start, AttemptDeadline = start.AddSeconds(30),
                 ObservedAt = start.AddSeconds(observedSeconds), ReceivedAt = start.AddMinutes(2) } };
-        var command = new AwdCheckAdjudicationCommand(fact.CompetitionId, fact.Id, fact.Awd.AttemptId, fact.Awd.ReceivedAt,
+        var command = new AwdCheckAdjudicationCommand(fact.CompetitionId!.Value, fact.Id, fact.Awd.AttemptId, fact.Awd.ReceivedAt,
             Guid.NewGuid(), AwdCheckAdjudicationAction.AcceptEvidence, "Checked original evidence", start.AddMinutes(3));
         var result = AdjudicateAwdCheck.Apply(fact, command, new(AwdHealth.Ok, AwdCheckReason.None, null, 1, 1));
         await Assert.That(result).IsEqualTo(accepted ? AwdCheckAdjudicationState.Applied : AwdCheckAdjudicationState.InvalidEvidence);

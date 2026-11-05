@@ -30,26 +30,13 @@ public static class TypedGameModeConfiguration
         value.MaxFlagAttempts,
         WrongSubmissionPenalty: value.WrongSubmissionPenalty,
         FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        MaxPatchAttempts: value.MaxPatchAttempts,
         ScoreSettlementMode: value.ScoreSettlementMode);
 
-    public static CtfChallengeConfiguration Ctf(CtfChallengeDefinition value)
-    {
-        var patch = value.InteractionKind == CtfInteractionKind.PatchVerification;
-        return new(
+    public static CtfChallengeConfiguration Ctf(ChallengeDefinition value) => new(
             ScoreCurve: null,
             BloodRewards: null,
-            Runtime: Runtime(value.Runtime),
-            InteractionKind: value.InteractionKind,
-            PatchEntrypoint: patch ? value.PatchEntrypoint : null,
-            PatchCommand: patch ? Strings(value, ChallengeDefinitionStringKind.PatchCommand) : null,
-            PatchTimeoutSeconds: patch ? value.PatchTimeoutSeconds : null,
-            Checker: patch ? Checker(value) : null,
-            ReadyTimeoutSeconds: patch ? value.ReadyTimeoutSeconds : null,
-            MaximumPatchUploadBytes: patch ? value.MaximumPatchUploadBytes : null,
-            FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-            CheckerFixInput: patch && value.CheckerFixInput);
-    }
+            Runtime: Runtime(value),
+            FlagTemplate: value.Break is { HasFlagTemplate: true } flag ? Flag(flag.FlagTemplate) : null);
 
     public static AwdConfiguration Awd(AwdCompetitionModeConfiguration value) => new(
         value.HardeningDurationSeconds,
@@ -72,21 +59,27 @@ public static class TypedGameModeConfiguration
         ServiceUnhealthyPenalty: value.ServiceUnhealthyPenalty,
         FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null);
 
-    public static AwdChallengeConfiguration Awd(AwdChallengeDefinition value) => new(
-        Runtime: Runtime(value.Runtime),
-        Checker: value.Checker is null
+    public static AwdChallengeConfiguration Awd(ChallengeDefinition value) => new(
+        Runtime: Runtime(value),
+        Checker: value.Check is null
             ? null
             : new AwdCheckerConfiguration(
                 Checker(value)!,
-                value.Checker.TargetServiceName),
-        FlagInjection: value.FlagInjectionCommand is null
+                value.Check.TargetServiceName),
+        FlagInjection: value.Break?.InjectionCommand is null
             ? null
             : new AwdFlagInjectionConfiguration(
-                value.FlagInjectionCommand,
-                value.FlagInjectionTimeoutSeconds ?? 30,
-                value.FlagInjectionServiceName),
-        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        FlagStores: value.FlagStores);
+                value.Break.InjectionCommand,
+                value.Break.InjectionTimeoutSeconds,
+                value.Break.InjectionServiceName),
+        FlagTemplate: value.Break is { HasFlagTemplate: true } flag ? Flag(flag.FlagTemplate) : null,
+        FlagStores: value.Break?.FlagStores.Select(store => new NoCTF.Domain.Competitions.Awd.AwdFlagStore
+        {
+            ChallengeId = store.ChallengeId, Id = store.Id, Position = store.Position, Name = store.Name,
+            TargetServiceName = store.TargetServiceName, DeliveryMode = (NoCTF.Domain.Competitions.Awd.AwdFlagDeliveryMode)store.DeliveryKind,
+            InjectionCommand = store.InjectionCommand, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
+            PreservesHistoricalFlags = store.PreservesHistoricalFlags
+        }).ToArray() ?? []);
 
     public static AwdpConfiguration Awdp(AwdpCompetitionModeConfiguration value) => new(
         value.RoundDurationSeconds,
@@ -115,21 +108,21 @@ public static class TypedGameModeConfiguration
             : (NoCTF.Domain.Gameplay.EvaluationDispatchMode)value.EvaluationDispatchMode.Value,
         FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null);
 
-    public static AwdpChallengeConfiguration Awdp(AwdpChallengeDefinition value) => new(
+    public static AwdpChallengeConfiguration Awdp(ChallengeDefinition value) => new(
         Break: null,
         Fix: null,
         RequireBreakBeforeFix: null,
         MaxBreakSubmissions: null,
         MaxFixSubmissions: null,
-        Runtime: Runtime(value.Runtime),
-        PatchEntrypoint: value.PatchEntrypoint,
-        PatchCommand: Strings(value, ChallengeDefinitionStringKind.PatchCommand),
-        PatchTimeoutSeconds: value.PatchTimeoutSeconds,
+        Runtime: Runtime(value),
+        PatchEntrypoint: value.Fix?.Entrypoint,
+        PatchCommand: value.Fix?.Command.OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
+        PatchTimeoutSeconds: value.Fix?.TimeoutSeconds,
         Checker: Checker(value),
-        ReadyTimeoutSeconds: value.ReadyTimeoutSeconds,
-        MaximumPatchUploadBytes: value.MaximumPatchUploadBytes,
-        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        CheckerFixInput: value.CheckerFixInput);
+        ReadyTimeoutSeconds: value.Check?.ReadyTimeoutSeconds,
+        MaximumPatchUploadBytes: value.Fix?.MaximumUploadBytes,
+        FlagTemplate: value.Break is { HasFlagTemplate: true } flag ? Flag(flag.FlagTemplate) : null,
+        CheckerFixInput: value.Check?.AcceptsFixInput ?? false);
 
     public static KohConfiguration Koh(KohCompetitionModeConfiguration value) => new(
         value.PollIntervalSeconds,
@@ -139,18 +132,27 @@ public static class TypedGameModeConfiguration
         PollIntervalSeconds: value.PollIntervalSeconds,
         ControlPointsPerInterval: value.ControlPointsPerInterval);
 
-    public static KohChallengeConfiguration Koh(KohChallengeDefinition value) => new(
-        Runtime(value.Runtime));
+    public static KohChallengeConfiguration Koh(ChallengeDefinition value) => new(
+        Runtime(value) is { } runtime && value.Control is { } control
+            ? runtime with { Allocation = RuntimeAllocation.Shared, ControlCheckUrlBinding = new(control.UrlTemplate, RuntimeExposure.Participants,
+                control.ContainerPort, control.ServiceName, control.VmId, control.GuestPort) }
+            : Runtime(value));
+
+    public static ChallengeRuntimeTemplate? Runtime(ChallengeDefinition? definition)
+    {
+        var runtime = Runtime(definition?.Runtime);
+        if (runtime?.Definition is not ContainerRuntimeDefinition container || definition?.Break is not { } capability) return runtime;
+        return runtime with { Definition = container with { Services = container.Services.Select(service => service with
+            { FlagEnvironmentVariableName = capability.EnvironmentTargets.SingleOrDefault(target => target.ServiceName == service.Name)?.VariableName }).ToArray() } };
+    }
 
     public static ChallengeRuntimeTemplate? Runtime(ChallengeRuntimeTemplateEntity? value)
     {
         if (value is null) return null;
-        var bindings = value.UrlBindings.Where(item => !item.IsControlCheck)
+        var bindings = value.UrlBindings
             .OrderBy(item => item.Position).Select(Binding).ToArray();
-        var control = value.UrlBindings.Where(item => item.IsControlCheck)
-            .OrderBy(item => item.Position).Select(Binding).FirstOrDefault();
         return new(
-            (RuntimeAllocation)value.Allocation,
+            RuntimeAllocation.PerTeam,
             value switch
             {
                 ContainerChallengeRuntimeTemplate container => new ContainerRuntimeDefinition(
@@ -159,7 +161,7 @@ public static class TypedGameModeConfiguration
                         service.Commands.Where(item => !item.IsArgument).OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
                         service.Commands.Where(item => item.IsArgument).OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
                         service.Environment.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal),
-                        service.InternalPorts.Select(item => item.Port).ToArray(), service.FlagEnvironmentVariableName)).ToArray(),
+                        service.InternalPorts.Select(item => item.Port).ToArray())).ToArray(),
                     (RuntimeEgressPolicy)container.EgressPolicy),
                 OvaChallengeRuntimeTemplate ova => new OvaRuntimeDefinition(
                     ova.OvaSourceUrl, ova.Sha256),
@@ -170,23 +172,38 @@ public static class TypedGameModeConfiguration
                 ? new RuntimeResourceLimits(
                     resources.Limits.MemoryBytes, resources.Limits.CpuMillicores, resources.Limits.PidsLimit)
                 : null,
-            value.TtlSeconds,
+            null,
             value.OperationTimeoutSeconds,
             bindings,
-            (RuntimeFlagSource)value.FlagSource,
-            control);
+            RuntimeFlagSource.Static,
+            null);
+    }
+
+    public static ChallengeRuntimeTemplate? Runtime(ChallengeDefinition? definition, CompetitionChallengeRules rules)
+    {
+        var template = Runtime(definition);
+        if (template is null) return null;
+        if (rules is not IChallengeRuntimeRules policy) throw new InvalidOperationException("Runtime rules are required for this competition challenge.");
+        var effective = template with
+        {
+            Allocation = (RuntimeAllocation)policy.Runtime.Allocation,
+            FlagSource = (RuntimeFlagSource)policy.Runtime.FlagSource,
+            TtlSeconds = policy.Runtime.TtlSeconds
+        };
+        return rules is KohCompetitionChallengeRules && definition?.Control is { } control
+            ? effective with { ControlCheckUrlBinding = new(control.UrlTemplate, RuntimeExposure.Participants,
+                control.ContainerPort, control.ServiceName, control.VmId, control.GuestPort) }
+            : effective;
     }
 
     public static RunnerJobConfiguration? Checker(ChallengeDefinition value) =>
-        value.Checker is null
+        value.Check is null
             ? null
             : new RunnerJobConfiguration(
-                value.Checker.Image,
-                Strings(value, ChallengeDefinitionStringKind.CheckerCommand),
-                value.StringItems.Where(item =>
-                        item.Kind == ChallengeDefinitionStringKind.CheckerEnvironment)
-                    .ToDictionary(item => item.Key!, item => item.Value, StringComparer.Ordinal),
-                value.Checker.TimeoutSeconds);
+                value.Check.Image,
+                value.Check.Command.OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
+                value.Check.Environment.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal),
+                value.Check.TimeoutSeconds);
 
     private static RuntimeUrlBinding Binding(ChallengeRuntimeUrlBinding value) => new(
         value.UrlTemplate,
@@ -195,11 +212,6 @@ public static class TypedGameModeConfiguration
         value.ServiceName,
         value.VmId,
         value.GuestPort);
-
-    private static string[] Strings(
-        ChallengeDefinition value,
-        ChallengeDefinitionStringKind kind) => value.StringItems.Where(item => item.Kind == kind)
-            .OrderBy(item => item.Position).Select(item => item.Value).ToArray();
 
     private static ScoreCurveConfiguration Curve(ScoreCurveValue value) => new(
         value.InitialPoints,

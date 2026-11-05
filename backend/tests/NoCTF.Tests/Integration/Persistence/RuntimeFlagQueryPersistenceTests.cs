@@ -156,13 +156,13 @@ public sealed class RuntimeFlagQueryPersistenceTests
         await Run(mode, async (db, fixture) =>
         {
             if (mode == GameMode.Awdp)
-                db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance { Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
+                db.RuntimeInstances.Add(new FixTargetRuntimeInstance { Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
                     CompetitionChallengeId = fixture.CompetitionChallengeId, TeamId = fixture.TeamId, State = RuntimeState.Running,
                     RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, CreatedAt = fixture.Now.AddMinutes(-5) });
             db.ChallengeFlags.Add(Flag(fixture, fixture.TeamId, fixture.RuntimeId, fixture.Now.AddMinutes(-1), GameMode.Ctf));
             await db.SaveChangesAsync(ct);
             var runtimeId = mode == GameMode.Koh ? fixture.RuntimeId
-                : await db.RuntimeInstances.Where(item => item.Purpose == RuntimePurpose.AwdpTarget).Select(item => item.Id).SingleAsync(ct);
+                : await db.RuntimeInstances.Where(item => item.Purpose == RuntimePurpose.FixTarget).Select(item => item.Id).SingleAsync(ct);
             await Assert.That((await new RuntimeFlagReader(db).ReadAsync(new(runtimeId, true, 0, 10, fixture.Now), ct)).Total).IsEqualTo(0);
         }, ct);
     }
@@ -172,10 +172,13 @@ public sealed class RuntimeFlagQueryPersistenceTests
     {
         if (mode == GameMode.Ctf)
         {
-            var definition = await db.Set<CtfChallengeDefinition>().SingleAsync(item => item.ChallengeId == fixture.ChallengeId, ct);
+            var definition = (await db.Challenges.SingleAsync(item => item.Id == fixture.ChallengeId, ct)).Definition!;
             definition.Runtime = new ContainerChallengeRuntimeTemplate { ChallengeId = fixture.ChallengeId,
-                FlagSource = PersistedRuntimeFlagSource.PerTeam, Allocation = PersistedRuntimeAllocation.PerTeam,
-                Services = [new() { Name = "main", Image = "alpine", FlagEnvironmentVariableName = "FLAG" }] };
+                Services = [new() { Name = "main", Image = "alpine" }] };
+            definition.Break!.EnvironmentTargets = [new() { ServiceName = "main", VariableName = "FLAG" }];
+            var rules = (CtfCompetitionChallengeRules)(await db.CompetitionChallenges.SingleAsync(item => item.Id == fixture.CompetitionChallengeId, ct)).Rules!;
+            rules.Runtime.FlagSource = PersistedRuntimeFlagSource.PerTeam;
+            rules.Runtime.Allocation = PersistedRuntimeAllocation.PerTeam;
         }
         var current = Flag(fixture, fixture.TeamId, fixture.RuntimeId, fixture.Now.AddMinutes(-1), mode);
         var foreign = Flag(fixture, fixture.OtherTeamId, Guid.NewGuid(), fixture.Now.AddMinutes(-1), mode);
@@ -287,7 +290,7 @@ public sealed class RuntimeFlagQueryPersistenceTests
         competition.ModeConfiguration = TestConfigurations.Competition(mode);
         competition.FlagDerivationSecret = new byte[32];
         db.Competitions.Add(competition);
-        Challenge template = mode switch { GameMode.Ctf => new CtfChallenge(), GameMode.Awd => new AwdChallenge(), GameMode.Awdp => new AwdpChallenge(), _ => new KohChallenge() };
+        var template = new Challenge();
         template.Id = fixture.ChallengeId; template.OwnerId = fixture.OwnerId; template.Title = "Template";
         template.Direction = "Web"; template.Definition = TestConfigurations.Definition(mode); template.CreatedAt = fixture.Now; template.UpdatedAt = fixture.Now;
         db.Challenges.Add(template);

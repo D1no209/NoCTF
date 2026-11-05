@@ -34,11 +34,11 @@ public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTem
                 if (await ReplayedAsync(request, request.Reset ? RuntimeAction.Reset : RuntimeAction.Start, ct) is { } previous) return previous;
                 var scope = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == request.CompetitionChallengeId && x.CompetitionId == request.CompetitionId)
                     .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template })
-                    .Join(db.Competitions.AsNoTracking(), x => x.Entry.CompetitionId, x => x.Id, (x, competition) => new { x.Template, Competition = competition })
-                    .SingleOrDefaultAsync(ct);
+                    .Join(db.Competitions.AsNoTracking(), x => x.Entry.CompetitionId, x => x.Id, (x, competition) => new { x.Template, x.Entry.Rules, Competition = competition })
+                    .AsSplitQuery().SingleOrDefaultAsync(ct);
                 if (scope is null || request.ExecutionScopeId == Guid.Empty || !await db.Teams.AnyAsync(x => x.Id == request.TeamId && x.CompetitionId == request.CompetitionId && !x.IsBanned, ct))
                     return new(null, null, false, RuntimeMutationFailure.NotFound);
-                var template = templates.Get(scope.Template.Definition);
+                var template = templates.Get(scope.Template.Definition, scope.Rules!);
                 if (template is null) return new(null, null, true);
                 if (template.RuntimeKind != RuntimeKind.Container || template.Allocation != RuntimeAllocation.PerTeam)
                     return new(null, null, false, RuntimeMutationFailure.Unsupported);

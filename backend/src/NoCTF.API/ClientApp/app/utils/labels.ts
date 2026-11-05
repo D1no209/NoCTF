@@ -68,7 +68,7 @@ export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStatePr
 
 export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
   if (!kind) return translate("common.label.gameplayFacts")
-  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('common.label.patchVerification'), HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), AwdServiceTransition: translate("common.label.awdServiceStatus"), AttachmentDownload: translate("cheats.label.attachmentDownload"), WriteUpUnlock: translate("challengeWriteUp.viewed"), KohControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  const labels = { BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), CheckObservation: translate("common.label.awdServiceStatus"), AttachmentDownload: translate("cheats.label.attachmentDownload"), WriteUpUnlock: translate("challengeWriteUp.viewed"), ControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
   return labels[kind]
 }
 
@@ -144,10 +144,12 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     StaticFlagWithoutContainerAndAttachment: translate("cheats.reason.bothMissing"),
     InsufficientScore: translate("common.label.insufficientScore"),
     HintUnavailable: translate("common.error.hintUnavailable"),
-    PatchStillExploitable: translate("common.label.expStillSucceeds"),
-    PatchExecutionFailed: translate("common.error.patchExecutionFailed"),
-    PatchServiceAbnormal: translate("common.label.serviceException"),
-    PatchVerificationPlatformFailed: translate("common.error.patchVerificationPlatformFailed"),
+    FixExecutionFailed: translate('challenges.fix.failed'),
+    FixExecutionTimedOut: translate('challenges.fix.timedOut'),
+    FixExecutionUncertain: translate('challenges.fix.recoveryRequired'),
+    FixPlatformFailure: translate('challenges.fix.platformFailure'),
+    FixStillExploitable: translate('common.label.expStillSucceeds'),
+    FixServiceAbnormal: translate('common.label.serviceException'),
   } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
   return labels[code]
 }

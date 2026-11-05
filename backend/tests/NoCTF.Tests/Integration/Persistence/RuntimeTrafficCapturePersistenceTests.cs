@@ -73,7 +73,7 @@ public sealed class RuntimeTrafficCapturePersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,

@@ -688,7 +688,7 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
             || request.PublicIngressPorts.Any(port => port is < 1 or > 65535))
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
-            && request.TargetPort is not (>= 1 and <= 65535))
+            && (request.InternalIngressPorts is not { Count: > 0 } || request.InternalIngressPorts.Any(port => port is < 1 or > 65535)))
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.EgressPolicy != RuntimeEgressPolicy.Isolated)
             throw new InvalidOperationException(
@@ -770,6 +770,10 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
             // Exact cleanup is idempotent. Duplicate delivery or reconciliation may
             // already have removed the isolated network.
         }
+        catch (DockerApiException exception)
+        {
+            throw new InvalidOperationException("Docker could not remove the Runtime network.", exception);
+        }
     }
 
     public async Task<bool> IsolatedNetworkExistsAsync(
@@ -794,6 +798,23 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         CancellationToken cancellationToken) =>
         await RunExecAsync(receipt, command, null, timeout, cancellationToken);
 
+    public Task<ContainerExecResult> ExecRetainingTargetAsync(ContainerReceipt receipt, IReadOnlyList<string> command,
+        TimeSpan timeout, CancellationToken cancellationToken) => RunExecAsync(receipt, command, null, timeout, cancellationToken, retainTarget: true);
+
+    public async Task<ContainerExecObservation> ObserveExecAsync(ContainerReceipt receipt, string executionIdentity, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var state = await client.Exec.InspectContainerExecAsync(executionIdentity, cancellationToken);
+            if (!string.Equals(state.ContainerID, receipt.ResourceId, StringComparison.Ordinal))
+                throw new InvalidDataException("The execution identity belongs to another container.");
+            return new(state.Running ? ContainerExecState.Running : ContainerExecState.Ended,
+                state.Running ? null : state.ExitCode is { } exitCode ? checked((int)exitCode) : null);
+        }
+        catch (DockerApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        { return new(ContainerExecState.Indeterminate); }
+    }
+
     public async Task<ContainerExecResult> ExecWithInputAsync(
         ContainerReceipt receipt,
         IReadOnlyList<string> command,
@@ -807,7 +828,8 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         IReadOnlyList<string> command,
         ReadOnlyMemory<byte>? standardInput,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool retainTarget = false)
     {
         var created = await client.Exec.CreateContainerExecAsync(receipt.ResourceId, new ContainerExecCreateParameters
         {
@@ -832,16 +854,29 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
             {
                 var state = await client.Exec.InspectContainerExecAsync(created.ID, timeoutSource.Token);
                 if (!state.Running)
-                    return new(state.ExitCode is { } exitCode ? checked((int)exitCode) : -1, false);
+                    return new(state.ExitCode is { } exitCode ? checked((int)exitCode) : -1, false, ExecutionIdentity: created.ID);
                 await Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider, timeoutSource.Token);
             }
         }
         catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested)
         {
+            if (retainTarget)
+            {
+                using var observationDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+                    var state = await client.Exec.InspectContainerExecAsync(created.ID, observationDeadline.Token);
+                    return state.Running ? new(-1, true, ExecutionUncertain: true, ExecutionIdentity: created.ID)
+                        : new(state.ExitCode is { } code ? checked((int)code) : -1, false, ExecutionIdentity: created.ID, PlatformFailure: true);
+                }
+                catch (Exception) { return new(-1, true, ExecutionUncertain: true, ExecutionIdentity: created.ID, PlatformFailure: true); }
+            }
             await StopContainerAfterExecTimeoutAsync(receipt.ResourceId);
             cancellationToken.ThrowIfCancellationRequested();
             return new(-1, true);
         }
+        catch (Exception) when (retainTarget)
+        { return new(-1, false, ExecutionUncertain: true, ExecutionIdentity: created.ID, PlatformFailure: true); }
     }
 
     private async Task StopContainerAfterExecTimeoutAsync(string resourceId)

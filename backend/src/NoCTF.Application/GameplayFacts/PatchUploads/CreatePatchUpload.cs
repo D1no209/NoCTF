@@ -1,5 +1,4 @@
-using System.Formats.Tar;
-using System.IO.Compression;
+using NoCTF.Application.Challenges.Capabilities;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Commands.Idempotency;
@@ -15,7 +14,9 @@ public sealed record PatchUploadScope(
     Guid UserId,
     Guid RuntimeInstanceId,
     long MaximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes,
-    RuntimePurpose Purpose = RuntimePurpose.AwdpTarget);
+    RuntimePurpose Purpose = RuntimePurpose.FixTarget,
+    NoCTF.Domain.Challenges.Capabilities.FixTargetKind TargetKind = NoCTF.Domain.Challenges.Capabilities.FixTargetKind.Isolated,
+    Guid? ExecutionScopeId = null);
 
 public static class PatchUploadRules
 {
@@ -23,7 +24,7 @@ public static class PatchUploadRules
     public const long HardMaximumArchiveBytes = 1024L * 1024 * 1024;
 }
 
-public sealed record AcceptedAwdpFix(
+public sealed record AcceptedFixSubmission(
     Guid PatchUploadId,
     Guid GameplayFactId,
     NoCTF.Domain.Gameplay.GameplayFactState State);
@@ -84,11 +85,7 @@ public sealed class CreatePatchUpload(
     ManagedFileUploads uploads,
     IRequestReplay? replay = null)
 {
-    private const int MaxEntries = 10_000;
-    private const long MaxExpandedBytes = 1L << 30;
-    private const long MaxSingleFileBytes = 256L << 20;
-
-    public async Task<OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>> ExecuteAsync(
+    public async Task<OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid runtimeInstanceId,
@@ -98,48 +95,52 @@ public sealed class CreatePatchUpload(
         Stream content,
         DateTimeOffset now,
         CancellationToken ct = default,
-        RuntimePurpose? expectedPurpose = null)
+        RuntimePurpose? expectedPurpose = null,
+        Guid? expectedExecutionScopeId = null)
     {
         if (content.CanSeek && content.Length <= PatchUploadRules.HardMaximumArchiveBytes && replay is not null)
         {
             var hash = await System.Security.Cryptography.SHA256.HashDataAsync(content, ct);
             content.Position = 0;
-            var previous = await replay.FindAsync<AcceptedAwdpFix>(
+            var previous = await replay.FindAsync<AcceptedFixSubmission>(
                 new(userId, ReplayOperation.PatchUpload, competitionId, runtimeInstanceId),
                 new PatchUploadReplayFingerprint(competitionChallengeId, fileName, contentType,
                     content.Length, Convert.ToHexString(hash)), ct);
-            if (previous is not null) return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Success(previous);
+            if (previous is not null) return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Success(previous);
         }
         var scope = await store.ResolveScopeAsync(
             competitionId, competitionChallengeId, runtimeInstanceId, userId, ct);
         if (scope is null)
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.PatchUploadNotAvailable,
                 "No active one-shot defense target is available for this team and challenge.");
         if (expectedPurpose is { } purpose && scope.Purpose != purpose)
         {
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.PatchUploadNotAvailable,
                 "The Patch target does not belong to this verification workflow.");
         }
+        if (expectedExecutionScopeId is { } expectedScope && scope.ExecutionScopeId != expectedScope)
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.PatchUploadNotAvailable,
+                "The Fix target does not belong to this execution scope.");
         if (!content.CanSeek)
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveStreamNotSeekable,
                 "The archive stream must support validation before storage.");
         if (content.Length > scope.MaximumArchiveBytes)
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveTooLarge,
                 $"The archive exceeds the configured {scope.MaximumArchiveBytes}-byte upload limit.");
 
         if (!await store.IsTargetUnconsumedAsync(scope, ct))
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.DefenseTargetConsumed, "This defense target already accepted a Patch or is no longer active.");
 
-        var validation = ValidateArchive(content);
+        var validation = FixArchiveValidation.Validate(content);
         ct.ThrowIfCancellationRequested();
         content.Position = 0;
         if (validation is not null)
-            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            return OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveInvalid, validation);
 
         var id = Guid.CreateVersion7(now);
@@ -174,76 +175,33 @@ public sealed class CreatePatchUpload(
         return saved!.State switch
         {
             PatchUploadSaveState.Accepted =>
-                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Success(
+                OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Success(
                     new(
                         id,
                         saved.GameplayFactId!.Value,
                         saved.GameplayFactState!.Value)),
-            PatchUploadSaveState.ChallengeNotOpened => OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeNotOpened, "The challenge is not open."),
-            PatchUploadSaveState.ChallengeSubmissionClosed => OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeSubmissionClosed, "Challenge submissions are closed."),
+            PatchUploadSaveState.ChallengeNotOpened => OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeNotOpened, "The challenge is not open."),
+            PatchUploadSaveState.ChallengeSubmissionClosed => OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeSubmissionClosed, "Challenge submissions are closed."),
             PatchUploadSaveState.DefenseTargetNotReady =>
-                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseTargetNotReady,
                     "The one-shot defense target no longer accepts a patch."),
             PatchUploadSaveState.AchievementAlreadySucceeded =>
-                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseAlreadySucceeded,
                     "This AWDP defense achievement has already succeeded."),
             PatchUploadSaveState.AttemptsExhausted =>
-                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.AttemptsExhausted,
                     "The maximum number of Fix attempts has been reached."),
             PatchUploadSaveState.DefenseTargetConsumed =>
-                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseTargetConsumed,
                     "The one-shot defense target already consumed its only patch."),
-            _ => OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+            _ => OperationResult<AcceptedFixSubmission, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.PatchUploadConflict,
                 "The one-shot defense target was consumed concurrently.")
         };
     }
 
-    private static string? ValidateArchive(Stream content)
-    {
-        try
-        {
-            using var gzip = new GZipStream(
-                content, CompressionMode.Decompress, leaveOpen: true);
-            using var tar = new TarReader(gzip, leaveOpen: true);
-            var entries = 0;
-            long totalLength = 0;
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            while (tar.GetNextEntry(copyData: false) is { } entry)
-            {
-                entries++;
-                if (entries > MaxEntries)
-                    return "The archive contains too many entries.";
-                if (entry.EntryType is TarEntryType.SymbolicLink
-                    or TarEntryType.HardLink
-                    or TarEntryType.BlockDevice
-                    or TarEntryType.CharacterDevice
-                    or TarEntryType.Fifo)
-                    return "The archive contains an unsupported entry type.";
-                if (Path.IsPathRooted(entry.Name)
-                    || entry.Name.Split('/', '\\').Any(segment => segment == ".."))
-                    return "The archive contains a path outside its extraction root.";
-                var normalizedName = entry.Name.Replace('\\', '/').TrimEnd('/');
-                if (!names.Add(normalizedName))
-                    return "The archive contains duplicate paths.";
-                if (entry.Length > MaxSingleFileBytes)
-                    return "An archive entry exceeds the single-file limit.";
-                totalLength = checked(totalLength + entry.Length);
-                if (totalLength > MaxExpandedBytes)
-                    return "The expanded archive exceeds the size limit.";
-            }
-            return entries == 0 ? "The archive is empty." : null;
-        }
-        catch (Exception exception) when (
-            exception is InvalidDataException
-                or IOException
-                or OverflowException)
-        {
-            return "The file is not a valid gzip-compressed tar archive.";
-        }
-    }
 }

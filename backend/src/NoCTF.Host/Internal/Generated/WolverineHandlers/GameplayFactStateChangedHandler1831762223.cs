@@ -61,8 +61,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider6 = __timeProvider6;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
@@ -87,13 +85,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await gameplayFactMessageHandler.Handle(gameplayFactStateChanged, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: GameplayFactStateChangedHandler1831762223
     
     
 }
-

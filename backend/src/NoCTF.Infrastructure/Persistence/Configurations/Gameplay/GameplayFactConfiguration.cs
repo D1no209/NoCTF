@@ -11,18 +11,17 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
         builder.ToTable("gameplay_facts");
         builder.HasKey(fact => fact.Id);
         builder.HasDiscriminator(fact => fact.Kind)
-            .HasValue<FlagAttemptGameplayFact>(GameplayFactKind.FlagAttempt)
             .HasValue<BreakAttemptGameplayFact>(GameplayFactKind.BreakAttempt)
             .HasValue<FixAttemptGameplayFact>(GameplayFactKind.FixAttempt)
             .HasValue<HintUnlockGameplayFact>(GameplayFactKind.HintUnlock)
             .HasValue<ManualAdjustmentGameplayFact>(GameplayFactKind.ManualAdjustment)
-            .HasValue<AwdServiceTransitionGameplayFact>(GameplayFactKind.AwdServiceTransition)
-            .HasValue<KohControlObservationGameplayFact>(GameplayFactKind.KohControlObservation)
+            .HasValue<CheckObservationGameplayFact>(GameplayFactKind.CheckObservation)
+            .HasValue<ControlObservationGameplayFact>(GameplayFactKind.ControlObservation)
             .HasValue<AttachmentDownloadGameplayFact>(GameplayFactKind.AttachmentDownload)
             .HasValue<WriteUpUnlockGameplayFact>(GameplayFactKind.WriteUpUnlock)
-            .HasValue<TheoryPaperSubmissionGameplayFact>(GameplayFactKind.TheoryPaperSubmission);
-        builder.HasOne<NoCTF.Domain.Theory.Papers.TheoryPaper>().WithOne()
-            .HasForeignKey<GameplayFact>(fact => fact.TheoryPaperId).OnDelete(DeleteBehavior.Restrict);
+            .HasValue<QuestionnaireAttemptGameplayFact>(GameplayFactKind.QuestionnaireAttempt);
+        builder.HasOne<NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment>().WithOne(assignment => assignment.Fact)
+            .HasForeignKey<GameplayFact>(fact => fact.QuestionnaireAssignmentId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsOne(fact => fact.AcquisitionEvidence, evidence =>
         {
             evidence.ToTable("flag_acquisition_evidence");
@@ -32,6 +31,15 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
         builder.Property(fact => fact.State).HasConversion<short>();
         builder.Property(fact => fact.Result).HasConversion<short>();
         builder.Property(fact => fact.FailureCode).HasConversion<short>();
+        builder.HasMany(fact => fact.CapabilityOutcomes).WithOne().HasForeignKey(outcome => outcome.GameplayFactId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(fact => fact.CapabilityOutcomes).AutoInclude();
+        builder.OwnsOne(fact => fact.FixExecution, execution =>
+        {
+            execution.ToTable("fix_execution_details");
+            execution.WithOwner().HasForeignKey(value => value.GameplayFactId);
+            execution.HasKey(value => value.GameplayFactId);
+            execution.HasOne<NoCTF.Domain.Runtime.RuntimeInstance>().WithMany().HasForeignKey(value => value.RuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
+        });
         builder.HasIndex(fact => new { fact.CompetitionId, fact.OccurredAt, fact.Id });
         builder.HasIndex(fact => new
         {

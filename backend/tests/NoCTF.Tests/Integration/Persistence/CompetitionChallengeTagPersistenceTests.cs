@@ -143,7 +143,7 @@ public sealed class CompetitionChallengeTagPersistenceTests
                 new NoCTF.Infrastructure.Competitions.Scoring.CompetitionScorePresetStore(db,
                     new NoCTF.GameModes.Registration.GameModeChallengeConfigurationCatalog(), events, publisher));
             var now = DateTimeOffset.UtcNow;
-            var rules = TestConfigurations.Rules(GameMode.Ctf);
+            var rules = (CtfCompetitionChallengeRules)TestConfigurations.Rules(GameMode.Ctf);
             rules.HasScoreCurve = true;
             rules.ScoreCurve = new() { InitialPoints = 777, MinimumPoints = 77, DecayTeamCount = 5 };
             var first = (await challenges.CreateAsync(new(null, competitions[0], templates[0], 1, now,
@@ -192,8 +192,8 @@ public sealed class CompetitionChallengeTagPersistenceTests
             db.ChangeTracker.Clear();
             await Assert.That((await challenges.FindAsync(competitions[0], first.Id, true, true, ct))!.Tags.SequenceEqual(["Web", "Plain"])).IsTrue();
             var persisted = await db.CompetitionChallenges.SingleAsync(item => item.Id == first.Id, ct);
-            await Assert.That(persisted.Rules!.HasScoreCurve).IsTrue();
-            await Assert.That(persisted.Rules.ScoreCurve.InitialPoints).IsEqualTo(777);
+            await Assert.That(((CtfCompetitionChallengeRules)persisted.Rules!).HasScoreCurve).IsTrue();
+            await Assert.That(((CtfCompetitionChallengeRules)persisted.Rules!).ScoreCurve.InitialPoints).IsEqualTo(777);
             var configurationStore = new NoCTF.Infrastructure.Challenges.Configuration.ChallengeConfigurationStore(db, publisher, events);
             var cleared = await new NoCTF.Application.Challenges.Configuration.UpdateChallengeConfiguration(configurationStore,
                 new NoCTF.GameModes.Registration.GameModeChallengeConfigurationCatalog())
@@ -202,7 +202,7 @@ public sealed class CompetitionChallengeTagPersistenceTests
             var bound = await challenges.UpdateAsync(new(competitions[0], first.Id, 1, false, now, Tags: ["Web", "Hard"]), ct);
             await Assert.That(bound.Failure).IsNull();
             var inherited = await configurationStore.FindAsync(competitions[0], first.Id, ct);
-            await Assert.That(inherited!.Rules.HasScoreCurve).IsFalse();
+            await Assert.That(((CtfCompetitionChallengeRules)inherited!.Rules).HasScoreCurve).IsFalse();
             await Assert.That(inherited.ScorePreset!.Name).IsEqualTo("Hard");
             var ordinaryHard = await presets.SaveAsync(competitions[0], hard.Item!.Preset.Id, "Hard", null, now, ct);
             await Assert.That(ordinaryHard.Failure).IsNull();
@@ -250,7 +250,7 @@ public sealed class CompetitionChallengeTagPersistenceTests
                 }
                 foreach (var id in templates)
                 {
-                    var template = ChallengeGeneratedCatalog.Create(mode);
+                    var template = new Challenge();
                     template.Id = id;
                     template.OwnerId = owner;
                     template.Title = "Template";

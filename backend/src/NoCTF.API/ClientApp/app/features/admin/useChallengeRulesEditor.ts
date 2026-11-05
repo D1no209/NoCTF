@@ -74,7 +74,7 @@ emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChalleng
   }
 
   function rawDisplayedValue(field: ConfigFieldDef): unknown {
-    return (overridden.value[field.key] ?? false)
+    return field.scope === 'runtimeRules' || (overridden.value[field.key] ?? false)
       ? values.value[field.key]
       : (inheritedValues.value[field.key] ?? values.value[field.key])
   }

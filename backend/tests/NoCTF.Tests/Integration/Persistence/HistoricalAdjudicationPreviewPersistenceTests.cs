@@ -185,12 +185,6 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(await access.CanReadInternalHistoricalAuditAsync(fixture.JudgeId, fixture.CompetitionId, ct)).IsTrue();
 
             await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
-            var templateId = await db.CompetitionChallenges.Where(row => row.Id == fixture.CompetitionChallengeId).Select(row => row.ChallengeId).SingleAsync(ct);
-            var template = await db.Challenges.AsSplitQuery()
-                .SingleAsync(row => row.Id == templateId, ct);
-            ((CtfChallengeDefinition)template.Definition!).InteractionKind =
-                CtfInteractionKind.PatchVerification;
-            await db.SaveChangesAsync(ct);
             // Archive content is outside this read-only projection; only the typed reference identity is relevant.
             var currentFact = await db.GameplayFacts.SingleAsync(
                 row => row.Id == fixture.LaterFactId,
@@ -215,8 +209,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await db.SaveChangesAsync(ct);
             var patch = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Single();
             await Assert.That(patch.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
-            await Assert.That(patch.MatchesCurrentInteraction).IsTrue();
-            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(patch).CurrentProjectedBloodRank).IsEqualTo(LeaderboardBloodRank.First);
+            await Assert.That(patch.MatchesCurrentInteraction).IsFalse();
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(patch).CurrentProjectedBloodRank).IsNull();
         });
     }
 
@@ -475,7 +469,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact
         {
             Id = fixture.EarlierFactId,
             CompetitionId = fixture.CompetitionId,
@@ -517,7 +511,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             IsBanned = true,
             RegisteredAt = fixture.Now
         });
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact
         {
             Id = factId,
             CompetitionId = fixture.CompetitionId,
@@ -549,7 +543,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         for (var index = 0; index < 600; index++)
         {
             var value = $"flag{{bounded-query-{index}}}";
-            db.GameplayFacts.Add(new FlagAttemptGameplayFact
+            db.GameplayFacts.Add(new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(),
                 CompetitionId = fixture.CompetitionId,
@@ -655,7 +649,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             RegistrationStatus = TeamRegistrationStatus.Approved,
             RegisteredAt = now
         });
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
@@ -674,7 +668,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact
         {
             Id = fixture.LaterFactId,
             CompetitionId = competitionId,

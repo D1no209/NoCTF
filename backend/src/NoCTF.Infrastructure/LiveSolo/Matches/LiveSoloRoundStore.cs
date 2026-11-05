@@ -272,7 +272,7 @@ public sealed partial class LiveSoloMatchStore
     {
         await NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, match.CompetitionId, (clock ?? TimeProvider.System).GetUtcNow(), ct);
         var templates = await db.CompetitionChallenges.Where(x => round.Questions.Select(q => q.CompetitionChallengeId).Contains(x.Id)).Select(x => x.ChallengeId).ToArrayAsync(ct);
-        var canonical = await db.LiveSoloChallengeSources.Where(x => templates.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
+        var canonical = await db.ChallengeSources.Where(x => templates.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
         var ids = templates.Select(id => canonical.GetValueOrDefault(id, id)).ToArray();
         var publicTimes = await db.LiveSoloQuestionExposures.Where(x => x.CompetitionId == match.CompetitionId && ids.Contains(x.CanonicalChallengeId))
             .Select(x => x.PublicAt).ToArrayAsync(ct);

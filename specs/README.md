@@ -16,7 +16,7 @@
 9. [Flag](flags.md)
 10. [Runtime](runtime.md)
 11. [附件与对象存储](storage-attachments.md)
-12. 模式规范：[CTF](game-modes/ctf.md)、[CTF PatchVerification](ctf-patch-verification-experiment.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)、[LiveSolo](live-solo.md)（[完成状态与验收缺口](live-solo-status.md)）
+12. 模式规范：[CTF](game-modes/ctf.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)、[LiveSolo](live-solo.md)（[完成状态与验收缺口](live-solo-status.md)）
 13. [实时与站内通知](realtime-notifications.md)
 14. [赛事 Webhook](competition-webhooks.md) 与 [Webhook/BOT 对接手册](webhook-bot-integration.md)；工作人员通道见 [Staff Webhook](staff-webhooks.md)
 15. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)

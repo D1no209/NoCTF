@@ -65,7 +65,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         foreach (var sample in AwdCheckPlan.Create(round, rule, 0).Where(sample => sample.ActiveTicks < TimeSpan.FromSeconds(100).Ticks))
         {
             var id = Guid.NewGuid(); var observed = start.AddTicks(sample.ActiveTicks).AddSeconds(1);
-            db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
+            db.GameplayFacts.Add(new CheckObservationGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = fixture.CompetitionChallenge.Id, TeamId = fixture.Team.Id, ReferenceKind = GameplayFactReferenceKind.AwdRound,
                 ReferenceId = round.Id, OccurredAt = observed, UpdatedAt = observed.AddSeconds(1), State = GameplayFactState.Completed,
                 Result = GameplayFactResult.ServiceUp, Awd = new() { GameplayFactId = id, RulesId = rule.Id,

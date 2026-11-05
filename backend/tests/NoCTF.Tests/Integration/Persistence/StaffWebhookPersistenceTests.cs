@@ -32,14 +32,14 @@ public sealed class StaffWebhookPersistenceTests
             var owner = Guid.NewGuid(); var competition = Guid.NewGuid(); var teamId = Guid.NewGuid(); var templateId = Guid.NewGuid(); var challengeId = Guid.NewGuid();
             db.Users.Add(new User { Id = owner, UserName = "owner", NormalizedUserName = "OWNER", Email = "owner@example.test", NormalizedEmail = "OWNER@EXAMPLE.TEST", PasswordHash = "test" });
             db.Competitions.Add(new CtfCompetition { Id = competition, OwnerId = owner, Title = "Private", ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf) });
-            db.Challenges.Add(new CtfChallenge { Id = templateId, OwnerId = owner, Title = "Private puzzle", Direction = new string('W', 96), Definition = TestConfigurations.Definition(GameMode.Ctf) });
+            db.Challenges.Add(new Challenge { Id = templateId, OwnerId = owner, Title = "Private puzzle", Direction = new string('W', 96), Definition = TestConfigurations.Definition(GameMode.Ctf) });
             db.CompetitionChallenges.Add(new CtfCompetitionChallenge { Id = challengeId, CompetitionId = competition, ChallengeId = templateId, Rules = TestConfigurations.Rules(GameMode.Ctf) });
             db.Teams.Add(new Team { Id = teamId, CompetitionId = competition, Name = "Blue", CaptainId = owner, MemberIds = [owner], InvitationToken = new string('T', 32), IsBanned = true });
             db.StaffWebhookTargets.Add(new() { Id = Guid.NewGuid(), CompetitionId = competition, ApprovedById = owner,
                 Name = "Staff", EndpointUrl = "https://bot.example/staff", Enabled = true });
             await db.SaveChangesAsync(ct);
             var factId = Guid.NewGuid(); var banId = Guid.NewGuid(); var appealId = Guid.NewGuid();
-            db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = factId, CompetitionId = competition, CompetitionChallengeId = challengeId,
+            db.GameplayFacts.Add(new BreakAttemptGameplayFact { Id = factId, CompetitionId = competition, CompetitionChallengeId = challengeId,
                 TeamId = teamId, ActorUserId = owner, Value = "flag{DO_NOT_SHARE}", OccurredAt = now, UpdatedAt = now,
                 State = GameplayFactState.Completed, Result = GameplayFactResult.Rejected, FailureCode = GameplayFactFailureCode.StaticFlagWithoutAttachment });
             db.CompetitionEvents.Add(new TeamBannedEvent { Id = banId, CompetitionId = competition, TeamId = teamId, SubjectType = NoCTF.Domain.Shared.EntityReferenceKind.Team,

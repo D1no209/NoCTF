@@ -70,13 +70,14 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
         var challenges = Enumerable.Range(0, shape.Challenges).Select(index =>
         {
             var templateId = Id();
-            var definition = new AwdChallengeDefinition
+            var definition = new ChallengeDefinition
             {
                 ChallengeId = templateId,
-                FlagStores = Enumerable.Range(0, 2).Select(store => new AwdFlagStore
-                    { Id = Id(), Position = store, Name = $"store-{store}", DeliveryMode = AwdFlagDeliveryMode.BusinessChecker }).ToList()
+                Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
+                { FlagStores = Enumerable.Range(0, 2).Select(store => new NoCTF.Domain.Challenges.Capabilities.FlagStoreDefinition
+                    { Id = Id(), Position = store, Name = $"store-{store}", DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker }).ToList() }]
             };
-            db.Challenges.Add(new AwdChallenge { Id = templateId, OwnerId = users[0].Id,
+            db.Challenges.Add(new Challenge { Id = templateId, OwnerId = users[0].Id,
                 Title = $"Question {index}", Definition = definition, CreatedAt = start, UpdatedAt = start });
             var entry = new AwdCompetitionChallenge
             {
@@ -139,7 +140,7 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
                 },
                 Teams = teams.Select((team, index) => new AwdRoundTeamEligibility
                     { TeamId = team.Id, Competitive = index != teams.Length - 1, SettledRank = index + 1 }).ToList(),
-                Stores = definition.FlagStores.Select((store, index) => new AwdRoundStoreBudget
+                Stores = definition.Break!.FlagStores.Select((store, index) => new AwdRoundStoreBudget
                 {
                     StoreId = store.Id, Name = store.Name, Weight = index + 1, FlagsPerIssue = 2,
                     DeliveryMode = AwdFlagDeliveryMode.BusinessChecker,
@@ -168,12 +169,12 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
                         IssuedAt = round.StartsAt, UpdatedAt = round.StartsAt, ActiveStartTicks = round.ActiveStartTicks,
                         ExpiryRound = round.Number + 2, HistoricalExpiryRound = round.Number + 2,
                         DeliveryState = AwdFlagDeliveryState.Succeeded, Obligation = AwdFlagObligation.PlayerRequired,
-                        Digest = Convert.ToHexString(digest), ProtectedReadContext = Convert.ToBase64String(protectedContext),
-                        PublicLocator = $"record/{flagId:N}"
+                        Digest = Convert.ToHexString(digest)
                     };
                     db.ChallengeFlags.Add(new AwdRoundChallengeFlag
                     {
                         Id = flagId, CompetitionChallengeId = challenge.Id, TeamId = team.Id, Flag = value, FlagSha256 = digest,
+                        ProtectedReadContext = protectedContext, PublicLocator = $"record/{flagId:N}",
                         SpecificationKind = SpecificationKind.AwdRound, SpecificationId = AwdRoundSpecificationId.FromRound(round.Number).Value,
                         CreatedAt = round.StartsAt, DeletedAt = issueCount % 53 == 0 ? end : null,
                         ValidStart = round.StartsAt, ValidUntil = Wall(round.ActiveStartTicks + TimeSpan.FromMinutes(2).Ticks), AwdIssue = issue
@@ -184,7 +185,7 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
                         var factId = Id();
                         var attacker = teams[(teamIndex + 1) % teams.Length];
                         var received = round.StartsAt.AddSeconds(20);
-                        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+                        db.GameplayFacts.Add(new BreakAttemptGameplayFact
                         {
                             Id = factId, CompetitionId = competitionId, CompetitionChallengeId = challenge.Id,
                             TeamId = attacker.Id, VictimTeamId = team.Id, OccurredAt = received, UpdatedAt = received,
@@ -212,7 +213,7 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
                         Write = AwdProbeOutcome.Passed, ReadReason = variant == 7 ? AwdCheckReason.HistoricalFlagMissing : AwdCheckReason.None
                     }).ToList();
                     // Every target's plan is retained, including pending, failed, exempted and late-adjudicated evidence.
-                    db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact
+                    db.GameplayFacts.Add(new CheckObservationGameplayFact
                     {
                         Id = factId, CompetitionId = competitionId, CompetitionChallengeId = challenge.Id, TeamId = team.Id,
                         ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = round.Id,

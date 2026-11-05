@@ -1123,7 +1123,7 @@ public sealed class KubernetesContainerLifecycleTests
                 ContainerNetworkPurpose.AwdpVerification,
                 RuntimeEgressPolicy.Isolated,
                 [],
-                8080),
+                [8080]),
             CancellationToken.None);
 
         await Assert.That(action).Throws<TimeoutException>();
@@ -1453,7 +1453,7 @@ public sealed class KubernetesContainerLifecycleTests
 
     private static ContainerRequest CheckerRequest() => new(Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), RuntimeProvider.Kubernetes, "checker:latest", ["/checker"], new Dictionary<string, string>
         {
-            ["NOCTF_CALLBACK_URL"] = "https://callback.noctf.svc:8443/api/internal/v1/awdp/fix-results"
+            ["NOCTF_CALLBACK_URL"] = "https://callback.noctf.svc:8443/api/internal/v1/capabilities/check-results"
         }, new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), TimeSpan.FromMinutes(1), NetworkName: "sandbox-a", AllowInternalCallback: true, NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static HttpOperationException NotFound() => new("not found")

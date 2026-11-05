@@ -67,28 +67,20 @@ public sealed class CompetitionLifecycleMessageHandler(
         BackendMessageOperations.ApplyCompetitionVisibilityAsync(message, cancellationToken);
 }
 
-public sealed class AwdpMessageHandler(
+public sealed class FixExecutionMessageHandler(
     IInternalResultStore results,
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     TimeProvider timeProvider)
 {
+    public Task Handle(CompleteFixExecutionWork message, CancellationToken ct) => results.CompleteFixWorkAsync(message, ct);
+    public Task Handle(FinalizeFixExecution message, CancellationToken ct) =>
+        results.FinalizeFixExecutionAsync(message.GameplayFactId, message.RuntimeInstanceId, timeProvider.GetUtcNow(), ct);
     public Task Handle(
-        StartAwdpFixVerification message,
+        StartFixExecution message,
         CancellationToken cancellationToken) =>
-        BackendMessageOperations.StartAwdpFixVerificationAsync(
-            message,
-            db,
-            outbox,
-            timeProvider,
-            cancellationToken,
-            events);
-
-    public Task Handle(
-        StartPatchVerification message,
-        CancellationToken cancellationToken) =>
-        BackendMessageOperations.StartPatchVerificationAsync(
+        BackendMessageOperations.StartFixExecutionAsync(
             message,
             db,
             outbox,
@@ -100,15 +92,15 @@ public sealed class AwdpMessageHandler(
         BackendMessageOperations.RecordAwdpFixResultAsync(message, results, cancellationToken);
 
     public Task Handle(
-        CompleteAwdpFixRecovery message,
+        RecoverFixExecution message,
         CancellationToken cancellationToken) =>
-        BackendMessageOperations.CompleteAwdpFixRecoveryAsync(
+        BackendMessageOperations.RecoverFixExecutionAsync(
             message, db, outbox, cancellationToken, events);
 
     public Task Handle(
-        ExpireAwdpFixVerification message,
+        ExpireFixExecution message,
         CancellationToken cancellationToken) =>
-        BackendMessageOperations.ExpireAwdpFixVerificationAsync(
+        BackendMessageOperations.ExpireFixExecutionAsync(
             message, db, outbox, timeProvider, cancellationToken, events);
 }
 

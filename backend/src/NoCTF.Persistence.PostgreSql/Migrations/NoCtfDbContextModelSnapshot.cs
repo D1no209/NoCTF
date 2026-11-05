@@ -48,6 +48,277 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("data_protection_keys", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome", b =>
+                {
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<short?>("ExecutionFailure")
+                        .HasColumnType("smallint")
+                        .HasColumnName("execution_failure");
+
+                    b.Property<short>("ExecutionState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("execution_state");
+
+                    b.Property<long>("ObservedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid?>("RuntimeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runtime_instance_id");
+
+                    b.HasKey("GameplayFactId", "Kind")
+                        .HasName("pk_capability_outcomes");
+
+                    b.HasIndex("RuntimeInstanceId")
+                        .HasDatabaseName("ix_capability_outcomes_runtime_instance_id");
+
+                    b.ToTable("capability_outcomes", (string)null);
+
+                    b.HasDiscriminator<short>("Kind");
+
+                    b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition", b =>
+                {
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.HasKey("ChallengeId", "Kind")
+                        .HasName("pk_challenge_capabilities");
+
+                    b.ToTable("challenge_capabilities", (string)null);
+
+                    b.HasDiscriminator<short>("Kind");
+
+                    b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_assignments");
+
+                    b.HasAlternateKey("Id", "SessionId", "RevisionId")
+                        .HasName("ak_questionnaire_assignments_id_session_id_revision_id");
+
+                    b.HasIndex("RevisionId", "ChallengeId")
+                        .HasDatabaseName("ix_questionnaire_assignments_revision_id_challenge_id");
+
+                    b.HasIndex("SessionId", "RevisionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_assignments_session_id_revision_id");
+
+                    b.ToTable("questionnaire_assignments", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOption", b =>
+                {
+                    b.Property<Guid>("QuestionVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_version_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(16000)
+                        .HasColumnType("character varying(16000)")
+                        .HasColumnName("content");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_correct");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<bool?>("TruthValue")
+                        .HasColumnType("boolean")
+                        .HasColumnName("truth_value");
+
+                    b.HasKey("QuestionVersionId", "Id")
+                        .HasName("pk_questionnaire_options");
+
+                    b.HasIndex("QuestionVersionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_options_question_version_id_position");
+
+                    b.HasIndex("QuestionVersionId", "RevisionId", "QuestionId")
+                        .HasDatabaseName("ix_questionnaire_options_question_version_id_revision_id_quest");
+
+                    b.ToTable("questionnaire_options", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", b =>
+                {
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(64000)
+                        .HasColumnType("character varying(64000)")
+                        .HasColumnName("body");
+
+                    b.Property<short>("Difficulty")
+                        .HasColumnType("smallint")
+                        .HasColumnName("difficulty");
+
+                    b.Property<string>("Explanation")
+                        .HasMaxLength(64000)
+                        .HasColumnType("character varying(64000)")
+                        .HasColumnName("explanation");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("RevisionId", "Id")
+                        .HasName("pk_questionnaire_questions");
+
+                    b.HasAlternateKey("VersionId")
+                        .HasName("ak_questionnaire_questions_version_id");
+
+                    b.HasAlternateKey("VersionId", "Id")
+                        .HasName("ak_questionnaire_questions_version_id_id");
+
+                    b.HasAlternateKey("VersionId", "RevisionId", "Id")
+                        .HasName("ak_questionnaire_questions_version_id_revision_id_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_questionnaire_questions_source_id");
+
+                    b.HasIndex("RevisionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_questions_revision_id_position");
+
+                    b.ToTable("questionnaire_questions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("FirstExposedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("first_exposed_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_sources");
+
+                    b.ToTable("questionnaire_sources", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_revisions");
+
+                    b.HasAlternateKey("Id", "ChallengeId")
+                        .HasName("ak_questionnaire_revision_id_challenge_id");
+
+                    b.HasIndex("ChallengeId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_revisions_challenge_id_number");
+
+                    b.ToTable("questionnaire_revisions", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -82,12 +353,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("character varying(96)")
                         .HasColumnName("direction");
 
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("mode");
-
                     b.Property<string>("NormalizedDirection")
                         .IsRequired()
                         .HasMaxLength(96)
@@ -121,9 +386,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasKey("Id")
                         .HasName("pk_challenges");
 
-                    b.HasAlternateKey("Id", "Mode")
-                        .HasName("ak_challenges_id_mode");
-
                     b.HasIndex("NormalizedDirection")
                         .HasDatabaseName("ix_challenges_normalized_direction");
 
@@ -134,10 +396,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_challenges_owner_id");
 
                     b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator<string>("Mode");
-
-                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeAttachment", b =>
@@ -175,126 +433,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("challenge_attachments", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeCheckerDefinition", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<string>("Image")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("image");
-
-                    b.Property<string>("TargetServiceName")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("target_service_name");
-
-                    b.Property<int>("TimeoutSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("timeout_seconds");
-
-                    b.HasKey("ChallengeId")
-                        .HasName("pk_challenge_checker_definitions");
-
-                    b.ToTable("challenge_checker_definitions", (string)null);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeDefinition", b =>
                 {
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
 
-                    b.Property<bool>("CheckerFixInput")
-                        .HasColumnType("boolean")
-                        .HasColumnName("checker_fix_input");
-
-                    b.Property<bool>("HasFlagTemplate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_flag_template");
-
-                    b.Property<long?>("MaximumPatchUploadBytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("maximum_patch_upload_bytes");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("mode");
-
-                    b.Property<string>("PatchEntrypoint")
-                        .HasColumnType("text")
-                        .HasColumnName("patch_entrypoint");
-
-                    b.Property<int?>("PatchTimeoutSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("patch_timeout_seconds");
-
-                    b.Property<int?>("ReadyTimeoutSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("ready_timeout_seconds");
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.ChallengeDefinition.FlagTemplate#FlagTemplateValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("BodyTemplate")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("flag_template_body_template");
-
-                            b1.Property<string>("Header")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("flag_template_header");
-
-                            b1.Property<bool>("LeetLiteralText")
-                                .HasColumnType("boolean")
-                                .HasColumnName("flag_template_leet_literal_text");
-                        });
-
                     b.HasKey("ChallengeId")
                         .HasName("pk_challenge_definitions");
 
                     b.ToTable("challenge_definitions", (string)null);
-
-                    b.HasDiscriminator<string>("Mode");
-
-                    b.UseTphMappingStrategy();
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeDefinitionStringItem", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("integer")
-                        .HasColumnName("position");
-
-                    b.Property<string>("Key")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("key");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("value");
-
-                    b.HasKey("ChallengeId", "Kind", "Position")
-                        .HasName("pk_challenge_definition_string_items");
-
-                    b.ToTable("challenge_definition_string_items", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
@@ -338,6 +486,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<short>("MatchKind")
                         .HasColumnType("smallint")
                         .HasColumnName("match_kind");
+
+                    b.Property<byte[]>("ProtectedReadContext")
+                        .HasMaxLength(32768)
+                        .HasColumnType("bytea")
+                        .HasColumnName("protected_read_context");
+
+                    b.Property<string>("PublicLocator")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_locator");
 
                     b.Property<Guid?>("SpecificationId")
                         .HasColumnType("uuid")
@@ -423,10 +581,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)")
                         .HasColumnName("cpu_cores");
-
-                    b.Property<string>("FlagEnvironmentVariableName")
-                        .HasColumnType("text")
-                        .HasColumnName("flag_environment_variable_name");
 
                     b.Property<string>("Image")
                         .IsRequired()
@@ -536,17 +690,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
 
-                    b.Property<short>("Allocation")
-                        .HasColumnType("smallint")
-                        .HasColumnName("allocation");
-
                     b.Property<short>("EgressPolicy")
                         .HasColumnType("smallint")
                         .HasColumnName("egress_policy");
-
-                    b.Property<short>("FlagSource")
-                        .HasColumnType("smallint")
-                        .HasColumnName("flag_source");
 
                     b.Property<int?>("OperationTimeoutSeconds")
                         .HasColumnType("integer")
@@ -555,10 +701,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<short>("RuntimeKind")
                         .HasColumnType("smallint")
                         .HasColumnName("runtime_kind");
-
-                    b.Property<int?>("TtlSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("ttl_seconds");
 
                     b.HasKey("ChallengeId")
                         .HasName("pk_challenge_runtime_templates");
@@ -592,10 +734,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("guest_port");
 
-                    b.Property<bool>("IsControlCheck")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_control_check");
-
                     b.Property<string>("ServiceName")
                         .HasColumnType("text")
                         .HasColumnName("service_name");
@@ -613,6 +751,33 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasName("pk_challenge_runtime_url_bindings");
 
                     b.ToTable("challenge_runtime_url_bindings", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeSource", b =>
+                {
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid>("CanonicalChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("canonical_challenge_id");
+
+                    b.Property<long>("CopiedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("copied_at");
+
+                    b.Property<Guid>("OriginalChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_challenge_id");
+
+                    b.HasKey("ChallengeId")
+                        .HasName("pk_challenge_sources");
+
+                    b.HasIndex("CanonicalChallengeId")
+                        .HasDatabaseName("ix_challenge_sources_canonical_challenge_id");
+
+                    b.ToTable("challenge_sources", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
@@ -705,11 +870,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasAlternateKey("Id", "CompetitionId")
                         .HasName("ak_competition_challenges_id_competition_id");
 
+                    b.HasIndex("ChallengeId")
+                        .HasDatabaseName("ix_competition_challenges_challenge_id");
+
                     b.HasIndex("NormalizedCustomTitle")
                         .HasDatabaseName("ix_competition_challenges_normalized_custom_title");
-
-                    b.HasIndex("ChallengeId", "Mode")
-                        .HasDatabaseName("ix_competition_challenges_challenge_id_mode");
 
                     b.HasIndex("CompetitionId", "ChallengeId")
                         .IsUnique()
@@ -763,193 +928,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
-                    b.Property<long?>("AttackPoints")
-                        .HasColumnType("bigint")
-                        .HasColumnName("attack_points");
-
-                    b.Property<short?>("AttackRewardMode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("attack_reward_mode");
-
-                    b.Property<int?>("CheckerIntervalSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("checker_interval_seconds");
-
-                    b.Property<long?>("ControlPointsPerInterval")
-                        .HasColumnType("bigint")
-                        .HasColumnName("control_points_per_interval");
-
-                    b.Property<short?>("EvaluationDispatchMode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("evaluation_dispatch_mode");
-
-                    b.Property<long?>("ExploitSucceededPenalty")
-                        .HasColumnType("bigint")
-                        .HasColumnName("exploit_succeeded_penalty");
-
-                    b.Property<long?>("FlagWrongPenalty")
-                        .HasColumnType("bigint")
-                        .HasColumnName("flag_wrong_penalty");
-
-                    b.Property<bool>("HasBreakScoreCurve")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_break_score_curve");
-
-                    b.Property<bool>("HasFixScoreCurve")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_fix_score_curve");
-
-                    b.Property<bool>("HasFlagTemplate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_flag_template");
-
-                    b.Property<bool>("HasScoreCurve")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_score_curve");
-
-                    b.Property<int?>("MaxBreakSubmissions")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_break_submissions");
-
-                    b.Property<int?>("MaxFixSubmissions")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_fix_submissions");
-
-                    b.Property<int?>("MaxFlagAttempts")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_flag_attempts");
-
-                    b.Property<int?>("MaxPatchAttempts")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_patch_attempts");
-
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
-
-                    b.Property<int?>("PollIntervalSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("poll_interval_seconds");
-
-                    b.Property<bool?>("RequireBreakBeforeFix")
-                        .HasColumnType("boolean")
-                        .HasColumnName("require_break_before_fix");
-
-                    b.Property<long?>("ServiceAbnormalPenalty")
-                        .HasColumnType("bigint")
-                        .HasColumnName("service_abnormal_penalty");
-
-                    b.Property<long?>("ServiceHealthyPoints")
-                        .HasColumnType("bigint")
-                        .HasColumnName("service_healthy_points");
-
-                    b.Property<long?>("ServiceUnhealthyPenalty")
-                        .HasColumnType("bigint")
-                        .HasColumnName("service_unhealthy_penalty");
-
-                    b.Property<long?>("VictimDefensePoolPoints")
-                        .HasColumnType("bigint")
-                        .HasColumnName("victim_defense_pool_points");
-
-                    b.Property<long?>("WrongSubmissionPenalty")
-                        .HasColumnType("bigint")
-                        .HasColumnName("wrong_submission_penalty");
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "BreakScoreCurve", "NoCTF.Domain.Challenges.CompetitionChallengeRules.BreakScoreCurve#ScoreCurveValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("CustomExpression")
-                                .HasColumnType("text")
-                                .HasColumnName("break_score_curve_custom_expression");
-
-                            b1.Property<short>("DecayMode")
-                                .HasColumnType("smallint")
-                                .HasColumnName("break_score_curve_decay_mode");
-
-                            b1.Property<int>("DecayTeamCount")
-                                .HasColumnType("integer")
-                                .HasColumnName("break_score_curve_decay_team_count");
-
-                            b1.Property<long>("InitialPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("break_score_curve_initial_points");
-
-                            b1.Property<long>("MinimumPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("break_score_curve_minimum_points");
-                        });
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "FixScoreCurve", "NoCTF.Domain.Challenges.CompetitionChallengeRules.FixScoreCurve#ScoreCurveValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("CustomExpression")
-                                .HasColumnType("text")
-                                .HasColumnName("fix_score_curve_custom_expression");
-
-                            b1.Property<short>("DecayMode")
-                                .HasColumnType("smallint")
-                                .HasColumnName("fix_score_curve_decay_mode");
-
-                            b1.Property<int>("DecayTeamCount")
-                                .HasColumnType("integer")
-                                .HasColumnName("fix_score_curve_decay_team_count");
-
-                            b1.Property<long>("InitialPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("fix_score_curve_initial_points");
-
-                            b1.Property<long>("MinimumPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("fix_score_curve_minimum_points");
-                        });
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.CompetitionChallengeRules.FlagTemplate#FlagTemplateValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("BodyTemplate")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("flag_template_body_template");
-
-                            b1.Property<string>("Header")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("flag_template_header");
-
-                            b1.Property<bool>("LeetLiteralText")
-                                .HasColumnType("boolean")
-                                .HasColumnName("flag_template_leet_literal_text");
-                        });
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "ScoreCurve", "NoCTF.Domain.Challenges.CompetitionChallengeRules.ScoreCurve#ScoreCurveValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("CustomExpression")
-                                .HasColumnType("text")
-                                .HasColumnName("score_curve_custom_expression");
-
-                            b1.Property<short>("DecayMode")
-                                .HasColumnType("smallint")
-                                .HasColumnName("score_curve_decay_mode");
-
-                            b1.Property<int>("DecayTeamCount")
-                                .HasColumnType("integer")
-                                .HasColumnName("score_curve_decay_team_count");
-
-                            b1.Property<long>("InitialPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("score_curve_initial_points");
-
-                            b1.Property<long>("MinimumPoints")
-                                .HasColumnType("bigint")
-                                .HasColumnName("score_curve_minimum_points");
-                        });
 
                     b.HasKey("CompetitionChallengeId")
                         .HasName("pk_competition_challenge_rules");
@@ -959,6 +942,112 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator<string>("Mode");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Testing.TemplateCapabilityTest", b =>
+                {
+                    b.Property<Guid>("RuntimeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runtime_instance_id");
+
+                    b.Property<long>("AcceptedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<bool>("CancellationRequested")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancellation_requested");
+
+                    b.Property<bool>("CheckCompleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("check_completed");
+
+                    b.Property<long?>("CheckObservedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("check_observed_at");
+
+                    b.Property<long?>("CheckStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("check_started_at");
+
+                    b.Property<long?>("CompletedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("Deadline")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deadline");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_id");
+
+                    b.Property<short?>("Failure")
+                        .HasColumnType("smallint")
+                        .HasColumnName("failure");
+
+                    b.Property<short?>("FailureStage")
+                        .HasColumnType("smallint")
+                        .HasColumnName("failure_stage");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<bool>("FixExecutionUncertain")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fix_execution_uncertain");
+
+                    b.Property<int?>("FixExitCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("fix_exit_code");
+
+                    b.Property<short?>("FixResult")
+                        .HasColumnType("smallint")
+                        .HasColumnName("fix_result");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("MutationStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mutation_started_at");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.HasKey("RuntimeInstanceId")
+                        .HasName("pk_template_capability_tests");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_template_capability_tests_actor_user_id");
+
+                    b.HasIndex("ExecutionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_template_capability_tests_execution_id");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_template_capability_tests_file_id");
+
+                    b.HasIndex("State", "Deadline")
+                        .HasDatabaseName("ix_template_capability_tests_state_deadline");
+
+                    b.ToTable("template_capability_tests", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
@@ -1349,6 +1438,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("attempt_started_at");
 
+                    b.Property<Guid?>("BlockingFixFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocking_fix_fact_id");
+
                     b.Property<short>("Connection")
                         .HasColumnType("smallint")
                         .HasColumnName("connection");
@@ -1396,6 +1489,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<short?>("KnownTargetFailure")
                         .HasColumnType("smallint")
                         .HasColumnName("known_target_failure");
+
+                    b.Property<long?>("MaintenanceWaitEndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maintenance_wait_ended_at");
+
+                    b.Property<long?>("MaintenanceWaitStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maintenance_wait_started_at");
 
                     b.Property<bool>("ManifestComplete")
                         .HasColumnType("boolean")
@@ -1468,6 +1569,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasKey("GameplayFactId")
                         .HasName("pk_awd_fact_details");
 
+                    b.HasIndex("BlockingFixFactId")
+                        .HasDatabaseName("ix_awd_fact_details_blocking_fix_fact_id");
+
                     b.HasIndex("FlagId")
                         .HasDatabaseName("ix_awd_fact_details_flag_id");
 
@@ -1496,6 +1600,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("ActiveStartTicks")
                         .HasColumnType("bigint")
                         .HasColumnName("active_start_ticks");
+
+                    b.Property<Guid?>("BlockingFixFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocking_fix_fact_id");
 
                     b.Property<Guid>("CompetitionChallengeId")
                         .HasColumnType("uuid")
@@ -1560,6 +1668,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("key_version");
 
+                    b.Property<long?>("MaintenanceWaitEndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maintenance_wait_ended_at");
+
+                    b.Property<long?>("MaintenanceWaitStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maintenance_wait_started_at");
+
                     b.Property<short>("Obligation")
                         .HasColumnType("smallint")
                         .HasColumnName("obligation");
@@ -1568,19 +1684,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("ordinal");
 
-                    b.Property<string>("ProtectedReadContext")
-                        .HasMaxLength(32768)
-                        .HasColumnType("character varying(32768)")
-                        .HasColumnName("protected_read_context");
-
                     b.Property<int>("ProtocolVersion")
                         .HasColumnType("integer")
                         .HasColumnName("protocol_version");
-
-                    b.Property<string>("PublicLocator")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("public_locator");
 
                     b.Property<Guid>("RoundId")
                         .HasColumnType("uuid")
@@ -1615,6 +1721,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.HasAlternateKey("FlagId", "CompetitionId")
                         .HasName("ak_awd_flag_issues_flag_id_competition_id");
+
+                    b.HasIndex("BlockingFixFactId")
+                        .HasDatabaseName("ix_awd_flag_issues_blocking_fix_fact_id");
 
                     b.HasIndex("Digest")
                         .IsUnique()
@@ -3414,7 +3523,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
-                    b.Property<Guid>("CompetitionId")
+                    b.Property<Guid?>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
@@ -3434,6 +3543,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("OccurredAt")
                         .HasColumnType("bigint")
                         .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("QuestionnaireAssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("questionnaire_assignment_id");
 
                     b.Property<Guid?>("ReferenceId")
                         .HasColumnType("uuid")
@@ -3459,10 +3572,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
-
-                    b.Property<Guid?>("TheoryPaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("theory_paper_id");
 
                     b.Property<short>("TimeEligibility")
                         .HasColumnType("smallint")
@@ -3494,12 +3603,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("CompetitionChallengeId")
                         .HasDatabaseName("ix_gameplay_facts_competition_challenge_id");
 
+                    b.HasIndex("QuestionnaireAssignmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gameplay_facts_questionnaire_assignment_id");
+
                     b.HasIndex("TeamId")
                         .HasDatabaseName("ix_gameplay_facts_team_id");
-
-                    b.HasIndex("TheoryPaperId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_gameplay_facts_theory_paper_id");
 
                     b.HasIndex("VictimTeamId")
                         .HasDatabaseName("ix_gameplay_facts_victim_team_id");
@@ -3569,7 +3678,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_patch_uploads_file_id");
 
                     b.HasIndex("RuntimeInstanceId")
-                        .IsUnique()
                         .HasDatabaseName("ix_patch_uploads_runtime_instance_id");
 
                     b.HasIndex("UploadedByUserId")
@@ -4380,33 +4488,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("live_solo_attachment_assignments", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<Guid>("CanonicalChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("canonical_challenge_id");
-
-                    b.Property<long>("CopiedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("copied_at");
-
-                    b.Property<Guid>("OriginalChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("original_challenge_id");
-
-                    b.HasKey("ChallengeId")
-                        .HasName("pk_live_solo_challenge_sources");
-
-                    b.HasIndex("CanonicalChallengeId")
-                        .HasDatabaseName("ix_live_solo_challenge_sources_canonical_challenge_id");
-
-                    b.ToTable("live_solo_challenge_sources", (string)null);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCorrectionMatch", b =>
                 {
                     b.Property<Guid>("CorrectionId")
@@ -4502,6 +4583,29 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_download_evidence_round_question_id");
 
                     b.ToTable("live_solo_download_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloFixTargetOwnership", b =>
+                {
+                    b.Property<Guid>("RuntimeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runtime_instance_id");
+
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<short>("Side")
+                        .HasColumnType("smallint")
+                        .HasColumnName("side");
+
+                    b.HasKey("RuntimeInstanceId")
+                        .HasName("pk_live_solo_fix_targets");
+
+                    b.HasIndex("RoundQuestionId", "Side")
+                        .HasDatabaseName("ix_live_solo_fix_targets_round_question_id_side");
+
+                    b.ToTable("live_solo_fix_targets", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
@@ -5031,6 +5135,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid>("RoundQuestionId")
                         .HasColumnType("uuid")
                         .HasColumnName("round_question_id");
+
+                    b.Property<short>("CompletionKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("completion_kind");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")
@@ -7026,11 +7134,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("concurrency_stamp");
 
-                    b.Property<bool>("CtfPatchVerificationEnabled")
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("ctf_patch_verification_enabled");
-
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -7222,7 +7325,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         {
                             Id = (short)1,
                             ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000001"),
-                            CtfPatchVerificationEnabled = false,
                             EmailPasswordResetCooldownSeconds = 60,
                             EmailPasswordResetMaxRequestsPerHour = 5,
                             EmailPasswordResetTokenLifetimeMinutes = 30,
@@ -7329,6 +7431,720 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator<short>("Protocol");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowExposedQuestions")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_exposed_questions");
+
+                    b.Property<int?>("AttemptLimit")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_limit");
+
+                    b.Property<long>("ClosesAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closes_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<long?>("FinishedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("finished_at");
+
+                    b.Property<bool>("IssuanceStopped")
+                        .HasColumnType("boolean")
+                        .HasColumnName("issuance_stopped");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("OpensAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opens_at");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<long?>("PublishedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("published_at");
+
+                    b.Property<short>("ScoringMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("scoring_mode");
+
+                    b.Property<short>("SelectionKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("selection_kind");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_activities");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_questionnaire_activities_owner_id");
+
+                    b.HasIndex("State", "ClosesAt")
+                        .HasDatabaseName("ix_questionnaire_activities_state_closes_at");
+
+                    b.ToTable("questionnaire_activities", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivityOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_activity_operations");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_questionnaire_activity_operations_activity_id");
+
+                    b.HasIndex("ActorId")
+                        .HasDatabaseName("ix_questionnaire_activity_operations_actor_id");
+
+                    b.HasIndex("RevisionId")
+                        .HasDatabaseName("ix_questionnaire_activity_operations_revision_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_questionnaire_activity_operations_session_id");
+
+                    b.ToTable("questionnaire_activity_operations", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivityPause", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<long>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_activity_pauses");
+
+                    b.HasIndex("ActivityId", "StartedAt")
+                        .HasDatabaseName("ix_questionnaire_activity_pauses_activity_id_started_at");
+
+                    b.ToTable("questionnaire_activity_pauses", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawCandidate", b =>
+                {
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("RuleId", "RevisionId")
+                        .HasName("pk_questionnaire_draw_candidates");
+
+                    b.HasIndex("RevisionId")
+                        .HasDatabaseName("ix_questionnaire_draw_candidates_revision_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_questionnaire_draw_candidates_source_id");
+
+                    b.ToTable("questionnaire_draw_candidates", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<short?>("Difficulty")
+                        .HasColumnType("smallint")
+                        .HasColumnName("difficulty");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer")
+                        .HasColumnName("points");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_draw_rules");
+
+                    b.HasIndex("ActivityId", "Order")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_draw_rules_activity_id_order");
+
+                    b.ToTable("questionnaire_draw_rules", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRuleFilter", b =>
+                {
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("NormalizedName")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("normalized_name");
+
+                    b.HasKey("RuleId", "Kind", "NormalizedName")
+                        .HasName("pk_questionnaire_draw_rule_filters");
+
+                    b.ToTable("questionnaire_draw_rule_filters", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireFixedSelection", b =>
+                {
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<int>("PointsPerQuestion")
+                        .HasColumnType("integer")
+                        .HasColumnName("points_per_question");
+
+                    b.Property<Guid?>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.HasKey("ActivityId", "Position")
+                        .HasName("pk_questionnaire_activity_fixed_questionnaires");
+
+                    b.HasIndex("ChallengeId")
+                        .HasDatabaseName("ix_questionnaire_activity_fixed_questionnaires_challenge_id");
+
+                    b.HasIndex("ActivityId", "ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_activity_fixed_questionnaires_activity_id_cha");
+
+                    b.HasIndex("RevisionId", "ChallengeId")
+                        .HasDatabaseName("ix_questionnaire_activity_fixed_questionnaires_revision_id_cha");
+
+                    b.ToTable("questionnaire_activity_fixed_questionnaires", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOption", b =>
+                {
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("OptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_id");
+
+                    b.HasKey("ActivityId", "RevisionId", "OptionId")
+                        .HasName("pk_questionnaire_grading_options");
+
+                    b.HasIndex("RevisionId", "OptionId")
+                        .HasDatabaseName("ix_questionnaire_grading_options_revision_id_option_id");
+
+                    b.ToTable("questionnaire_grading_options", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOverride", b =>
+                {
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid?>("AppliedRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("applied_revision");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<short>("Mode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("TargetRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_revision");
+
+                    b.HasKey("ActivityId", "RevisionId")
+                        .HasName("pk_questionnaire_grading_overrides");
+
+                    b.HasIndex("RevisionId")
+                        .HasDatabaseName("ix_questionnaire_grading_overrides_revision_id");
+
+                    b.ToTable("questionnaire_grading_overrides", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireQuestionExposure", b =>
+                {
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<long>("FirstExposedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("first_exposed_at");
+
+                    b.HasKey("SourceId", "ActivityId")
+                        .HasName("pk_questionnaire_question_exposures");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_questionnaire_question_exposures_activity_id");
+
+                    b.ToTable("questionnaire_question_exposures", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireActiveSession", b =>
+                {
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("ParticipantId")
+                        .HasName("pk_questionnaire_active_sessions");
+
+                    b.HasIndex("SessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_active_sessions_session_id");
+
+                    b.HasIndex("ParticipantId", "SessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_active_sessions_participant_id_session_id");
+
+                    b.ToTable("questionnaire_active_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireAnswerReceipt", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<Guid>("ResultingRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resulting_revision");
+
+                    b.Property<long>("SavedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("saved_at");
+
+                    b.Property<byte[]>("SelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea")
+                        .HasColumnName("selection_digest");
+
+                    b.HasKey("ItemId", "RequestId")
+                        .HasName("pk_questionnaire_answer_receipts");
+
+                    b.HasIndex("ActorId")
+                        .HasDatabaseName("ix_questionnaire_answer_receipts_actor_id");
+
+                    b.ToTable("questionnaire_answer_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireDrawReceipt", b =>
+                {
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("IssuedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("ParticipantId", "SourceId")
+                        .HasName("pk_questionnaire_draw_receipts");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_questionnaire_draw_receipts_source_id");
+
+                    b.HasIndex("ParticipantId", "SessionId")
+                        .HasDatabaseName("ix_questionnaire_draw_receipts_participant_id_session_id");
+
+                    b.ToTable("questionnaire_draw_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireIssueReceipt", b =>
+                {
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("ParticipantId", "RequestId")
+                        .HasName("pk_questionnaire_issue_receipts");
+
+                    b.HasIndex("ParticipantId", "SessionId")
+                        .HasDatabaseName("ix_questionnaire_issue_receipts_participant_id_session_id");
+
+                    b.ToTable("questionnaire_issue_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<int>("IssuedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("issued_count");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_participants");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_questionnaire_participants_user_id");
+
+                    b.HasIndex("ActivityId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_participants_activity_id_user_id");
+
+                    b.ToTable("questionnaire_participants", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("OpenedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opened_at");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<short?>("SubmissionKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("submission_kind");
+
+                    b.Property<long?>("SubmittedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Guid?>("SubmittedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_sessions");
+
+                    b.HasAlternateKey("ParticipantId", "Id")
+                        .HasName("ak_questionnaire_sessions_participant_id_id");
+
+                    b.HasIndex("SubmittedById")
+                        .HasDatabaseName("ix_questionnaire_sessions_submitted_by_id");
+
+                    b.HasIndex("ParticipantId", "Attempt")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_sessions_participant_id_attempt");
+
+                    b.HasIndex("State", "OpenedAt")
+                        .HasDatabaseName("ix_questionnaire_sessions_state_opened_at");
+
+                    b.ToTable("questionnaire_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionOption", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<Guid>("OptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_id");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<Guid>("QuestionVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_version_id");
+
+                    b.Property<bool>("Selected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("selected");
+
+                    b.HasKey("ItemId", "OptionId")
+                        .HasName("pk_questionnaire_session_options");
+
+                    b.HasIndex("ItemId", "Order")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_session_options_item_id_order");
+
+                    b.HasIndex("ItemId", "QuestionVersionId")
+                        .HasDatabaseName("ix_questionnaire_session_options_item_id_question_version_id");
+
+                    b.HasIndex("QuestionVersionId", "OptionId")
+                        .HasDatabaseName("ix_questionnaire_session_options_question_version_id_option_id");
+
+                    b.ToTable("questionnaire_session_options", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("AnsweredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("answered_at");
+
+                    b.Property<Guid?>("AnsweredById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("answered_by_id");
+
+                    b.Property<Guid?>("AppliedGradingRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("applied_grading_revision");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer")
+                        .HasColumnName("points");
+
+                    b.Property<Guid>("QuestionnaireQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("questionnaire_question_id");
+
+                    b.Property<Guid>("QuestionnaireRevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("questionnaire_revision_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_session_questions");
+
+                    b.HasAlternateKey("Id", "RevisionId")
+                        .HasName("ak_questionnaire_session_questions_id_revision_id");
+
+                    b.HasIndex("AnsweredById")
+                        .HasDatabaseName("ix_questionnaire_session_questions_answered_by_id");
+
+                    b.HasIndex("RuleId")
+                        .HasDatabaseName("ix_questionnaire_session_questions_rule_id");
+
+                    b.HasIndex("SessionId", "Order")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_session_questions_session_id_order");
+
+                    b.HasIndex("SessionId", "RevisionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_session_questions_session_id_revision_id");
+
+                    b.HasIndex("AssignmentId", "SessionId", "QuestionnaireRevisionId")
+                        .HasDatabaseName("ix_questionnaire_session_questions_assignment_id_session_id_qu");
+
+                    b.HasIndex("RevisionId", "QuestionnaireRevisionId", "QuestionnaireQuestionId")
+                        .HasDatabaseName("ix_questionnaire_session_questions_revision_id_questionnaire_r");
+
+                    b.ToTable("questionnaire_session_questions", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Runtime.ActiveRuntimeSlot", b =>
@@ -7459,6 +8275,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
+
+                    b.Property<short?>("TemplateTestUse")
+                        .HasColumnType("smallint")
+                        .HasColumnName("template_test_use");
 
                     b.Property<short?>("TestFlagDelivery")
                         .HasColumnType("smallint")
@@ -7778,931 +8598,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_team_members_competition_id_user_id");
 
                     b.ToTable("team_members", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity", b =>
-                {
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enabled");
-
-                    b.HasKey("CompetitionId")
-                        .HasName("pk_competition_theory_activities");
-
-                    b.HasIndex("ActivityId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_competition_theory_activities_activity_id");
-
-                    b.ToTable("competition_theory_activities", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("AllowExposedQuestions")
-                        .HasColumnType("boolean")
-                        .HasColumnName("allow_exposed_questions");
-
-                    b.Property<int?>("AttemptLimit")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt_limit");
-
-                    b.Property<long>("ClosesAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("closes_at");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<long?>("FinishedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("finished_at");
-
-                    b.Property<bool>("IssuanceStopped")
-                        .HasColumnType("boolean")
-                        .HasColumnName("issuance_stopped");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("name");
-
-                    b.Property<long>("OpensAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("opens_at");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.Property<long?>("PublishedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("published_at");
-
-                    b.Property<short>("ScoringMode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("scoring_mode");
-
-                    b.Property<short>("State")
-                        .HasColumnType("smallint")
-                        .HasColumnName("state");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_activities");
-
-                    b.HasIndex("OwnerId")
-                        .HasDatabaseName("ix_theory_activities_owner_id");
-
-                    b.HasIndex("State", "ClosesAt")
-                        .HasDatabaseName("ix_theory_activities_state_closes_at");
-
-                    b.ToTable("theory_activities", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivityOperation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<Guid>("ActorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<long>("OccurredAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<Guid?>("PaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("paper_id");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("reason");
-
-                    b.Property<Guid?>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_activity_operations");
-
-                    b.HasIndex("ActivityId")
-                        .HasDatabaseName("ix_theory_activity_operations_activity_id");
-
-                    b.HasIndex("ActorId")
-                        .HasDatabaseName("ix_theory_activity_operations_actor_id");
-
-                    b.HasIndex("PaperId")
-                        .HasDatabaseName("ix_theory_activity_operations_paper_id");
-
-                    b.HasIndex("RevisionId")
-                        .HasDatabaseName("ix_theory_activity_operations_revision_id");
-
-                    b.ToTable("theory_activity_operations", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivityPause", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<long?>("EndedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("ended_at");
-
-                    b.Property<long>("StartedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("started_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_activity_pauses");
-
-                    b.HasIndex("ActivityId", "StartedAt")
-                        .HasDatabaseName("ix_theory_activity_pauses_activity_id_started_at");
-
-                    b.ToTable("theory_activity_pauses", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawCandidate", b =>
-                {
-                    b.Property<Guid>("RuleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rule_id");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<Guid>("SourceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_id");
-
-                    b.HasKey("RuleId", "RevisionId")
-                        .HasName("pk_theory_draw_candidates");
-
-                    b.HasIndex("RevisionId")
-                        .HasDatabaseName("ix_theory_draw_candidates_revision_id");
-
-                    b.HasIndex("SourceId")
-                        .HasDatabaseName("ix_theory_draw_candidates_source_id");
-
-                    b.ToTable("theory_draw_candidates", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<int>("Count")
-                        .HasColumnType("integer")
-                        .HasColumnName("count");
-
-                    b.Property<short?>("Difficulty")
-                        .HasColumnType("smallint")
-                        .HasColumnName("difficulty");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer")
-                        .HasColumnName("order");
-
-                    b.Property<int>("Points")
-                        .HasColumnType("integer")
-                        .HasColumnName("points");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_draw_rules");
-
-                    b.HasIndex("ActivityId", "Order")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_draw_rules_activity_id_order");
-
-                    b.ToTable("theory_draw_rules", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawRuleFilter", b =>
-                {
-                    b.Property<Guid>("RuleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rule_id");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("NormalizedName")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("normalized_name");
-
-                    b.HasKey("RuleId", "Kind", "NormalizedName")
-                        .HasName("pk_theory_draw_rule_filters");
-
-                    b.ToTable("theory_draw_rule_filters", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOption", b =>
-                {
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<Guid>("OptionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("option_id");
-
-                    b.HasKey("ActivityId", "RevisionId", "OptionId")
-                        .HasName("pk_theory_grading_options");
-
-                    b.HasIndex("OptionId")
-                        .HasDatabaseName("ix_theory_grading_options_option_id");
-
-                    b.ToTable("theory_grading_options", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
-                {
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<Guid?>("AppliedRevision")
-                        .HasColumnType("uuid")
-                        .HasColumnName("applied_revision");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<short>("Mode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("mode");
-
-                    b.Property<Guid>("TargetRevision")
-                        .HasColumnType("uuid")
-                        .HasColumnName("target_revision");
-
-                    b.HasKey("ActivityId", "RevisionId")
-                        .HasName("pk_theory_grading_overrides");
-
-                    b.HasIndex("RevisionId")
-                        .HasDatabaseName("ix_theory_grading_overrides_revision_id");
-
-                    b.ToTable("theory_grading_overrides", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryQuestionExposure", b =>
-                {
-                    b.Property<Guid>("SourceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<long>("FirstExposedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("first_exposed_at");
-
-                    b.HasKey("SourceId", "ActivityId")
-                        .HasName("pk_theory_question_exposures");
-
-                    b.HasIndex("ActivityId")
-                        .HasDatabaseName("ix_theory_question_exposures_activity_id");
-
-                    b.ToTable("theory_question_exposures", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryActivePaper", b =>
-                {
-                    b.Property<Guid>("ParticipantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("participant_id");
-
-                    b.Property<Guid>("PaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("paper_id");
-
-                    b.HasKey("ParticipantId")
-                        .HasName("pk_theory_active_papers");
-
-                    b.HasIndex("PaperId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_active_papers_paper_id");
-
-                    b.HasIndex("ParticipantId", "PaperId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_active_papers_participant_id_paper_id");
-
-                    b.ToTable("theory_active_papers", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryAnswerReceipt", b =>
-                {
-                    b.Property<Guid>("ItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("item_id");
-
-                    b.Property<Guid>("RequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
-
-                    b.Property<Guid>("ActorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<Guid>("ResultingRevision")
-                        .HasColumnType("uuid")
-                        .HasColumnName("resulting_revision");
-
-                    b.Property<long>("SavedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("saved_at");
-
-                    b.Property<byte[]>("SelectionDigest")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("bytea")
-                        .HasColumnName("selection_digest");
-
-                    b.HasKey("ItemId", "RequestId")
-                        .HasName("pk_theory_answer_receipts");
-
-                    b.HasIndex("ActorId")
-                        .HasDatabaseName("ix_theory_answer_receipts_actor_id");
-
-                    b.ToTable("theory_answer_receipts", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryDrawReceipt", b =>
-                {
-                    b.Property<Guid>("ParticipantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("participant_id");
-
-                    b.Property<Guid>("SourceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_id");
-
-                    b.Property<long>("IssuedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("issued_at");
-
-                    b.Property<Guid>("PaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("paper_id");
-
-                    b.HasKey("ParticipantId", "SourceId")
-                        .HasName("pk_theory_draw_receipts");
-
-                    b.HasIndex("SourceId")
-                        .HasDatabaseName("ix_theory_draw_receipts_source_id");
-
-                    b.HasIndex("ParticipantId", "PaperId")
-                        .HasDatabaseName("ix_theory_draw_receipts_participant_id_paper_id");
-
-                    b.ToTable("theory_draw_receipts", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryIssueReceipt", b =>
-                {
-                    b.Property<Guid>("ParticipantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("participant_id");
-
-                    b.Property<Guid>("RequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
-
-                    b.Property<Guid>("PaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("paper_id");
-
-                    b.HasKey("ParticipantId", "RequestId")
-                        .HasName("pk_theory_issue_receipts");
-
-                    b.HasIndex("ParticipantId", "PaperId")
-                        .HasDatabaseName("ix_theory_issue_receipts_participant_id_paper_id");
-
-                    b.ToTable("theory_issue_receipts", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("Attempt")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<long>("OpenedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("opened_at");
-
-                    b.Property<Guid>("ParticipantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("participant_id");
-
-                    b.Property<short>("State")
-                        .HasColumnType("smallint")
-                        .HasColumnName("state");
-
-                    b.Property<short?>("SubmissionKind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("submission_kind");
-
-                    b.Property<long?>("SubmittedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("submitted_at");
-
-                    b.Property<Guid?>("SubmittedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submitted_by_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_papers");
-
-                    b.HasAlternateKey("ParticipantId", "Id")
-                        .HasName("ak_theory_papers_participant_id_id");
-
-                    b.HasIndex("SubmittedById")
-                        .HasDatabaseName("ix_theory_papers_submitted_by_id");
-
-                    b.HasIndex("ParticipantId", "Attempt")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_papers_participant_id_attempt");
-
-                    b.HasIndex("State", "OpenedAt")
-                        .HasDatabaseName("ix_theory_papers_state_opened_at");
-
-                    b.ToTable("theory_papers", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaperItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<long?>("AnsweredAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("answered_at");
-
-                    b.Property<Guid?>("AnsweredById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("answered_by_id");
-
-                    b.Property<Guid?>("AppliedGradingRevision")
-                        .HasColumnType("uuid")
-                        .HasColumnName("applied_grading_revision");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer")
-                        .HasColumnName("order");
-
-                    b.Property<Guid>("PaperId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("paper_id");
-
-                    b.Property<int>("Points")
-                        .HasColumnType("integer")
-                        .HasColumnName("points");
-
-                    b.Property<short?>("Result")
-                        .HasColumnType("smallint")
-                        .HasColumnName("result");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<Guid>("RuleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rule_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_paper_items");
-
-                    b.HasIndex("AnsweredById")
-                        .HasDatabaseName("ix_theory_paper_items_answered_by_id");
-
-                    b.HasIndex("RevisionId")
-                        .HasDatabaseName("ix_theory_paper_items_revision_id");
-
-                    b.HasIndex("RuleId")
-                        .HasDatabaseName("ix_theory_paper_items_rule_id");
-
-                    b.HasIndex("PaperId", "Order")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_paper_items_paper_id_order");
-
-                    b.HasIndex("PaperId", "RevisionId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_paper_items_paper_id_revision_id");
-
-                    b.ToTable("theory_paper_items", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaperOption", b =>
-                {
-                    b.Property<Guid>("ItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("item_id");
-
-                    b.Property<Guid>("OptionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("option_id");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer")
-                        .HasColumnName("order");
-
-                    b.Property<bool>("Selected")
-                        .HasColumnType("boolean")
-                        .HasColumnName("selected");
-
-                    b.HasKey("ItemId", "OptionId")
-                        .HasName("pk_theory_paper_options");
-
-                    b.HasIndex("OptionId")
-                        .HasDatabaseName("ix_theory_paper_options_option_id");
-
-                    b.HasIndex("ItemId", "Order")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_paper_options_item_id_order");
-
-                    b.ToTable("theory_paper_options", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryParticipant", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("activity_id");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<int>("IssuedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("issued_count");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_participants");
-
-                    b.HasIndex("TeamId")
-                        .HasDatabaseName("ix_theory_participants_team_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_theory_participants_user_id");
-
-                    b.HasIndex("ActivityId", "TeamId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_participants_activity_id_team_id");
-
-                    b.HasIndex("ActivityId", "UserId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_participants_activity_id_user_id");
-
-                    b.ToTable("theory_participants", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("CurrentVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("current_version");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.Property<Guid>("SourceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_id");
-
-                    b.Property<short>("State")
-                        .HasColumnType("smallint")
-                        .HasColumnName("state");
-
-                    b.Property<long>("UpdatedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_questions");
-
-                    b.HasIndex("SourceId")
-                        .HasDatabaseName("ix_theory_questions_source_id");
-
-                    b.HasIndex("OwnerId", "State", "UpdatedAt")
-                        .HasDatabaseName("ix_theory_questions_owner_id_state_updated_at");
-
-                    b.ToTable("theory_questions", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionClassification", b =>
-                {
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("NormalizedName")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("name");
-
-                    b.HasKey("RevisionId", "Kind", "NormalizedName")
-                        .HasName("pk_theory_question_classifications");
-
-                    b.HasIndex("Kind", "NormalizedName")
-                        .HasDatabaseName("ix_theory_question_classifications_kind_normalized_name");
-
-                    b.ToTable("theory_question_classifications", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionFile", b =>
-                {
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<Guid>("FileId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("file_id");
-
-                    b.HasKey("RevisionId", "FileId")
-                        .HasName("pk_theory_question_files");
-
-                    b.HasIndex("FileId")
-                        .HasDatabaseName("ix_theory_question_files_file_id");
-
-                    b.ToTable("theory_question_files", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionGrant", b =>
-                {
-                    b.Property<Guid>("QuestionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("question_id");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<short>("Permission")
-                        .HasColumnType("smallint")
-                        .HasColumnName("permission");
-
-                    b.HasKey("QuestionId", "UserId")
-                        .HasName("pk_theory_question_grants");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_theory_question_grants_user_id");
-
-                    b.ToTable("theory_question_grants", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionOption", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(16000)
-                        .HasColumnType("character varying(16000)")
-                        .HasColumnName("content");
-
-                    b.Property<bool>("IsCorrect")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_correct");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer")
-                        .HasColumnName("order");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<short?>("TruthValue")
-                        .HasColumnType("smallint")
-                        .HasColumnName("truth_value");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_question_options");
-
-                    b.HasIndex("RevisionId", "Order")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_question_options_revision_id_order");
-
-                    b.ToTable("theory_question_options", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(64000)
-                        .HasColumnType("character varying(64000)")
-                        .HasColumnName("body");
-
-                    b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_at");
-
-                    b.Property<short>("Difficulty")
-                        .HasColumnType("smallint")
-                        .HasColumnName("difficulty");
-
-                    b.Property<string>("Explanation")
-                        .HasMaxLength(64000)
-                        .HasColumnType("character varying(64000)")
-                        .HasColumnName("explanation");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<Guid>("QuestionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("question_id");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("title");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_question_revisions");
-
-                    b.HasIndex("QuestionId", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("ix_theory_question_revisions_question_id_version");
-
-                    b.ToTable("theory_question_revisions", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionSource", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<long?>("FirstExposedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("first_exposed_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_theory_question_sources");
-
-                    b.ToTable("theory_question_sources", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Infrastructure.Admission.RequestAdmissionLease", b =>
@@ -9415,110 +9310,265 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competition_webhook_outbox_events", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallenge", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.BreakOutcome", b =>
                 {
-                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome");
 
-                    b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator().HasValue("awd");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdpChallenge", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
-
-                    b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator().HasValue("awdp");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.CtfChallenge", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
-
-                    b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator().HasValue("ctf");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.KohChallenge", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
-
-                    b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator().HasValue("koh");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.LiveSoloChallenge", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
-
-                    b.ToTable("challenges", (string)null);
-
-                    b.HasDiscriminator().HasValue("livesolo");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallengeDefinition", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
-
-                    b.Property<string>("FlagInjectionCommand")
-                        .HasColumnType("text")
-                        .HasColumnName("flag_injection_command");
-
-                    b.Property<string>("FlagInjectionServiceName")
-                        .HasColumnType("text")
-                        .HasColumnName("flag_injection_service_name");
-
-                    b.Property<int?>("FlagInjectionTimeoutSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("flag_injection_timeout_seconds");
-
-                    b.ToTable("challenge_definitions", (string)null);
-
-                    b.HasDiscriminator().HasValue("awd");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdpChallengeDefinition", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
-
-                    b.ToTable("challenge_definitions", (string)null);
-
-                    b.HasDiscriminator().HasValue("awdp");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.CtfChallengeDefinition", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
-
-                    b.Property<short>("InteractionKind")
+                    b.Property<short>("Match")
                         .HasColumnType("smallint")
-                        .HasColumnName("interaction_kind");
+                        .HasColumnName("match");
 
-                    b.ToTable("challenge_definitions", (string)null);
+                    b.ToTable("capability_outcomes", (string)null);
 
-                    b.HasDiscriminator().HasValue("ctf");
+                    b.HasDiscriminator().HasValue((short)0);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.KohChallengeDefinition", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CheckOutcome", b =>
                 {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome");
 
-                    b.ToTable("challenge_definitions", (string)null);
+                    b.ToTable("capability_outcomes", (string)null);
 
-                    b.HasDiscriminator().HasValue("koh");
+                    b.HasDiscriminator().HasValue((short)2);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.ControlOutcome", b =>
                 {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome");
 
-                    b.ToTable("challenge_definitions", (string)null);
+                    b.Property<string>("ControllerIdentifier")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("controller_identifier");
 
-                    b.HasDiscriminator().HasValue("livesolo");
+                    b.Property<short>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.ToTable("capability_outcomes", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)3);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.FixOutcome", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome");
+
+                    b.Property<string>("ExecutionIdentity")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("execution_identity");
+
+                    b.Property<bool>("ExecutionUncertain")
+                        .HasColumnType("boolean")
+                        .HasColumnName("execution_uncertain");
+
+                    b.Property<int?>("ExitCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("exit_code");
+
+                    b.Property<short?>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.ToTable("capability_outcomes", null, t =>
+                        {
+                            t.Property("Result")
+                                .HasColumnName("fix_outcome_result");
+                        });
+
+                    b.HasDiscriminator().HasValue((short)1);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOutcome", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.HasIndex("RevisionId")
+                        .HasDatabaseName("ix_capability_outcomes_revision_id");
+
+                    b.ToTable("capability_outcomes", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)4);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
+
+                    b.Property<bool>("HasFlagTemplate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flag_template");
+
+                    b.Property<string>("InjectionCommand")
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)")
+                        .HasColumnName("injection_command");
+
+                    b.Property<string>("InjectionServiceName")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("injection_service_name");
+
+                    b.Property<int>("InjectionTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("injection_timeout_seconds");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition.FlagTemplate#FlagTemplateValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BodyTemplate")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("flag_template_body_template");
+
+                            b1.Property<string>("Header")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("flag_template_header");
+
+                            b1.Property<bool>("LeetLiteralText")
+                                .HasColumnType("boolean")
+                                .HasColumnName("flag_template_leet_literal_text");
+                        });
+
+                    b.ToTable("challenge_capabilities", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)0);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
+
+                    b.Property<bool>("AcceptsFixInput")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_fix_input");
+
+                    b.Property<string>("Image")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("image");
+
+                    b.Property<int>("ReadyTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("ready_timeout_seconds");
+
+                    b.Property<string>("TargetServiceName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("target_service_name");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("timeout_seconds");
+
+                    b.ToTable("challenge_capabilities", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)2);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.ControlCapabilityDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
+
+                    b.Property<int?>("ContainerPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("container_port");
+
+                    b.Property<int?>("GuestPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("guest_port");
+
+                    b.Property<short>("Protocol")
+                        .HasColumnType("smallint")
+                        .HasColumnName("protocol");
+
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("service_name");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("timeout_seconds");
+
+                    b.Property<string>("UrlTemplate")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("url_template");
+
+                    b.Property<string>("VmId")
+                        .HasColumnType("text")
+                        .HasColumnName("vm_id");
+
+                    b.ToTable("challenge_capabilities", null, t =>
+                        {
+                            t.Property("TimeoutSeconds")
+                                .HasColumnName("control_capability_definition_timeout_seconds");
+                        });
+
+                    b.HasDiscriminator().HasValue((short)3);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.FixCapabilityDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
+
+                    b.Property<string>("Entrypoint")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("entrypoint");
+
+                    b.Property<long>("MaximumUploadBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maximum_upload_bytes");
+
+                    b.Property<string>("TargetServiceName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("target_service_name");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("timeout_seconds");
+
+                    b.ToTable("challenge_capabilities", null, t =>
+                        {
+                            t.Property("TargetServiceName")
+                                .HasColumnName("fix_capability_definition_target_service_name");
+
+                            t.Property("TimeoutSeconds")
+                                .HasColumnName("fix_capability_definition_timeout_seconds");
+                        });
+
+                    b.HasDiscriminator().HasValue((short)1);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireCapabilityDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
+
+                    b.Property<Guid>("CurrentRevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_revision_id");
+
+                    b.HasIndex("CurrentRevisionId", "ChallengeId")
+                        .HasDatabaseName("ix_challenge_capabilities_current_revision_id_challenge_id");
+
+                    b.ToTable("challenge_capabilities", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)4);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdRoundChallengeFlag", b =>
@@ -9663,6 +9713,38 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdCompetitionChallengeRules", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
+
+                    b.Property<bool>("AllowFixSubmissions")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_fix_submissions");
+
+                    b.Property<long?>("AttackPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attack_points");
+
+                    b.Property<short?>("AttackRewardMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("attack_reward_mode");
+
+                    b.Property<int?>("CheckerIntervalSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("checker_interval_seconds");
+
+                    b.Property<bool>("HasFlagTemplate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flag_template");
+
+                    b.Property<long?>("ServiceHealthyPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_healthy_points");
+
+                    b.Property<long?>("ServiceUnhealthyPenalty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_unhealthy_penalty");
+
+                    b.Property<long?>("VictimDefensePoolPoints")
+                        .HasColumnType("bigint")
+                        .HasColumnName("victim_defense_pool_points");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "AwdOverrides", "NoCTF.Domain.Challenges.AwdCompetitionChallengeRules.AwdOverrides#AwdRuleOverrides", b1 =>
                         {
@@ -9816,7 +9898,47 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnName("awd_overrides_sla_settlement");
                         });
 
-                    b.ToTable("competition_challenge_rules", (string)null);
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.AwdCompetitionChallengeRules.FlagTemplate#FlagTemplateValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BodyTemplate")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("awd_flag_body_template");
+
+                            b1.Property<string>("Header")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("awd_flag_header");
+
+                            b1.Property<bool>("LeetLiteralText")
+                                .HasColumnType("boolean")
+                                .HasColumnName("awd_flag_leet_literal_text");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Runtime", "NoCTF.Domain.Challenges.AwdCompetitionChallengeRules.Runtime#CompetitionChallengeRuntimeRules", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("Allocation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_runtime_allocation");
+
+                            b1.Property<short>("FlagSource")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awd_runtime_flag_source");
+
+                            b1.Property<int?>("TtlSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awd_runtime_ttl_seconds");
+                        });
+
+                    b.ToTable("competition_challenge_rules", null, t =>
+                        {
+                            t.Property("HasFlagTemplate")
+                                .HasColumnName("awd_competition_challenge_rules_has_flag_template");
+                        });
 
                     b.HasDiscriminator().HasValue("awd");
                 });
@@ -9824,6 +9946,132 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdpCompetitionChallengeRules", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
+
+                    b.Property<short?>("EvaluationDispatchMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("evaluation_dispatch_mode");
+
+                    b.Property<long?>("ExploitSucceededPenalty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exploit_succeeded_penalty");
+
+                    b.Property<long?>("FlagWrongPenalty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("flag_wrong_penalty");
+
+                    b.Property<bool>("HasBreakScoreCurve")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_break_score_curve");
+
+                    b.Property<bool>("HasFixScoreCurve")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_fix_score_curve");
+
+                    b.Property<bool>("HasFlagTemplate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flag_template");
+
+                    b.Property<int?>("MaxBreakSubmissions")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_break_submissions");
+
+                    b.Property<int?>("MaxFixSubmissions")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_fix_submissions");
+
+                    b.Property<bool?>("RequireBreakBeforeFix")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_break_before_fix");
+
+                    b.Property<long?>("ServiceAbnormalPenalty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_abnormal_penalty");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "BreakScoreCurve", "NoCTF.Domain.Challenges.AwdpCompetitionChallengeRules.BreakScoreCurve#ScoreCurveValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("CustomExpression")
+                                .HasColumnType("text")
+                                .HasColumnName("break_score_curve_custom_expression");
+
+                            b1.Property<short>("DecayMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("break_score_curve_decay_mode");
+
+                            b1.Property<int>("DecayTeamCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("break_score_curve_decay_team_count");
+
+                            b1.Property<long>("InitialPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("break_score_curve_initial_points");
+
+                            b1.Property<long>("MinimumPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("break_score_curve_minimum_points");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FixScoreCurve", "NoCTF.Domain.Challenges.AwdpCompetitionChallengeRules.FixScoreCurve#ScoreCurveValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("CustomExpression")
+                                .HasColumnType("text")
+                                .HasColumnName("fix_score_curve_custom_expression");
+
+                            b1.Property<short>("DecayMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("fix_score_curve_decay_mode");
+
+                            b1.Property<int>("DecayTeamCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("fix_score_curve_decay_team_count");
+
+                            b1.Property<long>("InitialPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("fix_score_curve_initial_points");
+
+                            b1.Property<long>("MinimumPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("fix_score_curve_minimum_points");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.AwdpCompetitionChallengeRules.FlagTemplate#FlagTemplateValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BodyTemplate")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("awdp_flag_body_template");
+
+                            b1.Property<string>("Header")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("awdp_flag_header");
+
+                            b1.Property<bool>("LeetLiteralText")
+                                .HasColumnType("boolean")
+                                .HasColumnName("awdp_flag_leet_literal_text");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Runtime", "NoCTF.Domain.Challenges.AwdpCompetitionChallengeRules.Runtime#CompetitionChallengeRuntimeRules", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("Allocation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awdp_runtime_allocation");
+
+                            b1.Property<short>("FlagSource")
+                                .HasColumnType("smallint")
+                                .HasColumnName("awdp_runtime_flag_source");
+
+                            b1.Property<int?>("TtlSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("awdp_runtime_ttl_seconds");
+                        });
 
                     b.ToTable("competition_challenge_rules", (string)null);
 
@@ -9834,11 +10082,92 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
 
+                    b.Property<bool>("HasFlagTemplate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flag_template");
+
+                    b.Property<bool>("HasScoreCurve")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_score_curve");
+
+                    b.Property<int?>("MaxFlagAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_flag_attempts");
+
                     b.Property<short?>("ScoreSettlementMode")
                         .HasColumnType("smallint")
                         .HasColumnName("score_settlement_mode");
 
-                    b.ToTable("competition_challenge_rules", (string)null);
+                    b.Property<long?>("WrongSubmissionPenalty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("wrong_submission_penalty");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Challenges.CtfCompetitionChallengeRules.FlagTemplate#FlagTemplateValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BodyTemplate")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("ctf_flag_body_template");
+
+                            b1.Property<string>("Header")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("ctf_flag_header");
+
+                            b1.Property<bool>("LeetLiteralText")
+                                .HasColumnType("boolean")
+                                .HasColumnName("ctf_flag_leet_literal_text");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Runtime", "NoCTF.Domain.Challenges.CtfCompetitionChallengeRules.Runtime#CompetitionChallengeRuntimeRules", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("Allocation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("ctf_runtime_allocation");
+
+                            b1.Property<short>("FlagSource")
+                                .HasColumnType("smallint")
+                                .HasColumnName("ctf_runtime_flag_source");
+
+                            b1.Property<int?>("TtlSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("ctf_runtime_ttl_seconds");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "ScoreCurve", "NoCTF.Domain.Challenges.CtfCompetitionChallengeRules.ScoreCurve#ScoreCurveValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("CustomExpression")
+                                .HasColumnType("text")
+                                .HasColumnName("score_curve_custom_expression");
+
+                            b1.Property<short>("DecayMode")
+                                .HasColumnType("smallint")
+                                .HasColumnName("score_curve_decay_mode");
+
+                            b1.Property<int>("DecayTeamCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("score_curve_decay_team_count");
+
+                            b1.Property<long>("InitialPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("score_curve_initial_points");
+
+                            b1.Property<long>("MinimumPoints")
+                                .HasColumnType("bigint")
+                                .HasColumnName("score_curve_minimum_points");
+                        });
+
+                    b.ToTable("competition_challenge_rules", null, t =>
+                        {
+                            t.Property("HasFlagTemplate")
+                                .HasColumnName("ctf_competition_challenge_rules_has_flag_template");
+                        });
 
                     b.HasDiscriminator().HasValue("ctf");
                 });
@@ -9846,6 +10175,31 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.KohCompetitionChallengeRules", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
+
+                    b.Property<long?>("ControlPointsPerInterval")
+                        .HasColumnType("bigint")
+                        .HasColumnName("control_points_per_interval");
+
+                    b.Property<int?>("PollIntervalSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("poll_interval_seconds");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Runtime", "NoCTF.Domain.Challenges.KohCompetitionChallengeRules.Runtime#CompetitionChallengeRuntimeRules", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("Allocation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("koh_runtime_allocation");
+
+                            b1.Property<short>("FlagSource")
+                                .HasColumnType("smallint")
+                                .HasColumnName("koh_runtime_flag_source");
+
+                            b1.Property<int?>("TtlSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("koh_runtime_ttl_seconds");
+                        });
 
                     b.ToTable("competition_challenge_rules", (string)null);
 
@@ -9856,7 +10210,55 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
 
-                    b.ToTable("competition_challenge_rules", (string)null);
+                    b.Property<short>("CompletionKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("completion_kind");
+
+                    b.Property<bool>("HasFlagTemplate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flag_template");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules.FlagTemplate#FlagTemplateValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BodyTemplate")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("live_solo_flag_body_template");
+
+                            b1.Property<string>("Header")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("live_solo_flag_header");
+
+                            b1.Property<bool>("LeetLiteralText")
+                                .HasColumnType("boolean")
+                                .HasColumnName("live_solo_flag_leet_literal_text");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Runtime", "NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules.Runtime#CompetitionChallengeRuntimeRules", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<short>("Allocation")
+                                .HasColumnType("smallint")
+                                .HasColumnName("live_solo_runtime_allocation");
+
+                            b1.Property<short>("FlagSource")
+                                .HasColumnType("smallint")
+                                .HasColumnName("live_solo_runtime_flag_source");
+
+                            b1.Property<int?>("TtlSeconds")
+                                .HasColumnType("integer")
+                                .HasColumnName("live_solo_runtime_ttl_seconds");
+                        });
+
+                    b.ToTable("competition_challenge_rules", null, t =>
+                        {
+                            t.Property("HasFlagTemplate")
+                                .HasColumnName("live_solo_competition_challenge_rules_has_flag_template");
+                        });
 
                     b.HasDiscriminator().HasValue("livesolo");
                 });
@@ -9906,15 +10308,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)2);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Commands.PatchVerificationTargetCommandReceipt", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Commands.CommandReceipt");
-
-                    b.ToTable("command_receipts", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)7);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Commands.RuntimeMutationCommandReceipt", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Commands.CommandReceipt");
@@ -9922,6 +10315,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("command_receipts", (string)null);
 
                     b.HasDiscriminator().HasValue((short)3);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Commands.TemplateCapabilityTestCommandReceipt", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Commands.CommandReceipt");
+
+                    b.ToTable("command_receipts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)7);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.TemplateTestRuntimeMutationCommandReceipt", b =>
@@ -11149,16 +11551,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.ToTable("gameplay_facts", (string)null);
 
-                    b.HasDiscriminator().HasValue((short)7);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.AwdServiceTransitionGameplayFact", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
-
-                    b.ToTable("gameplay_facts", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)5);
+                    b.HasDiscriminator().HasValue((short)6);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.BreakAttemptGameplayFact", b =>
@@ -11167,46 +11560,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.ToTable("gameplay_facts", (string)null);
 
-                    b.HasDiscriminator().HasValue((short)1);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.FixAttemptGameplayFact", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
-
-                    b.ToTable("gameplay_facts", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)2);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.FlagAttemptGameplayFact", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
-
-                    b.ToTable("gameplay_facts", (string)null);
-
                     b.HasDiscriminator().HasValue((short)0);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.HintUnlockGameplayFact", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
-
-                    b.ToTable("gameplay_facts", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)3);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.KohControlObservationGameplayFact", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
-
-                    b.ToTable("gameplay_facts", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)6);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.ManualAdjustmentGameplayFact", b =>
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.CheckObservationGameplayFact", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
 
@@ -11215,13 +11572,49 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)4);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Gameplay.TheoryPaperSubmissionGameplayFact", b =>
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.ControlObservationGameplayFact", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
 
                     b.ToTable("gameplay_facts", (string)null);
 
-                    b.HasDiscriminator().HasValue((short)9);
+                    b.HasDiscriminator().HasValue((short)5);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.FixAttemptGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)1);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.HintUnlockGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)2);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.ManualAdjustmentGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)3);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.QuestionnaireAttemptGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)8);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.WriteUpUnlockGameplayFact", b =>
@@ -11230,7 +11623,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.ToTable("gameplay_facts", (string)null);
 
-                    b.HasDiscriminator().HasValue((short)8);
+                    b.HasDiscriminator().HasValue((short)7);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Notifications.AuthenticationSecurityActivityNotification", b =>
@@ -11564,7 +11957,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)0);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.AwdpAttackRuntimeInstance", b =>
+            modelBuilder.Entity("NoCTF.Domain.Runtime.AttackTargetRuntimeInstance", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Runtime.RuntimeInstance");
 
@@ -11573,22 +11966,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)3);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.AwdpTargetRuntimeInstance", b =>
+            modelBuilder.Entity("NoCTF.Domain.Runtime.FixTargetRuntimeInstance", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Runtime.RuntimeInstance");
 
                     b.ToTable("runtime_instances", (string)null);
 
                     b.HasDiscriminator().HasValue((short)1);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Runtime.PatchVerificationTargetRuntimeInstance", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Runtime.RuntimeInstance");
-
-                    b.ToTable("runtime_instances", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)5);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Runtime.PlayerRuntimeInstance", b =>
@@ -11607,6 +11991,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("runtime_instances", (string)null);
 
                     b.HasDiscriminator().HasValue((short)2);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Runtime.ScopedFixTargetRuntimeInstance", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Runtime.RuntimeInstance");
+
+                    b.ToTable("runtime_instances", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)5);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Runtime.TemplateTestRuntimeInstance", b =>
@@ -11696,6 +12089,163 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue("ova");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany("CapabilityOutcomes")
+                        .HasForeignKey("GameplayFactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_capability_outcomes_gameplay_facts_gameplay_fact_id");
+
+                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RuntimeInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_capability_outcomes_runtime_instances_runtime_instance_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeDefinition", null)
+                        .WithMany("Capabilities")
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenge_capabilities_challenge_definitions_challenge_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithMany("Assignments")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_assignments_questionnaire_sessions_session_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId", "ChallengeId")
+                        .HasPrincipalKey("Id", "ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_assignments_questionnaire_revision_revision_i");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOption", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", null)
+                        .WithMany("Options")
+                        .HasForeignKey("QuestionVersionId", "RevisionId", "QuestionId")
+                        .HasPrincipalKey("VersionId", "RevisionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_options_questionnaire_questions_question_vers");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", "Revision")
+                        .WithMany("Questions")
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_questions_questionnaire_revision_revision_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_questions_questionnaire_question_source_sourc");
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.QuestionnaireClassification", "Classifications", b1 =>
+                        {
+                            b1.Property<Guid>("RevisionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("revision_id");
+
+                            b1.Property<Guid>("QuestionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("question_id");
+
+                            b1.Property<short>("Kind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("kind");
+
+                            b1.Property<string>("NormalizedName")
+                                .HasMaxLength(80)
+                                .HasColumnType("character varying(80)")
+                                .HasColumnName("normalized_name");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(80)
+                                .HasColumnType("character varying(80)")
+                                .HasColumnName("name");
+
+                            b1.HasKey("RevisionId", "QuestionId", "Kind", "NormalizedName")
+                                .HasName("pk_questionnaire_classifications");
+
+                            b1.ToTable("questionnaire_classifications", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("RevisionId", "QuestionId")
+                                .HasConstraintName("fk_questionnaire_classifications_questionnaire_questions_revis");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.QuestionnaireFile", "Files", b1 =>
+                        {
+                            b1.Property<Guid>("RevisionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("revision_id");
+
+                            b1.Property<Guid>("QuestionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("question_id");
+
+                            b1.Property<Guid>("FileId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("file_id");
+
+                            b1.HasKey("RevisionId", "QuestionId", "FileId")
+                                .HasName("pk_questionnaire_files");
+
+                            b1.HasIndex("FileId")
+                                .HasDatabaseName("ix_questionnaire_files_file_id");
+
+                            b1.ToTable("questionnaire_files", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                                .WithMany()
+                                .HasForeignKey("FileId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_questionnaire_files_files_file_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RevisionId", "QuestionId")
+                                .HasConstraintName("fk_questionnaire_files_questionnaire_questions_revision_id_que");
+                        });
+
+                    b.Navigation("Classifications");
+
+                    b.Navigation("Files");
+
+                    b.Navigation("Revision");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_revisions_challenges_challenge_id");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -11725,16 +12275,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("File");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeCheckerDefinition", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.ChallengeDefinition", null)
-                        .WithOne("Checker")
-                        .HasForeignKey("NoCTF.Domain.Challenges.ChallengeCheckerDefinition", "ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_challenge_checker_definitions_challenge_definitions_challen");
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeDefinition", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
@@ -11743,16 +12283,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_challenge_definitions_challenges_challenge_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeDefinitionStringItem", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.ChallengeDefinition", null)
-                        .WithMany("StringItems")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_challenge_definition_string_items_challenge_definitions_cha");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
@@ -11846,15 +12376,24 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_challenge_runtime_url_bindings_challenge_runtime_templates_");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeSource", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Challenges.ChallengeSource", "ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenge_sources_challenges_challenge_id");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
                         .WithMany()
-                        .HasForeignKey("ChallengeId", "Mode")
-                        .HasPrincipalKey("Id", "Mode")
+                        .HasForeignKey("ChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_competition_challenges_challenges_challenge_id_mode");
+                        .HasConstraintName("fk_competition_challenges_challenges_challenge_id");
 
                     b.HasOne("NoCTF.Domain.Competitions.Directions.CompetitionDirection", "Direction")
                         .WithMany()
@@ -11961,7 +12500,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallengeBloodReward", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallengeRules", null)
+                    b.HasOne("NoCTF.Domain.Challenges.CtfCompetitionChallengeRules", null)
                         .WithMany("BloodRewards")
                         .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -11977,6 +12516,157 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_competition_challenge_rules_competition_challenges_competit");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Testing.TemplateCapabilityTest", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_template_capability_tests_users_actor_user_id");
+
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_template_capability_tests_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                        .WithOne("CapabilityTest")
+                        .HasForeignKey("NoCTF.Domain.Challenges.Testing.TemplateCapabilityTest", "RuntimeInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_template_capability_tests_runtime_instances_runtime_instanc");
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Testing.TemplateCheckFlagContext", "FlagContexts", b1 =>
+                        {
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<Guid>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<byte[]>("ProtectedReadContext")
+                                .HasMaxLength(32768)
+                                .HasColumnType("bytea")
+                                .HasColumnName("protected_read_context");
+
+                            b1.Property<string>("PublicLocator")
+                                .HasMaxLength(2048)
+                                .HasColumnType("character varying(2048)")
+                                .HasColumnName("public_locator");
+
+                            b1.HasKey("RuntimeInstanceId", "FlagId")
+                                .HasName("pk_template_check_flag_contexts");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_template_check_flag_contexts_flag_id");
+
+                            b1.ToTable("template_check_flag_contexts", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_template_check_flag_contexts_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .HasConstraintName("fk_template_check_flag_contexts_template_capability_tests_runt");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Testing.TemplateCheckProbe", "Probes", b1 =>
+                        {
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<Guid?>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<short>("Kind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("kind");
+
+                            b1.Property<short>("Reason")
+                                .HasColumnType("smallint")
+                                .HasColumnName("reason");
+
+                            b1.Property<short>("Result")
+                                .HasColumnType("smallint")
+                                .HasColumnName("result");
+
+                            b1.HasKey("RuntimeInstanceId", "Position")
+                                .HasName("pk_template_check_probes");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_template_check_probes_flag_id");
+
+                            b1.ToTable("template_check_probes", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .HasConstraintName("fk_template_check_probes_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .HasConstraintName("fk_template_check_probes_template_capability_tests_runtime_ins");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Testing.TemplateCheckRequirement", "Requirements", b1 =>
+                        {
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<Guid?>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<short>("Kind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("kind");
+
+                            b1.HasKey("RuntimeInstanceId", "Position")
+                                .HasName("pk_template_check_requirements");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_template_check_requirements_flag_id");
+
+                            b1.ToTable("template_check_requirements", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .HasConstraintName("fk_template_check_requirements_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .HasConstraintName("fk_template_check_requirements_template_capability_tests_runti");
+                        });
+
+                    b.Navigation("FlagContexts");
+
+                    b.Navigation("Probes");
+
+                    b.Navigation("Requirements");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
@@ -12117,6 +12807,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFactDetails", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany()
+                        .HasForeignKey("BlockingFixFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_fact_details_gameplay_facts_blocking_fix_fact_id");
+
                     b.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
                         .WithMany()
                         .HasForeignKey("FlagId")
@@ -12211,6 +12907,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany()
+                        .HasForeignKey("BlockingFixFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_awd_flag_issues_gameplay_facts_blocking_fix_fact_id");
+
                     b.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
                         .WithOne("AwdIssue")
                         .HasForeignKey("NoCTF.Domain.Competitions.Awd.AwdFlagIssue", "FlagId")
@@ -12836,8 +13538,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .WithMany()
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_gameplay_facts_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment", null)
+                        .WithOne("Fact")
+                        .HasForeignKey("NoCTF.Domain.Gameplay.GameplayFact", "QuestionnaireAssignmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gameplay_facts_questionnaire_assignment_questionnaire_assig");
 
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()
@@ -12845,17 +13552,97 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gameplay_facts_teams_team_id");
 
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Gameplay.GameplayFact", "TheoryPaperId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_gameplay_facts_theory_papers_theory_paper_id");
-
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()
                         .HasForeignKey("VictimTeamId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gameplay_facts_teams_victim_team_id");
+
+                    b.OwnsOne("NoCTF.Domain.Challenges.Capabilities.FixExecutionDetails", "FixExecution", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<long?>("AppliedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("applied_at");
+
+                            b1.Property<long>("Deadline")
+                                .HasColumnType("bigint")
+                                .HasColumnName("deadline");
+
+                            b1.Property<short?>("ExecutionFailure")
+                                .HasColumnType("smallint")
+                                .HasColumnName("execution_failure");
+
+                            b1.Property<short?>("FailedPhase")
+                                .HasColumnType("smallint")
+                                .HasColumnName("failed_phase");
+
+                            b1.Property<long?>("FinalizedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("finalized_at");
+
+                            b1.Property<long?>("JudgedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("judged_at");
+
+                            b1.Property<long?>("LastConfirmedRunningAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("last_confirmed_running_at");
+
+                            b1.Property<bool>("MutationBlocked")
+                                .HasColumnType("boolean")
+                                .HasColumnName("mutation_blocked");
+
+                            b1.Property<long?>("MutationCompletedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("mutation_completed_at");
+
+                            b1.Property<long?>("MutationStartedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("mutation_started_at");
+
+                            b1.Property<short>("Phase")
+                                .HasColumnType("smallint")
+                                .HasColumnName("phase");
+
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<long?>("StartedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("started_at");
+
+                            b1.Property<short>("TargetKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("target_kind");
+
+                            b1.Property<long?>("WorkCompletedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("work_completed_at");
+
+                            b1.HasKey("GameplayFactId")
+                                .HasName("pk_fix_execution_details");
+
+                            b1.HasIndex("RuntimeInstanceId")
+                                .HasDatabaseName("ix_fix_execution_details_runtime_instance_id");
+
+                            b1.ToTable("fix_execution_details", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId")
+                                .HasConstraintName("fk_fix_execution_details_gameplay_facts_id");
+
+                            b1.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                                .WithMany()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_fix_execution_details_runtime_instances_runtime_instance_id");
+                        });
 
                     b.OwnsOne("NoCTF.Domain.Gameplay.FlagAcquisitionEvidence", "AcquisitionEvidence", b1 =>
                         {
@@ -12910,6 +13697,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         });
 
                     b.Navigation("AcquisitionEvidence");
+
+                    b.Navigation("FixExecution");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.PatchUpload", b =>
@@ -13150,16 +13939,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_live_solo_attachment_assignments_teams_team_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", "ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_live_solo_challenge_sources_challenges_challenge_id");
-                });
-
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCorrectionMatch", b =>
                 {
                     b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloResultCorrection", null)
@@ -13215,6 +13994,23 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_download_evidence_live_solo_round_questions_round");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloFixTargetOwnership", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_fix_targets_live_solo_round_questions_round_quest");
+
+                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RuntimeInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_fix_targets_runtime_instances_runtime_instance_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
@@ -14042,6 +14838,324 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_sso_providers_platform_settings_platform_settings_id");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activities_users_owner_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivityOperation", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activity_operations_questionnaire_activities_");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activity_operations_users_actor_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .HasPrincipalKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_activity_operations_questionnaire_questions_r");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_activity_operations_questionnaire_sessions_se");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivityPause", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany("Pauses")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activity_pauses_questionnaire_activities_acti");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawCandidate", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .HasPrincipalKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_candidates_questionnaire_questions_revis");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", null)
+                        .WithMany("Candidates")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_candidates_questionnaire_draw_rules_rule");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_candidates_questionnaire_sources_source_");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany("Rules")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_rules_questionnaire_activities_activity_");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRuleFilter", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", null)
+                        .WithMany("Filters")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_rule_filters_questionnaire_draw_rules_ru");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireFixedSelection", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany("FixedQuestionnaires")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activity_fixed_questionnaires_questionnaire_a");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_activity_fixed_questionnaires_challenges_chal");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId", "ChallengeId")
+                        .HasPrincipalKey("Id", "ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_activity_fixed_questionnaires_questionnaire_r");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOption", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOverride", null)
+                        .WithMany("Options")
+                        .HasForeignKey("ActivityId", "RevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_grading_options_questionnaire_grading_overrid");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOption", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId", "OptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_grading_options_questionnaire_options_revisio");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOverride", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_grading_overrides_questionnaire_activities_ac");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .HasPrincipalKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_grading_overrides_questionnaire_questions_rev");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireQuestionExposure", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_question_exposures_questionnaire_activities_a");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_question_exposures_questionnaire_sources_sour");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireActiveSession", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireActiveSession", "ParticipantId", "SessionId")
+                        .HasPrincipalKey("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", "ParticipantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_active_sessions_questionnaire_sessions_partic");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireAnswerReceipt", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_answer_receipts_users_actor_id");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_answer_receipts_questionnaire_session_questio");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireDrawReceipt", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_receipts_questionnaire_sources_source_id");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantId", "SessionId")
+                        .HasPrincipalKey("ParticipantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_draw_receipts_questionnaire_sessions_particip");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireIssueReceipt", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantId", "SessionId")
+                        .HasPrincipalKey("ParticipantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_issue_receipts_questionnaire_sessions_partici");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireParticipant", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_participants_questionnaire_activities_activit");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_participants_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireParticipant", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_sessions_questionnaire_participants_participa");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_sessions_users_submitted_by_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionOption", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionQuestion", null)
+                        .WithMany("Options")
+                        .HasForeignKey("ItemId", "QuestionVersionId")
+                        .HasPrincipalKey("Id", "RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_options_questionnaire_session_questio");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOption", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionVersionId", "OptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_options_questionnaire_options_questio");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionQuestion", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("AnsweredById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_session_questions_users_answered_by_id");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", null)
+                        .WithMany()
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_questions_questionnaire_draw_rules_ru");
+
+                    b.HasOne("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", null)
+                        .WithMany("Items")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_questions_questionnaire_sessions_sess");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("AssignmentId", "SessionId", "QuestionnaireRevisionId")
+                        .HasPrincipalKey("Id", "SessionId", "RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_questions_questionnaire_assignments_a");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId", "QuestionnaireRevisionId", "QuestionnaireQuestionId")
+                        .HasPrincipalKey("VersionId", "RevisionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_session_questions_questionnaire_questions_rev");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Runtime.ActiveRuntimeSlot", b =>
                 {
                     b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
@@ -14448,390 +15562,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_team_members_users_user_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity", "ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_competition_theory_activities_theory_activities_activity_id");
-
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_competition_theory_activities_competitions_competition_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivity", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_activities_users_owner_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivityOperation", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_activity_operations_theory_activities_activity_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_activity_operations_users_actor_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithMany()
-                        .HasForeignKey("PaperId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_activity_operations_theory_papers_paper_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany()
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_activity_operations_theory_question_revisions_revisi");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivityPause", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany("Pauses")
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_activity_pauses_theory_activities_activity_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawCandidate", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany()
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_candidates_theory_question_revisions_revision_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryDrawRule", null)
-                        .WithMany("Candidates")
-                        .HasForeignKey("RuleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_candidates_theory_draw_rules_rule_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionSource", null)
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_candidates_theory_question_source_source_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawRule", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany("Rules")
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_rules_theory_activities_activity_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawRuleFilter", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryDrawRule", null)
-                        .WithMany("Filters")
-                        .HasForeignKey("RuleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_rule_filters_theory_draw_rules_rule_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOption", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionOption", null)
-                        .WithMany()
-                        .HasForeignKey("OptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_grading_options_theory_question_option_option_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", null)
-                        .WithMany("Options")
-                        .HasForeignKey("ActivityId", "RevisionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_grading_options_theory_grading_overrides_activity_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_grading_overrides_theory_activities_activity_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany()
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_grading_overrides_theory_question_revisions_revision");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryQuestionExposure", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_exposures_theory_activities_activity_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionSource", null)
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_exposures_theory_question_source_source_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryActivePaper", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Theory.Papers.TheoryActivePaper", "ParticipantId", "PaperId")
-                        .HasPrincipalKey("NoCTF.Domain.Theory.Papers.TheoryPaper", "ParticipantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_active_papers_theory_papers_participant_id_paper_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryAnswerReceipt", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_answer_receipts_users_actor_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaperItem", null)
-                        .WithMany()
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_answer_receipts_theory_paper_items_item_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryDrawReceipt", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionSource", null)
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_receipts_theory_question_source_source_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithMany()
-                        .HasForeignKey("ParticipantId", "PaperId")
-                        .HasPrincipalKey("ParticipantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_draw_receipts_theory_papers_participant_id_paper_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryIssueReceipt", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithMany()
-                        .HasForeignKey("ParticipantId", "PaperId")
-                        .HasPrincipalKey("ParticipantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_issue_receipts_theory_papers_participant_id_paper_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryParticipant", null)
-                        .WithMany()
-                        .HasForeignKey("ParticipantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_papers_theory_participants_participant_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("SubmittedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_papers_users_submitted_by_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaperItem", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("AnsweredById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_paper_items_users_answered_by_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
-                        .WithMany("Items")
-                        .HasForeignKey("PaperId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_paper_items_theory_papers_paper_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany()
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_paper_items_theory_question_revisions_revision_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryDrawRule", null)
-                        .WithMany()
-                        .HasForeignKey("RuleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_paper_items_theory_draw_rules_rule_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaperOption", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaperItem", null)
-                        .WithMany("Options")
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_paper_options_theory_paper_items_item_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionOption", null)
-                        .WithMany()
-                        .HasForeignKey("OptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_paper_options_theory_question_option_option_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryParticipant", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_participants_theory_activities_activity_id");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_participants_teams_team_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_theory_participants_users_user_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestion", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_questions_users_owner_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionSource", null)
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_questions_theory_question_source_source_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionClassification", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany("Classifications")
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_classifications_theory_question_revisions_r");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionFile", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
-                        .WithMany()
-                        .HasForeignKey("FileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_files_files_file_id");
-
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany("Files")
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_files_theory_question_revisions_revision_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionGrant", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestion", null)
-                        .WithMany("Grants")
-                        .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_grants_theory_questions_question_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_grants_users_user_id");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionOption", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
-                        .WithMany("Options")
-                        .HasForeignKey("RevisionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_options_theory_question_revisions_revision_");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestion", null)
-                        .WithMany("Revisions")
-                        .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_theory_question_revisions_theory_questions_question_id");
-                });
-
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookCategory", b =>
                 {
                     b.HasOne("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookTarget", null)
@@ -15142,9 +15872,247 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallengeDefinition", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.BreakOutcome", b =>
                 {
-                    b.OwnsMany("NoCTF.Domain.Competitions.Awd.AwdFlagStore", "FlagStores", b1 =>
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.BreakFlagMatch", "Flags", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("gameplay_fact_id");
+
+                            b1.Property<Guid>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<Guid?>("OwnerTeamId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("owner_team_id");
+
+                            b1.HasKey("GameplayFactId", "FlagId")
+                                .HasName("pk_break_flag_matches");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_break_flag_matches_flag_id");
+
+                            b1.HasIndex("GameplayFactId", "CapabilityKind")
+                                .HasDatabaseName("ix_break_flag_matches_gameplay_fact_id_capability_kind");
+
+                            b1.ToTable("break_flag_matches", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_break_flag_matches_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId", "CapabilityKind")
+                                .HasConstraintName("fk_break_flag_matches_capability_outcome_gameplay_fact_id_capa");
+                        });
+
+                    b.Navigation("Flags");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CheckOutcome", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckFlagContext", "FlagContexts", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("gameplay_fact_id");
+
+                            b1.Property<Guid>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<byte[]>("ProtectedReadContext")
+                                .HasMaxLength(32768)
+                                .HasColumnType("bytea")
+                                .HasColumnName("protected_read_context");
+
+                            b1.Property<string>("PublicLocator")
+                                .HasMaxLength(2048)
+                                .HasColumnType("character varying(2048)")
+                                .HasColumnName("public_locator");
+
+                            b1.HasKey("GameplayFactId", "FlagId")
+                                .HasName("pk_check_flag_contexts");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_check_flag_contexts_flag_id");
+
+                            b1.HasIndex("GameplayFactId", "CapabilityKind")
+                                .HasDatabaseName("ix_check_flag_contexts_gameplay_fact_id_capability_kind");
+
+                            b1.ToTable("check_flag_contexts", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_check_flag_contexts_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId", "CapabilityKind")
+                                .HasConstraintName("fk_check_flag_contexts_capability_outcomes_gameplay_fact_id_ca");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckProbe", "Probes", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("gameplay_fact_id");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<Guid?>("FlagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("flag_id");
+
+                            b1.Property<short>("Kind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("kind");
+
+                            b1.Property<short>("Reason")
+                                .HasColumnType("smallint")
+                                .HasColumnName("reason");
+
+                            b1.Property<short>("Result")
+                                .HasColumnType("smallint")
+                                .HasColumnName("result");
+
+                            b1.HasKey("GameplayFactId", "Position")
+                                .HasName("pk_check_probes");
+
+                            b1.HasIndex("FlagId")
+                                .HasDatabaseName("ix_check_probes_flag_id");
+
+                            b1.HasIndex("GameplayFactId", "CapabilityKind")
+                                .HasDatabaseName("ix_check_probes_gameplay_fact_id_capability_kind");
+
+                            b1.ToTable("check_probes", (string)null);
+
+                            b1.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
+                                .WithMany()
+                                .HasForeignKey("FlagId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .HasConstraintName("fk_check_probes_challenge_flags_flag_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId", "CapabilityKind")
+                                .HasConstraintName("fk_check_probes_capability_outcomes_gameplay_fact_id_capabilit");
+                        });
+
+                    b.Navigation("FlagContexts");
+
+                    b.Navigation("Probes");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireOutcome", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_capability_outcomes_questionnaire_revisions_revision_id");
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestionResult", "Questions", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("gameplay_fact_id");
+
+                            b1.Property<Guid>("QuestionId")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasColumnName("question_id");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<short>("Result")
+                                .HasColumnType("smallint")
+                                .HasColumnName("result");
+
+                            b1.HasKey("GameplayFactId", "QuestionId")
+                                .HasName("pk_questionnaire_question_results");
+
+                            b1.HasIndex("GameplayFactId", "CapabilityKind")
+                                .HasDatabaseName("ix_questionnaire_question_results_gameplay_fact_id_capability_");
+
+                            b1.ToTable("questionnaire_question_results", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId", "CapabilityKind")
+                                .HasConstraintName("fk_questionnaire_question_results_capability_outcomes_gameplay");
+                        });
+
+                    b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.FlagEnvironmentTarget", "EnvironmentTargets", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<string>("ServiceName")
+                                .HasMaxLength(63)
+                                .HasColumnType("character varying(63)")
+                                .HasColumnName("service_name");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<string>("VariableName")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("character varying(256)")
+                                .HasColumnName("variable_name");
+
+                            b1.HasKey("ChallengeId", "ServiceName")
+                                .HasName("pk_challenge_flag_environment_targets");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_flag_environment_targets_challenge_id_capability_");
+
+                            b1.HasIndex("ChallengeId", "Position")
+                                .IsUnique()
+                                .HasDatabaseName("ix_challenge_flag_environment_targets_challenge_id_position");
+
+                            b1.ToTable("challenge_flag_environment_targets", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_flag_environment_targets_challenge_capability_def");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.FlagStoreDefinition", "FlagStores", b1 =>
                         {
                             b1.Property<Guid>("ChallengeId")
                                 .HasColumnType("uuid")
@@ -15155,9 +16123,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 
-                            b1.Property<short>("DeliveryMode")
+                            b1.Property<short>("CapabilityKind")
                                 .HasColumnType("smallint")
-                                .HasColumnName("delivery_mode");
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<short>("DeliveryKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("delivery_kind");
 
                             b1.Property<string>("InjectionCommand")
                                 .HasMaxLength(8192)
@@ -15183,29 +16155,187 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnName("preserves_historical_flags");
 
                             b1.Property<string>("TargetServiceName")
-                                .HasMaxLength(64)
-                                .HasColumnType("character varying(64)")
+                                .HasMaxLength(63)
+                                .HasColumnType("character varying(63)")
                                 .HasColumnName("target_service_name");
 
                             b1.HasKey("ChallengeId", "Id")
-                                .HasName("pk_awd_flag_stores");
+                                .HasName("pk_challenge_flag_stores");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_flag_stores_challenge_id_capability_kind");
 
                             b1.HasIndex("ChallengeId", "Name")
                                 .IsUnique()
-                                .HasDatabaseName("ix_awd_flag_stores_challenge_id_name");
+                                .HasDatabaseName("ix_challenge_flag_stores_challenge_id_name");
 
                             b1.HasIndex("ChallengeId", "Position")
                                 .IsUnique()
-                                .HasDatabaseName("ix_awd_flag_stores_challenge_id_position");
+                                .HasDatabaseName("ix_challenge_flag_stores_challenge_id_position");
 
-                            b1.ToTable("awd_flag_stores", (string)null);
+                            b1.ToTable("challenge_flag_stores", (string)null);
 
                             b1.WithOwner()
-                                .HasForeignKey("ChallengeId")
-                                .HasConstraintName("fk_awd_flag_stores_challenge_definition_challenge_id");
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_flag_stores_challenge_capability_definition_chall");
                         });
 
+                    b.Navigation("EnvironmentTargets");
+
                     b.Navigation("FlagStores");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckCommandArgument", "Command", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(4096)
+                                .HasColumnType("character varying(4096)")
+                                .HasColumnName("value");
+
+                            b1.HasKey("ChallengeId", "Position")
+                                .HasName("pk_challenge_check_command");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_check_command_challenge_id_capability_kind");
+
+                            b1.ToTable("challenge_check_command", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_check_command_challenge_capabilities_challenge_id");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckEnvironmentVariable", "Environment", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<string>("Name")
+                                .HasMaxLength(256)
+                                .HasColumnType("character varying(256)")
+                                .HasColumnName("name");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("value");
+
+                            b1.HasKey("ChallengeId", "Name")
+                                .HasName("pk_challenge_check_environment");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_check_environment_challenge_id_capability_kind");
+
+                            b1.ToTable("challenge_check_environment", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_check_environment_challenge_capabilities_challeng");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckRequirement", "Requirements", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<short>("Kind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("kind");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.HasKey("ChallengeId", "Kind")
+                                .HasName("pk_challenge_check_requirements");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_check_requirements_challenge_id_capability_kind");
+
+                            b1.ToTable("challenge_check_requirements", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_check_requirements_challenge_capabilities_challen");
+                        });
+
+                    b.Navigation("Command");
+
+                    b.Navigation("Environment");
+
+                    b.Navigation("Requirements");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.FixCapabilityDefinition", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.FixCommandArgument", "Command", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(4096)
+                                .HasColumnType("character varying(4096)")
+                                .HasColumnName("value");
+
+                            b1.HasKey("ChallengeId", "Position")
+                                .HasName("pk_challenge_fix_command");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_fix_command_challenge_id_capability_kind");
+
+                            b1.ToTable("challenge_fix_command", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_fix_command_challenge_capabilities_challenge_id_c");
+                        });
+
+                    b.Navigation("Command");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireCapabilityDefinition", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", "CurrentRevision")
+                        .WithMany()
+                        .HasForeignKey("CurrentRevisionId", "ChallengeId")
+                        .HasPrincipalKey("Id", "ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenge_capabilities_questionnaire_revisions_current_revi");
+
+                    b.Navigation("CurrentRevision");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdCompetitionChallengeRules", b =>
@@ -15263,6 +16393,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_competition_progression_nodes_competition_challenges_compet");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireAssignment", b =>
+                {
+                    b.Navigation("Fact");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireQuestion", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.QuestionnaireRevision", b =>
+                {
+                    b.Navigation("Questions");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
                     b.Navigation("Attachments");
@@ -15274,11 +16419,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeDefinition", b =>
                 {
-                    b.Navigation("Checker");
+                    b.Navigation("Capabilities");
 
                     b.Navigation("Runtime");
-
-                    b.Navigation("StringItems");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
@@ -15303,11 +16446,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
                 {
                     b.Navigation("Rules");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallengeRules", b =>
-                {
-                    b.Navigation("BloodRewards");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
@@ -15349,6 +16487,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
                 {
                     b.Navigation("Awd");
+
+                    b.Navigation("CapabilityOutcomes");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.Passkeys.UserPasskey", b =>
@@ -15443,9 +16583,44 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("AllowedHostEntries");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity", b =>
+                {
+                    b.Navigation("FixedQuestionnaires");
+
+                    b.Navigation("Pauses");
+
+                    b.Navigation("Rules");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireDrawRule", b =>
+                {
+                    b.Navigation("Candidates");
+
+                    b.Navigation("Filters");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Activities.QuestionnaireGradingOverride", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession", b =>
+                {
+                    b.Navigation("Assignments");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSessionQuestion", b =>
+                {
+                    b.Navigation("Options");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeInstance", b =>
                 {
                     b.Navigation("ActiveSlot");
+
+                    b.Navigation("CapabilityTest");
 
                     b.Navigation("ProviderReceipt");
                 });
@@ -15462,51 +16637,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("ActiveMembership");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryActivity", b =>
-                {
-                    b.Navigation("Pauses");
-
-                    b.Navigation("Rules");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryDrawRule", b =>
-                {
-                    b.Navigation("Candidates");
-
-                    b.Navigation("Filters");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
-                {
-                    b.Navigation("Options");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>
-                {
-                    b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaperItem", b =>
-                {
-                    b.Navigation("Options");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestion", b =>
-                {
-                    b.Navigation("Grants");
-
-                    b.Navigation("Revisions");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", b =>
-                {
-                    b.Navigation("Classifications");
-
-                    b.Navigation("Files");
-
-                    b.Navigation("Options");
-                });
-
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookEvent", b =>
                 {
                     b.Navigation("Items");
@@ -15520,6 +16650,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", b =>
                 {
                     b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CtfCompetitionChallengeRules", b =>
+                {
+                    b.Navigation("BloodRewards");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", b =>

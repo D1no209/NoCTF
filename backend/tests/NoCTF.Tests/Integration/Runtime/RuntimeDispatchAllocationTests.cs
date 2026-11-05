@@ -63,7 +63,7 @@ public sealed class RuntimeDispatchAllocationTests
                         new ContainerRuntimeDefinition(compose
                             ? [new("web", "busybox:1.36.1", resources.CpuMillicores / 1000m, resources.MemoryBytes / (1024 * 1024)), new("db", "busybox:1.36.1", .25m, 32)]
                             : [new("main", "busybox:1.36.1", resources.CpuMillicores / 1000m, resources.MemoryBytes / (1024 * 1024))]))), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId, OwnerId = fixture.OwnerId, Title = "Allocation limits",
                 Definition = Definition(initial), CreatedAt = fixture.Now, UpdatedAt = fixture.Now
@@ -114,7 +114,7 @@ public sealed class RuntimeDispatchAllocationTests
                     .UseSnakeCaseNamingConvention()
                     .ConfigureWarnings(warnings => warnings.Throw(
                         RelationalEventId.MultipleCollectionIncludeWarning))
-                    .Options));
+                    .Options), TimeProvider.System);
             await Assert.That(await reader.ReadProvisionStatusAsync(request, ct)).IsEqualTo(RuntimeProvisionWorkStatus.Current);
             var claimed = (ProvisionContainerRuntime)request;
             var tampered = claimed with { Definition = claimed.Definition with

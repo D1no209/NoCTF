@@ -77,12 +77,14 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
                     if (canSelect && slot.RosterLockedAt == null && await db.Teams.AnyAsync(x => x.Id == team && x.CaptainId == actorId, ct)) allowed.Add(LiveSoloWorkspaceOperation.LockRoster);
                     if (slot.RosterLockedAt != null && slot.ReadyConfirmedAt == null && match.Roster.Any(x => x.TeamId == team && x.UserId == actorId)) allowed.Add(LiveSoloWorkspaceOperation.ConfirmReady);
                 }
-                if (round?.State == LiveSoloRoundState.Running && match.State == LiveSoloMatchState.Running && competition.Status == CompetitionStatus.Running
-                    && round.StartedAt is { } started && NoCTF.Application.LiveSolo.Rounds.LiveSoloActiveClock.Elapsed(started, now, round.Pauses) < TimeSpan.FromSeconds(round.LimitSeconds)
-                    && match.Roster.Any(x => x.TeamId == team && x.UserId == actorId)) allowed.Add(LiveSoloWorkspaceOperation.SubmitFlag);
             }
         }
         var questions = !staff && round != null ? await QuestionsAsync(competitionId, matchId, round.Id, actorId, now, ct) ?? [] : [];
+        if (questions.Any(question => question.AvailableActions.Any(action => action.Enabled && action.Kind == NoCTF.Application.Challenges.Actions.ChallengeActionKind.SubmitFlag)))
+            allowed.Add(LiveSoloWorkspaceOperation.SubmitFlag);
+        if (questions.Any(question => question.AvailableActions.Any(action => action.Enabled
+                && action.Kind is NoCTF.Application.Challenges.Actions.ChallengeActionKind.PrepareFixTarget or NoCTF.Application.Challenges.Actions.ChallengeActionKind.SubmitFix)))
+            allowed.Add(LiveSoloWorkspaceOperation.SubmitFix);
         // Build metadata inside this same database snapshot; body and file requests authorize separately.
         var teamId = await TeamAsync(competitionId, actorId, ct);
         var historyAllowed = staff || competition.Status == CompetitionStatus.Finished && teamId != null

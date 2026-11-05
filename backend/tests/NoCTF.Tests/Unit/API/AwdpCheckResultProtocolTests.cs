@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NoCTF.API.Endpoints.Internal;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -8,46 +9,48 @@ public sealed class AwdpCheckResultProtocolTests
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     [Test]
-    [Arguments("ExploitSucceeded", AwdpFixResultOutcome.ExploitSucceeded)]
-    [Arguments("DefenseSucceeded", AwdpFixResultOutcome.DefenseSucceeded)]
-    [Arguments("ServiceAbnormal", AwdpFixResultOutcome.ServiceAbnormal)]
-    public async Task Awdp_check_result_accepts_only_current_protocol_values(
+    [Arguments("Passed", CheckProbeResult.Passed)]
+    [Arguments("TargetFailure", CheckProbeResult.TargetFailure)]
+    [Arguments("PlatformFailure", CheckProbeResult.PlatformFailure)]
+    public async Task Check_evidence_uses_explicit_probe_results(
         string input,
-        AwdpFixResultOutcome expected)
+        CheckProbeResult expected)
     {
-        var request = JsonSerializer.Deserialize<RecordAwdpCheckResultRequest>(
-            $$"""{"outcome":"{{input}}"}""",
+        var request = JsonSerializer.Deserialize<RecordCheckResultRequest>(
+            $$"""{"observedAt":"2026-11-04T00:00:00Z","probes":[{"kind":"Functionality","result":"{{input}}","reason":"None"}]}""",
             Options);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Outcome).IsEqualTo(expected);
+        await Assert.That(request!.Probes.Single().Result).IsEqualTo(expected);
+        await Assert.That(request.Probes.Single().Kind).IsEqualTo(CheckItemKind.Functionality);
     }
 
     [Test]
-    public async Task Awdp_check_result_serializes_only_the_three_public_outcomes()
+    public async Task Check_evidence_serializes_objective_probe_information()
     {
         var json = JsonSerializer.Serialize(
-            new RecordAwdpCheckResultRequest
+            new RecordCheckResultRequest
             {
-                Outcome = AwdpFixResultOutcome.ServiceAbnormal
+                ObservedAt = DateTimeOffset.Parse("2026-11-04T00:00:00Z"),
+                Probes = [new() { Kind = CheckItemKind.Vulnerability, Result = CheckProbeResult.TargetFailure, Reason = CheckFailureReason.VulnerabilityPresent }]
             },
             Options);
 
-        await Assert.That(json).Contains("ServiceAbnormal");
-        await Assert.That(json).DoesNotContain("ServiceUnavailable");
-        await Assert.That(json).DoesNotContain("RuleViolation");
+        await Assert.That(json).Contains("VulnerabilityPresent");
+        await Assert.That(json).Contains("TargetFailure");
+        await Assert.That(json).DoesNotContain("outcome");
     }
 
     [Test]
-    [Arguments("StillVulnerable")]
-    [Arguments("Fixed")]
+    [Arguments("DefenseSucceeded")]
+    [Arguments("ExploitSucceeded")]
     [Arguments("RuleViolation")]
     [Arguments("ServiceUnavailable")]
     [Arguments("PatchFailed")]
-    public async Task Awdp_check_result_rejects_legacy_and_unknown_outcomes(string outcome)
+    public async Task Check_evidence_rejects_game_decisions_as_probe_results(string outcome)
     {
-        var act = () => JsonSerializer.Deserialize<RecordAwdpCheckResultRequest>(
-            $$"""{"outcome":"{{outcome}}"}""",
+        var act = () => JsonSerializer.Deserialize<RecordCheckResultRequest>(
+            $$"""{"probes":[{"kind":"Functionality","result":"{{outcome}}","reason":"None"}]}""",
             Options);
 
         await Assert.That(act).Throws<JsonException>();

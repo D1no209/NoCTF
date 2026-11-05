@@ -71,7 +71,7 @@ public sealed class LiveSoloReviewStore(NoCtfDbContext db, ICompetitionModeratio
         if (question.OpenedContent is { } content)
         {
             body = new(question.Id, question.CompetitionChallengeId, question.Position, content.Title, content.Description, content.Direction,
-                content.Tags.OrderBy(x => x.Position).Select(x => x.Name).ToArray(), question.OpenedAt!.Value, null);
+                content.Tags.OrderBy(x => x.Position).Select(x => x.Name).ToArray(), question.OpenedAt!.Value, null) { CompletionKind = content.CompletionKind };
             hints = content.Hints.OrderBy(x => x.Position).Select(x => new LiveSoloHintView(x.HintId, x.Content, x.PublishedAt)).ToArray();
             var allowed = content.Attachments.AsEnumerable();
             if (content.RandomAttachment && !request.Staff)
@@ -90,7 +90,8 @@ public sealed class LiveSoloReviewStore(NoCtfDbContext db, ICompetitionModeratio
                 .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (e, t) => new { Entry = e, Template = t }).SingleOrDefaultAsync(ct);
             if (material is null) return null;
             body = new(question.Id, question.CompetitionChallengeId, question.Position, material.Entry.CustomTitle ?? material.Template.Title,
-                material.Template.Description, material.Template.Direction, material.Entry.Tags.OrderBy(x => x.Position).Select(x => x.Name).ToArray(), default, null);
+                material.Template.Description, material.Template.Direction, material.Entry.Tags.OrderBy(x => x.Position).Select(x => x.Name).ToArray(), default, null)
+                { CompletionKind = ((LiveSoloCompetitionChallengeRules)material.Entry.Rules!).CompletionKind };
             hints = material.Entry.Hints.Where(x => x.Cost == 0).Select(x => new LiveSoloHintView(x.Id, x.Content, x.PublishedAt ?? default)).ToArray();
             attachments = await db.Set<ChallengeAttachment>().Where(x => x.ChallengeId == material.Template.Id && x.DeletedAt == null)
                 .Select(x => new LiveSoloAttachmentView(x.Id, x.File.FileName, x.File.ContentType, x.File.ByteLength)).ToArrayAsync(ct);

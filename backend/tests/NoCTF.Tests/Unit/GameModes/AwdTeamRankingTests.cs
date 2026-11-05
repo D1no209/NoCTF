@@ -67,10 +67,10 @@ public sealed class AwdTeamRankingTests
     }
 
     [Test]
-    public async Task Theory_completion_preserves_custom_gameplay_priority_and_precedes_registration_fallback()
+    public async Task Gameplay_completion_precedes_registration_and_custom_priority_remains_explicit()
     {
-        var early = new AwdRankingValues(Guid.NewGuid(), 100, 10, 1, 1, At, At, At);
-        var late = early with { TeamId = Guid.NewGuid(), RegisteredAt = At.AddHours(-1), TheoryAchievedAt = At.AddMinutes(1) };
+        var early = new AwdRankingValues(Guid.NewGuid(), 100, 10, 1, 1, At, At);
+        var late = early with { TeamId = Guid.NewGuid(), RegisteredAt = At.AddHours(-1), LastAttackAt = At.AddMinutes(1) };
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Awd, [], []);
         await Assert.That(AwdTeamRanking.Order([late, early], input, row => row).First().TeamId).IsEqualTo(early.TeamId);
         var custom = input with { AwdTieBreakers = [new(AwdTieBreakField.HealthyRounds, AwdSortDirection.Descending)] };

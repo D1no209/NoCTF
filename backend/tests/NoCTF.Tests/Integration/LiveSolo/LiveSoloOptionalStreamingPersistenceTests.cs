@@ -130,7 +130,7 @@ public sealed class LiveSoloOptionalStreamingPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Migration_preserves_existing_streaming_and_new_competitions_default_to_optional(CancellationToken ct)
+    public async Task Baseline_reapplication_preserves_explicit_streaming_and_new_competitions_default_to_optional(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -144,15 +144,15 @@ public sealed class LiveSoloOptionalStreamingPersistenceTests
             var owner = new User { Id = Guid.NewGuid(), UserName = "streaming-owner", NormalizedUserName = "STREAMING-OWNER", Email = "owner@example.test", PasswordHash = "unused", CreatedAt = now };
             var competition = new LiveSoloCompetition { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "Optional streaming", StartAt = now, EndAt = now.AddHours(1), CreatedAt = now, UpdatedAt = now, FlagDerivationSecret = new byte[32] };
             competition.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(GameMode.LiveSolo, competition.Id);
+            ((LiveSoloCompetitionModeConfiguration)competition.ModeConfiguration).PlatformStreamingEnabled = true;
             var group = new LiveSoloQuestionGroup { Id = Guid.NewGuid(), CompetitionId = competition.Id, Name = "Group" };
             var match = new LiveSoloMatch { Id = Guid.NewGuid(), CompetitionId = competition.Id, CreatedAt = now };
             var round = new LiveSoloRound { Id = Guid.NewGuid(), MatchId = match.Id, QuestionGroupId = group.Id, CreatedAt = now, PlatformStreamingEnabled = false };
             db.AddRange(owner, competition, group, match, round); await db.SaveChangesAsync(ct);
-            await db.GetService<IMigrator>().MigrateAsync("20261010065909_CompetitionChallengeTiming", ct);
             db.ChangeTracker.Clear();
             await db.Database.MigrateAsync(ct);
             await Assert.That((await db.Set<LiveSoloCompetitionModeConfiguration>().SingleAsync(ct)).PlatformStreamingEnabled).IsTrue();
-            await Assert.That((await db.LiveSoloRounds.SingleAsync(ct)).PlatformStreamingEnabled).IsTrue();
+            await Assert.That((await db.LiveSoloRounds.SingleAsync(ct)).PlatformStreamingEnabled).IsFalse();
             await Assert.That(((LiveSoloCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.LiveSolo, Guid.NewGuid())).PlatformStreamingEnabled).IsFalse();
         });
     }

@@ -162,12 +162,11 @@ public static class ScoreboardSlotDetailProjection
 
     private static ScoreboardEntryKind EntryKind(GameMode mode, GameplayFactKind kind) => kind switch
     {
-        GameplayFactKind.FlagAttempt when mode is GameMode.Awd => ScoreboardEntryKind.Attack,
-        GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
+        GameplayFactKind.BreakAttempt when mode == GameMode.Ctf => ScoreboardEntryKind.Solve,
         GameplayFactKind.HintUnlock => ScoreboardEntryKind.Hint,
         GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack,
         GameplayFactKind.FixAttempt => ScoreboardEntryKind.Defense,
-        GameplayFactKind.KohControlObservation => ScoreboardEntryKind.Control,
+        GameplayFactKind.ControlObservation => ScoreboardEntryKind.Control,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 

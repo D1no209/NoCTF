@@ -19,9 +19,12 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
         if (scope is null || scope.Round.State is not (LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running)) return LiveSoloFailure.NotFound;
         var bindings = new List<LiveSoloRuntimeBinding>();
         var ready = true;
+        var completion = await db.Set<LiveSoloCompetitionChallengeRules>().AsNoTracking()
+            .Where(rules => rules.CompetitionChallengeId == scope.Question.CompetitionChallengeId).Select(rules => rules.CompletionKind).SingleAsync(ct);
         foreach (var slot in scope.Match.Slots)
         {
             if (slot.TeamId is not Guid team) return await RevokeReadinessAsync(questionId, LiveSoloFailure.NotReady, ct);
+            if (completion == LiveSoloCompletionKind.FixAndCheck) continue;
             ScopedRuntimeResult result;
             try
             {
@@ -82,7 +85,29 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
 
     public async Task StopRoundAsync(Guid roundId, DateTimeOffset now, CancellationToken ct)
     {
-        foreach (var id in await db.LiveSoloRoundQuestions.Where(x => x.RoundId == roundId).Select(x => x.Id).ToArrayAsync(ct))
+        var questions = await db.LiveSoloRoundQuestions.Where(x => x.RoundId == roundId).Select(x => x.Id).ToArrayAsync(ct);
+        foreach (var id in questions)
             await runtimes.StopExecutionAsync(id, now, ct);
+        var fixes = await db.Set<LiveSoloFixTargetOwnership>().Where(value => questions.Contains(value.RoundQuestionId))
+            .Join(db.RuntimeInstances, value => value.RuntimeInstanceId, runtime => runtime.Id, (_, runtime) => runtime)
+            .Where(runtime => runtime.State == RuntimeState.Queued || runtime.State == RuntimeState.Provisioning || runtime.State == RuntimeState.Running)
+            .ToArrayAsync(ct);
+        var pending = await db.GameplayFacts.Where(fact => db.LiveSoloSubmissions.Any(submission => submission.GameplayFactId == fact.Id && submission.RoundId == roundId)
+                && (fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Pending || fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Queued
+                    || fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing)).ToArrayAsync(ct);
+        foreach (var fact in pending)
+        {
+            fact.State = NoCTF.Domain.Gameplay.GameplayFactState.Completed; fact.Result = NoCTF.Domain.Gameplay.GameplayFactResult.Rejected;
+            fact.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.RoundOutOfRange; fact.UpdatedAt = now;
+        }
+        foreach (var runtime in fixes)
+        {
+            runtime.State = RuntimeState.Stopping;
+            if (messages is not null) await messages.PublishAsync(new NoCTF.Application.Messaging.StopRuntime(runtime.Id));
+        }
+        await db.SaveChangesAsync(ct);
+        if (messages is not null)
+            foreach (var fact in pending) await messages.PublishAsync(new NoCTF.Application.Messaging.GameplayFactStateChanged(fact.Id, fact.State, fact.ConcurrencyStamp));
+        if (messages is not null) await messages.FlushCommittedMessagesAsync();
     }
 }

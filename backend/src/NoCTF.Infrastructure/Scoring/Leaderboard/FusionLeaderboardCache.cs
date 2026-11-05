@@ -261,9 +261,6 @@ public sealed class FusionLeaderboardCache(
                 instance.Order,
                 instance.IsPublished,
                 templates[instance.ChallengeId].Definition,
-                templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
-                    ? ctf.InteractionKind
-                    : CtfInteractionKind.FlagSubmission,
                 instance.Direction?.Icon, timingOverride != null && instance.Id == timingOverride.CompetitionChallengeId
                     ? timingOverride.Timing : ChallengeTiming.From(instance),
                 NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset.Match(instance.Tags.Select(tag => tag.Name), scorePresets)))
@@ -344,7 +341,6 @@ public sealed class FusionLeaderboardCache(
         var selectedRoundWindowEnd = competition.Mode == GameMode.Awd
             ? awdWindow.EndRound
             : scoreboardRoundWindowEnd;
-        var theory = await NoCTF.Infrastructure.Theory.Scoring.TheoryScoreReader.ReadAsync(db, competitionId, projectedAt, ct);
         var rankingRound = competition.Mode == GameMode.Awd
             ? await db.AwdRounds.AsNoTracking().Where(round => round.CompetitionId == competitionId && round.StartsAt <= projectedAt)
                 .OrderByDescending(round => round.Number).FirstOrDefaultAsync(ct) : null;
@@ -372,8 +368,7 @@ public sealed class FusionLeaderboardCache(
                 .OrderByDescending(rule => rule.EffectiveAt).ThenByDescending(rule => rule.Revision)
                 .Select(rule => rule.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null,
             rankingRound is null ? null : AwdTieBreakPolicy.Resolve(rankingRound.TieBreakers.OrderBy(item => item.Position)
-                 .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))),
-            theory.Scores);
+                 .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))));
         var spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct,
             timingOverride, rankingRound?.Id);
         if (inputTransaction is not null)

@@ -3,11 +3,11 @@ import { toRefs } from 'vue'
 import type { DefinitionFlagTemplateSectionViewState } from '~/features/admin/useDefinitionFlagTemplateSection'
 
 const viewProps = defineProps<{ state: DefinitionFlagTemplateSectionViewState }>()
-const { toggleFlagTemplate, FlagTemplateEditor, model, mode, disabled } = toRefs(viewProps.state)
+const { toggleFlagTemplate, FlagTemplateEditor, model, disabled, services, environmentVariable, setEnvironmentVariable } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <FieldSet v-if="mode === 'Awd'" class="rounded-md border p-4">
+  <FieldSet>
     <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.flagTemplate') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
@@ -20,23 +20,10 @@ const { toggleFlagTemplate, FlagTemplateEditor, model, mode, disabled } = toRefs
     </Field>
     <component :is="FlagTemplateEditor" v-if="model.flagTemplate" :template="model.flagTemplate" :disabled="disabled" />
     <FieldDescription v-else>{{ $t('administration.definitionFlag.description.configuredCompetitionGradeFlag') }}</FieldDescription>
+    <Field v-for="service in services" :key="service.name">
+      <FieldLabel>{{ $t('administration.label.flagEnvironmentVariableName') }} · {{ service.name }}</FieldLabel>
+      <Input :model-value="environmentVariable(service.name)" :disabled="disabled" @update:model-value="setEnvironmentVariable(service.name, $event)" />
+    </Field>
   </FieldSet>
 
-  <FieldSet
-    v-else-if="(mode === 'Ctf' || mode === 'LiveSolo') && model.runtime?.flagSource === 'PerTeam'"
-    class="rounded-md border p-4"
-  >
-    <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.dynamicFlagTemplateOverride') }}</FieldLegend>
-    <Field orientation="horizontal">
-      <Switch
-        id="def-has-ctf-flag-template"
-        :model-value="model.flagTemplate !== null"
-        :disabled="disabled"
-        @update:model-value="toggleFlagTemplate($event === true)"
-      />
-      <FieldLabel for="def-has-ctf-flag-template" class="font-normal"> {{ $t('administration.definitionFlag.description.coverCompetitionLevelDynamic') }} </FieldLabel>
-    </Field>
-    <component :is="FlagTemplateEditor" v-if="model.flagTemplate" :template="model.flagTemplate" :disabled="disabled" />
-    <FieldDescription v-else> {{ $t('administration.definitionFlag.description.competitionLevelTemplateConfigured') }} </FieldDescription>
-  </FieldSet>
 </template>

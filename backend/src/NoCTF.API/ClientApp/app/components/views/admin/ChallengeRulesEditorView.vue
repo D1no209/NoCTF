@@ -25,20 +25,21 @@ const { scoreCurveSource, hasScorePreset } = toRefs(viewProps.state)
           <div class="flex items-center gap-2">
             <FieldLabel>{{ field.label }}</FieldLabel>
             <Switch
+              v-if="field.scope !== 'runtimeRules'"
               size="sm"
               :model-value="overridden[field.key] ?? false"
               :disabled="readonly"
               @update:model-value="setOverride(field, $event === true)"
             />
-            <span class="text-xs text-muted-foreground">{{ $t(field.key === 'scoreCurve' && hasScorePreset ? 'scorePresets.override' : 'administration.label.cover') }}</span>
+            <span v-if="field.scope !== 'runtimeRules'" class="text-xs text-muted-foreground">{{ $t(field.key === 'scoreCurve' && hasScorePreset ? 'scorePresets.override' : 'administration.label.cover') }}</span>
             <span v-if="isAwd && presetControlled(field)" class="text-xs text-muted-foreground">{{ $t('administration.awd.presetControlled') }}</span>
-            <span v-else-if="field.key !== 'scoreCurve' && !(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('administration.label.inheritContestDefaults') }}</span>
+            <span v-else-if="field.scope !== 'runtimeRules' && field.key !== 'scoreCurve' && !(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('administration.label.inheritContestDefaults') }}</span>
           </div>
           <FieldDescription v-if="field.key === 'scoreCurve'">{{ scoreCurveSource }}</FieldDescription>
           <component :is="ConfigFieldInput"
             :field="field"
             :model-value="displayedValue(field)"
-            :disabled="readonly || !(overridden[field.key] ?? false)"
+            :disabled="readonly || field.scope !== 'runtimeRules' && !(overridden[field.key] ?? false)"
             @update:model-value="updateField(field.key, $event)"
           />
           <FieldDescription v-if="field.description">{{ field.description }}</FieldDescription>

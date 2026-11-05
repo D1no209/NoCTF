@@ -335,7 +335,8 @@ export function useLiveSoloMatch() {
     staff, hasStaffAccess, manage, backLabel, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
-    ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => workspaceAuthorized.value && workspace.value?.allowedOperations?.includes('SubmitFlag') === true),
+    ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => workspaceAuthorized.value
+      && workspace.value?.allowedOperations?.some(operation => operation === 'SubmitFlag' || operation === 'SubmitFix') === true),
     flagDock: computed(() => `live-solo-flag-${matchId.value}`),
     questionsVisible: computed(() => (onRoster.value || match.value?.teammatesMayViewQuestions === true && myRoster.value != null)
       && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),

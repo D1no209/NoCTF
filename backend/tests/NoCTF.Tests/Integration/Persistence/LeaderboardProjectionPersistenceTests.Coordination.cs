@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Leaderboard;
@@ -33,7 +34,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             var now = DateTimeOffset.UtcNow;
             var owner = CreateUser(now);
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
-            var rules = fixture.CompetitionChallenge.Rules ?? throw new InvalidOperationException("Missing CTF rules.");
+            var rules = (CtfCompetitionChallengeRules)(fixture.CompetitionChallenge.Rules ?? throw new InvalidOperationException("Missing CTF rules."));
             rules.HasScoreCurve = true;
             rules.ScoreCurve = new() { InitialPoints = 100, MinimumPoints = 100, DecayMode = PersistedScoreDecayMode.Fixed };
             await using var db = new NoCtfDbContext(options);

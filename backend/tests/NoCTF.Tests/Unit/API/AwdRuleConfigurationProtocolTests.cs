@@ -73,19 +73,22 @@ public sealed class AwdRuleConfigurationProtocolTests
     public async Task Store_contract_keeps_delivery_and_historical_semantics()
     {
         var id = Guid.NewGuid();
-        var source = new NoCTF.Domain.Challenges.AwdChallengeDefinition
+        var source = new NoCTF.Domain.Challenges.ChallengeDefinition
         {
-            FlagStores = [new() { Id = id, Name = "orders", Position = 0,
-                DeliveryMode = AwdFlagDeliveryMode.BusinessChecker, PreservesHistoricalFlags = false }]
+            Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
+            {
+                FlagStores = [new() { Id = id, Name = "orders", Position = 0,
+                    DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker, PreservesHistoricalFlags = false }]
+            }]
         };
         var contract = ChallengeDefinitionContractMapper.FromDomain(source);
         var json = JsonSerializer.Serialize(contract);
-        var restored = (NoCTF.Domain.Challenges.AwdChallengeDefinition)ChallengeDefinitionContractMapper.ToDomain(
-            Guid.NewGuid(), GameMode.Awd, JsonSerializer.Deserialize<ChallengeDefinitionContract>(json)!);
-        await Assert.That(restored.FlagStores.Single().Id).IsEqualTo(id);
-        await Assert.That(restored.FlagStores.Single().DeliveryMode).IsEqualTo(AwdFlagDeliveryMode.BusinessChecker);
-        await Assert.That(restored.FlagStores.Single().PreservesHistoricalFlags).IsFalse();
-        restored.FlagStores.Single().PreservesHistoricalFlags = true;
+        var restored = ChallengeDefinitionContractMapper.ToDomain(
+            Guid.NewGuid(), JsonSerializer.Deserialize<ChallengeDefinitionContract>(json)!);
+        await Assert.That(restored.Break!.FlagStores.Single().Id).IsEqualTo(id);
+        await Assert.That(restored.Break.FlagStores.Single().DeliveryKind).IsEqualTo(NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker);
+        await Assert.That(restored.Break.FlagStores.Single().PreservesHistoricalFlags).IsFalse();
+        restored.Break.FlagStores.Single().PreservesHistoricalFlags = true;
         await Assert.That(NoCTF.Domain.Challenges.ChallengeDefinitionStructuralComparer.Equals(source, restored)).IsFalse();
     }
 }

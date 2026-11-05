@@ -16,6 +16,7 @@ public sealed partial class LiveSoloMatchStore
         var content = new LiveSoloOpenedContent { RoundQuestionId = question.Id,
             Title = material.Entry.CustomTitle ?? material.Template.Title, Description = material.Template.Description,
             Direction = material.Template.Direction,
+            CompletionKind = ((LiveSoloCompetitionChallengeRules)material.Entry.Rules!).CompletionKind,
             RandomAttachment = await db.ChallengeFlags.AnyAsync(x => x.ChallengeId == material.Template.Id && x.DeletedAt == null
                 && x.SpecificationKind == SpecificationKind.Attachment && x.SpecificationId != null, ct) };
         content.Tags = material.Entry.Tags.OrderBy(x => x.Position).Select((x, i) =>

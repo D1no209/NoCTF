@@ -1,8 +1,8 @@
 # Checker 如何读取 Fix 输入和修补产物
 
 Fix 由 Runner 在独立目标 Runtime 中执行，Checker 持有回调凭证并验证修补后的靶机。
-只有需要检查原始上传文件时，才在模式定义中打开“向 Checker 提供 Fix 包”。该选项提供归档副本，
-不会授权 Checker 执行选手内容。这一边界同样适用于 CTF PatchVerification。
+只有需要检查原始上传文件时，才在 Check 能力中打开“向 Checker 提供 Fix 包”。该选项提供归档副本。
+Checker 只读取不可信文件并检查目标服务。
 
 | 需要检查的内容 | 读取位置／做法 | 平台是否自动提供 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ python3 /checker/inspect-file.py --source input --path policy.txt
 Runner 先把 Fix 注入独立的目标 Runtime，并在该容器中执行约定入口。选手程序只能在这个不持有
 Checker 回调凭证的环境执行。Checker 随后通过 `TARGET_HOST` 验证正常业务和漏洞利用结果。
 
-`checkerFixInput=true` 只向 Checker 提供原始上传归档，供普通文件检查使用。Checker 必须将其视为
+`Check.AcceptsFixInput=true` 向 Checker 提供原始上传归档，供普通文件检查使用。Checker 必须将其视为
 不可信数据；禁止执行、导入、解释或加载其中的脚本和二进制，也禁止共享回调凭证、进程环境、PID
 空间或敏感文件描述符。回调令牌绑定 Fact 与 Runtime，仍有权完成本次判定，不能交给选手代码。
 
@@ -59,5 +59,6 @@ Fix 入口由 Runner 在独立目标 Runtime 执行，Checker 只负责外部验
 若要求真实靶机执行后的磁盘文件，明确标记当前接口不提供，不能编造共享目录或下载 API。
 ```
 
-`ServiceAbnormal`、`ExploitSucceeded`、`DefenseSucceeded` 是业务判定；依赖或回调等基础设施故障
-应保留非零退出。具体环境变量和超时见 [字段字典](../platform/FIELDS.md)。
+Checker 按 `NOCTF_CHECK_REQUIREMENTS` 返回逐项 `probes` 与 `observedAt`，字段为 `kind`、`result`、`reason`。
+功能检查通过使用 `Functionality / Passed / None`，漏洞仍存在使用 `Vulnerability / TargetFailure / VulnerabilityPresent`。
+AWDP 根据完整证据计算防御结果；依赖或回调等基础设施故障应保留非零退出。具体环境变量和超时见 [字段字典](../platform/FIELDS.md)。

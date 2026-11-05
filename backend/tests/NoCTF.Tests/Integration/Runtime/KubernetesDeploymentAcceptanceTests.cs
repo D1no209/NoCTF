@@ -24,10 +24,12 @@ public sealed class KubernetesDeploymentAcceptanceTests
         }
         var context = Required("NOCTF_KUBERNETES_CONTEXT");
         if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated acceptance cluster.");
-        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(currentContext: context));
+        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(
+            Environment.GetEnvironmentVariable("KUBECONFIG"), currentContext: context));
         var dns = await client.CoreV1.ReadNamespacedServiceAsync("kube-dns", "kube-system", cancellationToken: ct);
         var options = new KubernetesRuntimeOptions(Namespace: "runtime", PublicHost: Required("NOCTF_KUBERNETES_PUBLIC_HOST"),
-            PodPidsLimit: 256, ClusterDomain: "cluster.local", ClusterDnsServiceAddress: dns.Spec.ClusterIP,
+            PodPidsLimit: long.Parse(Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_POD_PIDS_LIMIT") ?? "256", System.Globalization.CultureInfo.InvariantCulture),
+            ClusterDomain: "cluster.local", ClusterDnsServiceAddress: dns.Spec.ClusterIP,
             ProtectedCidrs: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
             ImagePullSecrets: (Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_IMAGE_PULL_SECRETS") ?? "")
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -46,7 +48,7 @@ public sealed class KubernetesDeploymentAcceptanceTests
         {
             await Parallel.ForEachAsync(Enumerable.Range(0, count), new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = ct }, async (_, token) =>
             {
-                var request = Request(image);
+                    var request = Request(image, options.PodPidsLimit);
                 var started = Stopwatch.GetTimestamp();
                 try
                 {
@@ -81,7 +83,7 @@ public sealed class KubernetesDeploymentAcceptanceTests
             var values = startup.Order().ToArray();
             var report = new
             {
-                Context = context, TargetPods = count, Started = receipts.Count, Reachable = reachable,
+                Context = context, PodPidsLimit = options.PodPidsLimit, TargetPods = count, Started = receipts.Count, Reachable = reachable,
                 Failed = failures.Count, FailureTypes = failures.GroupBy(value => value).ToDictionary(group => group.Key, group => group.Count()),
                 StartupP50Seconds = Percentile(values, .5), StartupP95Seconds = Percentile(values, .95),
                 CleanupSeconds = cleanupSeconds, TotalSeconds = stage.Elapsed.TotalSeconds,
@@ -101,11 +103,11 @@ public sealed class KubernetesDeploymentAcceptanceTests
         }
     }
 
-    private static ContainerRuntimeRequest Request(string image)
+    private static ContainerRuntimeRequest Request(string image, long processLimit)
     {
         RuntimeServiceDefinition[] services = [new("web", image, CpuCores: .05m, MemoryMiB: 32)];
         return new(Guid.NewGuid(), RuntimeProvider.Kubernetes, services, new Dictionary<string, string>(),
-            RuntimeResourceBudgetPolicy.Sum(services.Select(service => service.Resources(256))), null, TimeSpan.FromMinutes(2),
+            RuntimeResourceBudgetPolicy.Sum(services.Select(service => service.Resources(processLimit))), null, TimeSpan.FromMinutes(2),
             [new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 80, "web")]);
     }
     private static double? Percentile(double[] values, double fraction) => values.Length == 0 ? null : values[(int)Math.Ceiling(values.Length * fraction) - 1];

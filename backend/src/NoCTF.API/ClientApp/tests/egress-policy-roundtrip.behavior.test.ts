@@ -9,12 +9,9 @@ import {
 function containerRuntime(egressPolicy?: string) {
   return {
     kind: 'Container',
-    allocation: 'PerTeam',
     limits: { memoryBytes: 268_435_456, cpuMillicores: 500, pidsLimit: 128 },
-    ttlSeconds: 3600,
     operationTimeoutSeconds: 60,
     urlBindings: [],
-    flagSource: 'Static',
     ...(egressPolicy ? { egressPolicy } : {}),
     container: {
       services: [{
@@ -25,7 +22,6 @@ function containerRuntime(egressPolicy?: string) {
         command: [],
         arguments: [],
         environment: {},
-        flagEnvironmentVariableName: null,
         internalPorts: [],
       }],
     },
@@ -34,38 +30,25 @@ function containerRuntime(egressPolicy?: string) {
 
 function contractWith(egressPolicy?: string) {
   return {
-    mode: 'Ctf',
-    ctf: { interactionKind: 'FlagSubmission' },
-    awd: null,
-    awdp: null,
-    koh: null,
-    liveSolo: null,
+    capabilities: [{ kind: 'Break', break: {} }],
     runtime: containerRuntime(egressPolicy),
-    flagTemplate: null,
-    checker: null,
-    patchEntrypoint: null,
-    patchCommand: [],
-    patchTimeoutSeconds: null,
-    readyTimeoutSeconds: null,
-    maximumPatchUploadBytes: null,
-    checkerFixInput: false,
   } as unknown as NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
 }
 
 test('a saved runtime keeps InternetOnly instead of silently reverting to Isolated', () => {
-  const model = definitionContractToModel(contractWith('InternetOnly'), 'Ctf')
+  const model = definitionContractToModel(contractWith('InternetOnly'))
   expect(model.runtime?.egressPolicy).toBe('InternetOnly')
 
-  const written = definitionModelToContract('Ctf', model)
+  const written = definitionModelToContract(model)
   expect(written.runtime?.egressPolicy).toBe('InternetOnly')
 })
 
 test('a runtime without an egress policy still defaults to Isolated', () => {
-  const model = definitionContractToModel(contractWith(), 'Ctf')
+  const model = definitionContractToModel(contractWith())
   expect(model.runtime?.egressPolicy).toBe('Isolated')
-  expect(definitionModelToContract('Ctf', model).runtime?.egressPolicy).toBe('Isolated')
+  expect(definitionModelToContract(model).runtime?.egressPolicy).toBe('Isolated')
 })
 
 test('the empty runtime template starts isolated', () => {
-  expect(emptyRuntimeTemplate('Ctf').egressPolicy).toBe('Isolated')
+  expect(emptyRuntimeTemplate().egressPolicy).toBe('Isolated')
 })

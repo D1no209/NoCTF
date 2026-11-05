@@ -3,8 +3,9 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, supportsStaticFlags, runtimeDefinitionDirty, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, DefinitionEditor, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 const { templateFlagAttachmentName } = toRefs(viewProps.state)
+const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -33,7 +34,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex min-w-0 items-center gap-3">
             <h1 class="truncate text-2xl font-semibold">{{ template.title }}</h1>
-            <component :is="AdminGameModeBadge" :mode="template.mode" />
+            <Badge v-for="capability in template.capabilities" :key="capability" variant="secondary">{{ capability }}</Badge>
             <Badge v-if="isDeleted" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
           </div>
           <div class="flex items-center gap-2">
@@ -71,7 +72,8 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
             <TabsList class="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-3 lg:flex lg:flex-col">
               <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('administration.label.basicInformation') }}</TabsTrigger>
               <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('common.label.runtimeEnvironment') }}</TabsTrigger>
-              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('administration.label.modeDefinition') }}</TabsTrigger>
+              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('administration.capability.title') }}</TabsTrigger>
+              <TabsTrigger value="tests" class="w-full justify-start px-3 py-2">{{ $t('administration.capabilityTests.title') }}</TabsTrigger>
               <TabsTrigger value="attachments" class="w-full justify-start px-3 py-2">
                 {{ $t('common.label.accessories') }}
                 <Badge variant="secondary" class="ml-auto">{{ attachments.length }}</Badge>
@@ -87,7 +89,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
 
           <div data-slot="challenge-template-panels" class="min-h-0 min-w-0">
           <TabsContent value="placements" class="mt-0">
-            <component :is="ChallengeCompetitionPlacements" :challenge-id="challengeId" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
+            <component :is="ChallengeCompetitionPlacements" :challenge-id="challengeId" :capabilities="template.capabilities ?? []" :disabled="isDeleted" />
           </TabsContent>
           <TabsContent value="basic" class="mt-0">
             <Card>
@@ -167,7 +169,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
               <CardHeader v-if="!isDeleted" class="shrink-0">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.capability.reloadRuntime') }}
                     </Button>
                     <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
                       <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }}
@@ -188,16 +190,16 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
                   <AlertDescription class="flex flex-col items-start gap-3">
                     <span>{{ $t('administration.challengesBy.validation.existingDefinitionFormat') }}</span>
                     <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.capability.reloadRuntime') }}
                     </Button>
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="runtimeDefinitionModel">
-                  <component :is="DefinitionRuntimeSection" :model="runtimeDefinitionModel" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
+                  <component :is="DefinitionRuntimeSection" :model="runtimeDefinitionModel" :disabled="isDeleted" />
                   <component :is="ChallengeTestRuntimePanel"
                     v-if="runtimeDefinitionModel.runtime && !isDeleted"
                     :challenge-id="challengeId"
-                    :definition-dirty="runtimeDefinitionDirty"
+                    :definition-dirty="runtimeDefinitionDirty || capabilityDefinitionDirty"
                   />
                 </FieldGroup>
               </CardContent>
@@ -205,6 +207,12 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
             </Card>
           </TabsContent>
 
+          <TabsContent value="tests" class="mt-0">
+            <Card><ScrollSurface axis="y" class="min-h-0 flex-1 overflow-y-auto"><CardContent>
+              <component :is="ChallengeCapabilityTests" v-if="!isDeleted && template.definition" :challenge-id="challengeId"
+                :definition="template.definition" :definition-dirty="runtimeDefinitionDirty || capabilityDefinitionDirty" />
+            </CardContent></ScrollSurface></Card>
+          </TabsContent>
           <TabsContent value="definition" class="mt-0">
             <Card>
               <CardHeader v-if="!isDeleted" class="shrink-0">
@@ -236,66 +244,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
-                  <Alert v-if="hasModeDefinition && runtimeDisabled">
-                    <AlertDescription>{{ $t('administration.challengesBy.description.followingConfigurationsTakeEffect') }}</AlertDescription>
-                  </Alert>
-                  <Field>
-                    <FieldLabel for="edit-mode">{{ $t('common.label.gameMode') }}</FieldLabel>
-                    <Select :model-value="form.mode" :disabled="isDeleted" @update:model-value="changeMode">
-                      <SelectTrigger id="edit-mode" class="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem v-for="option in state.modeOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>{{ $t('administration.challengesBy.validation.modeModifiedFormat') }}</FieldDescription>
-                  </Field>
-                  <Field v-if="showInteractionKind">
-                    <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('administration.label.completionMethod') }}</FieldLabel>
-                    <Select
-                      :model-value="definitionModel.interactionKind"
-                      :disabled="isDeleted"
-                      @update:model-value="setInteractionKind"
-                    >
-                      <SelectTrigger id="challenge-ctf-interaction-kind" class="w-full"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="FlagSubmission">{{ $t('administration.label.flagSubmission') }}</SelectItem>
-                          <SelectItem value="PatchVerification">{{ $t('common.label.patchVerification') }}</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>{{ $t('administration.label.ctfCompletionMethodDescription') }}</FieldDescription>
-                  </Field>
-                  <template v-if="form.mode === 'Awd'">
-                    <component :is="DefinitionFlagInjectionSection" :model="definitionModel" :disabled="isDeleted" />
-                    <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
-                    <component :is="DefinitionFlagTemplateSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
-                  </template>
-                  <template v-else-if="form.mode === 'Awdp'">
-                    <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
-                    <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
-                  </template>
-                  <template v-else-if="form.mode === 'Ctf' || form.mode === 'LiveSolo'">
-                    <template v-if="form.mode === 'Ctf' && definitionModel.interactionKind === 'PatchVerification'">
-                      <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
-                      <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
-                    </template>
-                    <component v-else :is="DefinitionFlagTemplateSection"
-                      :model="definitionModel"
-                      :mode="form.mode"
-                      :disabled="isDeleted"
-                    />
-                  </template>
-                  <Empty v-if="!hasModeDefinition">
-                    <EmptyHeader>
-                      <EmptyTitle>{{ $t('administration.challengesBy.description.modeAdditionalModeDefinition') }}</EmptyTitle>
-                    </EmptyHeader>
-                  </Empty>
-                  <FieldDescription v-else> {{ $t('administration.definitionEditor.description.definitionModificationsTakeEffect') }} </FieldDescription>
+                  <component :is="DefinitionEditor" v-model="form.definition" :include-runtime="false" :disabled="isDeleted" :challenge-id="challengeId" :saved-question-ids="viewProps.state.savedQuestionIds" />
                 </FieldGroup>
               </CardContent>
               </ScrollSurface>
@@ -441,7 +390,7 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
               </CardHeader>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
-                <section v-if="!usesRuntimeFlagInjection" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
+                <section v-if="supportsStaticFlags" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
                   <div>
                     <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('administration.label.addFlag') }}</h3>
                   </div>
@@ -467,19 +416,14 @@ const { templateFlagAttachmentName } = toRefs(viewProps.state)
                     </div>
                   </UiForm>
                 </section>
-                <Separator v-if="!usesRuntimeFlagInjection" class="mb-6" />
-                <Alert v-if="usesRuntimeFlagInjection" class="mb-4">
-                  <AlertDescription>
-                    {{ $t('challengeDelivery.runtimeManagedHint') }}
-                  </AlertDescription>
-                </Alert>
+                <Separator v-if="supportsStaticFlags" class="mb-6" />
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
                   <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="staticFlags.length === 0 && systemFlags.length === 0">
                   <EmptyHeader>
                     <EmptyTitle>{{ $t('administration.label.flagYet') }}</EmptyTitle>
-                    <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('administration.challengesBy.label.addTemplateLevelStatic') }}</EmptyDescription>
+                    <EmptyDescription v-if="supportsStaticFlags">{{ $t('administration.challengesBy.label.addTemplateLevelStatic') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
                 <div v-else class="flex flex-col gap-6">

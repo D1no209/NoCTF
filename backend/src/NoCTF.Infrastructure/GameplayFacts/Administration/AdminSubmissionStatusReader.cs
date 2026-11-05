@@ -16,7 +16,7 @@ public sealed class AdminGameplayFactStatusReader(NoCtfDbContext db) : IAdminGam
                 submission.CompetitionId == competitionId && submission.Id == gameplayFactId)
             .Select(fact => new AdminGameplayFactStatusView(
                 fact.Id,
-                fact.CompetitionId,
+                fact.CompetitionId!.Value,
                 fact.TeamId,
                 fact.CompetitionChallengeId!.Value,
                 fact.ActorUserId,
@@ -26,7 +26,7 @@ public sealed class AdminGameplayFactStatusReader(NoCtfDbContext db) : IAdminGam
                 fact.FailureCode,
                 fact.OccurredAt,
                 fact.UpdatedAt, fact.TimeEligibility,
-                fact.Kind != GameplayFactKind.FlagAttempt || fact.Awd == null ? null : new AwdAttackStatusView(
+                fact.Kind != GameplayFactKind.BreakAttempt || fact.Awd == null ? null : new AwdAttackStatusView(
                     fact.Awd.FlagId, fact.Awd.GenerationRoundId,
                     db.AwdFlagIssues.Where(issue => issue.FlagId == fact.Awd.FlagId).Select(issue => (int?)issue.RoundNumber).SingleOrDefault(),
                     fact.Awd.ReceivedRoundId, fact.Awd.ReceivedRoundNumber,

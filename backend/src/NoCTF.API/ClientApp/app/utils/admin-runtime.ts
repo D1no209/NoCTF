@@ -14,7 +14,7 @@ export function adminRuntimeTeamLabel(
   const sourceTeamName = runtime.sourceTeamName
     ?? (sourceTeamId ? lookupTeamName(sourceTeamId) : undefined)
 
-  if (runtime.purpose === 'AwdpTarget') {
+  if (runtime.purpose === 'FixTarget' || runtime.purpose === 'ScopedFixTarget') {
     return sourceTeamName
       ? t("runtime.runtime.label.oneTimeFixVerification.adminRuntime", { team: sourceTeamName })
       : t("runtime.runtime.label.oneTimeFixVerification")
@@ -26,7 +26,7 @@ export function adminRuntimeTeamLabel(
     return sourceTeamName
   if (sourceTeamId)
     return sourceTeamId
-  if (runtime.purpose === 'AwdpAttack')
+  if (runtime.purpose === 'AttackTarget')
     return t("runtime.runtime.description.awdpAttackRuntimeBound")
   return t("common.label.share")
 }

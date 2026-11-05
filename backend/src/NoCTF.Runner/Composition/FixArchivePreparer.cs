@@ -135,6 +135,7 @@ public sealed class FixArchivePreparer
 public sealed class FixVerificationOptions
 {
     public const string SectionName = "FixVerification";
+    public string WorkDirectory { get; init; } = "data/runner-fixes";
 
     public long MaxExpandedBytes { get; init; } = 268_435_456L;
 
@@ -148,7 +149,8 @@ public sealed class FixVerificationOptions
 public sealed class FixVerificationOptionsValidator : IValidateOptions<FixVerificationOptions>
 {
     public ValidateOptionsResult Validate(string? name, FixVerificationOptions options) =>
-        options.MaxExpandedBytes > 0
+        !string.IsNullOrWhiteSpace(options.WorkDirectory)
+        && options.MaxExpandedBytes > 0
         && options.MaxArchiveEntries > 0
         && options.MaxSingleFileBytes > 0
         && options.MaxCompressionRatio > 0

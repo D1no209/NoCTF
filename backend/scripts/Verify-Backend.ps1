@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipOpenApi,
-    [switch]$RequireDockerIntegration
+    [switch]$RequireDockerIntegration,
+    [switch]$AllowGeneratedChanges
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +23,19 @@ function Test-DockerDaemon {
 
     & $docker.Source info --format '{{.ServerVersion}}' *> $null
     return $LASTEXITCODE -eq 0
+}
+
+function Get-GeneratedContentState([string[]]$Paths) {
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            "$path $((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash)"
+        }
+        elseif (Test-Path -LiteralPath $path -PathType Container) {
+            Get-ChildItem -LiteralPath $path -File -Recurse | Sort-Object FullName | ForEach-Object {
+                "$($_.FullName) $((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+            }
+        }
+    }
 }
 
 Push-Location $backendRoot
@@ -66,6 +80,8 @@ try {
     Complete-NativeStep 'EF migration drift check'
 
     if (-not $SkipOpenApi) {
+        $openApiPaths = @('artifacts/openapi/swagger.json', 'src/NoCTF.API/wwwroot/openapi/v1.json')
+        $previousOpenApi = @(Get-GeneratedContentState $openApiPaths)
         Write-Host '[RUN] OpenAPI export'
         dotnet run --project .\src\NoCTF.Host\NoCTF.Host.csproj `
             --no-launch-profile `
@@ -74,12 +90,20 @@ try {
         Complete-NativeStep 'OpenAPI export'
 
         Write-Host '[RUN] OpenAPI artifact drift check'
-        git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
-            backend/artifacts/openapi/swagger.json `
-            backend/src/NoCTF.API/wwwroot/openapi/v1.json
-        Complete-NativeStep 'OpenAPI artifact drift check'
+        if ($AllowGeneratedChanges) {
+            if (@(Compare-Object $previousOpenApi @(Get-GeneratedContentState $openApiPaths) -SyncWindow 0).Count -ne 0) {
+                throw 'OpenAPI generation changed file content. Generate the artifacts, then rerun verification.'
+            }
+        }
+        else {
+            git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
+                backend/artifacts/openapi/swagger.json `
+                backend/src/NoCTF.API/wwwroot/openapi/v1.json
+            Complete-NativeStep 'OpenAPI artifact drift check'
+        }
 
         Write-Host '[RUN] Frontend API client generation'
+        $previousSdk = @(Get-GeneratedContentState @('src/NoCTF.API/ClientApp/app/api'))
         Push-Location .\src\NoCTF.API\ClientApp
         try {
             bun install --frozen-lockfile
@@ -92,9 +116,16 @@ try {
         }
 
         Write-Host '[RUN] Frontend API client drift check'
-        git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
-            backend/src/NoCTF.API/ClientApp/app/api
-        Complete-NativeStep 'Frontend API client drift check'
+        if ($AllowGeneratedChanges) {
+            if (@(Compare-Object $previousSdk @(Get-GeneratedContentState @('src/NoCTF.API/ClientApp/app/api')) -SyncWindow 0).Count -ne 0) {
+                throw 'SDK generation changed file content. Generate the artifacts, then rerun verification.'
+            }
+        }
+        else {
+            git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
+                backend/src/NoCTF.API/ClientApp/app/api
+            Complete-NativeStep 'Frontend API client drift check'
+        }
     }
     else {
         Write-Warning '[SKIPPED] OpenAPI export: -SkipOpenApi was specified.'

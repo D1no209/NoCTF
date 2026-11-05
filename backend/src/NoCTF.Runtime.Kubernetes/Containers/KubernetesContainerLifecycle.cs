@@ -765,7 +765,7 @@ public sealed class KubernetesContainerLifecycle(
             || request.ProxyIngressPorts?.Any(port => port is < 1 or > 65535) == true)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
-            && request.TargetPort is not (>= 1 and <= 65535))
+            && (request.InternalIngressPorts is not { Count: > 0 } || request.InternalIngressPorts.Any(port => port is < 1 or > 65535)))
             throw new ArgumentOutOfRangeException(nameof(request));
         if (!options.NetworkPolicyRequired)
             throw new InvalidOperationException(
@@ -810,7 +810,7 @@ public sealed class KubernetesContainerLifecycle(
             {
                 FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }],
                 Ports = request.Purpose == ContainerNetworkPurpose.AwdpVerification
-                    ? [new V1NetworkPolicyPort { Protocol = "TCP", Port = request.TargetPort!.Value }]
+                    ? request.InternalIngressPorts!.Distinct().Order().Select(port => new V1NetworkPolicyPort { Protocol = "TCP", Port = port }).ToList()
                     : null
             }
         };
@@ -971,6 +971,12 @@ public sealed class KubernetesContainerLifecycle(
         CancellationToken cancellationToken) =>
         await RunExecAsync(receipt, command, null, timeout, cancellationToken);
 
+    public Task<ContainerExecResult> ExecRetainingTargetAsync(ContainerReceipt receipt, IReadOnlyList<string> command,
+        TimeSpan timeout, CancellationToken cancellationToken) => RunExecAsync(receipt, command, null, timeout, cancellationToken, retainTarget: true);
+
+    public Task<ContainerExecObservation> ObserveExecAsync(ContainerReceipt receipt, string executionIdentity, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Kubernetes exec does not expose a durable execution identity.");
+
     public async Task<ContainerExecResult> ExecWithInputAsync(
         ContainerReceipt receipt,
         IReadOnlyList<string> command,
@@ -984,7 +990,8 @@ public sealed class KubernetesContainerLifecycle(
         IReadOnlyList<string> command,
         ReadOnlyMemory<byte>? standardInput,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool retainTarget = false)
     {
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout + TimeSpan.FromSeconds(3));
@@ -1011,11 +1018,13 @@ public sealed class KubernetesContainerLifecycle(
             var exitCode = await statusTask.WaitAsync(timeoutSource.Token);
             await outputTask.WaitAsync(timeoutSource.Token);
             if (exitCode != ExecTimeoutExitCode) return new(exitCode, false);
+            if (retainTarget) return new(-1, true);
             await StopPodAfterExecTimeoutAsync(receipt);
             return new(-1, true);
         }
         catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested)
         {
+            if (retainTarget) return new(-1, true, ExecutionUncertain: true, PlatformFailure: true);
             await StopPodAfterExecTimeoutAsync(receipt);
             cancellationToken.ThrowIfCancellationRequested();
             return new(-1, true);

@@ -41,12 +41,12 @@ public sealed class RunnerScoringTokenIssuerTests
         var runtimeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
 
-        var encoded = issuer.IssueAwdpFixResult(new AwdpFixResultTokenRequest(
+        var encoded = issuer.IssueFixCheckResult(new FixCheckResultTokenRequest(
             "runner-a", gameplayFactId, runtimeId, issuedAt.AddMinutes(2), issuedAt));
 
         var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
         await Assert.That(token.Claims.Single(claim => claim.Type == "permission").Value)
-            .IsEqualTo("awdp:fix-result:write");
+            .IsEqualTo("fix:check-result:write");
         await Assert.That(token.Claims.Single(claim => claim.Type == "resource").Value)
             .IsEqualTo($"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeId:D}");
         await Assert.That(token.Claims.Any(claim => claim.Type == "generation"))
@@ -71,7 +71,7 @@ public sealed class RunnerScoringTokenIssuerTests
 
         var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
         await Assert.That(token.Claims.Single(claim => claim.Type == "permission").Value)
-            .IsEqualTo("awdp:fix-archive:read");
+            .IsEqualTo("fix:archive:read");
         await Assert.That(token.Claims.Single(claim => claim.Type == "patch_upload_id").Value)
             .IsEqualTo(uploadId.ToString("D"));
         await Assert.That(token.Claims.Single(claim => claim.Type == "gameplay_fact_id").Value)

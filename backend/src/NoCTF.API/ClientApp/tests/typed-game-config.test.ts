@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { adminChallengeBankCreateTemplate } from '../app/api'
-import { createClient } from '../app/api/client'
+import type { NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest } from '../app/api'
 
 import {
   buildConfigValues,
@@ -15,10 +14,11 @@ import {
   emptyOvaDefinition,
   emptyRuntimeTemplate,
   readConfigValues,
+  setChallengeCapability,
 } from '../app/utils/game-config'
 import {
   challengeRuntimeDefinitionsEqual,
-  mergeChallengeModeDefinition,
+  mergeChallengeCapabilityDefinition,
   mergeChallengeRuntimeDefinition,
 } from '../app/features/admin/challenge-definition-sections'
 
@@ -29,98 +29,85 @@ describe('typed game configuration contracts', () => {
     expect('security' in emptyContainerDefinition()).toBeFalse()
   })
 
-  test.each(['Ctf', 'Awd', 'Awdp', 'Koh', 'LiveSolo'] as const)('%s defaults select one typed branch without a schema version', (mode) => {
-    const definition = defaultDefinition(mode) as unknown as Record<string, unknown>
-    expect(definition.mode).toBe(mode)
-    expect(definition[mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()]).toBeDefined()
-    expect(['ctf', 'awd', 'awdp', 'koh', 'liveSolo'].filter(key => definition[key] != null)).toHaveLength(1)
-    expect('schemaVersion' in definition).toBeFalse()
+  test.each(['Break', 'Fix', 'Check', 'Control', 'Questionnaire'] as const)('%s selects its independent typed configuration', (kind) => {
+    const model = emptyDefinition()
+    model.capabilities = []
+    setChallengeCapability(model, kind, true)
+    const definition = definitionModelToContract(model)
+    expect(definition.capabilities).toHaveLength(1)
+    const capability = definition.capabilities![0]!
+    expect(capability.kind).toBe(kind)
+    expect(['break', 'fix', 'check', 'control', 'questionnaire'].filter(key => capability[key as keyof typeof capability] != null)).toEqual([kind.toLowerCase()])
+    expect('mode' in definition).toBeFalse()
   })
 
-  test.each(['Ctf', 'Awd', 'Awdp', 'Koh', 'LiveSolo'] as const)('%s serialized runtime selects a typed branch', (mode) => {
-    const model = emptyDefinition(mode)
-    model.runtime = emptyRuntimeTemplate(mode)
-    const payload = JSON.parse(JSON.stringify(definitionModelToContract(mode, model))) as {
-      mode?: string
+  test('serialized runtime selects its typed construction branch', () => {
+    const model = emptyDefinition()
+    model.runtime = emptyRuntimeTemplate()
+    const payload = JSON.parse(JSON.stringify(definitionModelToContract(model))) as {
       runtime?: { kind?: string, container?: object }
     }
-    expect(payload.mode).toBe(mode)
     expect(payload.runtime?.kind).toBe('Container')
     expect(payload.runtime?.container).toBeDefined()
   })
 
   test('Ova runtimes serialize only their matching branch', () => {
     for (const definition of [emptyOvaDefinition()]) {
-      const model = emptyDefinition('Ctf')
-      model.runtime = emptyRuntimeTemplate('Ctf')
+      const model = emptyDefinition()
+      model.runtime = emptyRuntimeTemplate()
       model.runtime.definition = definition
-      const payload = JSON.parse(JSON.stringify(definitionModelToContract('Ctf', model))) as {
+      const payload = JSON.parse(JSON.stringify(definitionModelToContract(model))) as {
         runtime?: Record<string, unknown>
       }
       expect(payload.runtime?.[String(payload.runtime.kind).toLowerCase()]).toBeDefined()
       expect(['container', 'ova'].filter(key => payload.runtime?.[key] != null)).toHaveLength(1)
-      const restored = definitionContractToModel(payload as ReturnType<typeof definitionModelToContract>, 'Ctf')
+      const restored = definitionContractToModel(payload as ReturnType<typeof definitionModelToContract>)
       expect(restored.runtime?.definition.kind).toBe(definition.kind)
     }
   })
 
-  test('definition reader rejects absent, mismatched and multiple mode branches', () => {
-    const current = defaultDefinition('Ctf')
-    expect(() => definitionContractToModel({ ...current, ctf: null }, 'Ctf')).toThrow()
-    expect(() => definitionContractToModel({ ...current, ctf: null, awd: { flagInjection: null } }, 'Ctf')).toThrow()
-    expect(() => definitionContractToModel({ ...current, awd: { flagInjection: null } }, 'Ctf')).toThrow()
+  test('definition reader rejects absent, mismatched and duplicate capability branches', () => {
+    const current = defaultDefinition()
+    expect(() => definitionContractToModel({ ...current, capabilities: [] })).toThrow()
+    expect(() => definitionContractToModel({ ...current, capabilities: [{ kind: 'Break', fix: {} }] })).toThrow()
+    expect(() => definitionContractToModel({ ...current, capabilities: [{ kind: 'Break', break: {}, fix: {} }] })).toThrow()
+    expect(() => definitionContractToModel({ ...current, capabilities: [...current.capabilities!, ...current.capabilities!] })).toThrow()
   })
 
   test('runtime reader rejects a branch that conflicts with kind', () => {
-    const model = emptyDefinition('Ctf')
-    model.runtime = emptyRuntimeTemplate('Ctf')
-    const current = definitionModelToContract('Ctf', model)
+    const model = emptyDefinition()
+    model.runtime = emptyRuntimeTemplate()
+    const current = definitionModelToContract(model)
     expect(() => definitionContractToModel({ ...current, runtime: {
       ...current.runtime!, kind: 'Container', container: null,
       ova: { sourceUrl: 'https://example.test/a.ova', sha256: 'abc' },
-    } }, 'Ctf')).toThrow()
+    } })).toThrow()
   })
 
-  test('generated create-template SDK sends the branch regardless of property order', async () => {
-    const sent: string[] = []
-    const client = createClient({
-      baseUrl: 'https://noctf.test',
-      fetch: async (input) => {
-        sent.push(await new Request(input).text())
-        return new Response(JSON.stringify({ id: '00000000-0000-0000-0000-000000000001' }), {
-          status: 201,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      },
-    })
-    const model = emptyDefinition('Ctf')
-    model.runtime = emptyRuntimeTemplate('Ctf')
-    await adminChallengeBankCreateTemplate({
-      client,
-      body: {
-        mode: 'Ctf',
+  test('create-template payload retains its runtime and capabilities through serialization', () => {
+    const model = emptyDefinition()
+    model.runtime = emptyRuntimeTemplate()
+    const request: NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
         visibility: 'Private',
         title: 'Current template',
         direction: 'Web',
-        definition: definitionModelToContract('Ctf', model),
-      },
-    })
-    expect(sent).toHaveLength(1)
-    const payload = JSON.parse(sent[0]!) as { definition: { mode: string, ctf: object, runtime: { kind: string, container: object } } }
-    expect(payload.definition.mode).toBe('Ctf')
-    expect(payload.definition.ctf).toBeDefined()
-    expect(payload.definition.runtime.container).toBeDefined()
+        definition: definitionModelToContract(model),
+    }
+    const payload = JSON.parse(JSON.stringify(request)) as typeof request
+    expect(payload.definition.capabilities?.map(capability => capability.kind)).toEqual(['Break'])
+    expect(payload.definition.runtime?.container).toBeDefined()
+    expect('mode' in payload).toBeFalse()
   })
 
   test('named services, resources and the single public entry list round-trip', () => {
-    const model = emptyDefinition('Ctf')
-    model.runtime = emptyRuntimeTemplate('Ctf')
+    const model = emptyDefinition()
+    model.runtime = emptyRuntimeTemplate()
     model.runtime.definition = emptyContainerDefinition(true)
     model.runtime.definition.services[0]!.image = 'challenge:latest'
     model.runtime.definition.services[0]!.cpuCores = 0.501
     model.runtime.urlBindings = [{ serviceName: 'main', containerPort: 8080, urlTemplate: 'nc {HOST} {PORT}', exposure: 'OwnerOnly' }]
-    const contract = definitionModelToContract('Ctf', model)
-    const restored = definitionContractToModel(contract, 'Ctf')
+    const contract = definitionModelToContract(model)
+    const restored = definitionContractToModel(contract)
     expect(restored.runtime?.definition).toEqual(model.runtime.definition)
     expect(restored.runtime?.urlBindings).toEqual(model.runtime.urlBindings)
     expect(contract.runtime?.limits).toBeNull()
@@ -128,23 +115,23 @@ describe('typed game configuration contracts', () => {
   })
 
   test('definition flag template is not lost while editing', () => {
-    const model = emptyDefinition('Ctf')
+    const model = emptyDefinition()
     model.flagTemplate = { header: 'FLAG', bodyTemplate: '[TEAM]', leetLiteralText: true }
-    const contract = definitionModelToContract('Ctf', model)
+    const contract = definitionModelToContract(model)
 
-    expect(definitionContractToModel(contract, 'Ctf').flagTemplate).toEqual(model.flagTemplate)
+    expect(definitionContractToModel(contract).flagTemplate).toEqual(model.flagTemplate)
   })
 
   test('runtime access exposure survives typed protocol conversion', () => {
-    const model = emptyDefinition('Ctf')
-    model.runtime = emptyRuntimeTemplate('Ctf')
+    const model = emptyDefinition()
+    model.runtime = emptyRuntimeTemplate()
     model.runtime.urlBindings = [
       { urlTemplate: 'http://{HOST}:{PORT}', exposure: 'OwnerOnly', containerPort: 80, serviceName: '' },
       { urlTemplate: 'tcp://{HOST}:{PORT}', exposure: 'Participants', containerPort: 81, serviceName: '' },
     ]
 
-    const contract = definitionModelToContract('Ctf', model)
-    const restored = definitionContractToModel(contract, 'Ctf')
+    const contract = definitionModelToContract(model)
+    const restored = definitionContractToModel(contract)
     expect(restored.runtime?.urlBindings.map(binding => binding.exposure)).toEqual([
       'OwnerOnly',
       'Participants',
@@ -213,12 +200,12 @@ describe('typed game configuration contracts', () => {
       koh: { pollIntervalSeconds: 5, controlPointsPerInterval: 10 },
     })
     const rules = buildConfigValues('Awdp', challengeRuleFields('Awdp'), {}, { rules: true })
-    expect(rules).toEqual({ mode: 'Awdp', awdp: {} })
+    expect(rules).toEqual({ mode: 'Awdp', awdp: { runtime: { allocation: 'PerTeam', flagSource: 'PerTeam', ttlSeconds: 900 } } })
   })
 
   test('section merges preserve untouched typed state', () => {
-    const persisted = emptyDefinition('Awdp')
-    persisted.runtime = emptyRuntimeTemplate('Awdp')
+    const persisted = emptyDefinition()
+    persisted.runtime = emptyRuntimeTemplate()
     persisted.checkerFixInput = true
     const runtimeDraft = structuredClone(persisted)
     if (!runtimeDraft.runtime) throw new Error('Expected Runtime defaults.')
@@ -228,18 +215,20 @@ describe('typed game configuration contracts', () => {
     expect(runtimeMerged.checkerFixInput).toBeTrue()
     expect(runtimeMerged.runtime?.ttlSeconds).toBe(120)
 
-    const modeDraft = structuredClone(runtimeMerged)
-    modeDraft.checkerFixInput = true
-    const modeMerged = mergeChallengeModeDefinition('Awdp', runtimeMerged, 'Awdp', modeDraft)
-    expect(modeMerged.checkerFixInput).toBeTrue()
-    expect(challengeRuntimeDefinitionsEqual('Awdp', modeMerged, runtimeMerged)).toBeTrue()
+    const capabilityDraft = structuredClone(runtimeMerged)
+    capabilityDraft.checkerFixInput = true
+    const merged = mergeChallengeCapabilityDefinition(runtimeMerged, capabilityDraft)
+    expect(merged.checkerFixInput).toBeTrue()
+    expect(challengeRuntimeDefinitionsEqual(merged, runtimeMerged)).toBeTrue()
   })
 
-  test('CTF interaction is represented by the typed branch', () => {
-    const model = emptyDefinition('Ctf')
-    model.interactionKind = 'PatchVerification'
-    const contract = definitionModelToContract('Ctf', model) as unknown as Record<string, unknown>
-    expect(contract.mode).toBe('Ctf')
-    expect((contract.ctf as Record<string, unknown>).interactionKind).toBe('PatchVerification')
+  test('a repairable template retains Break, Fix and Check together', () => {
+    const model = emptyDefinition()
+    setChallengeCapability(model, 'Fix', true)
+    setChallengeCapability(model, 'Check', true)
+    const contract = definitionModelToContract(model)
+    expect(contract.capabilities?.map(capability => capability.kind)).toEqual(['Break', 'Fix', 'Check'])
+    expect(definitionContractToModel(contract).capabilities).toEqual(model.capabilities)
+    expect('mode' in contract).toBeFalse()
   })
 })

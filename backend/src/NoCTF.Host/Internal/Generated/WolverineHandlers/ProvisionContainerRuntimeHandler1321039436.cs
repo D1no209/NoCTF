@@ -57,8 +57,6 @@ namespace Internal.Generated.WolverineHandlers
             _fusionCacheProvider = fusionCacheProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -79,13 +77,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // Outgoing, cascaded message
             await context.EnqueueCascadingAsync(outgoing1).ConfigureAwait(false);
-
         }
-
     }
 
     // END: ProvisionContainerRuntimeHandler1321039436
     
     
 }
-

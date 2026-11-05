@@ -13,14 +13,18 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
         builder.HasDiscriminator(instance => instance.Purpose)
             .HasValue<PlayerRuntimeInstance>(RuntimePurpose.Player)
-            .HasValue<AwdpTargetRuntimeInstance>(RuntimePurpose.AwdpTarget)
+            .HasValue<FixTargetRuntimeInstance>(RuntimePurpose.FixTarget)
             .HasValue<PracticeRuntimeInstance>(RuntimePurpose.Practice)
-            .HasValue<AwdpAttackRuntimeInstance>(RuntimePurpose.AwdpAttack)
+            .HasValue<AttackTargetRuntimeInstance>(RuntimePurpose.AttackTarget)
             .HasValue<TemplateTestRuntimeInstance>(RuntimePurpose.TemplateTest)
-            .HasValue<PatchVerificationTargetRuntimeInstance>(RuntimePurpose.PatchVerificationTarget);
+            .HasValue<ScopedFixTargetRuntimeInstance>(RuntimePurpose.ScopedFixTarget);
         builder.Property(instance => instance.AccessMode).HasConversion<short>();
         builder.Property(instance => instance.TestFlagDelivery).HasConversion<short>();
         builder.Property(instance => instance.TestFlagState).HasConversion<short>();
+        builder.HasOne(instance => instance.CapabilityTest).WithOne()
+            .HasForeignKey<NoCTF.Domain.Challenges.Testing.TemplateCapabilityTest>(test => test.RuntimeInstanceId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(instance => instance.CapabilityTest).AutoInclude();
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();

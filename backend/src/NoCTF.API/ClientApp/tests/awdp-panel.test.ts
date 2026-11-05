@@ -1,5 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
+import { definitionContractToModel, definitionModelToContract, emptyDefinition, setChallengeCapability } from '../app/utils/game-config'
 
 describe('AWDP participant panel', () => {
   test('separates team attack runtime from one-shot fix verification', async () => {
@@ -139,16 +140,20 @@ describe('AWDP participant panel', () => {
     expect(challengeDetail).toContain("<component :is=\"ChallengeSubmissionHistory\"")
   })
 
-  test('labels the AWDP checker as a one-shot Fix verifier', async () => {
-    const source = await sourceFile(
-      new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url),
-    ).text()
-    const awdpBranch = source.slice(source.indexOf("mode === 'Awdp' || mode === 'Ctf'"))
-
-    expect(awdpBranch).toContain("administration.definitionChecker.label.oneShotFixVerification")
-    expect(awdpBranch).toContain("administration.definitionChecker.description.enableOneShotFix.checkerSectionView")
-    expect(awdpBranch).not.toContain("administration.label.enablePeriodicServiceChecks")
-    expect(awdpBranch).not.toContain("administration.label.checkerServiceHealthCheck")
+  test('Check retains its evidence requirements when reused with Break and Fix', () => {
+    const model = emptyDefinition()
+    setChallengeCapability(model, 'Fix', true)
+    setChallengeCapability(model, 'Check', true)
+    model.checker!.targetServiceName = 'api'
+    model.checkerFixInput = true
+    model.checkRequirements = ['Connection', 'Functionality', 'Vulnerability']
+    const contract = definitionModelToContract(model)
+    const loaded = definitionContractToModel(contract)
+    expect(contract.capabilities?.map(item => item.kind)).toEqual(['Break', 'Fix', 'Check'])
+    expect(loaded.checker?.targetServiceName).toBe('api')
+    expect(loaded.checkerFixInput).toBeTrue()
+    expect(loaded.checkRequirements).toEqual(['Connection', 'Functionality', 'Vulnerability'])
+    expect('mode' in contract).toBeFalse()
   })
 
   test('shows safe defense outcomes in the unified challenge history', async () => {

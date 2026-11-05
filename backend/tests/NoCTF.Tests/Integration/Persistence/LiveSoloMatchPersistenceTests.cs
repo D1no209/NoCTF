@@ -209,7 +209,7 @@ public sealed class LiveSoloMatchPersistenceTests
                 ContentType = "application/pdf", ByteLength = 4, Sha256 = new byte[32], CreatedAt = fixture.Now };
             var attachment = new ChallengeAttachment { Id = Guid.NewGuid(), ChallengeId = fixture.Templates[0].Id, File = file, CreatedAt = fixture.Now };
             fixture.Db.Add(attachment);
-            fixture.Db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id,
+            fixture.Db.GameplayFacts.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = fixture.Entries[0].Id, TeamId = fixture.LeftTeam.Id, State = GameplayFactState.Completed,
                 Result = GameplayFactResult.Wrong, OccurredAt = fixture.Now.AddMinutes(-1), UpdatedAt = fixture.Now });
             await fixture.Db.SaveChangesAsync(ct);
@@ -402,7 +402,7 @@ public sealed class LiveSoloMatchPersistenceTests
         public Team LeftTeam { get; private set; } = null!;
         public Team RightTeam { get; private set; } = null!;
         public LiveSoloCompetition Competition { get; private set; } = null!;
-        public LiveSoloChallenge[] Templates { get; private set; } = [];
+        public Challenge[] Templates { get; private set; } = [];
         public LiveSoloCompetitionChallenge[] Entries { get; private set; } = [];
         public LiveSoloMatchView Match { get; private set; } = null!;
         public LiveSoloRound Round { get; private set; } = null!;
@@ -426,9 +426,9 @@ public sealed class LiveSoloMatchPersistenceTests
             Team Team(User user, char key) => new() { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id, Name = user.UserName,
                 CaptainId = user.Id, MemberIds = [user.Id], InvitationToken = new string(key, 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = fixture.Now };
             fixture.LeftTeam = Team(fixture.Left, 'l'); fixture.RightTeam = Team(fixture.Right, 'r');
-            fixture.Templates = Enumerable.Range(0, 2).Select(i => new LiveSoloChallenge { Id = Guid.NewGuid(), OwnerId = fixture.Owner.Id,
+            fixture.Templates = Enumerable.Range(0, 2).Select(i => new Challenge { Id = Guid.NewGuid(), OwnerId = fixture.Owner.Id,
                 Title = "Question " + i, Direction = "Web", Description = "secret body " + i, CreatedAt = fixture.Now, UpdatedAt = fixture.Now,
-                Definition = new LiveSoloChallengeDefinition() }).ToArray();
+                Definition = new ChallengeDefinition { Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()] } }).ToArray();
             fixture.Entries = fixture.Templates.Select((x, i) => new LiveSoloCompetitionChallenge { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id,
                 ChallengeId = x.Id, Order = i, Rules = new LiveSoloCompetitionChallengeRules(), UpdatedAt = fixture.Now }).ToArray();
             fixture.Db.Users.AddRange(fixture.Owner, fixture.Left, fixture.Right); fixture.Db.Competitions.Add(fixture.Competition);

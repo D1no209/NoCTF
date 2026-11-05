@@ -241,11 +241,11 @@ public sealed partial class RuntimeCapacityDomainTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Index_upgrade_and_downgrade_preserve_the_global_fence_and_existing_allocations(CancellationToken ct)
+    public async Task Repeated_baseline_application_preserves_the_global_fence_and_existing_allocations(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var fixture = await RuntimeCapacityDomainFixture.CreateAsync(3, ct, previousSchema: true);
+            await using var fixture = await RuntimeCapacityDomainFixture.CreateAsync(3, ct, migrateDatabase: true);
             RuntimeCapacityAllocation preserved;
             await using (var db = new NoCtfDbContext(fixture.Options))
             {
@@ -279,8 +279,7 @@ public sealed partial class RuntimeCapacityDomainTests
             {
                 var originalFence = await downgrade.RuntimeCapacityLedgers.AsNoTracking()
                     .Select(item => item.ConcurrencyStamp).SingleAsync(ct);
-                // Index-only upgrades and downgrades leave the authoritative allocation and fence rows intact.
-                await downgrade.GetService<IMigrator>().MigrateAsync("20261013124256_MergeAwdAndTheoryModels", ct);
+                await downgrade.Database.MigrateAsync(ct);
                 await Assert.That(await downgrade.Database.SqlQueryRaw<int>(
                     "SELECT COUNT(*)::integer AS \"Value\" FROM runtime_capacity_ledger WHERE id = 1").SingleAsync(ct))
                     .IsEqualTo(1);

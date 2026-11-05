@@ -48,7 +48,7 @@ describe('AWD rule editor', () => {
         historicalLifetime: 10, maximumRoundPenalty: 0 } } }, rulesFields, { rules: true })!
     expect(parsed.overridden).toMatchObject({ recoveringRatio: true, retryCount: true, linkHistoricalWindow: true, offlineRatio: false })
     const saved = buildConfigValues('Awd', rulesFields, reactive(parsed.values), { rules: true, overridden: parsed.overridden })
-    expect(saved.awd).toEqual({ attackPoints: 0, storeRules, overrides: {
+    expect(saved.awd).toEqual({ attackPoints: 0, storeRules, runtime: { allocation: 'PerTeam', flagSource: 'AwdRotation' }, overrides: {
       recoveringRatio: 0, retryCount: 0, linkHistoricalWindow: false, historicalLifetime: 10, maximumRoundPenalty: 0,
     } })
     expect(rulesFields.some(field => field.key === 'submissionTailSeconds')).toBeFalse()
@@ -94,15 +94,15 @@ describe('AWD rule editor', () => {
   })
 
   test('editing a reactive AWD definition retains stores and updates service references', () => {
-    const model = reactive(emptyDefinition('Awd'))
-    model.runtime = emptyRuntimeTemplate('Awd')
-    model.awdFlagStores = [{ id: '981f28b6-8954-41e5-9c70-857e72631791', name: 'database',
+    const model = reactive(emptyDefinition())
+    model.runtime = emptyRuntimeTemplate()
+    model.flagStores = [{ id: '981f28b6-8954-41e5-9c70-857e72631791', name: 'database',
       deliveryMode: 'BusinessChecker', targetServiceName: 'main', injectionTimeoutSeconds: 30,
       preservesHistoricalFlags: true }]
     expect(runtimeServiceIsReferenced(model, 'main')).toBeTrue()
     renameRuntimeService(model, 'main', 'web')
-    const contract = definitionModelToContract('Awd', model)
-    expect(contract.awd?.flagStores?.[0]?.targetServiceName).toBe('web')
-    expect(definitionContractToModel(reactive(contract), 'Awd').awdFlagStores).toEqual(model.awdFlagStores)
+    const contract = definitionModelToContract(model)
+    expect(contract.capabilities?.find(item => item.kind === 'Break')?.break?.flagStores?.[0]?.targetServiceName).toBe('web')
+    expect(definitionContractToModel(reactive(contract)).flagStores).toEqual(model.flagStores)
   })
 })

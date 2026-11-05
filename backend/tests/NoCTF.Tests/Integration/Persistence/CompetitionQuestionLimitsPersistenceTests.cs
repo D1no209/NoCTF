@@ -700,7 +700,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             UpdatedAt = Now
         };
 
-        private Challenge Challenge(Guid id, Guid ownerId, string title) => new CtfChallenge
+        private Challenge Challenge(Guid id, Guid ownerId, string title) => new Challenge
         {
             Id = id,
             OwnerId = ownerId,

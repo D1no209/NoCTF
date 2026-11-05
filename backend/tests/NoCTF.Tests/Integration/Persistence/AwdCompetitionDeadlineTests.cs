@@ -132,7 +132,7 @@ public sealed partial class AwdRoundCoordinationTests
             }
             var accepted = await Submit();
             await Assert.That(accepted.Succeeded).IsTrue();
-            var fact = await db.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Kind == GameplayFactKind.FlagAttempt, ct);
+            var fact = await db.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Kind == GameplayFactKind.BreakAttempt, ct);
             await Assert.That(fact.Awd!.ReceivedRoundId).IsEqualTo(last.Id);
             await Assert.That(fact.Awd.ReceivedActiveTicks).IsEqualTo(last.ActiveEndTicks);
             configuration.AwdOptions = configuration.AwdOptions with { SubmissionTailSeconds = 900 };

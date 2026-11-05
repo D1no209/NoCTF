@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTemplateCreateDialogViewState } from '~/features/admin/useChallengeTemplateCreateDialog'
 
 const viewProps = defineProps<{ state: ChallengeTemplateCreateDialogViewState }>()
-const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources, sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, open, title, mode, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, changeMode, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
+const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources, sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, open, title, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -14,14 +14,14 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
         <DialogDescription>{{ $t('administration.challengeTemplate.description.optionalConfigureLaterCreation') }}</DialogDescription>
       </DialogHeader>
 
-      <div v-if="mode === 'LiveSolo'" class="px-6 pt-4"><Tabs :model-value="variant" @update:model-value="setVariant"><TabsList><TabsTrigger value="blank">{{ $t('liveSolo.bank.blank') }}</TabsTrigger><TabsTrigger value="copy">{{ $t('liveSolo.bank.copy') }}</TabsTrigger></TabsList></Tabs></div>
+      <div class="px-6 pt-4"><Tabs :model-value="variant" @update:model-value="setVariant"><TabsList><TabsTrigger value="blank">{{ $t('liveSolo.bank.blank') }}</TabsTrigger><TabsTrigger value="copy">{{ $t('liveSolo.bank.copy') }}</TabsTrigger></TabsList></Tabs></div>
       <UiForm validation="feature" class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
         <Alert v-if="saveErrors.length" variant="destructive" class="mx-6 mt-5 shrink-0">
           <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
           <AlertDescription class="flex flex-col gap-2">
             <span>{{ $t('administration.challengeTemplate.description.correctFollowingIssuesTry') }}</span>
             <ul class="list-disc pl-5">
-              <li v-for="(message, index) in saveErrors" :key="index">{{ message }}</li>
+              <li v-for="(message, index) in saveErrors" :key="index">{{ $message(message) }}</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -40,15 +40,6 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
                   <Input id="create-template-title" v-model="title" required maxlength="160" :aria-invalid="titleInvalid || undefined" :placeholder="$t('administration.challengeTemplate.description.exampleGettingStartedWeb')" />
                 </Field>
                 <div class="grid gap-4 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel for="create-template-mode">{{ $t('common.label.gameMode') }}</FieldLabel>
-                    <Select :model-value="mode" @update:model-value="changeMode">
-                      <SelectTrigger id="create-template-mode" class="w-full"><SelectValue :placeholder="$t('common.label.selectMode')" /></SelectTrigger>
-                      <SelectContent><SelectGroup>
-                        <SelectItem v-for="option in state.modeOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-                      </SelectGroup></SelectContent>
-                    </Select>
-                  </Field>
                   <Field>
                     <FieldLabel for="create-template-visibility">{{ $t('administration.label.visibility') }}</FieldLabel>
                     <Select v-model="visibility">
@@ -76,7 +67,7 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
               </FieldGroup>
             </TabsContent>
             <TabsContent value="definition" class="mt-0 pb-5">
-              <component :is="DefinitionEditor" v-model="definition" :mode="mode" />
+              <component :is="DefinitionEditor" v-model="definition" />
             </TabsContent>
             </div>
           </ScrollSurface>
@@ -88,7 +79,6 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
             <ChoicePicker :model-value="sourceId" :items="sourceOptions" :disabled="sourceLoading || pending" :label="$t('liveSolo.groups.selectTemplate')" :search-label="$t('liveSolo.groups.searchTemplate')" :empty-label="$t('liveSolo.groups.noTemplate')" @update:model-value="selectSource" />
             <OffsetPagination :page="sourcePage" :page-count="sourcePageCount" :total="sourceTotal" :limit="sourceLimit" :loading="sourceLoading" @update:page="sourcePageChange" @update:limit="sourceLimitChange" />
             <p v-if="source && !copySupported" class="text-sm text-destructive">{{ $t('liveSolo.bank.unsupported') }}</p>
-            <p v-if="source?.definition?.runtime?.allocation === 'Shared'" class="text-sm text-muted-foreground">{{ $t('liveSolo.bank.allocation') }}</p>
             <Field orientation="horizontal"><Checkbox id="bank-copy-attachments" v-model="copyAttachments" :disabled="pending" /><FieldLabel for="bank-copy-attachments">{{ $t('liveSolo.groups.copyAttachments') }}</FieldLabel></Field>
             <Field orientation="horizontal"><Checkbox id="bank-copy-flags" v-model="copyFlags" :disabled="pending" /><FieldLabel for="bank-copy-flags">{{ $t('liveSolo.groups.copyFlags') }}</FieldLabel></Field>
             <FieldDescription>{{ $t('liveSolo.groups.flagsPermission') }}</FieldDescription>

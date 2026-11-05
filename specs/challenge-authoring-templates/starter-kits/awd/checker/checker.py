@@ -1,4 +1,3 @@
-"""AWD evidence checker example. Never log task material, tokens or response bodies."""
 import datetime as dt
 import errno
 import json
@@ -49,7 +48,7 @@ def failure(error, missing_reason):
 
 
 def combine(observations):
-    for outcome in ("PlatformFailure", "Unknown", "TargetFailure"):
+    for outcome in ("PlatformFailure", "Unknown", "TargetFailure", "NotExecuted"):
         for item in observations:
             if item["outcome"] == outcome:
                 return item
@@ -99,7 +98,7 @@ def evaluate(task, targets, fallback, port=8080):
             if result["reason"] == "RequestTimeout":
                 result["reason"] = "ConnectTimeout"
             connection.append(result)
-            functionality.append(probe("Unknown"))
+            functionality.append(probe("NotExecuted" if result["outcome"] == "TargetFailure" else "PlatformFailure", result["reason"]))
             continue
         try:
             body = request(f"http://{target}:{port}/health", timeout())
@@ -137,13 +136,34 @@ def evaluate(task, targets, fallback, port=8080):
             "observedAt": dt.datetime.now(dt.timezone.utc).isoformat()}
 
 
+def callback_evidence(evidence, task):
+    def convert(kind, result, flag_id=None):
+        reason = result["reason"]
+        if reason == "FlagStoreFailed":
+            reason = "FlagWriteFailed"
+        elif reason in ("CurrentFlagMissing", "HistoricalFlagMissing"):
+            reason = "FlagReadFailed"
+        return {"kind": kind, "flagId": flag_id, "result": result["outcome"], "reason": reason}
+
+    probes = [convert("Connection", evidence["connection"]), convert("Functionality", evidence["functionality"])]
+    contexts = []
+    material = {flag["flagId"]: flag for flag in task["flags"]}
+    for flag in evidence["flags"]:
+        assigned = material[flag["flagId"]]
+        if assigned["requiresWrite"]:
+            probes.append(convert("FlagWrite", flag["write"], flag["flagId"]))
+        probes.append(convert("HistoricalFlagRead" if assigned["historical"] else "CurrentFlagRead", flag["read"], flag["flagId"]))
+        contexts.append({"flagId": flag["flagId"], "privateReadContext": flag["privateReadContext"], "publicLocator": flag["publicLocator"]})
+    return {"probes": probes, "flagContexts": contexts, "observedAt": evidence["observedAt"]}
+
+
 def main():
     try:
         token = os.environ["NOCTF_CALLBACK_TOKEN"]
         task = json.loads(request(os.environ["NOCTF_AWD_TASK_URL"], 5, token=token))
         result = evaluate(task, json.loads(os.environ.get("NOCTF_AWD_TARGETS", "{}")), os.environ["NOCTF_TARGET_HOST"])
         # One immutable receipt; transport failure never changes evidence to success.
-        data = json.dumps(result, separators=(",", ":")).encode("utf-8")
+        data = json.dumps(callback_evidence(result, task), separators=(",", ":")).encode("utf-8")
         req = urllib.request.Request(os.environ["NOCTF_CALLBACK_URL"], data,
                                      {"Authorization": "Bearer " + token, "Content-Type": "application/json"})
         with HTTP.open(req, timeout=5) as response:

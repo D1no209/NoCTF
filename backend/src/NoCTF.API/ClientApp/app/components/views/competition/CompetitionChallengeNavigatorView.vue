@@ -57,9 +57,6 @@ const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, lo
             <Badge v-if="item.challenge.locked" variant="outline" class="shrink-0 text-[0.625rem] not-italic">
               {{ $t('progression.locked') }}
             </Badge>
-            <Badge v-else-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
-              {{ $t('common.label.patchVerification') }}
-            </Badge>
             <StatusIcon :name="progressIcon(item.challenge.id)" :label="progressIconLabel(item.challenge.id)" />
             <span v-if="currentScore(item.challenge.id) !== null" data-challenge-score class="shrink-0 whitespace-nowrap text-right font-sans text-sm leading-none font-bold italic tabular-nums text-primary">
               {{ currentScore(item.challenge.id) }} <span class="text-[0.625rem]">{{ $t('common.label.pts.scoreTrendChart') }}</span>

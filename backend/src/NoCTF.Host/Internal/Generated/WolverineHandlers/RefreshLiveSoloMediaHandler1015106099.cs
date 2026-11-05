@@ -58,8 +58,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider4 = __timeProvider4;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
@@ -82,13 +80,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await liveSoloMediaMessageHandler.Handle(refreshLiveSoloMedia, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: RefreshLiveSoloMediaHandler1015106099
     
     
 }
-

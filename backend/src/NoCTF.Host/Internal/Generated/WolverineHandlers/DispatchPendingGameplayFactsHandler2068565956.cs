@@ -4,8 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Infrastructure.Runtime.Capacity;
 using System;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace Internal.Generated.WolverineHandlers
 {
@@ -19,10 +22,14 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.PendingGameplayFactDispatchHandler> _loggerOfPendingGameplayFactDispatchHandler;
         private readonly NATS.Client.Core.INatsConnection _natsConnection;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
+        private readonly NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy _runtimePlacementPolicy;
         private readonly NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore _gameplayFactRecoveryCursorStore;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly System.TimeProvider _timeProvider;
+        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public DispatchPendingGameplayFactsHandler2068565956(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.PendingGameplayFactDispatchHandler> loggerOfPendingGameplayFactDispatchHandler, NATS.Client.Core.INatsConnection natsConnection, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore gameplayFactRecoveryCursorStore, System.TimeProvider timeProvider)
+        public DispatchPendingGameplayFactsHandler2068565956(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.PendingGameplayFactDispatchHandler> loggerOfPendingGameplayFactDispatchHandler, NATS.Client.Core.INatsConnection natsConnection, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy runtimePlacementPolicy, NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactRecoveryCursorStore gameplayFactRecoveryCursorStore, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -30,33 +37,36 @@ namespace Internal.Generated.WolverineHandlers
             _loggerOfPendingGameplayFactDispatchHandler = loggerOfPendingGameplayFactDispatchHandler;
             _natsConnection = natsConnection;
             _notificationChangePublisher = notificationChangePublisher;
+            _runtimePlacementPolicy = runtimePlacementPolicy;
             _gameplayFactRecoveryCursorStore = gameplayFactRecoveryCursorStore;
+            _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _timeProvider = timeProvider;
+            _fusionCacheProvider = fusionCacheProvider;
         }
-
-
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
+            var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
+            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
+            var awdPersistentFixStore = new NoCTF.Infrastructure.Competitions.Awd.Fixes.AwdPersistentFixStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore);
+            var recoverPersistentFixes = new NoCTF.Application.Competitions.Awd.Fixes.RecoverPersistentFixes(awdPersistentFixStore, persistedRunnerCapacityGate, _runtimePlacementPolicy, _timeProvider);
             // The actual message body
             var dispatchPendingGameplayFacts = (NoCTF.Application.Messaging.DispatchPendingGameplayFacts)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.PendingGameplayFactDispatchHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.PendingGameplayFactDispatchHandler");
-            var pendingGameplayFactDispatchHandler = new NoCTF.Worker.PendingGameplayFactDispatchHandler(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider, _natsConnection, _gameplayFactRecoveryCursorStore, _loggerOfPendingGameplayFactDispatchHandler);
+            var pendingGameplayFactDispatchHandler = new NoCTF.Worker.PendingGameplayFactDispatchHandler(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider, _natsConnection, _gameplayFactRecoveryCursorStore, recoverPersistentFixes, _loggerOfPendingGameplayFactDispatchHandler);
             
             // The actual message execution
             await pendingGameplayFactDispatchHandler.Handle(dispatchPendingGameplayFacts, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: DispatchPendingGameplayFactsHandler2068565956
     
     
 }
-

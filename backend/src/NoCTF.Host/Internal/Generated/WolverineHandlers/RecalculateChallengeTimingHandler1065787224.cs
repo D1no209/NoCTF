@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Runtime.Provisioning;
 using System;
-using ZiggyCreatures.Caching.Fusion;
 
 namespace Internal.Generated.WolverineHandlers
 {
@@ -19,9 +18,8 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog _challengeRuntimeTemplateCatalog;
         private readonly System.TimeProvider _timeProvider;
-        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public RecalculateChallengeTimingHandler1065787224(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public RecalculateChallengeTimingHandler1065787224(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, System.TimeProvider timeProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -29,21 +27,16 @@ namespace Internal.Generated.WolverineHandlers
             _notificationChangePublisher = notificationChangePublisher;
             _challengeRuntimeTemplateCatalog = challengeRuntimeTemplateCatalog;
             _timeProvider = timeProvider;
-            _fusionCacheProvider = fusionCacheProvider;
         }
-
-
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            var fileReferenceLock = new NoCTF.Infrastructure.Storage.FileReferenceLock();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var liveSoloMaterialMutationGate = new NoCTF.Infrastructure.LiveSolo.Templates.LiveSoloMaterialMutationGate(noCtfDbContext);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var platformConfigurationStore = new NoCTF.Infrastructure.Administration.PlatformConfigurationStore(noCtfDbContext, _fusionCacheProvider, wolverinePostCommitMessagePublisher, fileReferenceLock);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
-            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, platformConfigurationStore, liveSoloMaterialMutationGate);
+            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, liveSoloMaterialMutationGate);
             var challengeTimingStore = new NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingStore(noCtfDbContext, wolverinePostCommitMessagePublisher, challengeManagementStore, competitionEventStore);
             // The actual message body
             var recalculateChallengeTiming = (NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming)context.Envelope.Message;
@@ -54,13 +47,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await challengeTimingMessageHandler.Handle(recalculateChallengeTiming, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: RecalculateChallengeTimingHandler1065787224
     
     
 }
-

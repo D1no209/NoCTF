@@ -24,7 +24,7 @@ export function leaderboard(state: MockState, competitionId: string) {
     ]
     return model('CompetitionsScoreboardTeamResponse', {
       teamId: team.id, teamName: team.name, trackKey: team.trackKey, rankingState: team.isBanned ? 'Banned' : 'Eligible',
-      totalScore, attackScore, defenseScore, globalAdjustmentCount: 0, theoryScore: 0, hasTheorySubmission: false,
+      totalScore, attackScore, defenseScore, globalAdjustmentCount: 0,
       // Slots, achievements and totals reference challenges by their position in `challenges`.
       slots: progress.map((item, ci) => model('CompetitionsScoreboardSlotResponse', {
         challenge: ci, round: null, scoreState: 'Settled',

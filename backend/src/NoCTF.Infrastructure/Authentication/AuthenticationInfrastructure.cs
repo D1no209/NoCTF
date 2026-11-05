@@ -130,10 +130,10 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<GetPublicUserProfile>();
         services.AddScoped<UpdateCurrentUserProfile>();
         services.AddScoped<PatchCurrentUserProfile>();
-        services.AddSingleton<IAvatarImageProcessor, ImageSharpAvatarImageProcessor>();
+        services.AddSingleton<IAvatarImageProcessor, SkiaAvatarImageProcessor>();
         services.AddScoped<ReplaceCurrentUserAvatar>();
         services.AddScoped<GetUserAvatar>();
-        services.AddSingleton<IWallpaperImageProcessor, ImageSharpWallpaperImageProcessor>();
+        services.AddSingleton<IWallpaperImageProcessor, SkiaWallpaperImageProcessor>();
         services.AddScoped<ReplaceCurrentUserWallpaper>();
         services.AddScoped<GetCurrentUserWallpaper>();
         services.AddScoped<UpdateCurrentUserWallpaperPreference>();

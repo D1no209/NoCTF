@@ -21,12 +21,13 @@ export function useLiveSoloQuestionPool() {
   const loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null), saved = ref(false)
   const uploadFiles = ref<File[]>([]), uploadKey = ref(0), deliveryPolicy = ref<'All' | 'RandomOnePerTeam'>('All'), downloadFileName = ref('')
   const deployOpen = ref(false), sourceId = ref<string | null>(null), keyword = ref(''), leaveOpen = ref(false)
+  const deployCompletionKind = ref<import('~/api').NoCtfDomainLiveSoloLiveSoloCompletionKind>('Break')
   const current = computed(() => questions.value.find(x => x.id === selected.value) ?? null)
   const dirty = computed(() => original.value !== JSON.stringify(draft.value))
   const options = computed(() => questions.value.filter(x => x.id).map(x => ({ value: x.id!, label: x.title ?? '—', row: x })))
   const returning = computed(() => typeof route.query.group === 'string')
   const sources = useOffsetPagination<Template>(async ({ offset, limit }) => {
-    const result = await adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, desc: false, offset, limit, mode: 'LiveSolo', keyword: keyword.value || undefined } })
+    const result = await adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, desc: false, offset, limit, requiredCapabilities: [], keyword: keyword.value || undefined } })
     if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
     return result.data
   })
@@ -93,7 +94,7 @@ export function useLiveSoloQuestionPool() {
     busy.value = true
     const actor = user.value?.userId, epoch = generation
     try {
-      const result = await deployLiveSoloPoolQuestion({ path: { competitionId: competitionId.value }, body: { sourceTemplateId: source.id, expectedSourceStamp: source.concurrencyStamp } })
+      const result = await deployLiveSoloPoolQuestion({ path: { competitionId: competitionId.value }, body: { sourceTemplateId: source.id, expectedSourceStamp: source.concurrencyStamp, completionKind: deployCompletionKind.value } })
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
       if (disposed || actor !== user.value?.userId || epoch !== generation) return
       questions.value = [...questions.value.filter(x => x.id !== result.data!.id), result.data]
@@ -127,6 +128,7 @@ export function useLiveSoloQuestionPool() {
   onMounted(() => { void load(); window.addEventListener('beforeunload', beforeUnload) })
   onScopeDispose(() => { disposed = true; generation++; window.removeEventListener('beforeunload', beforeUnload) })
   return { exportedTemplatePath, questions, options, current, selected, draft, dirty, writable, canOrganize, loading, busy, error, saved, returning, load, select, create, save, back,
+    deployCompletionKind,
     attachments, uploadFiles, uploadKey, deliveryPolicy, downloadFileName, addFlag, removeFlag, removeAttachment, chooseFiles, upload, deployOpen, setDeployment, openDeployment, sourceId, sourceOptions, keyword, searchSources, deploy, exportToBank,
     sourcePage: sources.page, sourcePageCount: sources.pageCount, sourceTotal: sources.total, sourceLimit: sources.limit, sourceLoading: sources.loading,
     sourcePageChange: sources.loadPage, sourceLimitChange: sources.setPageSize, leaveOpen, setLeave, discard, DefinitionEditor: markRaw(DefinitionEditor) }

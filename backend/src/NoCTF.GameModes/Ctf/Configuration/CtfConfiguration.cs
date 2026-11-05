@@ -32,14 +32,5 @@ public sealed record CtfChallengeConfiguration(
     ChallengeRuntimeTemplate? Runtime = null,
     long? WrongSubmissionPenalty = null,
     PerTeamFlagTemplate? FlagTemplate = null,
-    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission,
-    int? MaxPatchAttempts = null,
-    string? PatchEntrypoint = null,
-    IReadOnlyList<string>? PatchCommand = null,
-    int? PatchTimeoutSeconds = null,
-    RunnerJobConfiguration? Checker = null,
-    int? ReadyTimeoutSeconds = null,
-    long? MaximumPatchUploadBytes = null,
-    bool CheckerFixInput = false,
     CtfScoreSettlementMode? ScoreSettlementMode = null)
 ;

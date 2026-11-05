@@ -73,7 +73,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         fixture.Competition.OwnerId = owner.Id;
         fixture.Challenge.OwnerId = owner.Id;
         fixture.Facts[0].Result = GameplayFactResult.Correct;
-        fixture.CompetitionChallenge.Rules!.HasScoreCurve = true;
+        ((CtfCompetitionChallengeRules)fixture.CompetitionChallenge.Rules!).HasScoreCurve = true;
         ((CtfCompetitionChallengeRules)fixture.CompetitionChallenge.Rules!).ScoreCurve = new()
             { InitialPoints = 100, MinimumPoints = 100, DecayTeamCount = 10, DecayMode = PersistedScoreDecayMode.Fixed };
         db.Users.AddRange(owner, participant); db.Competitions.Add(fixture.Competition); db.Challenges.Add(fixture.Challenge);

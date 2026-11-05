@@ -69,9 +69,9 @@ public sealed class HumanVerificationOpenApiTests
             "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch"
+            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes",
+            "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-target",
+            "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-targets/{runtimeInstanceId}/fixes"
         });
         await Assert.That(protectedPaths.Any(path => path.Contains("/admin/", StringComparison.Ordinal))).IsFalse();
         await Assert.That(protectedPaths.Any(path => path.Contains("/internal/", StringComparison.Ordinal))).IsFalse();

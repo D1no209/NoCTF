@@ -39,6 +39,6 @@ Checker 通过 `NOCTF_AWD_TASK_URL` 和当前尝试 JWT 读取固定清单，逐
 - 管理端：比赛默认、题目覆盖、Store 配置、历史计分预览、检查证据与裁定。
 - 选手：规则说明区分本轮已生效与下一轮配置，只读取本队服务状态。
 - 大屏：`awd-spectator` 提供一致快照与有界历史，服务健康灯与本轮捕获标记独立；冻结视图使用同一快照代际并应用公开受众过滤。
-- Checker 任务与结果：`GET /api/internal/v1/awd/check-task`、`POST /api/internal/v1/awd/check-results`。
+- Checker 任务与结果：`GET /api/internal/v1/awd/check-task`、`POST /api/internal/v1/capabilities/check-results`。
 
 可运行镜像与证据示例见 [AWD Starter Kit](../challenge-authoring-templates/starter-kits/awd/README.md)，制作流程见 [出题规范](../challenge-authoring-awd-awdp.md)。

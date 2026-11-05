@@ -12,7 +12,10 @@ public sealed record GameplayFactDecision(
     Guid? VictimTeamId = null,
     GameplayFactReferenceKind? ReferenceKind = null,
     Guid? ReferenceId = null,
-    AwdAttackDecision? AwdAttack = null);
+    AwdAttackDecision? AwdAttack = null)
+{
+    public NoCTF.Domain.Challenges.Capabilities.BreakOutcome? BreakOutcome { get; init; }
+}
 
 public sealed record AwdAttackDecision(AwdAttackOutcome Outcome, Guid? FlagId = null,
     Guid? GenerationRoundId = null, Guid? RulesId = null);
@@ -27,7 +30,10 @@ public sealed record GameplayFactProcessingContext(
     DateTimeOffset? CompetitionStartTime = null,
     TimeSpan? EffectiveRunningTime = null,
     ChallengeDefinition? ChallengeDefinition = null,
-    IReadOnlyList<AwdRoundRules>? AwdIssuanceRules = null);
+    IReadOnlyList<AwdRoundRules>? AwdIssuanceRules = null)
+{
+    public NoCTF.Domain.Challenges.Capabilities.BreakOutcome? BreakEvidence { get; init; }
+}
 
 public interface IGameplayFactEvaluator
 {

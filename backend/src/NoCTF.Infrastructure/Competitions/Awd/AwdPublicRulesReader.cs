@@ -35,7 +35,7 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
                 && item.FirstRound <= round.Number && item.LastRound >= round.Number && item.AppliedAt <= now)
             .OrderByDescending(item => item.Sequence).FirstOrDefaultAsync(ct);
         var resolved = AwdEffectiveRules.Resolve(defaults, overrides);
-        var nextStores = ((AwdChallengeDefinition)template.Definition!).FlagStores.OrderBy(store => store.Position)
+        var nextStores = template.Definition!.Break!.FlagStores.OrderBy(store => store.Position)
             .Select(store => { var rule = overrides.StoreRules.SingleOrDefault(item => item.StoreId == store.Id);
                 return new AwdPublicStoreRule(store.Id, store.Name, rule?.Weight ?? 1m,
                     rule?.FlagsPerIssue ?? resolved.Options.FlagsPerStore); }).ToArray();
@@ -72,7 +72,7 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
     {
         var checks = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == competitionId
             && fact.CompetitionChallengeId == challengeId && fact.TeamId == teamId
-            && fact.Kind == GameplayFactKind.AwdServiceTransition && fact.OccurredAt <= now && fact.Awd != null)
+            && fact.Kind == GameplayFactKind.CheckObservation && fact.OccurredAt <= now && fact.Awd != null)
             .Select(fact => new { fact.Id, fact.Awd!.ReceivedRoundId, fact.Awd.Health, fact.Awd.Execution,
                 fact.Awd.Settlement, fact.Awd.ScheduledAt, fact.Awd.ObservedAt });
         var current = await checks.Where(check => roundId != null && check.ReceivedRoundId == roundId)

@@ -28,7 +28,8 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
             var finished = CompetitionOfficialWindowReader.FinishedAt(db, competitionId);
             var rules = await db.Set<CompetitionChallengeRules>().AsNoTracking()
                 .Where(item => item.CompetitionChallengeId == competitionChallengeId)
-                .Select(item => new { item.MaxFlagAttempts, item.MaxBreakSubmissions,
+                .Select(item => new { MaxFlagAttempts = item is CtfCompetitionChallengeRules ? ((CtfCompetitionChallengeRules)item).MaxFlagAttempts : null,
+                    MaxBreakSubmissions = item is AwdpCompetitionChallengeRules ? ((AwdpCompetitionChallengeRules)item).MaxBreakSubmissions : null,
                     Timing = db.CompetitionChallenges.Where(challenge => challenge.Id == item.CompetitionChallengeId)
                         .Select(challenge => new { challenge.AutoOpenAt, challenge.SubmissionDeadlineAt }).First(),
                     Window = db.Competitions.Where(competition => competition.Id == competitionId)
@@ -73,7 +74,7 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
             }
 
             var totals = await attempts
-                .Where(item => item.Kind == GameplayFactKind.FlagAttempt
+                .Where(item => item.Kind == GameplayFactKind.BreakAttempt
                     || item.Kind == GameplayFactKind.BreakAttempt)
                 .GroupBy(item => item.Kind)
                 .Select(group => new
@@ -85,7 +86,7 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
                 .ToArrayAsync(cancellationToken);
             var accepted = totals.Sum(item => item.Count);
             var solved = mode == GameMode.Ctf
-                && totals.Any(item => item.Kind == GameplayFactKind.FlagAttempt && item.HasCorrect);
+                && totals.Any(item => item.Kind == GameplayFactKind.BreakAttempt && item.HasCorrect);
             return new(maximum, accepted,
                 maximum is { } limit ? Math.Max(0, limit - accepted) : null,
                 solved);

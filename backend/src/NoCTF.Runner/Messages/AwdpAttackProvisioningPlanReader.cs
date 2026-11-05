@@ -52,7 +52,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbCo
             .SingleOrDefaultAsync(cancellationToken);
         if (runtime is null)
             return new(AwdpAttackProvisioningPlanState.Invalid);
-        if (runtime.Purpose != RuntimePurpose.AwdpAttack)
+        if (runtime.Purpose != RuntimePurpose.AttackTarget)
             return new(AwdpAttackProvisioningPlanState.NotApplicable);
         if (runtime.TeamId is not Guid teamId)
             return new(AwdpAttackProvisioningPlanState.Invalid);
@@ -72,7 +72,8 @@ public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbCo
                 challenge => challenge.Id,
                 (target, challenge) => new
                 {
-                    Template = challenge
+                    Template = challenge,
+                    target.Challenge.Rules
                 })
             .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
@@ -96,7 +97,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbCo
         ChallengeRuntimeTemplate? template;
         try
         {
-            template = RuntimeTemplates.Get(target.Template.Definition);
+            template = RuntimeTemplates.Get(target.Template.Definition, target.Rules!);
         }
         catch (Exception exception) when (exception is JsonException
             or GameModeConfigurationException
@@ -104,11 +105,12 @@ public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbCo
         {
             return new(AwdpAttackProvisioningPlanState.Invalid);
         }
-        if (template is not { FlagSource: RuntimeFlagSource.PerTeam, Definition: ContainerRuntimeDefinition { Services.Count: 1 } definition }
-            || definition.Services[0].FlagEnvironmentVariableName is not { Length: > 0 } variable
-            || message.Definition.Services.Count != 1
-            || message.Definition.Services[0].Environment?.TryGetValue(variable, out var injectedFlag) != true
-            || !string.Equals(injectedFlag, flag, StringComparison.Ordinal))
+        if (template is not { FlagSource: RuntimeFlagSource.PerTeam, Definition: ContainerRuntimeDefinition definition }
+            || !definition.Services.Any(service => service.FlagEnvironmentVariableName is { Length: > 0 })
+            || definition.Services.Where(service => service.FlagEnvironmentVariableName is { Length: > 0 }).Any(service =>
+                message.Definition.Services.SingleOrDefault(targetService => targetService.Name == service.Name)?.Environment
+                    ?.TryGetValue(service.FlagEnvironmentVariableName!, out var injectedFlag) != true
+                || !string.Equals(injectedFlag, flag, StringComparison.Ordinal)))
             return new(AwdpAttackProvisioningPlanState.Invalid);
 
         return new(AwdpAttackProvisioningPlanState.Ready, message.Definition);

@@ -10,7 +10,11 @@ describe('isolated LiveSolo UI fixtures', () => {
     const state = createFixtures(), fixture = createMockLiveSolo(state)
     const challenges = state.challenges.filter(row => row.competitionId === fixture.competitionId)
     expect(challenges).toHaveLength(4)
-    for (const row of challenges) expect(state.templates.find(template => template.id === row.challengeId)?.mode).toBe('LiveSolo')
+    for (const row of challenges) {
+      const template = state.templates.find(template => template.id === row.challengeId)!
+      expect(template.definition.capabilities.some((capability: { kind: string }) => capability.kind === 'Break')).toBe(true)
+      expect(template).not.toHaveProperty('mode')
+    }
     for (const group of fixture.groups) expect(validGroup(groupDraft(group), 180, 900)).toBe(true)
     expect(new Set(state.teams.map(row => row.id)).size).toBe(state.teams.length)
   })

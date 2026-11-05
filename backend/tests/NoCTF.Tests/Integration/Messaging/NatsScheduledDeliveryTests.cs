@@ -20,7 +20,7 @@ public sealed class NatsScheduledDeliveryTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var nats = new ContainerBuilder(
-                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                    "docker.m.daocloud.io/library/nats:2.14.7-alpine@sha256:4063edae0717ba5f7501bfde75f97fd9b57f5b93597b92c70b6a6fbbf6a74e06")
                 .WithPortBinding(4222, assignRandomHostPort: true)
                 .WithCommand("-js")
                 .WithWaitStrategy(Wait.ForUnixContainer()
@@ -43,13 +43,12 @@ public sealed class NatsScheduledDeliveryTests
                     options.UseNats(connectionString)
                         .AutoProvision()
                         .UseJetStream(_ => { })
-                        .DefineWorkQueueStream(
+                        .DefineStream(
                             stream,
                             configuration => configuration.WithSubjects(
                                     subject,
-                                    NatsSubjects.ScheduledSubject(WorkerQueue.Control))
-                                .EnableScheduledDelivery(),
-                            subject);
+                                    NatsSubjects.ScheduledSubject(WorkerQueue.Control) + ".>")
+                                .EnableScheduledDelivery());
                     options.ListenToNatsSubject(subject)
                         .UseJetStream(stream, consumer);
                     options.PublishMessage<ScheduledProbeMessage>()

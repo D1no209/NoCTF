@@ -9,7 +9,10 @@ public static class EndpointRegistration
 {
     public static WebApplication UseNoCtfEndpoints(this WebApplication app)
     {
-        app.UseMiddleware<NoCTF.API.Endpoints.Theory.TheoryResponsePrivacy>();
+        app.UseMiddleware<NoCTF.API.Security.PrivateEndpointResponseMiddleware>();
+        app.UseWhen(context => context.GetEndpoint()?.Metadata.GetMetadata<NoCTF.API.Security.ProtectedEntryMetadata>()?.Entry
+            == NoCTF.API.Security.ProtectedEntry.TemplatePatchUpload,
+            branch => branch.UseMiddleware<NoCTF.API.Security.TemplateCapabilityUploadScopeMiddleware>());
         app.UseFastEndpoints(options =>
         {
             options.Endpoints.ShortNames = true;

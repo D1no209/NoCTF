@@ -8,8 +8,8 @@ public interface INotificationHubClient
 {
     [HubMethodName("navigationCapabilitiesChanged")]
     Task NavigationCapabilitiesChanged(CancellationToken cancellationToken);
-    [HubMethodName("theoryChanged")]
-    Task TheoryChanged(Guid activityId, CancellationToken cancellationToken);
+    [HubMethodName("questionnaireChanged")]
+    Task QuestionnaireChanged(Guid activityId, CancellationToken cancellationToken);
     [HubMethodName("notificationChanged")]
     Task NotificationChanged(CancellationToken cancellationToken);
 }

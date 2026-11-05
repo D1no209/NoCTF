@@ -41,7 +41,7 @@ public sealed class CompetitionDirectionPersistenceTests
                 ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32], CreatedAt = now, UpdatedAt = now });
         var templateIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
         foreach (var id in templateIds)
-            db.Challenges.Add(new CtfChallenge { Id = id, OwnerId = ownerId, Title = "Web template", Direction = "Web",
+            db.Challenges.Add(new Challenge { Id = id, OwnerId = ownerId, Title = "Web template", Direction = "Web",
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now });
         var ccId = Guid.NewGuid();
         db.CompetitionChallenges.Add(new CtfCompetitionChallenge { Id = ccId, CompetitionId = competitionIds[0], ChallengeId = templateIds[0],

@@ -18,7 +18,6 @@ public sealed class ChallengeTestFlagFactoryTests
         var runtime = Runtime(RuntimeFlagSource.PerTeam);
 
         var plan = ChallengeTestFlagFactory.Create(
-            GameMode.Ctf,
             runtime,
             challengeId,
             runtimeId);
@@ -32,7 +31,6 @@ public sealed class ChallengeTestFlagFactoryTests
     public async Task Create_AwdRotation_UsesCommandDelivery()
     {
         var plan = ChallengeTestFlagFactory.Create(
-            GameMode.Awd,
             Runtime(RuntimeFlagSource.AwdRotation),
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
@@ -45,7 +43,6 @@ public sealed class ChallengeTestFlagFactoryTests
     public async Task Create_StaticRuntime_DoesNotInventAnInjectedFlag()
     {
         var plan = ChallengeTestFlagFactory.Create(
-            GameMode.Ctf,
             Runtime(RuntimeFlagSource.Static),
             Guid.CreateVersion7(),
             Guid.CreateVersion7());

@@ -4,6 +4,7 @@ using NoCTF.Application.LiveSolo.Rounds;
 using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Challenges.Actions;
 using NoCTF.Domain.Commands;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Gameplay;
@@ -45,10 +46,12 @@ public sealed partial class LiveSoloMatchStore
         var round = await db.LiveSoloRounds.Include(x => x.Pauses).Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == command.RoundId && x.MatchId == match.Id, ct);
         var question = round?.Questions.SingleOrDefault(x => x.Id == command.QuestionId);
         if (round is null || question is null) return new(null, null, null, LiveSoloFailure.NotFound);
+        if (!await db.Set<LiveSoloCompetitionChallengeRules>().AnyAsync(rule => rule.CompetitionChallengeId == question.CompetitionChallengeId
+                && rule.CompletionKind == LiveSoloCompletionKind.Break, ct)) return new(null, null, null, LiveSoloFailure.SubmissionActionUnsupported);
         await SynchronizeCompetitionPausesAsync(round, command.CompetitionId, (clock ?? TimeProvider.System).GetUtcNow(), true, ct);
         var admittedAt = (clock ?? TimeProvider.System).GetUtcNow();
         if (LiveSoloRoundRules.CanAdmit(round, question, admittedAt) is { } denied) return new(null, null, null, denied);
-        var fact = new FlagAttemptGameplayFact { Id = Guid.CreateVersion7(admittedAt), CompetitionId = command.CompetitionId,
+        var fact = new BreakAttemptGameplayFact { Id = Guid.CreateVersion7(admittedAt), CompetitionId = command.CompetitionId,
             CompetitionChallengeId = question.CompetitionChallengeId, TeamId = teamId, ActorUserId = command.ActorId,
             State = GameplayFactState.Queued, Value = command.Flag, ValueSha256 = ManageChallengeFlags.Hash(command.Flag), OccurredAt = admittedAt, UpdatedAt = admittedAt,
             AcquisitionEvidence = await CaptureEvidenceAsync(question, round.StaticFlagEvidenceRequired, teamId, admittedAt, ct) };
@@ -65,9 +68,11 @@ public sealed partial class LiveSoloMatchStore
     {
         if (!required) return new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };
         var templateId = await db.CompetitionChallenges.Where(x => x.Id == question.CompetitionChallengeId).Select(x => x.ChallengeId).SingleAsync(ct);
-        var definition = await db.Set<LiveSoloChallengeDefinition>().Include(x => x.Runtime).SingleAsync(x => x.ChallengeId == templateId, ct);
+        var definition = await db.Set<ChallengeDefinition>().Include(x => x.Runtime).SingleAsync(x => x.ChallengeId == templateId, ct);
         var evidence = new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };
-        if (definition.Runtime is { FlagSource: not PersistedRuntimeFlagSource.Static }) return evidence;
+        var rules = await db.Set<LiveSoloCompetitionChallengeRules>().AsNoTracking()
+            .SingleAsync(value => value.CompetitionChallengeId == question.CompetitionChallengeId, ct);
+        if (rules.Runtime.FlagSource != PersistedRuntimeFlagSource.Static) return evidence;
         evidence.Scope = FlagAcquisitionScope.FormalStaticExecution;
         if (definition.Runtime is ContainerChallengeRuntimeTemplate) evidence.Required |= FlagAcquisitionResource.Container;
         if (await db.Set<ChallengeAttachment>().AnyAsync(x => x.ChallengeId == templateId && x.DeletedAt == null, ct)) evidence.Required |= FlagAcquisitionResource.Attachment;
@@ -97,6 +102,8 @@ public sealed partial class LiveSoloMatchStore
             || competition.ModeConfiguration is not LiveSoloCompetitionModeConfiguration { Enabled: true }
             || !await db.LiveSoloRounds.AnyAsync(x => x.Id == roundId && x.MatchId == matchId
                 && (x.State == LiveSoloRoundState.Running || x.State == LiveSoloRoundState.ConfirmingResult), ct)) return null;
+        var round = await db.LiveSoloRounds.AsNoTracking().Include(value => value.Pauses).SingleAsync(value => value.Id == roundId, ct);
+        await SynchronizeCompetitionPausesAsync(round, competitionId, now, false, ct);
         var questions = await db.LiveSoloRoundQuestions.AsNoTracking().Include(x => x.Runtimes).Include(x => x.OpenedContent)
             .Where(x => x.RoundId == roundId && x.OpenedAt != null && x.OpenedAt <= now).OrderBy(x => x.Position).ToArrayAsync(ct);
         var questionIds = questions.Select(x => x.Id).ToArray();
@@ -105,9 +112,39 @@ public sealed partial class LiveSoloMatchStore
             .ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
             .Select(x => new { x.ExecutionScopeId, x.Id }).ToArrayAsync(ct);
         var current = runtimes.GroupBy(x => x.ExecutionScopeId!.Value).ToDictionary(x => x.Key, x => (Guid?)x.First().Id);
+        var challengeIds = questions.Select(value => value.CompetitionChallengeId).ToArray();
+        var completions = await db.Set<LiveSoloCompetitionChallengeRules>().AsNoTracking()
+            .Where(value => challengeIds.Contains(value.CompetitionChallengeId)).ToDictionaryAsync(value => value.CompetitionChallengeId, value => value.CompletionKind, ct);
+        var fixTargets = await db.Set<LiveSoloFixTargetOwnership>().AsNoTracking().Where(value => questionIds.Contains(value.RoundQuestionId))
+            .Join(db.RuntimeInstances.AsNoTracking().Where(value => value.TeamId == teamId), value => value.RuntimeInstanceId, value => value.Id,
+                (binding, instance) => new { binding.RoundQuestionId, instance.Id, instance.State, instance.GameplayFactId, instance.CreatedAt,
+                    Sequence = db.LiveSoloSubmissions.Where(value => value.GameplayFactId == instance.GameplayFactId).Select(value => (long?)value.AdmissionSequence).SingleOrDefault() })
+            .OrderByDescending(value => value.GameplayFactId == null
+                && (value.State == RuntimeState.Queued || value.State == RuntimeState.Provisioning || value.State == RuntimeState.Running))
+            .ThenByDescending(value => value.CreatedAt).ThenByDescending(value => value.Sequence).ThenByDescending(value => value.Id).ToArrayAsync(ct);
+        var latestFix = fixTargets.GroupBy(value => value.RoundQuestionId).ToDictionary(value => value.Key, value => value.First());
+        LiveSoloAvailableAction[] Actions(LiveSoloRoundQuestion question)
+        {
+            LiveSoloFailure? failure = match.PendingCorrectionId is not null || match.SupersededAt is not null ? LiveSoloFailure.RoundNotRunning
+                : !match.Roster.Any(member => member.UserId == actorId && member.TeamId == teamId)
+                    || !match.Slots.Any(slot => slot.TeamId == teamId && slot.RosterLockedAt != null) ? LiveSoloFailure.Forbidden
+                : match.State == LiveSoloMatchState.Paused || competition.Status == NoCTF.Domain.Competitions.CompetitionStatus.Paused ? LiveSoloFailure.RoundPaused
+                : LiveSoloRoundRules.CanAdmit(round, question, now);
+            var availability = failure is null ? ChallengeActionAvailability.Available : ChallengeActionAvailability.AdmissionRejected;
+            if (completions[question.CompetitionChallengeId] == LiveSoloCompletionKind.Break)
+                return [new(ChallengeActionKind.SubmitFlag, failure is null, availability, failure)];
+            var target = latestFix.GetValueOrDefault(question.Id);
+            var ready = target is { GameplayFactId: null, State: RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running };
+            return [new(ChallengeActionKind.PrepareFixTarget, failure is null && !ready, failure is not null ? availability
+                        : ready ? ChallengeActionAvailability.TargetBusy : ChallengeActionAvailability.Available, failure),
+                new(ChallengeActionKind.SubmitFix, failure is null && ready, failure is not null ? availability
+                        : ready ? ChallengeActionAvailability.Available : ChallengeActionAvailability.TargetRequired,
+                    failure, target?.Id, target?.GameplayFactId)];
+        }
         return questions.Where(x => x.OpenedContent != null).Select(x => new LiveSoloQuestionView(x.Id, x.CompetitionChallengeId, x.Position,
             x.OpenedContent!.Title, x.OpenedContent.Description,
             x.OpenedContent.Direction, x.OpenedContent.Tags.OrderBy(t => t.Position).Select(t => t.Name).ToArray(),
-            x.OpenedAt!.Value, current.GetValueOrDefault(x.Id))).ToArray();
+            x.OpenedAt!.Value, current.GetValueOrDefault(x.Id))
+            { CompletionKind = completions[x.CompetitionChallengeId], AvailableActions = Actions(x) }).ToArray();
     }
 }

@@ -134,7 +134,7 @@ public sealed class AggregatePatchMapperTests
     public async Task Template_content_and_competition_challenge_rules_keep_scope_identifiers()
     {
         var ownerId = Guid.NewGuid();
-        var template = new CtfChallenge
+        var template = new Challenge
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
@@ -146,17 +146,11 @@ public sealed class AggregatePatchMapperTests
         };
         ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(new()
         {
-            Mode = GameModeProtocol.Awd,
             Visibility = ChallengeVisibilityProtocol.Shared,
             Title = "new",
             Description = null,
             Direction = "Pwn",
-            Definition = new ChallengeDefinitionContract
-            {
-                Mode = GameModeProtocol.Awd,
-                Awd = new AwdChallengeDefinitionContract { FlagInjection = null },
-                PatchCommand = []
-            }
+            Definition = ChallengeDefinitionContractMapper.FromDomain(TestConfigurations.Definition(GameMode.Awd))
         }, template);
 
         var competitionId = Guid.NewGuid();
@@ -418,7 +412,7 @@ public sealed class AggregatePatchMapperTests
     [Test]
     public async Task Template_permissions_and_competition_presentation_preserve_owned_content_and_links()
     {
-        var template = new CtfChallenge
+        var template = new Challenge
         {
             Id = Guid.NewGuid(),
             OwnerId = Guid.NewGuid(),
@@ -454,7 +448,7 @@ public sealed class AggregatePatchMapperTests
         await Assert.That(template.ManagerIds[0]).IsNotEqualTo(managers[0]);
         await Assert.That(instance.CompetitionId).IsEqualTo(competitionId);
         await Assert.That(instance.ChallengeId).IsEqualTo(challengeId);
-        await Assert.That(instance.Rules!.WrongSubmissionPenalty).IsEqualTo(7);
+        await Assert.That(((CtfCompetitionChallengeRules)instance.Rules!).WrongSubmissionPenalty).IsEqualTo(7);
     }
 
     [Test]

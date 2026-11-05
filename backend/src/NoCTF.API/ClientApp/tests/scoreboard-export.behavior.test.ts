@@ -7,7 +7,7 @@ function board(mode: 'Ctf' | 'Koh') {
     mode,
     challenges: ['current', 'settled', 'pending', 'zero', 'missing'].map(competitionChallengeId => ({ competitionChallengeId })),
     teams: [{
-      teamId: 'team', teamName: 'Team,"一"', totalScore: 461, theoryScore: 10,
+      teamId: 'team', teamName: 'Team,"一"', totalScore: 461,
       slots: [
         { challenge: 0, scoreState: 'Provisional', netPoints: 286 },
         { challenge: 1, scoreState: 'Settled', netPoints: 165 },
@@ -22,12 +22,12 @@ describe('leaderboard CSV export', () => {
   test.each(['Ctf', 'Koh'] as const)('includes current %s points alongside totals and leaves unavailable cells empty', mode => {
     const snapshot = board(mode)
     const csv = buildScoreboardCsv(
-      ['Rank', 'Team', 'Total', 'Theory', 'Current', 'Settled', 'Pending', 'Zero', 'Missing'],
+      ['Rank', 'Team', 'Total', 'Current', 'Settled', 'Pending', 'Zero', 'Missing'],
       snapshot.teams, snapshot.layout.columns, mode,
-      team => [1, team.teamName, team.totalScore, team.theoryScore],
+      team => [1, team.teamName, team.totalScore],
     )
-    expect(csv).toBe('\uFEFF"Rank","Team","Total","Theory","Current","Settled","Pending","Zero","Missing"\r\n'
-      + '"1","Team,""一""","461","10","286","165","","0",""')
+    expect(csv).toBe('\uFEFF"Rank","Team","Total","Current","Settled","Pending","Zero","Missing"\r\n'
+      + '"1","Team,""一""","461","286","165","","0",""')
   })
 
   test.each(['Awd', 'Awdp'] as const)('exports only settled %s round points', mode => {

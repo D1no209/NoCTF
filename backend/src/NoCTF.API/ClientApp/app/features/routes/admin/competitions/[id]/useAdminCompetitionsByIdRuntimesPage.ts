@@ -40,7 +40,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const isPlayerManagedRuntime = (
     runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
-  ) => runtime.purpose !== 'AwdpTarget'
+  ) => runtime.purpose !== 'FixTarget' && runtime.purpose !== 'ScopedFixTarget'
 
   const filterChallenge = ref('')
 

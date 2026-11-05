@@ -40,7 +40,7 @@ public sealed class CompetitionChallengeConflictPersistenceTests
                 Status = CompetitionStatus.Draft, ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32], CreatedAt = now, UpdatedAt = now });
             foreach (var templateId in templates)
-                db.Challenges.Add(new CtfChallenge { Id = templateId, OwnerId = owner, Title = "Template", Direction = "Web",
+                db.Challenges.Add(new Challenge { Id = templateId, OwnerId = owner, Title = "Template", Direction = "Web",
                     Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now });
             await db.SaveChangesAsync(ct);
             var publisher = Substitute.For<IPostCommitMessagePublisher>();

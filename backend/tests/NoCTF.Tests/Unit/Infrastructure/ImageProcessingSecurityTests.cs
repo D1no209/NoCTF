@@ -1,10 +1,7 @@
 using System.Buffers.Binary;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Infrastructure.Authentication;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Metadata.Profiles.Icc;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
@@ -34,8 +31,8 @@ public sealed class ImageProcessingSecurityTests
             BinaryPrimitives.WriteUInt16LittleEndian(content.AsSpan(8), 1_000);
         }
 
-        var avatar = new ImageSharpAvatarImageProcessor().Process(content);
-        var wallpaper = new ImageSharpWallpaperImageProcessor().Process(content);
+        var avatar = new SkiaAvatarImageProcessor().Process(content);
+        var wallpaper = new SkiaWallpaperImageProcessor().Process(content);
 
         await Assert.That(avatar.Failure).IsEqualTo(AvatarImageFailure.UnsupportedFormat);
         await Assert.That(wallpaper.Failure).IsEqualTo(WallpaperImageFailure.UnsupportedFormat);
@@ -44,22 +41,21 @@ public sealed class ImageProcessingSecurityTests
     [Test]
     public async Task Avatar_does_not_preserve_an_embedded_color_profile()
     {
-        var profile = new byte[132];
-        BinaryPrimitives.WriteUInt32BigEndian(profile, (uint)profile.Length);
-        "acsp"u8.CopyTo(profile.AsSpan(36));
-        using var sourceImage = new Image<Rgba32>(32, 32, Color.CornflowerBlue);
-        sourceImage.Metadata.IccProfile = new IccProfile(profile);
-        using var source = new MemoryStream();
-        sourceImage.Save(source, new PngEncoder());
+        using var colorSpace = SKColorSpace.CreateSrgbLinear();
+        using var sourceImage = new SKBitmap(new SKImageInfo(32, 32, SKColorType.Rgba8888, SKAlphaType.Premul, colorSpace));
+        sourceImage.Erase(SKColors.CornflowerBlue);
+        using var source = sourceImage.Encode(SKEncodedImageFormat.Png, 100);
         var content = source.ToArray();
-        using var original = Image.Load<Rgba32>(content);
-        await Assert.That(original.Metadata.IccProfile).IsNotNull();
+        using var originalData = new MemoryStream(content);
+        using var original = SKCodec.Create(originalData);
+        await Assert.That(original.Info.ColorSpace.GammaIsLinear).IsTrue();
 
-        var result = new ImageSharpAvatarImageProcessor().Process(content);
+        var result = new SkiaAvatarImageProcessor().Process(content);
 
         await Assert.That(result.Failure).IsNull();
         await Assert.That(result.Image).IsNotNull();
-        using var normalized = Image.Load<Rgba32>(result.Image!.Content.Span);
-        await Assert.That(normalized.Metadata.IccProfile).IsNull();
+        using var normalizedData = new MemoryStream(result.Image!.Content.ToArray());
+        using var normalized = SKCodec.Create(normalizedData);
+        await Assert.That(normalized.Info.ColorSpace?.GammaIsLinear == true).IsFalse();
     }
 }

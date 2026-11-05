@@ -163,7 +163,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                 fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId,
                 cancellationToken);
             await Assert.That(admission).IsNotNull();
-            await Assert.That(admission!.ChallengeRules.MaxFlagAttempts).IsEqualTo(1);
+            await Assert.That(((CtfCompetitionChallengeRules)admission!.ChallengeRules).MaxFlagAttempts).IsEqualTo(1);
             var rootStampBefore = await intakeDb.CompetitionChallenges.AsNoTracking()
                 .Where(item => item.Id == fixture.CompetitionChallengeId)
                 .Select(item => item.ConcurrencyStamp)
@@ -186,7 +186,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             var factCountBefore = await intakeDb.GameplayFacts.CountAsync(cancellationToken);
             var result = await intake.TryAcceptFlagAsync(new(
                 Guid.CreateVersion7(fixture.Now), fixture.CompetitionId, fixture.TeamId,
-                fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.FlagAttempt,
+                fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.BreakAttempt,
                 fixture.Flag, SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag)), fixture.Now),
                 admission, maxAttempts: 1, cancellationToken);
             await Assert.That(result.State).IsEqualTo(GameplayFactAcceptanceState.Created);
@@ -232,7 +232,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                     fixture.CompetitionChallengeId, fixture.UserId, cancellationToken);
                 return await intake.TryAcceptFlagAsync(new(
                     Guid.CreateVersion7(fixture.Now), fixture.CompetitionId, fixture.TeamId,
-                    fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.FlagAttempt,
+                    fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.BreakAttempt,
                     "flag{replayed}", SHA256.HashData(Encoding.UTF8.GetBytes("flag{replayed}")), fixture.Now),
                     admission!, maxAttempts: null, cancellationToken);
             }
@@ -584,7 +584,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                 OccurredAt = finishedAt
             });
         }
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
@@ -626,7 +626,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             CreatedAt = startAt
         });
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact
         {
             Id = Guid.CreateVersion7(finishedAt.AddMinutes(-30)),
             CompetitionId = competitionId,

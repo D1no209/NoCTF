@@ -37,9 +37,6 @@ public class LeaderboardProjectionBenchmarks
     [Benchmark]
     public ScoreboardProjection Project() => engine.Project(input);
 
-    internal static LeaderboardProjectionInput CreateMixedCtfInput(int teamCount) =>
-        Corpus.Create(GameMode.Ctf, teamCount, mixedCtf: true);
-
     private static class Corpus
     {
         private const int ChallengeCount = 12;
@@ -49,8 +46,7 @@ public class LeaderboardProjectionBenchmarks
 
         public static LeaderboardProjectionInput Create(
             GameMode mode,
-            int teamCount,
-            bool mixedCtf = false)
+            int teamCount)
         {
             var competitionId = StableGuid(1);
             var challenges = Enumerable.Range(1, ChallengeCount)
@@ -60,10 +56,7 @@ public class LeaderboardProjectionBenchmarks
                     $"Challenge {index}",
                     false,
                     ChallengeConfiguration(mode, index),
-                    Order: index,
-                    InteractionKind: mode == GameMode.Ctf && mixedCtf && index % 2 == 0
-                        ? CtfInteractionKind.PatchVerification
-                        : CtfInteractionKind.FlagSubmission))
+                    Order: index))
                 .ToArray();
             var teams = Enumerable.Range(1, teamCount)
                 .Select(index => new LeaderboardTeamFact(
@@ -117,9 +110,7 @@ public class LeaderboardProjectionBenchmarks
                 {
                     var actorId = StableGuid(500_000 + teamIndex * 10 + challengeIndex % 4);
                     var occurredAt = Start.AddMinutes(5 + teamIndex).AddSeconds(challengeIndex);
-                    var interactionKind = challenge.InteractionKind == CtfInteractionKind.PatchVerification
-                        ? GameplayFactKind.FixAttempt
-                        : GameplayFactKind.FlagAttempt;
+                    var interactionKind = GameplayFactKind.BreakAttempt;
                     facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
                         occurredAt, GameplayFactResult.Correct, actorId: actorId));
                     facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
@@ -156,7 +147,7 @@ public class LeaderboardProjectionBenchmarks
                         rounds.Add(new(challenge.Id, team.Id, roundIds[roundIndex], startsAt, startsAt.AddMinutes(5)));
                         if (roundIndex % 4 == 0)
                             scoreboard.Add(Fact(sequence++, team.Id, challenge.Id,
-                                GameplayFactKind.AwdServiceTransition,
+                                GameplayFactKind.CheckObservation,
                                 startsAt.AddMinutes(1),
                                 (teamIndex + challengeIndex + roundIndex) % 7 == 0
                                     ? GameplayFactResult.ServiceDown
@@ -165,7 +156,7 @@ public class LeaderboardProjectionBenchmarks
                         {
                             var victim = teams[(teamIndex + 1) % teams.Count];
                             scoreboard.Add(Fact(sequence++, team.Id, challenge.Id,
-                                GameplayFactKind.FlagAttempt,
+                                GameplayFactKind.BreakAttempt,
                                 startsAt.AddMinutes(2),
                                 GameplayFactResult.Correct,
                                 referenceKind: GameplayFactReferenceKind.AwdRound,
@@ -229,7 +220,7 @@ public class LeaderboardProjectionBenchmarks
             foreach (var (team, teamIndex) in teams.Select((value, index) => (value, index)))
             {
                 foreach (var (challenge, challengeIndex) in challenges.Select((value, index) => (value, index)))
-                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.KohControlObservation,
+                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.ControlObservation,
                         Start.AddMinutes(teamIndex + challengeIndex), GameplayFactResult.Controlled,
                         multiplicity: RoundCount,
                         lastOccurredAt: Start.AddMinutes(100 + teamIndex + challengeIndex)));
@@ -367,26 +358,4 @@ public class LeaderboardProjectionBenchmarks
             IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds,
             IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates);
     }
-}
-
-[MemoryDiagnoser]
-public class CtfMixedLeaderboardProjectionBenchmarks
-{
-    private readonly LeaderboardProjectionEngine engine = new(new LeaderboardProjectorCatalog());
-    private LeaderboardProjectionInput input = null!;
-
-    [Params(16, 64)]
-    public int TeamCount { get; set; }
-
-    [GlobalSetup]
-    public void Setup()
-    {
-        input = LeaderboardProjectionBenchmarks.CreateMixedCtfInput(TeamCount);
-        var output = engine.Project(input);
-        if (output.Snapshot.Teams.Count == 0 || output.EntryAllocations.Count == 0)
-            throw new InvalidOperationException("The mixed CTF corpus did not exercise the leaderboard hot path.");
-    }
-
-    [Benchmark]
-    public ScoreboardProjection Project() => engine.Project(input);
 }

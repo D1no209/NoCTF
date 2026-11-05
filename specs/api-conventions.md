@@ -85,8 +85,8 @@ IP、用户、目标或并发额度。Flag 的业务受理准入位于 Applicati
 同一操作作用域、请求键和负载重放已提交结果，同键不同负载返回 409 `IdempotencyPayloadMismatch`。
 新的主动提交使用新键；网络重试复用原键，避免重复产生尝试、扣分或资源操作。
 
-理论开卷与逐题保存使用强类型请求中的 RequestId 和关系化回执；整卷提交幂等返回同一结果，
-每份正式试卷只有一个 TheoryPaperSubmission 事实。Runtime 重置创建新 UUID，消息消费者仍按
+Questionnaire 发卷与逐题保存使用强类型请求中的 RequestId 和关系化回执；整卷提交幂等返回同一结果，
+每个正式 Assignment 只有一个 QuestionnaireAttempt 事实。Runtime 重置创建新 UUID，消息消费者仍按
 Runtime 身份、状态和消息作用域处理至少一次投递；HTTP 请求回执与消息幂等是不同边界。
 
 内部消息通过 NATS JetStream 持久投递，数据库提交后发布并从关系化待处理状态恢复；不引入数据库 Inbox 或通用 Outbox。Competition Webhook 的专用事务 Outbox 保持现有例外。

@@ -25,13 +25,13 @@ public sealed class LiveSoloCompetitionDeletionTests
         DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
-            var owned = new LiveSoloChallenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Local material", Direction = "Web",
-                Definition = new LiveSoloChallengeDefinition(), CatalogScope = ChallengeCatalogScope.CompetitionOwned, CreatedAt = f.Now, UpdatedAt = f.Now };
+            var owned = new Challenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Local material", Direction = "Web",
+                Definition = TestConfigurations.Definition(GameMode.LiveSolo), CatalogScope = ChallengeCatalogScope.CompetitionOwned, CreatedAt = f.Now, UpdatedAt = f.Now };
             var file = new StoredFile { Id = Guid.NewGuid(), ObjectKey = Guid.NewGuid().ToString("N"), FileName = "answer.txt", ContentType = "text/plain",
                 Sha256 = new byte[32], ByteLength = 4, CreatedAt = f.Now };
             var attachment = new ChallengeAttachment { Id = Guid.NewGuid(), ChallengeId = owned.Id, FileId = file.Id, CreatedAt = f.Now };
             f.Db.Add(owned); f.Db.Files.Add(file); f.Db.Add(attachment);
-            f.Db.Add(new LiveSoloChallengeSource { ChallengeId = owned.Id, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
+            f.Db.Add(new ChallengeSource { ChallengeId = owned.Id, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
             f.Db.ChallengeFlags.Add(new TemplateChallengeFlag { Id = Guid.NewGuid(), ChallengeId = owned.Id, Flag = "flag{first}", FlagSha256 = ManageChallengeFlags.Hash("flag{first}"), CreatedAt = f.Now });
             f.Entries[0].ChallengeId = owned.Id;
             f.Db.Add(new LiveSoloQuestionMaterial { CompetitionChallengeId = f.Entries[0].Id, CompetitionId = f.Competition.Id, ChallengeId = owned.Id,

@@ -2,6 +2,7 @@ using NoCTF.Application.Common;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Application.Challenges.Bank;
 
@@ -9,7 +10,7 @@ public sealed record ChallengeTemplateView(
     Guid Id,
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
-    GameMode Mode,
+    IReadOnlyList<ChallengeCapabilityKind> Capabilities,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
@@ -21,21 +22,17 @@ public sealed record ChallengeTemplateView(
     DateTimeOffset UpdatedAt)
 {
     public Guid ConcurrencyStamp { get; init; }
-    public CtfInteractionKind InteractionKind => Definition is CtfChallengeDefinition ctf
-        ? ctf.InteractionKind
-        : CtfInteractionKind.FlagSubmission;
 }
 
 public sealed record ChallengeTemplateSummaryView(
     Guid Id,
-    GameMode Mode,
+    IReadOnlyList<ChallengeCapabilityKind> Capabilities,
     ChallengeVisibility Visibility,
     string Title,
     string Direction,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
-    DateTimeOffset UpdatedAt,
-    CtfInteractionKind InteractionKind)
+    DateTimeOffset UpdatedAt)
 {
     public Guid ConcurrencyStamp { get; init; }
 }
@@ -50,7 +47,7 @@ public sealed record ChallengeTemplateListQuery(
     int Limit,
     bool Desc,
     bool OnlyMine = false,
-    GameMode? Mode = null);
+    IReadOnlyList<ChallengeCapabilityKind>? RequiredCapabilities = null);
 
 public sealed record ChallengeTemplateListPage(
     IReadOnlyList<ChallengeTemplateSummaryView> Items,
@@ -64,13 +61,12 @@ public enum ChallengeTemplateWriteState
     InvalidDefinition,
     ResourceIdConflict,
     NotFoundOrForbidden,
-    ActiveCompetitionModeConflict,
+    ReferencedCapabilityConflict,
     ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible,
-    ExperimentalFeatureDisabled,
-    InteractionKindConflict
+    PendingExecutionConflict
 }
 
 public sealed record ChallengeTemplateWriteResult(
@@ -85,7 +81,6 @@ public sealed record ChallengeTemplateWriteResult(
 public sealed record CreateChallengeTemplateCommand(
     Guid? ChallengeId,
     Guid OwnerId,
-    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
@@ -97,7 +92,6 @@ public sealed record UpdateChallengeTemplateCommand(
     Guid ChallengeId,
     Guid ActorId,
     bool IsAdministrator,
-    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
@@ -153,7 +147,7 @@ public enum ChallengeTemplateDeleteFailure
 
 public enum ChallengeTemplateValidationFailureCode
 {
-    InvalidMode,
+    InvalidCapabilities,
     InvalidTitle,
     InvalidDirection,
     InvalidDefinition
@@ -168,14 +162,10 @@ public enum ChallengeTemplateDeleteFailureCode
 public static class ChallengeTemplateValidation
 {
     public static OperationResult<ChallengeTemplateValidationFailureCode> Validate(
-        GameMode mode,
         string title,
         string direction,
         ChallengeDefinition definition)
     {
-        if (!Enum.IsDefined(mode))
-            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
-                ChallengeTemplateValidationFailureCode.InvalidMode, "Mode is invalid.");
         if (string.IsNullOrWhiteSpace(title) || title.Length > 160)
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidTitle,
@@ -184,25 +174,23 @@ public static class ChallengeTemplateValidation
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidDirection,
                 "Direction is required and must be at most 96 characters.");
-        if (definition is null || definition.Mode != mode)
+        if (definition is null || definition.Capabilities.Count is < 1 or > 5)
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidDefinition,
-                "The challenge definition type must match its mode.");
+                "A challenge must define between one and five capabilities.");
         return OperationResult<ChallengeTemplateValidationFailureCode>.Success();
     }
 }
 
 public sealed class CreateChallengeTemplate(
     IChallengeBankStore store,
-    IChallengeConfigurationCatalog configurations,
-    IExperimentalFeatureReader? experimentalFeatures = null)
+    IChallengeConfigurationCatalog configurations)
 {
     public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
         var validation = ChallengeTemplateValidation.Validate(
-            command.Mode,
             command.Title,
             command.Direction,
             command.Definition);
@@ -213,20 +201,12 @@ public sealed class CreateChallengeTemplate(
                 Detail: validation.ErrorMessage);
         }
         var definitionErrors = configurations.ValidateDefinition(
-            command.Mode,
             command.Definition);
         if (definitionErrors.Count > 0)
         {
             return new(
                 ChallengeTemplateWriteState.InvalidDefinition,
                 Detail: string.Join(" ", definitionErrors));
-        }
-        if (IsPatchVerification(command.Definition)
-            && !(await IsPatchVerificationEnabledAsync(ct)))
-        {
-            return new(
-                ChallengeTemplateWriteState.ExperimentalFeatureDisabled,
-                Detail: "CTF PatchVerification is disabled in platform settings.");
         }
         return await store.CreateAsync(command with
         {
@@ -237,60 +217,23 @@ public sealed class CreateChallengeTemplate(
         }, ct);
     }
 
-    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
-
-    private static bool IsPatchVerification(ChallengeDefinition definition) =>
-        definition is CtfChallengeDefinition
-            { InteractionKind: CtfInteractionKind.PatchVerification };
 }
 
-public sealed class ListChallengeTemplates(
-    IChallengeBankStore store,
-    IExperimentalFeatureReader? experimentalFeatures = null)
+public sealed class ListChallengeTemplates(IChallengeBankStore store)
 {
-    public async Task<ChallengeTemplateListPage> ExecutePageAsync(
+    public Task<ChallengeTemplateListPage> ExecutePageAsync(
         ChallengeTemplateListQuery query,
-        CancellationToken ct = default)
-    {
-        var page = await store.ListPageAsync(query, ct);
-        if (query.IsAdministrator || await IsEnabledAsync(ct))
-            return page;
-
-        var visible = page.Items
-            .Where(item => item.InteractionKind != CtfInteractionKind.PatchVerification)
-            .ToArray();
-        return page with { Items = visible };
-    }
-
-    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
+        CancellationToken ct = default) => store.ListPageAsync(query, ct);
 }
 
-public sealed class GetChallengeTemplate(
-    IChallengeBankStore store,
-    IExperimentalFeatureReader? experimentalFeatures = null)
+public sealed class GetChallengeTemplate(IChallengeBankStore store)
 {
-    public async Task<ChallengeTemplateView?> ExecuteAsync(
+    public Task<ChallengeTemplateView?> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted = false,
-        CancellationToken ct = default)
-    {
-        var item = await store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
-        if (item is null || isAdministrator
-            || item.InteractionKind != CtfInteractionKind.PatchVerification
-            || await IsEnabledAsync(ct))
-            return item;
-        return null;
-    }
-
-    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
+        CancellationToken ct = default) => store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
 }
 
 public sealed class UpdateChallengeTemplate(
@@ -302,7 +245,6 @@ public sealed class UpdateChallengeTemplate(
         CancellationToken ct = default)
     {
         var validation = ChallengeTemplateValidation.Validate(
-            command.Mode,
             command.Title,
             command.Direction,
             command.Definition);
@@ -313,7 +255,6 @@ public sealed class UpdateChallengeTemplate(
                 Detail: validation.ErrorMessage);
         }
         var definitionErrors = configurations.ValidateDefinition(
-            command.Mode,
             command.Definition);
         if (definitionErrors.Count > 0)
         {

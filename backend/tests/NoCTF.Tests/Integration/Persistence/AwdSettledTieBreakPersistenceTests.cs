@@ -45,7 +45,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         foreach (var teamId in new[] { fixture.Team.Id, team.Id })
         {
             var id = Guid.NewGuid();
-            db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
+            db.GameplayFacts.Add(new CheckObservationGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = fixture.CompetitionChallenge.Id, TeamId = teamId, ReferenceKind = GameplayFactReferenceKind.AwdRound,
                 ReferenceId = round.Id, OccurredAt = start.AddSeconds(150), UpdatedAt = start.AddSeconds(155), State = GameplayFactState.Completed,
                 Result = GameplayFactResult.ServiceUp, Awd = new() { GameplayFactId = id, RulesId = rule.Id,

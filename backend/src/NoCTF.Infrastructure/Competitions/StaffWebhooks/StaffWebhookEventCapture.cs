@@ -22,9 +22,9 @@ internal static class StaffWebhookEventCapture
         CompetitionEventKind.TeamUpdated, CompetitionEventKind.ChallengeUpdated, CompetitionEventKind.ChallengeDescriptionUpdated, CompetitionEventKind.CompetitionUpdated];
     public static Guid[] ChangedCompetitions(NoCtfDbContext db) => db.ChangeTracker.Entries<CompetitionEvent>()
         .Where(value => value.State == EntityState.Added && Kinds.Contains(value.Entity.Kind)).Select(value => value.Entity.CompetitionId)
-        .Concat(db.ChangeTracker.Entries<GameplayFact>().Where(value => value.State is EntityState.Added or EntityState.Modified
+        .Concat(db.ChangeTracker.Entries<GameplayFact>().Where(value => value.Entity.CompetitionId != null && (value.State is EntityState.Added or EntityState.Modified)
             && (CheatIncidentFailures.IsIncident(value.Entity.FailureCode) || CheatIncidentFailures.IsIncident(value.OriginalValues.GetValue<GameplayFactFailureCode?>(nameof(GameplayFact.FailureCode)))))
-            .Select(value => value.Entity.CompetitionId))
+            .Select(value => value.Entity.CompetitionId!.Value))
         .Concat(db.ChangeTracker.Entries<Notification>().Where(value => value.State == EntityState.Added
             && value.Entity.QuestionStatus != null && value.Entity.TargetType == NotificationTargetType.CompetitionCollaborators)
             .Select(value => value.Entity.TargetId))

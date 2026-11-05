@@ -90,7 +90,7 @@ test('management links use entity subpaths and typed runtime/audit attribution',
     adminRuntimePath(null, first), adminCompetitionPath(first), adminChallengePath(first, second), adminTemplatePath(first)]
   for (const path of paths) expect(path).not.toContain('?')
   expect(adminUserPath(first)).toBe(`${base}/${first}`)
-  expect(adminRuntimeTeamPath({ purpose: 'AwdpTarget', competitionId: first, sourceTeamId: second, teamId: null })).toBe(adminTeamPath(first, second))
+  expect(adminRuntimeTeamPath({ purpose: 'FixTarget', competitionId: first, sourceTeamId: second, teamId: null })).toBe(adminTeamPath(first, second))
   expect(adminRuntimeTeamPath({ purpose: 'TemplateTest', competitionId: first, sourceTeamId: second })).toBeUndefined()
   expect(adminRuntimeTeamPath({ purpose: 'Player', competitionId: first })).toBeUndefined()
   expect(adminRuntimeChallengePath({ challengeId: first })).toBe(adminTemplatePath(first))

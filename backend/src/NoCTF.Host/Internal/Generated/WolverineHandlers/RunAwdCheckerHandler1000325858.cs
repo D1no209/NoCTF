@@ -58,22 +58,22 @@ namespace Internal.Generated.WolverineHandlers
             _fusionCacheProvider = fusionCacheProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
-            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, _loggerOfAuxiliaryRuntimeCapacity, _runtimeExecutionOptions1);
-            var awdCheckerExecutor = new NoCTF.Runner.Messages.AwdCheckerExecutor(_oneShotRuntimeProviderCatalog, _httpClientFactory, auxiliaryRuntimeCapacity, _runtimeExecutionOptions2, _timeProvider);
+            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, _loggerOfAuxiliaryRuntimeCapacity, _runtimeExecutionOptions2);
+            var runtimeCheckExecutor = new NoCTF.Runner.Challenges.Capabilities.RuntimeCheckExecutor(_oneShotRuntimeProviderCatalog, _runtimeExecutionOptions1, auxiliaryRuntimeCapacity);
+            var executeCheck = new NoCTF.Application.Challenges.Capabilities.ExecuteCheck(runtimeCheckExecutor);
+            var awdCheckerExecutor = new NoCTF.Runner.Messages.AwdCheckerExecutor(executeCheck, _httpClientFactory, _timeProvider);
             // The actual message body
             var runAwdChecker = (NoCTF.Application.Messaging.RunAwdChecker)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Runner.Messages.AwdCheckerHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Runner.Messages.AwdCheckerHandler");
-            var awdCheckerHandler = new NoCTF.Runner.Messages.AwdCheckerHandler(_awdCheckerWorkReader, awdCheckerExecutor, _optionsOfRunnerOptions, _timeProvider);
+            var awdCheckerHandler = new NoCTF.Runner.Messages.AwdCheckerHandler(_awdCheckerWorkReader, awdCheckerExecutor, _optionsOfRunnerOptions, _timeProvider, _runnerResourceMutationCoordinator);
             
             // The actual message execution
             var outgoing1 = await awdCheckerHandler.Handle(runAwdChecker, cancellation).ConfigureAwait(false);
@@ -81,13 +81,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // Outgoing, cascaded message
             await context.EnqueueCascadingAsync(outgoing1).ConfigureAwait(false);
-
         }
-
     }
 
     // END: RunAwdCheckerHandler1000325858
     
     
 }
-

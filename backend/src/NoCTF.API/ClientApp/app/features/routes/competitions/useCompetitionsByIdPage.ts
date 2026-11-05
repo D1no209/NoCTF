@@ -6,7 +6,6 @@ import { provideCompetitionScoreboard } from '../../../composables/useScoreboard
 
 import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, Monitor, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getMyTeamStanding, getMyTeamEndpoint } from '../../../api'
-import { watchNotifications } from '~/composables/useNotificationHub'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsMyTeamStandingResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { scoreboardChallengeBenefits } from '../../../utils/scoreboard'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
@@ -33,7 +32,7 @@ export function useCompetitionsByIdPage() {
     `/competitions/${competitionId.value}/awdp-live`,
     `/competitions/${competitionId.value}/awd-live`,
     `/competitions/${competitionId.value}/koh-live`,
-  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/question-pool') || route.path.includes('/live-solo/postgame/') || route.path.endsWith('/theory'))
+  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/question-pool') || route.path.includes('/live-solo/postgame/'))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,
@@ -106,12 +105,6 @@ export function useCompetitionsByIdPage() {
 
   const progressionEnabled = computed(() => competition.value?.features?.progressionEnabled === true
     && competition.value.features.progressionMapVisible === true)
-  const theoryVisible = computed(() => !!user.value && user.value.kind === 'Human'
-    && hasParticipantChallengeAccess.value && ['Ctf', 'Awd', 'Awdp'].includes(competition.value?.mode ?? '')
-    && competition.value?.features?.hasPublishedTheory === true)
-  let unwatchTheory: (() => void) | undefined
-  onMounted(() => { unwatchTheory = watchNotifications({ theoryChanged: () => void refresh(), onReconnected: () => void refresh() }) })
-  onBeforeUnmount(() => unwatchTheory?.())
 
   let standingGeneration = 0
   let standingPending: Promise<boolean> | null = null
@@ -347,7 +340,6 @@ export function useCompetitionsByIdPage() {
           ...(competition.value?.mode === 'LiveSolo' && canReadChallenges
             ? [{ to: `${base}/live-solo`, label: gameModeLabel('LiveSolo'), icon: GitBranch }] : []),
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle }] : []),
-          ...(theoryVisible.value ? [{ to: `${base}/theory`, label: translate('common.label.theoryActivities'), icon: FileText }] : []),
           ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
             ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
             : []),

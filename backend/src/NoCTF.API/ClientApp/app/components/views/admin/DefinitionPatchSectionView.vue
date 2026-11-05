@@ -7,9 +7,10 @@ const { bytesToMib, HARD_MAXIMUM_PATCH_UPLOAD_BYTES, mibToBytes, model, disabled
 </script>
 
 <template>
-  <FieldSet class="rounded-md border p-4">
+  <FieldSet>
     <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.fix') }}</FieldLegend>
     <FieldGroup>
+      <Field><FieldLabel>{{ $t('administration.label.targetServiceName') }}</FieldLabel><Input v-model="model.patchTargetServiceName" :disabled="disabled" /></Field>
       <Field>
         <FieldLabel>{{ $t('administration.label.patchEntrance') }}</FieldLabel>
         <Input
@@ -49,7 +50,7 @@ const { bytesToMib, HARD_MAXIMUM_PATCH_UPLOAD_BYTES, mibToBytes, model, disabled
           <NullableNumberInput
             :model-value="model.readyTimeoutSeconds"
             :min="1"
-            :max="model.checkerJob?.timeoutSeconds ?? undefined"
+            :max="model.checker?.job.timeoutSeconds ?? undefined"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueModelReadyTimeoutSeconds"
           />

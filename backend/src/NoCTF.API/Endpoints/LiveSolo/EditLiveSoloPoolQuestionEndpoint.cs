@@ -6,6 +6,8 @@ using NoCTF.API.Security;
 using NoCTF.Application.LiveSolo.Templates;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.LiveSolo;
+using System.Text.Json.Serialization;
+using NoCTF.API.Serialization;
 
 namespace NoCTF.API.Endpoints.LiveSolo;
 
@@ -21,6 +23,8 @@ public sealed class EditLiveSoloPoolQuestionRequest
     public IReadOnlyList<SaveChallengeFlagRequest>? Flags { get; set; }
     public IReadOnlyList<Guid>? RemovedAttachmentIds { get; set; }
     public required ChallengeDefinitionContract Definition { get; set; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloCompletionKind>))]
+    public LiveSoloCompletionKind CompletionKind { get; set; }
 }
 public sealed class EditLiveSoloPoolQuestionValidator : Validator<EditLiveSoloPoolQuestionRequest>
 {
@@ -30,6 +34,7 @@ public sealed class EditLiveSoloPoolQuestionValidator : Validator<EditLiveSoloPo
         RuleFor(x => x.ExpectedStamp).NotEmpty(); RuleFor(x => x.ExpectedMaterialStamp).NotEmpty();
         RuleForEach(x => x.Flags!).SetValidator(new SaveChallengeFlagValidator()).When(x => x.Flags is not null);
         RuleFor(x => x.Title).NotEmpty().MaximumLength(160); RuleFor(x => x.Direction).NotEmpty().MaximumLength(96);
+        RuleFor(x => x.CompletionKind).IsInEnum();
     }
 }
 public sealed class EditLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
@@ -43,10 +48,10 @@ public sealed class EditLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool 
     }
     public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(EditLiveSoloPoolQuestionRequest req, CancellationToken ct)
     {
-        if (req.Definition.Mode != NoCTF.API.Endpoints.Competitions.GameModeProtocol.LiveSolo)
+        if (!ChallengeDefinitionContractMapper.HasValidShape(req.Definition))
             return TypedResults.UnprocessableEntity(new LiveSoloPoolFailureResponse(LiveSoloPoolFailure.UnsupportedDefinition));
-        var definition = (LiveSoloChallengeDefinition)ChallengeDefinitionContractMapper.ToDomain(Guid.Empty, GameMode.LiveSolo, req.Definition);
+        var definition = ChallengeDefinitionContractMapper.ToDomain(Guid.Empty, req.Definition);
         return LiveSoloPoolProtocol.Mutation(await pool.EditAsync(new(req.CompetitionId, req.CompetitionChallengeId, user.UserId,
-            req.ExpectedStamp, req.ExpectedMaterialStamp, req.Title, req.Description, req.Direction, definition, clock.GetUtcNow(), req.Flags?.Select(x => new LiveSoloPoolFlagInput(x.Flag, x.MatchKind == ChallengeFlagMatchKindProtocol.Exact ? NoCTF.Domain.Challenges.ChallengeFlagMatchKind.Exact : NoCTF.Domain.Challenges.ChallengeFlagMatchKind.RegularExpression)).ToArray(), req.RemovedAttachmentIds), ct));
+            req.ExpectedStamp, req.ExpectedMaterialStamp, req.Title, req.Description, req.Direction, definition, clock.GetUtcNow(), req.Flags?.Select(x => new LiveSoloPoolFlagInput(x.Flag, x.MatchKind == ChallengeFlagMatchKindProtocol.Exact ? NoCTF.Domain.Challenges.ChallengeFlagMatchKind.Exact : NoCTF.Domain.Challenges.ChallengeFlagMatchKind.RegularExpression)).ToArray(), req.RemovedAttachmentIds, CompletionKind: req.CompletionKind), ct));
     }
 }

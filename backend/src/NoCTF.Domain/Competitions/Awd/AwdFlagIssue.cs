@@ -36,8 +36,9 @@ public sealed class AwdFlagIssue : IConcurrencyTracked
     public int? HistoricalExpiryRound { get; set; }
     public Guid? DeliveryRuntimeId { get; set; }
     public Guid? DeliveryAttemptId { get; set; }
-    [MaxLength(2048)] public string? PublicLocator { get; set; }
-    [MaxLength(32768)] public string? ProtectedReadContext { get; set; }
+    public Guid? BlockingFixFactId { get; set; }
+    public DateTimeOffset? MaintenanceWaitStartedAt { get; set; }
+    public DateTimeOffset? MaintenanceWaitEndedAt { get; set; }
 }
 
 /// <summary>A unique successful-capture identity, not a second submission or scoring record.</summary>

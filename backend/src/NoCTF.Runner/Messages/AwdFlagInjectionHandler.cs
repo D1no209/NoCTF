@@ -11,6 +11,8 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
+using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Application.Runtime.Capacity;
 
 namespace NoCTF.Runner.Messages;
 
@@ -25,13 +27,17 @@ public sealed record AwdFlagInjectionWork(
     TimeSpan Timeout,
     Guid FlagId = default,
     Guid StoreId = default,
-    Guid AttemptId = default);
+    Guid AttemptId = default)
+{
+    public AwdCheckReason? BlockedReason { get; init; }
+}
 
 public interface IAwdFlagInjectionWorkReader
 {
     Task<AwdFlagInjectionWork?> ReadAsync(InjectAwdFlag message, CancellationToken cancellationToken);
     Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
         AwdCheckReason reason, CancellationToken cancellationToken);
+    Task RecordWaitAsync(InjectAwdFlag message, DateTimeOffset startedAt, DateTimeOffset endedAt, CancellationToken ct);
 }
 
 public interface IAwdFlagInjectionExecutor
@@ -43,6 +49,12 @@ public sealed class AwdFlagInjectionWorkReader(
     IDbContextFactory<NoCtfDbContext> contexts,
     TimeProvider timeProvider) : IAwdFlagInjectionWorkReader
 {
+    public async Task RecordWaitAsync(InjectAwdFlag message, DateTimeOffset startedAt, DateTimeOffset endedAt, CancellationToken ct)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        await AwdMaintenanceEvidence.RecordFlagWaitAsync(db, message, startedAt, endedAt, ct);
+    }
+
     public async Task<AwdFlagInjectionWork?> ReadAsync(InjectAwdFlag message, CancellationToken cancellationToken)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
@@ -88,10 +100,16 @@ public sealed class AwdFlagInjectionWorkReader(
                 .SetProperty(issue => issue.UpdatedAt, now)
                 .SetProperty(issue => issue.ConcurrencyStamp, Guid.NewGuid()), cancellationToken);
         if (claimed == 0) return null;
+        var blocked = await db.GameplayFacts.AsNoTracking().Where(fact => fact.FixExecution != null
+                && fact.FixExecution.RuntimeInstanceId == message.RuntimeInstanceId && fact.FixExecution.MutationBlocked)
+            .Select(fact => (NoCTF.Domain.Gameplay.GameplayFactState?)fact.State).SingleOrDefaultAsync(cancellationToken);
         return new(target.Issue.CompetitionId, target.Runtime.RuntimeKind, target.Runtime.RuntimeProvider,
             target.Runtime.ProviderReceipt!.ToData(), target.Flag.Flag, store.InjectionCommand,
             store.TargetServiceName, TimeSpan.FromSeconds(Math.Min(store.InjectionTimeoutSeconds,
-                (deliveryEndsAt - now).TotalSeconds)), target.Flag.Id, store.StoreId, attemptId);
+                (deliveryEndsAt - now).TotalSeconds)), target.Flag.Id, store.StoreId, attemptId)
+        {
+            BlockedReason = blocked is null ? null : AwdCheckReason.InfrastructureFailure
+        };
     }
 
     public async Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
@@ -139,16 +157,23 @@ public sealed class AwdFlagInjectionHandler(
     IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider,
+    RunnerResourceMutationCoordinator mutations,
+    IRunnerCapacityGate capacity,
     ILogger<AwdFlagInjectionHandler>? logger = null)
 {
     public async Task<MessageExecutionOutcome> Handle(InjectAwdFlag message, CancellationToken cancellationToken)
     {
         RunnerNodeAssignmentGuard.Validate(message, runnerOptions.Value.Pool, runnerOptions.Value.Id);
+        var waitStartedAt = timeProvider.GetUtcNow();
+        using var targetMutation = await mutations.EnterRuntimeAsync(message.RuntimeInstanceId, cancellationToken);
+        if (targetMutation.Waited) await reader.RecordWaitAsync(message, waitStartedAt, timeProvider.GetUtcNow(), cancellationToken);
+        using var providerMutation = await mutations.EnterAsync(cancellationToken);
+        if (!await capacity.CanMutateAsync(message.RuntimeInstanceId, runnerOptions.Value.Id, cancellationToken)) return MessageExecutionOutcome.Superseded;
         var work = await reader.ReadAsync(message, cancellationToken);
         if (work is null) return MessageExecutionOutcome.Superseded;
         var state = AwdFlagDeliveryState.Unconfirmed;
-        var reason = AwdCheckReason.TaskNotExecuted;
-        if (timeProvider.GetUtcNow() < message.ValidUntil)
+        var reason = work.BlockedReason ?? AwdCheckReason.TaskNotExecuted;
+        if (work.BlockedReason is null && timeProvider.GetUtcNow() < message.ValidUntil)
         {
             try
             {

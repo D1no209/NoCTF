@@ -40,10 +40,10 @@ internal static class LeaderboardFactProjectionReader
         if (excludedFactId is Guid excluded) query = query.Where(fact => fact.Id != excluded);
         if (scoringTeamId is Guid teamId)
             query = query.Where(fact => fact.TeamId == teamId
-                || mode == GameMode.Koh && fact.Kind == GameplayFactKind.KohControlObservation
+                || mode == GameMode.Koh && fact.Kind == GameplayFactKind.ControlObservation
                 || (mode == GameMode.Ctf || mode == GameMode.Awdp)
                     && fact.State == GameplayFactState.Completed
-                    && (fact.Kind == GameplayFactKind.FlagAttempt || fact.Kind == GameplayFactKind.BreakAttempt
+                    && (fact.Kind == GameplayFactKind.BreakAttempt
                         || fact.Kind == GameplayFactKind.FixAttempt)
                     && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue));
         var displayQuery = query;
@@ -52,15 +52,15 @@ internal static class LeaderboardFactProjectionReader
         var overrideScoringEnd = timingOverride?.Timing.ScoringEndsAt;
         var overrideSubmissionEnd = timingOverride?.Timing.SubmissionDeadlineAt;
         query = query.Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment || fact.Kind == GameplayFactKind.HintUnlock
-            || fact.Kind == GameplayFactKind.AwdServiceTransition
+            || fact.Kind == GameplayFactKind.CheckObservation
             || fact.CompetitionChallengeId == overrideId
                 && (overrideOpening == null || fact.OccurredAt >= overrideOpening)
                 && (overrideScoringEnd == null || fact.OccurredAt < overrideScoringEnd)
-                && (fact.Kind == GameplayFactKind.KohControlObservation || overrideSubmissionEnd == null || fact.OccurredAt < overrideSubmissionEnd)
+                && (fact.Kind == GameplayFactKind.ControlObservation || overrideSubmissionEnd == null || fact.OccurredAt < overrideSubmissionEnd)
             || db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId && challenge.Id != overrideId
                 && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
                 && (challenge.ScoringEndsAt == null || fact.OccurredAt < challenge.ScoringEndsAt)
-                && (fact.Kind == GameplayFactKind.KohControlObservation || challenge.SubmissionDeadlineAt == null
+                && (fact.Kind == GameplayFactKind.ControlObservation || challenge.SubmissionDeadlineAt == null
                     || fact.OccurredAt < challenge.SubmissionDeadlineAt)));
         if (mode == GameMode.Awdp)
         {
@@ -175,7 +175,7 @@ internal static class LeaderboardFactProjectionReader
         CompetitionOfficialWindow officialWindow,
         CancellationToken ct) => query
         .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
-            || (fact.Kind == GameplayFactKind.FlagAttempt
+            || (fact.Kind == GameplayFactKind.BreakAttempt
                 || fact.Kind == GameplayFactKind.FixAttempt
                 || fact.Kind == GameplayFactKind.HintUnlock)
             && fact.OccurredAt >= officialWindow.StartAt
@@ -252,7 +252,7 @@ internal static class LeaderboardFactProjectionReader
         IQueryable<GameplayFact> query, IReadOnlyList<LeaderboardAwdRoundFact> rounds, CancellationToken ct)
     {
         var roundIds = rounds.Select(round => round.RoundId).Distinct().ToArray();
-        return query.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt && fact.Awd != null
+        return query.Where(fact => fact.Kind == GameplayFactKind.BreakAttempt && fact.Awd != null
                 && fact.Awd.ReceivedRoundId != null && roundIds.Contains(fact.Awd.ReceivedRoundId.Value))
             .Select(fact => new FactSummary(fact.Id, fact.TeamId, fact.CompetitionChallengeId, fact.Kind,
                 fact.OccurredAt, fact.State, fact.Result, fact.FailureCode, GameplayFactReferenceKind.AwdRound,
@@ -352,7 +352,7 @@ internal static class LeaderboardFactProjectionReader
         // inside PostgreSQL before grouping so projection memory stays bounded without changing the
         // ordering semantics used by KohLeaderboardProjection.
         var observations = await query
-            .Where(fact => fact.Kind == GameplayFactKind.KohControlObservation
+            .Where(fact => fact.Kind == GameplayFactKind.ControlObservation
                 && fact.Result == GameplayFactResult.Controlled
                 && fact.TeamId != null
                 && activeTeamIds.Contains(fact.TeamId.Value))
@@ -360,18 +360,18 @@ internal static class LeaderboardFactProjectionReader
             {
                 Fact = fact,
                 EffectiveTeamId = query
-                    .Where(candidate => candidate.Kind == GameplayFactKind.KohControlObservation
+                    .Where(candidate => candidate.Kind == GameplayFactKind.ControlObservation
                         && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
                         && (candidate.OccurredAt < fact.OccurredAt
                             || (candidate.OccurredAt == fact.OccurredAt
                                 && candidate.Id.CompareTo(fact.Id) <= 0))
-                        && (candidate.Result == GameplayFactResult.Uncontrolled
+                        && (candidate.State != GameplayFactState.Completed || candidate.Result != GameplayFactResult.Controlled
                             || (candidate.Result == GameplayFactResult.Controlled
                                 && candidate.TeamId != null
                                 && competitiveTeamIds.Contains(candidate.TeamId.Value))))
                     .OrderByDescending(candidate => candidate.OccurredAt)
                     .ThenByDescending(candidate => candidate.Id)
-                    .Select(candidate => candidate.Result == GameplayFactResult.Uncontrolled
+                    .Select(candidate => candidate.State != GameplayFactState.Completed || candidate.Result != GameplayFactResult.Controlled
                         ? (Guid?)null
                         : candidate.TeamId)
                     .FirstOrDefault()
@@ -394,7 +394,7 @@ internal static class LeaderboardFactProjectionReader
                     .First(),
                 group.Key.TeamId,
                 group.Key.CompetitionChallengeId,
-                GameplayFactKind.KohControlObservation,
+                GameplayFactKind.ControlObservation,
                 group.Min(row => row.Fact.OccurredAt),
                 group.Key.State,
                 group.Key.Result,

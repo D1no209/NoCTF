@@ -308,12 +308,11 @@ public sealed class ResourceManagerRolePersistenceTests
                 new(
                     rejectedChallengeId,
                     ordinaryUserId,
-                    GameMode.Ctf,
                     ChallengeVisibility.Private,
                     "Rejected challenge owner",
                     null,
                     "Web",
-                    new CtfChallengeDefinition(),
+                    TestConfigurations.Definition(GameMode.Ctf),
                     now),
                 cancellationToken);
             await Assert.That(rejectedChallenge.State)
@@ -661,7 +660,7 @@ public sealed class ResourceManagerRolePersistenceTests
         DateTimeOffset now,
         Guid[]? managerIds = null,
         DateTimeOffset? deletedAt = null) =>
-        new CtfChallenge
+        new Challenge
         {
             Id = id,
             OwnerId = ownerId,

@@ -73,7 +73,7 @@ public sealed class CompetitionTrackLeaderboardTests
             GameMode.Awd => new[]
             {
                 new LeaderboardGameplayFact(Guid.NewGuid(), publicA.Id, challengeId,
-                    GameplayFactKind.AwdServiceTransition, Start,
+                    GameplayFactKind.CheckObservation, Start,
                     GameplayFactState.Completed, GameplayFactResult.ServiceUp, null)
             },
             GameMode.Awdp => new[]
@@ -85,7 +85,7 @@ public sealed class CompetitionTrackLeaderboardTests
             GameMode.Koh => new[]
             {
                 new LeaderboardGameplayFact(Guid.NewGuid(), publicA.Id, challengeId,
-                    GameplayFactKind.KohControlObservation, Start,
+                    GameplayFactKind.ControlObservation, Start,
                     GameplayFactState.Completed, GameplayFactResult.Controlled, null)
             },
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
@@ -209,10 +209,10 @@ public sealed class CompetitionTrackLeaderboardTests
         var observations = new[]
         {
             new LeaderboardGameplayFact(Guid.NewGuid(), publicTeam.Id, challengeId,
-                GameplayFactKind.KohControlObservation, Start, GameplayFactState.Completed,
+                GameplayFactKind.ControlObservation, Start, GameplayFactState.Completed,
                 GameplayFactResult.Controlled, null),
             new LeaderboardGameplayFact(Guid.NewGuid(), internalTeam.Id, challengeId,
-                GameplayFactKind.KohControlObservation, Start.AddSeconds(10), GameplayFactState.Completed,
+                GameplayFactKind.ControlObservation, Start.AddSeconds(10), GameplayFactState.Completed,
                 GameplayFactResult.Controlled, null)
         };
         var result = ProjectCurrent(new(
@@ -238,14 +238,14 @@ public sealed class CompetitionTrackLeaderboardTests
         var fact = mode switch
         {
             GameMode.Awd => new LeaderboardGameplayFact(Guid.NewGuid(), internalTeam.Id, challengeId,
-                GameplayFactKind.FlagAttempt, Start, GameplayFactState.Completed,
+                GameplayFactKind.BreakAttempt, Start, GameplayFactState.Completed,
                 GameplayFactResult.Correct, null, GameplayFactReferenceKind.AwdRound,
                 Guid.NewGuid(), publicTeam.Id),
             GameMode.Awdp => new LeaderboardGameplayFact(Guid.NewGuid(), internalTeam.Id, challengeId,
                 GameplayFactKind.BreakAttempt, Start, GameplayFactState.Completed,
                 GameplayFactResult.Correct, null, VictimTeamId: publicTeam.Id),
             GameMode.Koh => new LeaderboardGameplayFact(Guid.NewGuid(), internalTeam.Id, challengeId,
-                GameplayFactKind.KohControlObservation, Start, GameplayFactState.Completed,
+                GameplayFactKind.ControlObservation, Start, GameplayFactState.Completed,
                 GameplayFactResult.Controlled, null),
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
@@ -284,7 +284,7 @@ public sealed class CompetitionTrackLeaderboardTests
         Guid.NewGuid(),
         teamId,
         challengeId,
-        GameplayFactKind.FlagAttempt,
+        GameplayFactKind.BreakAttempt,
         occurredAt,
         GameplayFactState.Completed,
         GameplayFactResult.Correct,

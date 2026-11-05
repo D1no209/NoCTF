@@ -1,243 +1,53 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Flags;
-using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Challenges.Capabilities;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
-using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Flags;
-using NoCTF.Infrastructure.Persistence;
-using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
 public sealed class ChallengeFlagRegularExpressionPersistenceTests
 {
-    [Test]
-    [Timeout(300_000)]
-    public async Task Owners_and_managers_control_static_regex_flags_and_dynamic_conversion_is_fenced(
-        CancellationToken ct)
+    [Test, Timeout(300_000)]
+    public async Task Break_flags_follow_bank_permissions_and_remain_independent_of_runtime_injection_and_other_capabilities(CancellationToken ct)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_flag_regex")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(ct);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .ConfigureWarnings(warnings => warnings.Throw(
-                    RelationalEventId.MultipleCollectionIncludeWarning))
-                .Options;
-            var now = DateTimeOffset.UtcNow;
-            var ownerId = Guid.CreateVersion7(now);
-            var managerId = Guid.CreateVersion7(now.AddTicks(1));
-            var outsiderId = Guid.CreateVersion7(now.AddTicks(2));
-            var challengeId = Guid.CreateVersion7(now.AddTicks(3));
-            var awdpChallengeId = Guid.CreateVersion7(now.AddTicks(4));
-
-            await using var db = new NoCtfDbContext(options);
-            await db.Database.EnsureCreatedAsync(ct);
-            db.Users.AddRange(
-                User(ownerId, "regex-owner", now),
-                User(managerId, "regex-manager", now),
-                User(outsiderId, "regex-outsider", now));
-            db.Challenges.Add(new CtfChallenge
-            {
-                Id = challengeId,
-                OwnerId = ownerId,
-                ManagerIds = [managerId],
-                Visibility = ChallengeVisibility.Private,
-                Title = "Static regex challenge",
-                Direction = "Web",
-                Definition = TestConfigurations.Definition(GameMode.Ctf),
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-            db.Challenges.Add(new AwdpChallenge
-            {
-                Id = awdpChallengeId,
-                OwnerId = ownerId,
-                ManagerIds = [],
-                Visibility = ChallengeVisibility.Private,
-                Title = "AWDP break challenge",
-                Direction = "Pwn",
-                Definition = TestConfigurations.Definition(GameMode.Awdp),
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-            await db.SaveChangesAsync(ct);
-
-            var flags = new ManageChallengeFlags(new ChallengeFlagManagementStore(db));
-            var ownerSave = await flags.SaveAsync(
-                Command(challengeId, @"flag\{owner-[0-9]+\}", now),
-                ownerId,
-                false,
-                ct);
-            var managerSave = await flags.SaveAsync(
-                Command(challengeId, @"flag\{manager-[0-9]+\}", now.AddTicks(1)),
-                managerId,
-                false,
-                ct);
-            var outsiderSave = await flags.SaveAsync(
-                Command(challengeId, @"flag\{outsider-[0-9]+\}", now.AddTicks(2)),
-                outsiderId,
-                false,
-                ct);
-
-            await Assert.That(ownerSave.Succeeded).IsTrue();
-            await Assert.That(managerSave.Succeeded).IsTrue();
-            await Assert.That(ownerSave.Value!.Id).IsNotEqualTo(managerSave.Value!.Id);
-            await Assert.That(outsiderSave.FailureCode)
-                .IsEqualTo(ChallengeFlagFailureCode.FlagNotFound);
-            var awdpExact = await flags.SaveAsync(
-                ExactCommand(awdpChallengeId, "flag{awdp-break}", now.AddTicks(3)),
-                ownerId,
-                false,
-                ct);
-            var awdpRegex = await flags.SaveAsync(
-                Command(awdpChallengeId, @"flag\{awdp-[0-9]+\}", now.AddTicks(4)),
-                ownerId,
-                false,
-                ct);
-
-            await Assert.That(awdpExact.Succeeded).IsTrue();
-            await Assert.That(awdpRegex.FailureCode)
-                .IsEqualTo(ChallengeFlagFailureCode.RegularExpressionNotSupported);
-            await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(3);
-
-            var dynamicDefinition = new CtfChallengeDefinition
-            {
-                ChallengeId = challengeId,
-                Runtime = new ContainerChallengeRuntimeTemplate
-                {
-                    ChallengeId = challengeId,
-                    Allocation = PersistedRuntimeAllocation.PerTeam,
-                    FlagSource = PersistedRuntimeFlagSource.PerTeam,
-                    Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/challenge:v1" }],
-                }
-            };
-            var bank = new ChallengeBankStore(db);
-            var blocked = await bank.UpdateAsync(new(
-                challengeId,
-                ownerId,
-                false,
-                GameMode.Ctf,
-                ChallengeVisibility.Private,
-                "Static regex challenge",
-                null,
-                "Web",
-                dynamicDefinition,
-                now.AddMinutes(1)), ct);
-
-            await Assert.That(blocked.State)
-                .IsEqualTo(ChallengeTemplateWriteState.InvalidDefinition);
-            await Assert.That(blocked.Detail).Contains("regular-expression flags");
-
-            await using var mutationDb = new NoCtfDbContext(options);
-            var mutationFlags = new ManageChallengeFlags(new ChallengeFlagManagementStore(mutationDb));
-            var ownerDeleted = await mutationFlags.DeleteAsync(
-                ChallengeFlagScope.Template(challengeId),
-                ownerSave.Value!.Id,
-                ownerId,
-                false,
-                now.AddMinutes(2),
-                ct);
-            var managerDeleted = await mutationFlags.DeleteAsync(
-                ChallengeFlagScope.Template(challengeId),
-                managerSave.Value!.Id,
-                managerId,
-                false,
-                now.AddMinutes(2),
-                ct);
-            await Assert.That(ownerDeleted.Succeeded).IsTrue();
-            await Assert.That(managerDeleted.Succeeded).IsTrue();
-            var activeFlagIds = await mutationDb.ChallengeFlags.AsNoTracking()
-                .Where(item => item.ChallengeId == challengeId)
-                .Select(item => item.Id)
-                .ToArrayAsync(ct);
-            await Assert.That(activeFlagIds).IsEmpty()
-                .Because($"Active IDs: {string.Join(", ", activeFlagIds)}; owner={ownerSave.Value.Id}; manager={managerSave.Value.Id}");
-            await using var conversionDb = new NoCtfDbContext(options);
-            var converted = await new ChallengeBankStore(conversionDb).UpdateAsync(new(
-                challengeId,
-                ownerId,
-                false,
-                GameMode.Ctf,
-                ChallengeVisibility.Private,
-                "Static regex challenge",
-                null,
-                "Web",
-                dynamicDefinition,
-                now.AddMinutes(3)), ct);
-            await using var restoreDb = new NoCtfDbContext(options);
-            var restored = await new ManageChallengeFlags(new ChallengeFlagManagementStore(restoreDb)).RestoreAsync(
-                ChallengeFlagScope.Template(challengeId),
-                ownerSave.Value.Id,
-                ownerId,
-                false,
-                now.AddMinutes(4),
-                ct);
-
-            await Assert.That(converted.State)
-                .IsEqualTo(ChallengeTemplateWriteState.Succeeded)
-                .Because(converted.Detail ?? "No detail was returned.");
-            await Assert.That(restored.Succeeded).IsFalse();
-            await Assert.That(await restoreDb.ChallengeFlags.IgnoreQueryFilters()
-                .CountAsync(item => item.ChallengeId == challengeId && item.DeletedAt == null, ct))
-                .IsEqualTo(0);
-        });
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
+        var db = fixture.Db; var managerId = Guid.NewGuid(); var outsiderId = Guid.NewGuid();
+        foreach (var id in new[] { managerId, outsiderId })
+            db.Users.Add(new User { Id = id, UserName = id.ToString("N"), NormalizedUserName = id.ToString("N").ToUpperInvariant(),
+                Email = $"{id:N}@example.test", Role = UserRole.Organizer, AccountStatus = UserAccountStatus.Active });
+        var template = await db.Challenges.AsSplitQuery().SingleAsync(value => value.Id == fixture.TemplateId, ct);
+        template.ManagerIds = [managerId];
+        var repairableId = Guid.NewGuid();
+        db.Challenges.Add(new Challenge { Id = repairableId, OwnerId = fixture.OwnerId, Title = "Repairable",
+            Definition = NoCTF.Tests.Unit.Gameplay.ChallengeCapabilityTests.Repairable() });
+        await db.SaveChangesAsync(ct);
+        var flags = new ManageChallengeFlags(new ChallengeFlagManagementStore(db));
+        var owner = await flags.SaveAsync(Command(template.Id, @"flag\{owner-[0-9]+\}", fixture.Now), fixture.OwnerId, false, ct);
+        var manager = await flags.SaveAsync(Command(template.Id, @"flag\{manager-[0-9]+\}", fixture.Now), managerId, false, ct);
+        var outsider = await flags.SaveAsync(Command(template.Id, @"flag\{other-[0-9]+\}", fixture.Now), outsiderId, false, ct);
+        await Assert.That(owner.Succeeded).IsTrue(); await Assert.That(manager.Succeeded).IsTrue();
+        await Assert.That(outsider.FailureCode).IsEqualTo(ChallengeFlagFailureCode.FlagNotFound);
+        await Assert.That((await flags.SaveAsync(Command(repairableId, @"flag\{repair-[0-9]+\}", fixture.Now), fixture.OwnerId, false, ct)).Succeeded).IsTrue();
+        var definition = new ChallengeDefinition { Capabilities = [new BreakCapabilityDefinition
+            { EnvironmentTargets = [new() { ServiceName = "main", VariableName = "FLAG" }] }],
+            Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = RuntimeExecutionFixture.Image }] } };
+        var updated = await new ChallengeBankStore(db, fixture.Publisher).UpdateAsync(new(template.Id, fixture.OwnerId, false,
+            ChallengeVisibility.Private, template.Title, null, "Web", definition, fixture.Now.AddSeconds(1)), ct);
+        await Assert.That(updated.Succeeded).IsTrue();
+        await Assert.That((await flags.ListAsync(ChallengeFlagScope.Template(template.Id), fixture.OwnerId, false, false, ct))!.Count).IsEqualTo(2);
+        await Assert.That((await flags.DeleteAsync(ChallengeFlagScope.Template(template.Id), owner.Value!.Id, fixture.OwnerId, false, fixture.Now.AddSeconds(2), ct)).Succeeded).IsTrue();
+        await Assert.That((await flags.DeleteAsync(ChallengeFlagScope.Template(template.Id), manager.Value!.Id, managerId, false, fixture.Now.AddSeconds(2), ct)).Succeeded).IsTrue();
+        await Assert.That((await flags.RestoreAsync(ChallengeFlagScope.Template(template.Id), owner.Value.Id, fixture.OwnerId, false, fixture.Now.AddSeconds(3), ct)).Succeeded).IsTrue();
+        var restored = await db.ChallengeFlags.AsNoTracking().SingleAsync(value => value.ChallengeId == template.Id, ct);
+        await Assert.That(restored.MatchKind).IsEqualTo(ChallengeFlagMatchKind.RegularExpression);
     }
 
-    private static SaveChallengeFlagCommand Command(
-        Guid challengeId,
-        string pattern,
-        DateTimeOffset now) => new(
-        ChallengeFlagScope.Template(challengeId),
-        null,
-        true,
-        null,
-        pattern,
-        null,
-        null,
-        null,
-        null,
-        now,
-        ChallengeFlagMatchKind.RegularExpression);
-
-    private static SaveChallengeFlagCommand ExactCommand(
-        Guid challengeId,
-        string flag,
-        DateTimeOffset now) => new(
-        ChallengeFlagScope.Template(challengeId),
-        null,
-        true,
-        null,
-        flag,
-        null,
-        null,
-        null,
-        null,
-        now,
-        ChallengeFlagMatchKind.Exact);
-
-    private static User User(Guid id, string name, DateTimeOffset now) => new()
-    {
-        Id = id,
-        UserName = name,
-        NormalizedUserName = name.ToUpperInvariant(),
-        Email = $"{name}@example.test",
-        PasswordHash = "test",
-        Role = UserRole.Organizer,
-        CreatedAt = now,
-        UpdatedAt = now
-    };
+    private static SaveChallengeFlagCommand Command(Guid challengeId, string pattern, DateTimeOffset now) => new(
+        ChallengeFlagScope.Template(challengeId), null, true, null, pattern, null, null, null, null, now, ChallengeFlagMatchKind.RegularExpression);
 }

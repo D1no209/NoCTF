@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { DefinitionContainerViewState } from '~/features/admin/useDefinitionContainer'
 const viewProps = defineProps<{ state: DefinitionContainerViewState }>()
-const { definition, disabled, singleServiceOnly, showFlagEnvironmentVariable, serviceNameInputId, serviceImageInputId, selectedServiceIndex, selectedService, selectedServiceId, topology, advancedOpen, selectService, addService, canRemove, removeService, renameService, updateService } = toRefs(viewProps.state)
+const { definition, disabled, singleServiceOnly, serviceNameInputId, serviceImageInputId, selectedServiceIndex, selectedService, selectedServiceId, topology, advancedOpen, selectService, addService, canRemove, removeService, renameService, updateService } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -64,10 +64,6 @@ const { definition, disabled, singleServiceOnly, showFlagEnvironmentVariable, se
         <Field>
           <FieldLabel>{{ $t('administration.label.internalPort') }}</FieldLabel>
           <NumberListEditor :model-value="selectedService.internalPorts" :disabled="disabled" @update:model-value="updateService(selectedServiceIndex, 'internalPorts', $event)" />
-        </Field>
-        <Field v-if="showFlagEnvironmentVariable">
-          <FieldLabel>{{ $t('administration.label.flagEnvironmentVariableName') }}</FieldLabel>
-          <Input v-model="selectedService.flagEnvironmentVariableName" :disabled="disabled" />
         </Field>
       </DefinitionSection>
       <FieldDescription v-if="definition.services.length > 1 && !canRemove(selectedServiceIndex)">{{ $t('runtime.label.runtimeService') }}</FieldDescription>

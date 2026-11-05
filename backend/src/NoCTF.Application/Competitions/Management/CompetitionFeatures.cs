@@ -1,6 +1,6 @@
 namespace NoCTF.Application.Competitions.Management;
 
-public sealed record CompetitionFeatures(bool ProgressionEnabled, bool ProgressionMapVisible, bool HasPublishedTheory);
+public sealed record CompetitionFeatures(bool ProgressionEnabled, bool ProgressionMapVisible);
 
 public interface ICompetitionFeatureReader
 {

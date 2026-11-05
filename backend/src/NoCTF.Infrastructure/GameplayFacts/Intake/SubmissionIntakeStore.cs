@@ -196,7 +196,7 @@ public sealed class GameplayFactIntakeStore(
             awdReceipt = receipt.Receipt!;
         }
 
-        var acquisitionEvidence = received[0].Kind == GameplayFactKind.FlagAttempt
+        var acquisitionEvidence = received[0].Kind == GameplayFactKind.BreakAttempt
             ? await FlagAcquisitionEvidenceReader.CaptureAsync(db, current, templates,
                 received[0].OccurredAt, practice, cancellationToken)
             : null;
@@ -235,7 +235,7 @@ public sealed class GameplayFactIntakeStore(
         foreach (var entity in entities)
         {
             await events.RecordAsync(new(
-                entity.CompetitionId,
+                entity.CompetitionId!.Value,
                 CompetitionEventKind.GameplayFactReceived,
                 CompetitionEventLevel.Information,
                 CompetitionEventVisibility.Team,
@@ -250,7 +250,7 @@ public sealed class GameplayFactIntakeStore(
                 && entity.Kind == GameplayFactKind.BreakAttempt)
             {
                 await events.RecordAsync(new(
-                    entity.CompetitionId,
+                    entity.CompetitionId!.Value,
                     CompetitionEventKind.AwdpBreakAttempted,
                     CompetitionEventLevel.Information,
                     CompetitionEventVisibility.Public,
@@ -368,7 +368,7 @@ public sealed class GameplayFactIntakeStore(
         };
         db.GameplayFacts.Add(entity);
         await events.RecordAsync(new(
-            entity.CompetitionId,
+            entity.CompetitionId!.Value,
             CompetitionEventKind.ScoringRecorded,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Staff,

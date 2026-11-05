@@ -41,7 +41,7 @@ public sealed class FlagAcquisitionDetectionTests
     public async Task Duplicate_incidents_are_not_emitted_again_but_later_valid_access_can_solve()
     {
         var context = Context(new() { Scope = FlagAcquisitionScope.FormalStaticCtf, Required = FlagAcquisitionResource.Attachment });
-        var prior = GameplayFactGeneratedCatalog.Create(GameplayFactKind.FlagAttempt);
+        var prior = GameplayFactGeneratedCatalog.Create(GameplayFactKind.BreakAttempt);
         prior.TeamId = context.GameplayFact.TeamId;
         prior.CompetitionChallengeId = context.GameplayFact.CompetitionChallengeId;
         prior.Value = context.GameplayFact.Value;
@@ -65,13 +65,13 @@ public sealed class FlagAcquisitionDetectionTests
             MatchKind = ChallengeFlagMatchKind.Exact
         };
         context = context with { ApplicableFlags = [flag] };
-        var decision = new CtfGameplayFactEvaluator(new Fixed(GameplayFactResult.Wrong)).Evaluate(context);
+        var decision = new GameModeGameplayFactEvaluatorCatalog().Get(GameMode.Ctf).Evaluate(context);
         await Assert.That(decision.FailureCode).IsEqualTo(GameplayFactFailureCode.ForeignTeamFlagDetected);
     }
 
     private static GameplayFactProcessingContext Context(FlagAcquisitionEvidence? evidence)
     {
-        var fact = GameplayFactGeneratedCatalog.Create(GameplayFactKind.FlagAttempt);
+        var fact = GameplayFactGeneratedCatalog.Create(GameplayFactKind.BreakAttempt);
         fact.Id = Guid.NewGuid(); fact.TeamId = Guid.NewGuid(); fact.CompetitionChallengeId = Guid.NewGuid();
         fact.Value = "flag{unit}"; fact.ValueSha256 = NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash(fact.Value);
         fact.OccurredAt = DateTimeOffset.UtcNow; fact.AcquisitionEvidence = evidence;

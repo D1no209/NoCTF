@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeSectionViewState } from '~/features/admin/useDefinitionRuntimeSection'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeSectionViewState }>()
-const { toggleRuntime, DefinitionRuntime, model, mode, disabled } = toRefs(viewProps.state)
+const { toggleRuntime, DefinitionRuntime, model, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -21,8 +21,6 @@ const { toggleRuntime, DefinitionRuntime, model, mode, disabled } = toRefs(viewP
       v-if="model.runtime"
       :model="model"
       :runtime="model.runtime"
-      :mode="mode"
-      :interaction-kind="model.interactionKind"
       :disabled="disabled"
     />
   </FieldSet>

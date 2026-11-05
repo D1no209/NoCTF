@@ -235,7 +235,7 @@ public static class ServiceRegistration
         services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
         // Consumed only by the infrastructure relays below; it depends on the Infrastructure audience resolver.
         if (includeInfrastructure)
-            services.AddSingleton<LocalTheoryChangePublisher>();
+            services.AddSingleton<LocalQuestionnaireChangePublisher>();
         if (includeInfrastructure && development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher,
@@ -244,7 +244,7 @@ public static class ServiceRegistration
                 LocalGameplayFactStatePublisher>();
             services.Replace(ServiceDescriptor.Singleton<INotificationChangePublisher,
                 LocalNotificationChangePublisher>());
-            services.Replace(ServiceDescriptor.Singleton<NoCTF.Application.Theory.Realtime.ITheoryChangePublisher, LocalTheoryChangePublisher>());
+            services.Replace(ServiceDescriptor.Singleton<NoCTF.Application.Questionnaires.Realtime.IQuestionnaireChangePublisher, LocalQuestionnaireChangePublisher>());
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
@@ -258,7 +258,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
             services.AddHostedService<NoCTF.API.Hosting.NatsCompetitionEventRefreshRelay>();
             services.AddHostedService<NatsNotificationChangeRelay>();
-            services.AddHostedService<NatsTheoryChangeRelay>();
+            services.AddHostedService<NatsQuestionnaireChangeRelay>();
             services.AddHostedService<NatsMfaAuthenticationRelay>();
         }
         services.AddRateLimiter(options =>

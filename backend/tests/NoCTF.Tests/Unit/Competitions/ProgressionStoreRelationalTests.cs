@@ -65,13 +65,13 @@ public sealed class ProgressionStoreRelationalTests
             EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
             CreatedAt = now, UpdatedAt = now
         });
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId, OwnerId = userId, Title = "Challenge",
             Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now, UpdatedAt = now
         });
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = secondChallengeId, OwnerId = userId, Title = "Locked challenge",
             Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf),
@@ -182,7 +182,7 @@ public sealed class ProgressionStoreRelationalTests
         await Assert.That(await db.UserBadgeGrants.CountAsync(grant => grant.Active))
             .IsEqualTo(0);
 
-        db.GameplayFacts.Add(new FlagAttemptGameplayFact
+        db.GameplayFacts.Add(new BreakAttemptGameplayFact
         {
             Id = Guid.NewGuid(), CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId, TeamId = teamId,

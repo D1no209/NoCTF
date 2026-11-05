@@ -101,10 +101,10 @@ public sealed class AwdRuntimeProvisioningTests
             var secondTemplateId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
             var secondCompetitionChallengeId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
             var definition = (await db.Challenges.AsNoTracking()
-                .Where(challenge => challenge.Mode == GameMode.Awd)
+                .Where(challenge => db.CompetitionChallenges.Any(entry => entry.CompetitionId == fixture.CompetitionId && entry.ChallengeId == challenge.Id))
                 .SingleAsync(cancellationToken)).Definition!;
             ChallengeDefinitionGraph.AssignChallengeId(definition, secondTemplateId);
-            db.Challenges.Add(new AwdChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = secondTemplateId,
                 OwnerId = fixture.OwnerId,
@@ -347,7 +347,7 @@ public sealed class AwdRuntimeProvisioningTests
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new AwdChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,

@@ -42,11 +42,11 @@ public sealed class RuntimeParticipantUrlProjectionTests
     }
 
     private static ChallengeDefinition Definition(params RuntimeUrlBinding[] bindings) =>
-        new CtfChallengeDefinition
+        new ChallengeDefinition
         {
+            Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()],
             Runtime = new ContainerChallengeRuntimeTemplate
             {
-                Allocation = PersistedRuntimeAllocation.PerTeam,
                 Services = [new ChallengeRuntimeService { Name = "main", Image = "example.invalid/runtime:test" }],
                 UrlBindings = bindings.Select((binding, position) => new ChallengeRuntimeUrlBinding
                 {

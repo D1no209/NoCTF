@@ -14,7 +14,12 @@ public sealed record GameplayFactStatusView(
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt,
     NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
-    AwdAttackStatusView? AwdAttack = null);
+    AwdAttackStatusView? AwdAttack = null,
+    FixExecutionStatusView? FixExecution = null);
+
+public sealed record FixExecutionStatusView(NoCTF.Domain.Challenges.Capabilities.FixTargetKind TargetKind,
+    NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase Phase,
+    NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase? FailedPhase, bool MutationBlocked);
 
 public sealed record AwdAttackStatusView(Guid? FlagId, Guid? GenerationRoundId, int? GenerationRoundNumber,
     Guid? ReceivedRoundId, int? ReceivedRoundNumber, Guid? StoreId,

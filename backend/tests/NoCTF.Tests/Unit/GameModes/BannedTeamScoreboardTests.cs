@@ -8,20 +8,20 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class BannedTeamScoreboardTests
 {
-    [Test, Arguments(CtfInteractionKind.FlagSubmission), Arguments(CtfInteractionKind.PatchVerification)]
-    public async Task Ban_excludes_completion_activity_and_achievements_and_unban_restores_them(CtfInteractionKind interaction)
+    [Test]
+    public async Task Ban_excludes_completion_activity_and_achievements_and_unban_restores_them()
     {
         var now = DateTimeOffset.Parse("2026-10-26T00:00:00Z");
         var challenge = Guid.NewGuid();
         var first = Guid.NewGuid();
         var second = Guid.NewGuid();
-        var kind = CtfCompletionEligibility.CompletionKind(interaction);
+        var kind = GameplayFactKind.BreakAttempt;
         LeaderboardGameplayFact Fact(Guid team, int seconds) => new(Guid.NewGuid(), team, challenge, kind,
             now.AddSeconds(seconds), GameplayFactState.Completed, GameplayFactResult.Correct, null);
         var facts = new[] { Fact(first, 1), Fact(first, 2), Fact(second, 3) };
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Ctf,
             [new(first, "first", false, false), new(second, "second", false, false)], facts,
-            [new(challenge, "Web", "challenge", false, InteractionKind: interaction)],
+            [new(challenge, "Web", "challenge", false)],
             CompetitionConfiguration: new CtfCompetitionModeConfiguration
             {
                 DefaultScoreCurve = new() { InitialPoints = 500, MinimumPoints = 100, DecayTeamCount = 5, DecayMode = PersistedScoreDecayMode.Linear },

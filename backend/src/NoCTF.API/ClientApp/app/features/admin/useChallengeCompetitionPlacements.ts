@@ -4,14 +4,14 @@ import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from 'vue'
 import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
 import { adminCreateCompetitionChallenge, adminListCompetitionChallenges, adminListCompetitions, competitionPosterGet } from '../../api'
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol } from '../../api'
 import type { ContentSwapPreset } from '../../motion/useContentSwap'
 import { parseApiError } from '../../utils/api-error'
 import { competitionChallengeConflictMessage } from '../../lib/competition-challenge-conflict'
 import { availablePlacementCompetitions, placementManagementPath, projectChallengePlacements, writablePlacementCompetitions } from './challenge-competition-placements'
 import type { ChallengeCompetitionPlacement } from './challenge-competition-placements'
 
-export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId: string; mode: NoCtfapiEndpointsCompetitionsGameModeProtocol; disabled: boolean }>) {
+export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId: string; capabilities: NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol[]; disabled: boolean }>) {
   const { user } = useAuth()
   const items = ref<ChallengeCompetitionPlacement[]>([])
   const loading = ref(true)
@@ -22,7 +22,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
   const protectedPosters = ref<Record<string, string>>({})
   const previewMotion = ref<ContentSwapPreset>('film-left')
   const linked = computed(() => items.value.filter(item => item.instances.length > 0 && (includeFinished.value || item.competition.status !== 'Finished')))
-  const candidates = computed(() => availablePlacementCompetitions(items.value, props.mode, includeFinished.value))
+  const candidates = computed(() => availablePlacementCompetitions(items.value, props.capabilities, includeFinished.value))
   const linkedOptions = computed(() => linked.value.map(item => ({
     value: item.competition.id, label: item.competition.title ?? '', posterUrl: posterFor(item.competition),
     href: placementManagementPath(item),
@@ -64,7 +64,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
       const { data, error: failure } = await adminListCompetitions({ query: { includeDeleted: false }, signal })
       if (signal.aborted) return
       if (failure || !data) throw failure
-      const competitions = writablePlacementCompetitions(data.items ?? []).filter(item => item.mode === props.mode)
+      const competitions = writablePlacementCompetitions(data.items ?? [])
       const results: ChallengeCompetitionPlacement[] = []
       const failures: string[] = []
       const posterBlobs = new Map<string, Blob>()
@@ -122,7 +122,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
       if (!disposed && actorId === user.value?.userId) error.value = parseApiError(failure, describeMessage('placements.addFailed')).displayMessage
     } finally { adding.value = false }
   }
-  watch(() => [user.value?.userId, props.challengeId, props.mode], () => {
+  watch(() => [user.value?.userId, props.challengeId, props.capabilities], () => {
     items.value = []
     clearProtectedPosters()
     targetId.value = ''

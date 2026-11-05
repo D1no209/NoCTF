@@ -22,6 +22,8 @@ using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Runner.Messages;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -31,7 +33,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Trusted_checker_failure_is_applied_and_a_later_success_cannot_replace_it(
+    public async Task Summary_results_cannot_bypass_required_checker_evidence(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -50,55 +52,53 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
                 operation.GameplayFactId, operation.RuntimeInstanceId, AwdpFixOutcome.DefenseSucceeded,
                 fixture.Now.AddSeconds(2)), cancellationToken);
 
-            await Assert.That(failure).IsEqualTo(InternalResultDisposition.Applied);
-            await Assert.That(replay).IsEqualTo(InternalResultDisposition.Duplicate);
+            await Assert.That(failure).IsEqualTo(InternalResultDisposition.Conflict);
+            await Assert.That(replay).IsEqualTo(InternalResultDisposition.Conflict);
             db.ChangeTracker.Clear();
             var fact = await db.GameplayFacts.SingleAsync(item => item.Id == operation.GameplayFactId, cancellationToken);
-            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
-            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Wrong);
+            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Processing);
+            await Assert.That(fact.Result).IsNull();
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Successful_Fix_events_expose_the_current_result(
+    public async Task Successful_Fix_events_wait_for_work_completion_and_released_target(
         CancellationToken cancellationToken)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = await StartPostgresAsync(cancellationToken);
-            var options = Options(postgres);
-            var fixture = await SeedBaseAsync(options, cancellationToken);
-            var operation = await AddFixAsync(
-                options,
-                fixture,
-                RuntimeState.Running,
-                cancellationToken);
-
-            await using var db = new NoCtfDbContext(options);
-            var outbox = new RecordingOutbox();
-            var eventStore = new CompetitionEventStore(db, outbox);
-            var resultStore = new InternalResultStore(db, outbox, eventStore);
-            var resolvedAt = fixture.Now.AddSeconds(1);
-            var disposition = await resultStore.RecordAwdpAsync(
-                AwdpFixResult.Create(
-                    operation.GameplayFactId,
-                    operation.RuntimeInstanceId,
-                    AwdpFixOutcome.DefenseSucceeded,
-                    resolvedAt),
-                cancellationToken);
-
-            await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Applied);
-            db.ChangeTracker.Clear();
-            var current = await db.CompetitionEvents.AsNoTracking().SingleAsync(
-                item => item.Kind == CompetitionEventKind.AwdpFixResolved,
-                cancellationToken);
-            await Assert.That(current.GameplayFactState)
-                .IsEqualTo(GameplayFactState.Completed);
-            await Assert.That(current.GameplayFactResult)
-                .IsEqualTo(GameplayFactResult.Correct);
-
-        });
+        await using var application = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Running, cancellationToken);
+        var db = application.Db;
+        var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(db.Database.GetConnectionString()).Options;
+        var fixture = await SeedBaseAsync(options, cancellationToken);
+        var operation = await AddFixAsync(options, fixture, RuntimeState.Running, cancellationToken);
+        var fact = await db.GameplayFacts.AsSplitQuery().SingleAsync(item => item.Id == operation.GameplayFactId, cancellationToken);
+        fact.FixExecution = new() { GameplayFactId = fact.Id, RuntimeInstanceId = operation.RuntimeInstanceId,
+            TargetKind = FixTargetKind.Isolated, Phase = FixExecutionPhase.Checking, AppliedAt = fixture.Now, Deadline = fixture.Now.AddMinutes(3) };
+        fact.CapabilityOutcomes.Add(new FixOutcome { GameplayFactId = fact.Id, RuntimeInstanceId = operation.RuntimeInstanceId,
+            ObservedAt = fixture.Now, ExecutionState = CapabilityExecutionState.Completed, Result = FixResult.Applied });
+        await db.SaveChangesAsync(cancellationToken);
+        var resultStore = new InternalResultStore(db, application.Publisher, new CompetitionEventStore(db, application.Publisher));
+        var observedAt = fixture.Now.AddSeconds(1);
+        var disposition = await resultStore.RecordFixCheckAsync(new(fact.Id, operation.RuntimeInstanceId,
+            [new(CheckItemKind.Functionality, null, CheckProbeResult.Passed, CheckFailureReason.None),
+                new(CheckItemKind.Vulnerability, null, CheckProbeResult.Passed, CheckFailureReason.None)], observedAt, observedAt), cancellationToken);
+        await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Applied);
+        await Assert.That(await db.CompetitionEvents.CountAsync(item => item.Kind == CompetitionEventKind.AwdpFixResolved, cancellationToken)).IsEqualTo(0);
+        await Assert.That(await resultStore.CompleteFixWorkAsync(new(fact.Id, operation.RuntimeInstanceId,
+            new(FixWorkCompletionKind.Completed), observedAt), cancellationToken)).IsEqualTo(InternalResultDisposition.Applied);
+        await Assert.That(await resultStore.FinalizeFixExecutionAsync(fact.Id, operation.RuntimeInstanceId, observedAt, cancellationToken))
+            .IsEqualTo(InternalResultDisposition.Superseded);
+        db.ChangeTracker.Clear();
+        await Assert.That((await db.GameplayFacts.SingleAsync(item => item.Id == operation.GameplayFactId, cancellationToken)).State).IsEqualTo(GameplayFactState.Processing);
+        var target = await db.RuntimeInstances.SingleAsync(item => item.Id == operation.RuntimeInstanceId, cancellationToken);
+        target.State = RuntimeState.Stopped; target.StoppedAt = observedAt;
+        await db.SaveChangesAsync(cancellationToken);
+        await Assert.That(await resultStore.FinalizeFixExecutionAsync(operation.GameplayFactId, target.Id, observedAt, cancellationToken))
+            .IsEqualTo(InternalResultDisposition.Applied);
+        db.ChangeTracker.Clear();
+        var current = await db.CompetitionEvents.AsNoTracking().SingleAsync(item => item.Kind == CompetitionEventKind.AwdpFixResolved, cancellationToken);
+        await Assert.That(current.GameplayFactState).IsEqualTo(GameplayFactState.Completed);
+        await Assert.That(current.GameplayFactResult).IsEqualTo(GameplayFactResult.Correct);
     }
 
     [Test]
@@ -129,20 +129,20 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
                 var events = new CompetitionEventStore(db, outbox);
                 var deadline = fixture.Now.AddMinutes(1);
                 var clock = new FakeTimeProvider(deadline.AddSeconds(1));
-                var message = new ExpireAwdpFixVerification(
+                var message = new ExpireFixExecution(
                     operation.GameplayFactId,
                     operation.RuntimeInstanceId,
                     deadline,
                     "runner-a");
 
-                await BackendMessageOperations.ExpireAwdpFixVerificationAsync(
+                await BackendMessageOperations.ExpireFixExecutionAsync(
                     message,
                     db,
                     outbox,
                     clock,
                     cancellationToken,
                     events);
-                await BackendMessageOperations.ExpireAwdpFixVerificationAsync(
+                await BackendMessageOperations.ExpireFixExecutionAsync(
                     message,
                     db,
                     outbox,
@@ -337,7 +337,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             Sha256 = new byte[32],
             CreatedAt = fixture.Now
         });
-        db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
+        db.RuntimeInstances.Add(new FixTargetRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = fixture.CompetitionId,
@@ -423,7 +423,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = userId,

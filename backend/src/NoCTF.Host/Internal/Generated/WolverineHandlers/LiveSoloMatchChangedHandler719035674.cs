@@ -15,8 +15,6 @@ namespace Internal.Generated.WolverineHandlers
             _liveSoloRealtimePublisher = liveSoloRealtimePublisher;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             // The actual message body
@@ -28,13 +26,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await liveSoloRealtimeMessageHandler.Handle(liveSoloMatchChanged, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: LiveSoloMatchChangedHandler719035674
     
     
 }
-

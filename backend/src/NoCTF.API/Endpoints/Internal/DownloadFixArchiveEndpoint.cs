@@ -16,13 +16,13 @@ public sealed class DownloadFixArchiveEndpoint(
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Download)));
-        Get("/api/internal/v1/awdp/fix-archives/{gameplayFactId}");
+        Get("/api/internal/v1/fixes/{gameplayFactId}/archive");
         AuthSchemes("Internal");
         Policies("FixArchiveRead");
         RoutePrefixOverride(string.Empty);
         Summary(summary =>
         {
-            summary.Summary = "Download one AWDP fix archive";
+            summary.Summary = "Download the archive bound to a Fix attempt";
             summary.Description = "Returns only the archive bound to the internal JWT gameplay-fact claim.";
         });
     }

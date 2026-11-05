@@ -10,9 +10,23 @@ public sealed class RunnerResourceMutationCoordinator : IDisposable
     private readonly SemaphoreSlim admission = new(1, 1);
     private readonly SemaphoreSlim mutations = new(Slots, Slots);
     private readonly AsyncKeyedLock.AsyncKeyedLocker<RuntimeWorkloadIdentity> workloadLocks = new();
+    private readonly AsyncKeyedLock.AsyncKeyedLocker<Guid> runtimeLocks = new();
     private readonly ConcurrentDictionary<RuntimeWorkloadIdentity, byte> active = new();
 
     public bool IsActive(RuntimeWorkloadIdentity identity) => active.ContainsKey(identity);
+
+    public async Task<RuntimeMutationLease> EnterRuntimeAsync(Guid runtimeId, CancellationToken ct)
+    {
+        var acquisition = runtimeLocks.LockAsync(runtimeId, ct);
+        var waited = !acquisition.IsCompletedSuccessfully;
+        return new(await acquisition, waited);
+    }
+
+    public sealed class RuntimeMutationLease(IDisposable lease, bool waited) : IDisposable
+    {
+        public bool Waited { get; } = waited;
+        public void Dispose() => lease.Dispose();
+    }
 
     public async Task<IDisposable> EnterWorkloadAsync(RuntimeWorkloadIdentity identity, CancellationToken ct)
     {
@@ -52,7 +66,7 @@ public sealed class RunnerResourceMutationCoordinator : IDisposable
         }
     }
 
-    public void Dispose() { admission.Dispose(); mutations.Dispose(); workloadLocks.Dispose(); }
+    public void Dispose() { admission.Dispose(); mutations.Dispose(); workloadLocks.Dispose(); runtimeLocks.Dispose(); }
 
     private sealed class Lease(Action release) : IDisposable
     {

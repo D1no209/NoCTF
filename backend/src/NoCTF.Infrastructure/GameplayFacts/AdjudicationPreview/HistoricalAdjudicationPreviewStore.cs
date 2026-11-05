@@ -54,7 +54,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         var hiddenTeams = db.Teams.IgnoreQueryFilters().Where(team => team.CompetitionId == competitionId
             && internalKeys.Contains(team.TrackKey)).Select(team => (Guid?)team.Id);
         var query = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == competitionId
-            && (competition.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.FlagAttempt || fact.Kind == GameplayFactKind.FixAttempt
+            && (competition.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.BreakAttempt
                 : fact.Kind == GameplayFactKind.BreakAttempt));
         if (!includeInternalTeams) query = query.Where(fact => !hiddenTeams.Contains(fact.TeamId));
         CompetitionOfficialWindow? window = null;
@@ -77,21 +77,11 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), instance => instance.ChallengeId, template => template.Id,
                 (instance, template) => new { instance.Id, Title = instance.CustomTitle ?? template.Title,
                     instance.AutoOpenAt, instance.ScoringEndsAt, instance.SubmissionDeadlineAt, instance.TimingRevision,
-                    InteractionKind = db.Set<CtfChallengeDefinition>()
-                        .IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes()
-                        .Where(definition => definition.ChallengeId == template.Id)
-                        .Select(definition => (CtfInteractionKind?)definition.InteractionKind)
-                        .FirstOrDefault(),
                     Deleted = instance.DeletedAt != null || template.DeletedAt != null })
             .ToDictionaryAsync(row => row.Id, ct);
         var timings = challenges.ToDictionary(x => x.Key, x => new ChallengeTiming(
             x.Value.AutoOpenAt, x.Value.ScoringEndsAt, x.Value.SubmissionDeadlineAt));
-        var interactions = competition.Mode == GameMode.Ctf
-            ? challenges.ToDictionary(pair => pair.Key,
-                pair => pair.Value.Deleted ? null : pair.Value.InteractionKind)
-            : new Dictionary<Guid, CtfInteractionKind?>();
-        var flagIds = interactions.Where(pair => pair.Value == CtfInteractionKind.FlagSubmission).Select(pair => pair.Key).ToArray();
-        var patchIds = interactions.Where(pair => pair.Value == CtfInteractionKind.PatchVerification).Select(pair => pair.Key).ToArray();
+        var flagIds = challenges.Where(pair => !pair.Value.Deleted).Select(pair => pair.Key).ToArray();
         var candidateTeamIds = facts.Where(fact => fact.TeamId != null).Select(fact => fact.TeamId!.Value).Distinct().ToArray();
         var officialStart = window?.StartAt ?? competition.StartAt;
         var officialEnd = window?.EndAt ?? competition.EndAt;
@@ -99,10 +89,8 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             ? await db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.CompetitionId == competitionId
                     && fact.TeamId != null && (includeInternalTeams || !hiddenTeams.Contains(fact.TeamId))
-                    && (fact.Kind == GameplayFactKind.FlagAttempt
-                        && fact.CompetitionChallengeId != null && flagIds.Contains(fact.CompetitionChallengeId.Value)
-                        || fact.Kind == GameplayFactKind.FixAttempt
-                        && fact.CompetitionChallengeId != null && patchIds.Contains(fact.CompetitionChallengeId.Value))
+                    && fact.Kind == GameplayFactKind.BreakAttempt
+                    && fact.CompetitionChallengeId != null && flagIds.Contains(fact.CompetitionChallengeId.Value)
                     && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
                     && db.CompetitionChallenges.IgnoreQueryFilters().Any(challenge => challenge.Id == fact.CompetitionChallengeId
                         && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
@@ -174,7 +162,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         var evidence = facts.Select(fact =>
         {
             var timing = timings.GetValueOrDefault(fact.CompetitionChallengeId) ?? new ChallengeTiming();
-            var practice = competition.Mode == GameMode.Ctf && fact.Kind == GameplayFactKind.FlagAttempt && fact.OccurredAt >= officialEnd;
+            var practice = competition.Mode == GameMode.Ctf && fact.Kind == GameplayFactKind.BreakAttempt && fact.OccurredAt >= officialEnd;
             var firsts = firstsByChallenge.GetValueOrDefault(fact.CompetitionChallengeId, []);
             var own = firsts.Length == 0 ? null : firsts.SingleOrDefault(item => item.TeamId == fact.TeamId);
             var earlier = firsts.Length == 0 ? [] : firsts.Where(item => item.TeamId != fact.TeamId
@@ -187,7 +175,6 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             var adjustments = eligibilityEvents.Length == 0 ? [] : eligibilityEvents.Where(item => item.OccurredAt >= fact.OccurredAt
                 && (item.Kind == CompetitionEventKind.TrackConfigurationUpdated || item.TeamId == fact.TeamId
                     || earlier.Any(first => first.TeamId == item.TeamId))).Take(64).Select(item => eligibilityEvidence[item.Id]).ToArray();
-            var knownInteraction = interactions.GetValueOrDefault(fact.CompetitionChallengeId);
             return new HistoricalAdjudicationEvidence(fact.Id, fact.CompetitionChallengeId,
                 challenges.GetValueOrDefault(fact.CompetitionChallengeId)?.Title ?? fact.CompetitionChallengeId.ToString(),
                 fact.TeamId, fact.TeamId is { } owner ? teams.GetValueOrDefault(owner)?.Name ?? owner.ToString() : null,
@@ -199,7 +186,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 fact.State, ownEvents.Length > MaximumEventsPerFact || eligibilityEvents.Length > 64
                     ? AdjudicationEvidenceCompleteness.Truncated : AdjudicationEvidenceCompleteness.Complete,
                 adjustments.Length > 0, currentEligible,
-                competition.Mode != GameMode.Ctf || knownInteraction is { } interaction && CtfCompletionEligibility.Matches(fact.Kind, interaction), adjustments,
+                competition.Mode != GameMode.Ctf || flagIds.Contains(fact.CompetitionChallengeId) && CtfCompletionEligibility.Matches(fact.Kind), adjustments,
                 Timing: timing, Practice: practice, HasTimingChanges: (challenges.GetValueOrDefault(fact.CompetitionChallengeId)?.TimingRevision ?? Guid.Empty) != Guid.Empty);
         }).ToArray();
         await transaction.CommitAsync(ct);
@@ -225,7 +212,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             .Join(db.Competitions.IgnoreQueryFilters().AsNoTracking(), fact => fact.CompetitionId, competition => competition.Id,
                 (fact, competition) => new { fact.Kind, fact.TeamId, competition.Mode, competition.TracksEnabled, competition.Tracks })
             .SingleOrDefaultAsync(ct);
-        if (scope is null || !(scope.Mode == GameMode.Ctf && scope.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt
+        if (scope is null || !(scope.Mode == GameMode.Ctf && scope.Kind == GameplayFactKind.BreakAttempt
             || scope.Mode == GameMode.Awdp && scope.Kind == GameplayFactKind.BreakAttempt)) return null;
         if (!includeInternalTeams && scope.TeamId is Guid teamId)
         {

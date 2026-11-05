@@ -10,6 +10,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Domain.Commands;
+using NoCTF.Domain.Challenges.Testing;
 
 namespace NoCTF.Infrastructure.Challenges.Testing;
 
@@ -32,7 +33,8 @@ public sealed class ChallengeTestRuntimeStore(
         var runtime = await db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(instance =>
                 instance.ChallengeId == challengeId
-                && instance.Purpose == RuntimePurpose.TemplateTest)
+                && instance.Purpose == RuntimePurpose.TemplateTest
+                && instance.TemplateTestUse != TemplateTestUse.CapabilityVerification)
             .OrderByDescending(instance => instance.CreatedAt)
             .ThenByDescending(instance => instance.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -51,6 +53,7 @@ public sealed class ChallengeTestRuntimeStore(
             command.ChallengeId,
             cancellationToken);
         if (challenge is null
+            || challenge.CatalogScope != ChallengeCatalogScope.QuestionBank
             || challenge.DeletedAt is not null
             || !CanManage(challenge, command.ActorUserId, command.IsAdministrator))
         {
@@ -68,7 +71,8 @@ public sealed class ChallengeTestRuntimeStore(
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.ChallengeId == command.ChallengeId
-                && instance.Purpose == RuntimePurpose.TemplateTest)
+                && instance.Purpose == RuntimePurpose.TemplateTest
+                && instance.TemplateTestUse != TemplateTestUse.CapabilityVerification)
             .OrderByDescending(instance => instance.CreatedAt)
             .ThenByDescending(instance => instance.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -87,13 +91,21 @@ public sealed class ChallengeTestRuntimeStore(
                     return new(null, RuntimeMutationFailure.Unsupported);
                 }
                 newRuntimeInstanceId = Guid.CreateVersion7(command.Now);
+                template = template with
+                {
+                    FlagSource = challenge.Definition?.Break is { InjectionCommand: not null }
+                        || challenge.Definition?.Break?.FlagStores.Any(store => store.DeliveryKind == NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.RunnerCommand) == true
+                        ? RuntimeFlagSource.AwdRotation
+                        : template.Definition is ContainerRuntimeDefinition container
+                            && container.Services.Any(service => service.FlagEnvironmentVariableName is { Length: > 0 })
+                            ? RuntimeFlagSource.PerTeam : RuntimeFlagSource.Static
+                };
                 newFlagPlan = ChallengeTestFlagFactory.Create(
-                    challenge.Mode,
                     template,
                     challenge.Id,
                     newRuntimeInstanceId.Value,
-                    challenge.Definition?.HasFlagTemplate == true
-                        ? challenge.Definition.FlagTemplate
+                    challenge.Definition?.Break?.HasFlagTemplate == true
+                        ? challenge.Definition.Break.FlagTemplate
                         : null);
             }
             catch (Exception exception) when (exception is InvalidOperationException
@@ -123,6 +135,8 @@ public sealed class ChallengeTestRuntimeStore(
             case RuntimeAction.Reset:
                 if (current is null || !IsRunningOrStarting(current.State))
                     return new(null, RuntimeMutationFailure.InvalidState);
+                if (current.CapabilityTest is { IsTerminal: false })
+                    return new(null, RuntimeMutationFailure.Conflict);
                 await StopAsync(current, command.Now, cancellationToken);
                 entity = await CreateAsync(
                     challenge, template!, newRuntimeInstanceId!.Value, newFlagPlan!, command.Now);
@@ -203,6 +217,7 @@ public sealed class ChallengeTestRuntimeStore(
         {
             Id = runtimeInstanceId,
             ChallengeId = challenge.Id,
+            TemplateTestUse = TemplateTestUse.Interactive,
             AccessMode = RuntimeAccessMode.DirectAndWsrx,
             TestFlagDelivery = flagPlan.Delivery,
             TestFlagState = flagPlan.InitialState,
@@ -221,6 +236,11 @@ public sealed class ChallengeTestRuntimeStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (runtime.CapabilityTest is { IsTerminal: false } test)
+        {
+            test.CancellationRequested = true;
+            test.State = TemplateCapabilityTestState.Finalizing;
+        }
         await EndPendingFlagAsync(runtime, RuntimeTestFlagState.Canceled, now, cancellationToken);
         if (runtime.State == RuntimeState.Queued
             && runtime.RunnerId is null
@@ -245,6 +265,7 @@ public sealed class ChallengeTestRuntimeStore(
             .Where(instance =>
                 instance.ChallengeId == challengeId
                 && instance.Purpose == RuntimePurpose.TemplateTest
+                && instance.TemplateTestUse != TemplateTestUse.CapabilityVerification
                 && instance.State == RuntimeState.Failed
                 && instance.RunnerId != null)
             .OrderByDescending(instance => instance.CreatedAt)
@@ -284,6 +305,7 @@ public sealed class ChallengeTestRuntimeStore(
         db.RuntimeInstances.AnyAsync(instance =>
             instance.ChallengeId == challengeId
             && instance.Purpose == RuntimePurpose.TemplateTest
+            && instance.TemplateTestUse != TemplateTestUse.CapabilityVerification
             && instance.State == RuntimeState.Stopping,
             cancellationToken);
 
@@ -294,6 +316,8 @@ public sealed class ChallengeTestRuntimeStore(
         CancellationToken cancellationToken) =>
         db.Challenges.AsNoTracking().AnyAsync(challenge =>
             challenge.Id == challengeId
+            && challenge.CatalogScope == ChallengeCatalogScope.QuestionBank
+            && challenge.DeletedAt == null
             && (isAdministrator
                 || challenge.OwnerId == actorUserId
                 || challenge.Managers.Any(manager => manager.UserId == actorUserId)),

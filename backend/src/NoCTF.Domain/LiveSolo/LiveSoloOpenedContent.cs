@@ -10,6 +10,7 @@ public sealed class LiveSoloOpenedContent
     public string? Description { get; set; }
     [MaxLength(96)] public string Direction { get; set; } = string.Empty;
     public bool RandomAttachment { get; set; }
+    public LiveSoloCompletionKind CompletionKind { get; set; }
     public List<LiveSoloOpenedTag> Tags { get; set; } = [];
     public List<LiveSoloOpenedHint> Hints { get; set; } = [];
     public List<LiveSoloOpenedAttachment> Attachments { get; set; } = [];

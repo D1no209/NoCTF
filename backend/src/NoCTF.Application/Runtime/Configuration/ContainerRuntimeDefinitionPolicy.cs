@@ -53,7 +53,7 @@ public static partial class ContainerRuntimeDefinitionPolicy
         return errors;
     }
 
-    private static bool IsEnvironmentName(string name) => !string.IsNullOrEmpty(name)
+    public static bool IsEnvironmentName(string name) => !string.IsNullOrEmpty(name)
         && (char.IsAsciiLetter(name[0]) || name[0] == '_')
         && name.Skip(1).All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
 }

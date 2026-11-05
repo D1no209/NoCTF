@@ -107,18 +107,18 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var factId = saved.Result.GameplayFactId!.Value;
             await Assert.That(await db.GameplayFacts.Where(item => item.Id == factId)
                 .Select(item => item.SourceIpAddress).SingleAsync(cancellationToken)).IsEqualTo("2001:db8::42");
-            var start = new StartAwdpFixVerification(factId, runtimeId);
+            var start = new StartFixExecution(factId, runtimeId);
             var clock = new FakeTimeProvider(fixture.Now.AddSeconds(2));
             var outbox = new RecordingOutbox();
             var events = new CompetitionEventStore(db, outbox);
-            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+            await BackendMessageOperations.StartFixExecutionAsync(
                 start,
                 db,
                 outbox,
                 clock,
                 cancellationToken,
                 events);
-            await Assert.That(outbox.Messages.OfType<StartAwdpFixVerification>())
+            await Assert.That(outbox.Messages.OfType<StartFixExecution>())
                 .Count().IsEqualTo(1);
 
             runtime = await db.RuntimeInstances.SingleAsync(
@@ -130,14 +130,14 @@ public sealed class AwdpDefenseTargetPersistenceTests
             runtime.RunningAt = fixture.Now;
             runtime.ExpiresAt = fixture.Now.AddMinutes(15);
             await db.SaveChangesAsync(cancellationToken);
-            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+            await BackendMessageOperations.StartFixExecutionAsync(
                 start,
                 db,
                 outbox,
                 clock,
                 cancellationToken,
                 events);
-            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+            await BackendMessageOperations.StartFixExecutionAsync(
                 start,
                 db,
                 outbox,
@@ -166,16 +166,17 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await Assert.That(fixTarget.SourceTeamId).IsEqualTo(fixture.TeamId);
             await Assert.That(targets.All(item => item.Runtime.SourceTeamId == fixture.TeamId)).IsTrue();
             await Assert.That(fact.UpdatedAt).IsEqualTo(clock.GetUtcNow());
-            var run = outbox.Messages.OfType<RunAwdpFixVerification>().ToArray();
+            var run = outbox.Messages.OfType<RunFixExecution>().ToArray();
             await Assert.That(run).Count().IsEqualTo(1);
             await Assert.That(run[0].GameplayFactId).IsEqualTo(fact.Id);
             await Assert.That(run[0].PatchUploadId).IsEqualTo(patch.Id);
             await Assert.That(run[0].RuntimeInstanceId).IsEqualTo(runtimeId);
+            await db.Entry(patch).ReloadAsync(cancellationToken);
             await Assert.That(run[0].Deadline).IsEqualTo(
-                patch.UploadedAt.Add(AwdpFixExecutionBudget.Calculate(
-                    AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds,
+                patch.UploadedAt.Add(NoCTF.Application.Challenges.Capabilities.FixExecutionBudget.Calculate(
+                    NoCTF.Application.Challenges.Capabilities.FixExecutionBudget.DefaultPatchTimeoutSeconds,
                     60)));
-            await Assert.That(outbox.Messages.OfType<ExpireAwdpFixVerification>())
+            await Assert.That(outbox.Messages.OfType<ExpireFixExecution>())
                 .Count().IsEqualTo(1);
         });
     }
@@ -376,7 +377,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await Assert.That(await verification.PatchUploads.CountAsync(cancellationToken))
                 .IsEqualTo(0);
             await Assert.That(await verification.RuntimeInstances.CountAsync(
-                instance => instance.Purpose == RuntimePurpose.AwdpTarget,
+                instance => instance.Purpose == RuntimePurpose.FixTarget,
                 cancellationToken)).IsEqualTo(1);
         });
     }
@@ -433,8 +434,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
             cancellationToken);
         return (
             result,
-            outbox.Messages.OfType<StartAwdpFixVerification>().Count(),
-            outbox.Messages.OfType<RunAwdpFixVerification>().Count());
+            outbox.Messages.OfType<StartFixExecution>().Count(),
+            outbox.Messages.OfType<RunFixExecution>().Count());
     }
 
     private static async Task AddFilesAsync(
@@ -559,7 +560,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = userId,

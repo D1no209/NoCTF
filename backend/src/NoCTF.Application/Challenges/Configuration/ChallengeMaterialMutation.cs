@@ -1,7 +1,9 @@
 namespace NoCTF.Application.Challenges.Configuration;
 
 public enum ChallengeMaterialMutationFailure : short { ActiveExecutionScope }
-public readonly record struct ChallengeMaterialScope(Guid? ChallengeId, Guid? CompetitionChallengeId);
+public readonly record struct ChallengeMaterialScope(Guid? ChallengeId, Guid? CompetitionChallengeId,
+    IReadOnlyList<NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind>? AffectedCapabilities = null,
+    bool RuntimeChanged = false);
 public sealed class ChallengeMaterialMutationException(ChallengeMaterialMutationFailure failure)
     : Exception("The challenge material is in use by an active execution scope.")
 {

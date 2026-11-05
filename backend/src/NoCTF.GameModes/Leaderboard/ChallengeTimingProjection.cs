@@ -8,11 +8,11 @@ internal static class ChallengeTimingProjection
 {
     public static bool CanScore(LeaderboardProjectionInput input, LeaderboardGameplayFact fact)
     {
-        if (fact.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment or GameplayFactKind.AwdServiceTransition)
+        if (fact.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment or GameplayFactKind.CheckObservation)
             return true;
         var timing = input.Challenges?.FirstOrDefault(x => x.Id == fact.CompetitionChallengeId)?.Timing;
         if (timing is null) return true;
-        return fact.Kind == GameplayFactKind.KohControlObservation
+        return fact.Kind == GameplayFactKind.ControlObservation
             ? timing.CanScoreCheckpoint(fact.OccurredAt) : timing.CanScore(fact.OccurredAt);
     }
 
@@ -28,7 +28,7 @@ internal static class ChallengeTimingProjection
         LeaderboardGameplayFact Current(LeaderboardGameplayFact fact)
         {
             var timing = input.Challenges?.FirstOrDefault(x => x.Id == fact.CompetitionChallengeId)?.Timing;
-            return timing is not null && fact.Result is { } result && fact.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
+            return timing is not null && fact.Result is { } result && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
                 ? fact with { Result = timing.Classify(result, fact.OccurredAt) } : fact;
         }
         return input with { GameplayFacts = input.GameplayFacts.Select(Current).ToArray(),

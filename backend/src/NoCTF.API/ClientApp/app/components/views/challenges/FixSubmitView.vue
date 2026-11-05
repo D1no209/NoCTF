@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { FixSubmitViewState } from '~/features/challenges/useFixSubmit'
 
 const viewProps = defineProps<{ state: FixSubmitViewState }>()
-const { file, pendingAction, targetCreating, canUpload, validating, recycling, patchWaitingForTarget, targetFailed, completedAndRecycled, canRequest, onFileChange, requestTarget, uploadFix, competitionChallengeId, ctfPatchVerification } = toRefs(viewProps.state)
+const { file, pendingAction, targetCreating, canUpload, validating, recycling, patchWaitingForTarget, targetFailed, completedAndRecycled, canRequest, onFileChange, requestTarget, uploadFix, competitionChallengeId } = toRefs(viewProps.state)
 </script>
 
 <template>
   <section class="flex flex-col gap-4" aria-labelledby="fix-submit-title">
-    <h3 id="fix-submit-title" class="text-sm font-semibold">{{ ctfPatchVerification ? $t('common.label.patchVerification') : $t('common.label.defenseVerification') }}</h3>
+    <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('common.label.defenseVerification') }}</h3>
     <div class="flex flex-col gap-4">
       <UiForm v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
         <p class="flex items-start gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
@@ -64,9 +64,7 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
         <Spinner v-if="pendingAction === 'request'" data-icon="inline-start" />
         {{ pendingAction === 'request'
           ? $t('challenges.label.requesting')
-          : ctfPatchVerification
-            ? completedAndRecycled || targetFailed ? $t('challenges.label.patchVerificationAgain') : $t('challenges.label.patchVerificationTarget')
-            : completedAndRecycled || targetFailed ? $t('challenges.label.defenseAgain') : $t('challenges.label.defenseEnvironment') }}
+          : completedAndRecycled || targetFailed ? $t('challenges.label.defenseAgain') : $t('challenges.label.defenseEnvironment') }}
       </Button>
     </div>
   </section>

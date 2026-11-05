@@ -1,34 +1,5 @@
 namespace NoCTF.Application.Competitions.Koh;
 
-public enum KohControlResponseKind
-{
-    Success,
-    Timeout,
-    Unavailable
-}
-
-public sealed record KohControlResponse(
-    KohControlResponseKind Kind,
-    ReadOnlyMemory<byte> Body)
-{
-    public static KohControlResponse Success(ReadOnlyMemory<byte> body) =>
-        new(KohControlResponseKind.Success, body);
-
-    public static KohControlResponse Timeout() =>
-        new(KohControlResponseKind.Timeout, ReadOnlyMemory<byte>.Empty);
-
-    public static KohControlResponse Unavailable() =>
-        new(KohControlResponseKind.Unavailable, ReadOnlyMemory<byte>.Empty);
-}
-
-public interface IKohControlClient
-{
-    Task<KohControlResponse> ObserveAsync(
-        Uri controlUrl,
-        TimeSpan timeout,
-        CancellationToken cancellationToken);
-}
-
 public static class KohPollSchedule
 {
     public static DateTimeOffset NextDue(

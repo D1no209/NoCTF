@@ -5,7 +5,7 @@ import { buildHubConnection, createHubStarter, stopHubConnection } from '../lib/
 
 export interface NotificationHubHandlers {
   navigationCapabilitiesChanged?: () => void
-  theoryChanged?: (activityId: string) => void
+  questionnaireChanged?: (activityId: string) => void
   notificationChanged?: () => void
   onReconnected?: () => void
 }
@@ -21,8 +21,8 @@ function notifyReconnected(): void {
   for (const handlers of subscribers.values()) handlers.onReconnected?.()
 }
 
-function notifyTheoryChanged(activityId: string): void {
-  for (const handlers of subscribers.values()) handlers.theoryChanged?.(activityId)
+function notifyQuestionnaireChanged(activityId: string): void {
+  for (const handlers of subscribers.values()) handlers.questionnaireChanged?.(activityId)
 }
 
 function ensureConnection(): signalR.HubConnection {
@@ -38,7 +38,7 @@ function ensureConnection(): signalR.HubConnection {
   hub.on('navigationCapabilitiesChanged', () => {
     for (const handlers of subscribers.values()) handlers.navigationCapabilitiesChanged?.()
   })
-  hub.on('theoryChanged', notifyTheoryChanged)
+  hub.on('questionnaireChanged', notifyQuestionnaireChanged)
   hub.onreconnected(() => {
     if (connection === hub) notifyReconnected()
   })

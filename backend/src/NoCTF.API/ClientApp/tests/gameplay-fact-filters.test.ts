@@ -7,7 +7,6 @@ describe('administrator gameplay fact filters', () => {
       new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url),
     ).text()
 
-    expect(page).toContain("{ value: 'FlagAttempt', label: 'Flag' }")
     expect(page).toContain("{ value: 'BreakAttempt', label: 'Break' }")
     expect(page).toContain("{ value: 'FixAttempt', label: translate('common.label.patchVerification') }")
     expect(page).toContain('gameplayFactKind: filters.kind || null')

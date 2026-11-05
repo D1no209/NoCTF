@@ -165,12 +165,12 @@ public sealed class AuthenticationStore(
             .Where(fact => fact.ActorUserId == userId
                 && fact.State == GameplayFactState.Completed
                 && fact.TeamId != null
-                && ((fact.Kind == GameplayFactKind.FlagAttempt
+                && ((fact.Kind == GameplayFactKind.BreakAttempt
                         || fact.Kind == GameplayFactKind.BreakAttempt)
                     && fact.Result == GameplayFactResult.Correct
                     || fact.Kind == GameplayFactKind.FixAttempt
                     && fact.Result == GameplayFactResult.Applied
-                    || fact.Kind == GameplayFactKind.KohControlObservation
+                    || fact.Kind == GameplayFactKind.ControlObservation
                     && fact.Result == GameplayFactResult.Controlled))
             .Join(
                 eligibleTeams,

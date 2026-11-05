@@ -6,7 +6,6 @@ using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
-using NoCTF.Domain.Theory.Activities;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Competitions.Progression;
 using NoCTF.Infrastructure.Persistence;
@@ -73,7 +72,7 @@ public sealed class CompetitionProgressionPersistenceTests
                     EndAt = now.AddDays(1), Status = CompetitionStatus.Running,
                     CreatedAt = now, UpdatedAt = now
                 });
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = challengeId, OwnerId = ownerId, Title = "Question",
                     Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf),
@@ -146,23 +145,6 @@ public sealed class CompetitionProgressionPersistenceTests
                 var configured = await features.ReadAsync(competitionId, ct);
                 await Assert.That(configured.ProgressionEnabled).IsTrue();
                 await Assert.That(configured.ProgressionMapVisible).IsTrue();
-                await Assert.That(configured.HasPublishedTheory).IsFalse();
-                var activity = new TheoryActivity { Id = Guid.NewGuid(), OwnerId = ownerId,
-                    Name = "Navigation activity", Kind = TheoryActivityKind.Competition,
-                    State = TheoryActivityState.Draft, OpensAt = now, ClosesAt = now.AddHours(1), CreatedAt = now };
-                var link = new CompetitionTheoryActivity { CompetitionId = competitionId, ActivityId = activity.Id, Enabled = true };
-                db.TheoryActivities.Add(activity); db.CompetitionTheoryActivities.Add(link);
-                await db.SaveChangesAsync(ct);
-                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
-                activity.State = TheoryActivityState.Published;
-                await db.SaveChangesAsync(ct);
-                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsTrue();
-                link.Enabled = false;
-                await db.SaveChangesAsync(ct);
-                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
-                link.Enabled = true; activity.State = TheoryActivityState.Voided;
-                await db.SaveChangesAsync(ct);
-                await Assert.That((await features.ReadAsync(competitionId, ct)).HasPublishedTheory).IsFalse();
                 var savedGraph = await db.CompetitionProgressions.SingleAsync(ct);
                 savedGraph.ShowPlayerMap = false;
                 await db.SaveChangesAsync(ct);

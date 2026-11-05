@@ -167,14 +167,14 @@ public sealed class LiveSoloReviewAndResultsTests
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false); await f.PrepareAsync(ct); await f.StartAsync(ct);
             var question = f.Round.Questions.Single(x => x.Position == 1);
-            question.Readiness = LiveSoloQuestionReadiness.Failed; question.PreparationFailure = LiveSoloResourceFailure.DependencyUnavailable;
+            question.Readiness = LiveSoloQuestionReadiness.Failed; question.PreparationFailure = LiveSoloResourceFailure.UnsupportedEnvironment;
             await f.Db.SaveChangesAsync(ct); f.Now = f.Now.AddSeconds(12);
             await Assert.That(NoCTF.Application.LiveSolo.Rounds.LiveSoloRoundSchedulePolicy.PreparationCandidates(f.Round, f.Now)).IsEmpty();
             var store = f.Store(f.Db);
             var player = await ((ILiveSoloWorkspaceReader)store).ReadAsync(f.Competition.Id, f.Match.Id, f.Left.Id, false, f.Now, ct);
             await Assert.That(player!.Resources.Count).IsEqualTo(0);
             var staff = await ((ILiveSoloWorkspaceReader)store).ReadAsync(f.Competition.Id, f.Match.Id, f.Owner.Id, true, f.Now, ct);
-            await Assert.That(staff!.Resources.Single(x => x.QuestionId == question.Id).Failure).IsEqualTo(LiveSoloResourceFailure.DependencyUnavailable);
+            await Assert.That(staff!.Resources.Single(x => x.QuestionId == question.Id).Failure).IsEqualTo(LiveSoloResourceFailure.UnsupportedEnvironment);
             await Assert.That(staff.AllowedOperations.Contains(LiveSoloWorkspaceOperation.RetryPreparation)).IsTrue();
             var retried = await store.RetryPreparationAsync(new(f.Competition.Id, f.Match.Id, f.Round.Id, f.Owner.Id, staff.Round!.ConcurrencyStamp, f.Now, question.Id), ct);
             await Assert.That(retried.Failure).IsNull(); await Assert.That(retried.Round!.Id).IsEqualTo(f.Round.Id);

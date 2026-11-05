@@ -41,10 +41,10 @@ internal sealed class CompetitionForceDeleteFixture
         db.Files.AddRange(File(FileId), File(WriteUpFileId), File(SharedFileId));
         db.Files.AddRange(AdditionalPatchFileIds.Select(File));
         db.Competitions.AddRange(Competition(Id, "Delete fixture", FileId), Competition(OtherId, "Keep fixture", SharedFileId));
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = TemplateId, OwnerId = OwnerId, Visibility = ChallengeVisibility.Private,
-            Title = "Global template", Direction = "Pwn", Definition = TestConfigurations.Definition(GameMode.Awdp), CreatedAt = Now, UpdatedAt = Now
+            Title = "Global template", Direction = "Pwn", Definition = NoCTF.Tests.Unit.Gameplay.ChallengeCapabilityTests.Repairable(), CreatedAt = Now, UpdatedAt = Now
         });
         db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
@@ -82,7 +82,7 @@ internal sealed class CompetitionForceDeleteFixture
                 Result = GameplayFactResult.Wrong, ReferenceKind = GameplayFactReferenceKind.PatchUpload,
                 ReferenceId = patchId, OccurredAt = Now, UpdatedAt = Now
             });
-            db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
+            db.RuntimeInstances.Add(new FixTargetRuntimeInstance
             {
                 Id = runtimeId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
                 GameplayFactId = factId, RuntimeKind = RuntimeKind.Container,

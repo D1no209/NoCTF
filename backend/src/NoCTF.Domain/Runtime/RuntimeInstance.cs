@@ -23,11 +23,11 @@ public enum RuntimeState : short
 public enum RuntimePurpose : short
 {
     Player,
-    AwdpTarget,
+    FixTarget,
     Practice,
-    AwdpAttack,
+    AttackTarget,
     TemplateTest,
-    PatchVerificationTarget
+    ScopedFixTarget
 }
 
 public enum RuntimeAccessMode : short
@@ -154,6 +154,8 @@ public abstract class RuntimeInstance : IConcurrencyTracked
     public long TrafficCaptureReservedBytes { get; set; }
     public RuntimeTestFlagDelivery? TestFlagDelivery { get; set; }
     public RuntimeTestFlagState? TestFlagState { get; set; }
+    public NoCTF.Domain.Challenges.Testing.TemplateTestUse? TemplateTestUse { get; set; }
+    public NoCTF.Domain.Challenges.Testing.TemplateCapabilityTest? CapabilityTest { get; set; }
     public Guid? GameplayFactId { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }

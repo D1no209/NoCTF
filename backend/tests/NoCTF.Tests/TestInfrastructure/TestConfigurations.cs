@@ -13,6 +13,7 @@ using NoCTF.GameModes.Scoring;
 using NoCTF.API.Endpoints.Administration.ChallengeBank;
 using NoCTF.API.Endpoints.Administration.Challenges;
 using NoCTF.API.Endpoints.Administration.Competitions;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Tests;
 
@@ -25,7 +26,33 @@ internal static class TestConfigurations
         => new GameModeChallengeConfigurationCatalog().CreateDefaultRules(mode, Guid.Empty);
 
     public static ChallengeDefinition Definition(GameMode mode)
-        => new GameModeChallengeConfigurationCatalog().CreateDefaultDefinition(mode, Guid.Empty);
+        => mode switch
+        {
+            GameMode.Ctf or GameMode.LiveSolo => new() { Capabilities = [new BreakCapabilityDefinition()] },
+            GameMode.Awd => ServiceDefinition(includeFix: false),
+            GameMode.Awdp => ServiceDefinition(includeFix: true),
+            GameMode.Koh => new() { Runtime = ServiceRuntime(), Capabilities = [new ControlCapabilityDefinition {
+                ServiceName = "main", ContainerPort = 8080, UrlTemplate = "http://{HOST}:{PORT}/control" }] },
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
+
+    private static ChallengeRuntimeTemplateEntity ServiceRuntime() => new ContainerChallengeRuntimeTemplate
+    {
+        Services = [new() { Name = "main", Image = "challenge:1", InternalPorts = [new() { Port = 8080 }] }]
+    };
+
+    private static ChallengeDefinition ServiceDefinition(bool includeFix)
+    {
+        var definition = new ChallengeDefinition { Runtime = ServiceRuntime(), Capabilities = [new BreakCapabilityDefinition(),
+            new CheckCapabilityDefinition { Image = "checker:1", TargetServiceName = "main", Command = [new() { Value = "check" }],
+                Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }] }] };
+        if (includeFix)
+        {
+            definition.Break!.EnvironmentTargets.Add(new() { ServiceName = "main", VariableName = "FLAG" });
+            definition.Capabilities.Add(new FixCapabilityDefinition { TargetServiceName = "main" });
+        }
+        return definition;
+    }
 
     public static CompetitionModeConfiguration Clone(
         CompetitionModeConfiguration source,
@@ -48,7 +75,6 @@ internal static class TestConfigurations
         Guid challengeId = default) =>
         ChallengeDefinitionContractMapper.ToDomain(
             challengeId,
-            source.Mode,
             ChallengeDefinitionContractMapper.FromDomain(source));
 
     public static CompetitionModeConfiguration Competition(GameMode mode, string json) => mode switch
@@ -131,11 +157,11 @@ internal static class TestConfigurations
     private static CompetitionChallengeRules Rules(CtfChallengeConfiguration value) =>
         CommonRules(new CtfCompetitionChallengeRules
         {
+            Runtime = RuntimeRules(value.Runtime, new CtfCompetitionChallengeRules().Runtime),
             ScoreSettlementMode = value.ScoreSettlementMode,
             HasScoreCurve = value.ScoreCurve is not null,
             ScoreCurve = Curve(value.ScoreCurve),
             MaxFlagAttempts = value.MaxFlagAttempts,
-            MaxPatchAttempts = value.MaxPatchAttempts,
             WrongSubmissionPenalty = value.WrongSubmissionPenalty,
             BloodRewards = (value.BloodRewards ?? []).Select((reward, position) =>
                 new CompetitionChallengeBloodReward
@@ -151,6 +177,7 @@ internal static class TestConfigurations
         {
             AttackRewardMode = value.AttackRewardMode is null
                 ? null : (AwdAttackRewardMode)value.AttackRewardMode.Value,
+            Runtime = RuntimeRules(value.Runtime, new AwdCompetitionChallengeRules().Runtime),
             AttackPoints = value.AttackPoints,
             VictimDefensePoolPoints = value.VictimDefensePoolPoints,
             CheckerIntervalSeconds = value.CheckerIntervalSeconds,
@@ -162,6 +189,7 @@ internal static class TestConfigurations
         CommonRules(new AwdpCompetitionChallengeRules
         {
             HasBreakScoreCurve = value.Break is not null,
+            Runtime = RuntimeRules(value.Runtime, new AwdpCompetitionChallengeRules().Runtime),
             BreakScoreCurve = Curve(value.Break),
             HasFixScoreCurve = value.Fix is not null,
             FixScoreCurve = Curve(value.Fix),
@@ -184,37 +212,38 @@ internal static class TestConfigurations
         };
 
     private static ChallengeDefinition Definition(CtfChallengeConfiguration value) =>
-        CommonDefinition(new CtfChallengeDefinition
-        {
-            InteractionKind = value.InteractionKind
-        }, value.Runtime, value.PatchEntrypoint, value.PatchCommand,
-            value.PatchTimeoutSeconds, value.Checker, value.ReadyTimeoutSeconds,
-            value.MaximumPatchUploadBytes, value.FlagTemplate,
-            value.CheckerFixInput);
+        CommonDefinition(false, value.Runtime, null, null, null, null, null, null, value.FlagTemplate, false);
 
     private static ChallengeDefinition Definition(AwdChallengeConfiguration value)
     {
-        var result = CommonDefinition(new AwdChallengeDefinition
-        {
-            FlagInjectionCommand = value.FlagInjection?.Command,
-            FlagInjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds,
-            FlagInjectionServiceName = value.FlagInjection?.ServiceName
-        }, value.Runtime, null, null, null, value.Checker?.Job, null, null, value.FlagTemplate,
+        var result = CommonDefinition(false, value.Runtime, null, null, null, value.Checker?.Job, null, null, value.FlagTemplate,
             false);
-        if (result.Checker is not null)
-            result.Checker.TargetServiceName = value.Checker?.TargetServiceName;
+        result.Break!.InjectionCommand = value.FlagInjection?.Command;
+        result.Break.InjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds ?? 30;
+        result.Break.InjectionServiceName = value.FlagInjection?.ServiceName
+            ?? (value.FlagInjection is not null && value.Runtime?.Definition is ContainerRuntimeDefinition { Services.Count: 1 } container
+                ? container.Services[0].Name : null);
+        if (result.Check is { } check && value.Checker?.TargetServiceName is { } serviceName)
+            check.TargetServiceName = serviceName;
         return result;
     }
 
     private static ChallengeDefinition Definition(AwdpChallengeConfiguration value) =>
-        CommonDefinition(new AwdpChallengeDefinition(), value.Runtime,
+        CommonDefinition(true, value.Runtime,
             value.PatchEntrypoint, value.PatchCommand, value.PatchTimeoutSeconds,
             value.Checker, value.ReadyTimeoutSeconds, value.MaximumPatchUploadBytes, value.FlagTemplate,
             value.CheckerFixInput);
 
-    private static ChallengeDefinition Definition(KohChallengeConfiguration value) =>
-        CommonDefinition(new KohChallengeDefinition(), value.Runtime,
-            null, null, null, null, null, null, null, false);
+    private static ChallengeDefinition Definition(KohChallengeConfiguration value) => new()
+    {
+        Runtime = Runtime(value.Runtime), Capabilities = [new ControlCapabilityDefinition
+        {
+            UrlTemplate = value.Runtime?.ControlCheckUrlBinding?.UrlTemplate ?? string.Empty,
+            ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName,
+            ContainerPort = value.Runtime?.ControlCheckUrlBinding?.ContainerPort,
+            VmId = value.Runtime?.ControlCheckUrlBinding?.VmId, GuestPort = value.Runtime?.ControlCheckUrlBinding?.GuestPort
+        }]
+    };
 
     private static T Common<T>(T value, NoCTF.GameModes.Flags.PerTeamFlagTemplate? flag)
         where T : CompetitionModeConfiguration
@@ -224,15 +253,15 @@ internal static class TestConfigurations
     }
 
     private static T CommonRules<T>(T value, NoCTF.GameModes.Flags.PerTeamFlagTemplate? flag)
-        where T : CompetitionChallengeRules
+        where T : CompetitionChallengeRules, IChallengeFlagTemplateOverride
     {
         value.HasFlagTemplate = flag is not null;
         value.FlagTemplate = Flag(flag);
         return value;
     }
 
-    private static T CommonDefinition<T>(
-        T value,
+    private static ChallengeDefinition CommonDefinition(
+        bool includesFix,
         ChallengeRuntimeTemplate? runtime,
         string? patchEntrypoint,
         IReadOnlyList<string>? patchCommand,
@@ -241,43 +270,31 @@ internal static class TestConfigurations
         int? readyTimeoutSeconds,
         long? maximumPatchUploadBytes,
         NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
-        bool checkerFixInput) where T : ChallengeDefinition
+        bool checkerFixInput)
     {
-        value.Runtime = Runtime(runtime);
-        value.PatchEntrypoint = patchEntrypoint;
-        value.PatchTimeoutSeconds = patchTimeoutSeconds;
-        value.ReadyTimeoutSeconds = readyTimeoutSeconds;
-        value.MaximumPatchUploadBytes = maximumPatchUploadBytes;
-        value.HasFlagTemplate = flagTemplate is not null;
-        value.FlagTemplate = Flag(flagTemplate);
-        value.CheckerFixInput = checkerFixInput;
-        value.Checker = checker is null ? null : new ChallengeCheckerDefinition
+        var value = new ChallengeDefinition { Runtime = Runtime(runtime), Capabilities = [new BreakCapabilityDefinition
         {
-            Image = checker.Image,
-            TimeoutSeconds = checker.TimeoutSeconds
-        };
-        value.StringItems = (patchCommand ?? []).Select((item, position) =>
-                new ChallengeDefinitionStringItem
-                {
-                    Kind = ChallengeDefinitionStringKind.PatchCommand,
-                    Position = position,
-                    Value = item
-                })
-            .Concat((checker?.Command ?? []).Select((item, position) =>
-                new ChallengeDefinitionStringItem
-                {
-                    Kind = ChallengeDefinitionStringKind.CheckerCommand,
-                    Position = position,
-                    Value = item
-                }))
-            .Concat((checker?.Environment ?? new Dictionary<string, string>())
-                .Select((item, position) => new ChallengeDefinitionStringItem
-                {
-                    Kind = ChallengeDefinitionStringKind.CheckerEnvironment,
-                    Position = position,
-                    Key = item.Key,
-                    Value = item.Value
-                })).ToList();
+            HasFlagTemplate = flagTemplate is not null, FlagTemplate = Flag(flagTemplate),
+            EnvironmentTargets = runtime?.Definition is ContainerRuntimeDefinition environment
+                ? environment.Services.Where(service => service.FlagEnvironmentVariableName is not null)
+                    .Select((service, position) => new FlagEnvironmentTarget { Position = position, ServiceName = service.Name,
+                        VariableName = service.FlagEnvironmentVariableName! }).ToList() : []
+        }] };
+        var service = runtime?.Definition is ContainerRuntimeDefinition { Services.Count: 1 } container ? container.Services[0].Name : "main";
+        if (includesFix) value.Capabilities.Add(new FixCapabilityDefinition
+        {
+            Entrypoint = patchEntrypoint ?? "fix.sh", TimeoutSeconds = patchTimeoutSeconds ?? 60,
+            MaximumUploadBytes = maximumPatchUploadBytes ?? 256L * 1024 * 1024, TargetServiceName = service,
+            Command = (patchCommand ?? []).Select((argument, position) => new FixCommandArgument { Position = position, Value = argument }).ToList()
+        });
+        if (checker is not null) value.Capabilities.Add(new CheckCapabilityDefinition
+        {
+            Image = checker.Image, TimeoutSeconds = checker.TimeoutSeconds, ReadyTimeoutSeconds = readyTimeoutSeconds ?? 30,
+            AcceptsFixInput = checkerFixInput, TargetServiceName = service,
+            Command = (checker.Command ?? []).Select((argument, position) => new CheckCommandArgument { Position = position, Value = argument }).ToList(),
+            Environment = (checker.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { Name = item.Key, Value = item.Value }).ToList(),
+            Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }]
+        });
         return value;
     }
 
@@ -291,7 +308,6 @@ internal static class TestConfigurations
                 Services = container.Services.Select((service, position) => new ChallengeRuntimeService
                 {
                     Name = service.Name, Position = position, Image = service.Image, CpuCores = service.CpuCores, MemoryMiB = service.MemoryMiB,
-                    FlagEnvironmentVariableName = service.FlagEnvironmentVariableName,
                     Commands = (service.Command ?? []).Select((item, index) => new ChallengeRuntimeServiceCommand { Position = index, Value = item })
                         .Concat((service.Arguments ?? []).Select((item, index) => new ChallengeRuntimeServiceCommand { Position = index, Value = item, IsArgument = true })).ToList(),
                     Environment = (service.Environment ?? new Dictionary<string, string>()).Select(item => new ChallengeRuntimeServiceEnvironment { Name = item.Key, Value = item.Value }).ToList(),
@@ -306,15 +322,12 @@ internal static class TestConfigurations
             },
             _ => throw new ArgumentOutOfRangeException(nameof(value))
         };
-        runtime.Allocation = (PersistedRuntimeAllocation)value.Allocation;
         if (runtime is OvaChallengeRuntimeTemplate ovaResources && value.Limits is { } limits)
         {
             ovaResources.HasExplicitLimits = true;
             ovaResources.Limits = new() { MemoryBytes = limits.MemoryBytes, CpuMillicores = limits.CpuMillicores, PidsLimit = limits.PidsLimit };
         }
-        runtime.TtlSeconds = value.TtlSeconds;
         runtime.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
-        runtime.FlagSource = (PersistedRuntimeFlagSource)value.FlagSource;
         runtime.UrlBindings = (value.UrlBindings ?? []).Select((binding, position) =>
             new ChallengeRuntimeUrlBinding
             {
@@ -326,21 +339,6 @@ internal static class TestConfigurations
                 VmId = binding.VmId,
                 GuestPort = binding.GuestPort
             }).ToList();
-        if (value.ControlCheckUrlBinding is not null)
-        {
-            var binding = value.ControlCheckUrlBinding;
-            runtime.UrlBindings.Add(new ChallengeRuntimeUrlBinding
-            {
-                Position = runtime.UrlBindings.Count,
-                IsControlCheck = true,
-                UrlTemplate = binding.UrlTemplate,
-                Exposure = (PersistedRuntimeExposure)binding.Exposure,
-                ContainerPort = binding.ContainerPort,
-                ServiceName = binding.ServiceName ?? (value.Definition is ContainerRuntimeDefinition ? "main" : null),
-                VmId = binding.VmId,
-                GuestPort = binding.GuestPort
-            });
-        }
         return runtime;
     }
 
@@ -354,6 +352,10 @@ internal static class TestConfigurations
             DecayMode = (PersistedScoreDecayMode)value.DecayMode,
             CustomExpression = value.CustomExpression
         };
+
+    private static CompetitionChallengeRuntimeRules RuntimeRules(ChallengeRuntimeTemplate? value, CompetitionChallengeRuntimeRules defaults) =>
+        value is null ? defaults : new() { Allocation = (PersistedRuntimeAllocation)value.Allocation,
+            FlagSource = (PersistedRuntimeFlagSource)value.FlagSource, TtlSeconds = value.TtlSeconds };
 
     private static FlagTemplateValue Flag(NoCTF.GameModes.Flags.PerTeamFlagTemplate? value) =>
         value is null

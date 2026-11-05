@@ -18,9 +18,9 @@ public sealed class GameModeGameplayFactEvaluatorCatalog : IGameplayFactEvaluato
     private readonly IReadOnlyDictionary<GameMode, IGameplayFactEvaluator> evaluators =
         new Dictionary<GameMode, IGameplayFactEvaluator>
         {
-            [GameMode.Ctf] = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator()),
-            [GameMode.Awd] = new AwdGameplayFactEvaluator(),
-            [GameMode.Awdp] = new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator()),
+            [GameMode.Ctf] = new BreakCapabilityEvaluator(new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())),
+            [GameMode.Awd] = new BreakCapabilityEvaluator(new AwdGameplayFactEvaluator()),
+            [GameMode.Awdp] = new BreakCapabilityEvaluator(new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())),
             [GameMode.Koh] = new KohGameplayFactEvaluator()
         };
 
@@ -38,7 +38,7 @@ internal static class ModeGameplayFactEvaluatorRules
     {
         var submission = context.GameplayFact;
         var activeMatches = context.ApplicableFlags
-            .Where(flag => DefaultEfGameplayFactEvaluator.Matches(submission, flag))
+            .Where(flag => DefaultEfGameplayFactEvaluator.Matches(context, flag))
             .Where(flag => flag.ValidStart is null || flag.ValidStart <= submission.OccurredAt)
             .Where(flag => flag.ValidUntil is null || submission.OccurredAt < flag.ValidUntil)
             .ToArray();
@@ -101,21 +101,18 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
 {
     public GameplayFactDecision Evaluate(GameplayFactProcessingContext context)
     {
-        var interactionKind = context.ChallengeDefinition is CtfChallengeDefinition ctf
-            ? ctf.InteractionKind
-            : CtfInteractionKind.FlagSubmission;
-        if (interactionKind == NoCTF.Domain.Challenges.CtfInteractionKind.PatchVerification)
+        if (context.ChallengeDefinition?.Break is null)
         {
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
                 GameplayFactFailureCode.FlagNotSupported);
         }
-        if (context.GameplayFact.Kind != GameplayFactKind.FlagAttempt)
+        if (context.GameplayFact.Kind != GameplayFactKind.BreakAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
                 GameplayFactFailureCode.FixNotSupported);
-        var usesRuntimeInjection = context.ChallengeDefinition is CtfChallengeDefinition
-            { Runtime: { FlagSource: PersistedRuntimeFlagSource.PerTeam } };
+        var usesRuntimeInjection = context.ChallengeRules is CtfCompetitionChallengeRules
+            { Runtime.FlagSource: PersistedRuntimeFlagSource.PerTeam };
         var effectiveContext = usesRuntimeInjection
             ? context with
             {
@@ -136,7 +133,7 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
                 && fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected
                 && fact.TeamId == context.GameplayFact.TeamId
                 && fact.CompetitionChallengeId == context.GameplayFact.CompetitionChallengeId
-                && fact.Kind == GameplayFactKind.FlagAttempt
+                && fact.Kind == GameplayFactKind.BreakAttempt
                 && string.Equals(fact.Value, context.GameplayFact.Value, StringComparison.Ordinal)))
             return new(GameplayFactResult.Duplicate, null, context.GameplayFact.OccurredAt);
         return ModeGameplayFactEvaluatorRules.Reject(context.GameplayFact, failure);
@@ -149,7 +146,7 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
     public GameplayFactDecision Evaluate(GameplayFactProcessingContext context)
     {
         var submission = context.GameplayFact;
-        if (submission.Kind != GameplayFactKind.FlagAttempt)
+        if (submission.Kind != GameplayFactKind.BreakAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FixNotSupported);
 
         if (submission.Awd is not { ReceivedRoundNumber: { } round, ReceivedActiveTicks: { } ticks,
@@ -161,7 +158,7 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
         var candidates = context.ApplicableFlags
             .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
             .Where(flag => flag.CompetitionChallengeId == submission.CompetitionChallengeId
-                && flag.TeamId is not null && string.Equals(flag.Flag, value, StringComparison.Ordinal))
+                && flag.TeamId is not null && DefaultEfGameplayFactEvaluator.Matches(context, flag))
             .OrderBy(flag => flag.Id)
             .ToList();
         if (candidates.Count == 0)
@@ -212,8 +209,6 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
     public GameplayFactDecision Evaluate(GameplayFactProcessingContext context)
     {
         var submission = context.GameplayFact;
-        if (submission.Kind == GameplayFactKind.FlagAttempt)
-            return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FlagNotSupported);
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return inner.Evaluate(context);
         if (context.PriorFacts.Any(fact =>
@@ -235,7 +230,7 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
             PriorFacts = []
         };
         var matching = exactContext.ApplicableFlags
-            .Where(flag => DefaultEfGameplayFactEvaluator.Matches(submission, flag))
+            .Where(flag => DefaultEfGameplayFactEvaluator.Matches(exactContext, flag))
             .ToArray();
         if (matching.Length > 0 && matching.All(flag =>
                 flag.ValidStart is null || flag.ValidStart > submission.OccurredAt

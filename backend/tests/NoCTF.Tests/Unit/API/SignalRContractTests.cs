@@ -32,7 +32,7 @@ public sealed class SignalRContractTests
                 "platformLogReceived",
                 "notificationChanged",
                 "navigationCapabilitiesChanged",
-                "theoryChanged"
+                "questionnaireChanged"
             ]);
         await Assert.That(methods.All(method => method.ReturnType == typeof(Task))).IsTrue();
         await Assert.That(methods.All(method =>

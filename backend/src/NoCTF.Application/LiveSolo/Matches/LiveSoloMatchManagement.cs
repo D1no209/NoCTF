@@ -1,4 +1,5 @@
 using NoCTF.Application.LiveSolo.Rounds;
+using NoCTF.Application.Challenges.Actions;
 using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Application.LiveSolo.Matches;
@@ -55,7 +56,13 @@ public sealed record LiveSoloAdmission(Guid CompetitionId, Guid MatchId, Guid Ro
     string Flag, DateTimeOffset Now);
 public sealed record LiveSoloAdmissionResult(Guid? GameplayFactId, long? Sequence, DateTimeOffset? AcceptedAt, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloQuestionView(Guid Id, Guid CompetitionChallengeId, int Position, string Title, string? Description,
-    string Direction, IReadOnlyList<string> Tags, DateTimeOffset OpenedAt, Guid? RuntimeInstanceId);
+    string Direction, IReadOnlyList<string> Tags, DateTimeOffset OpenedAt, Guid? RuntimeInstanceId)
+{
+    public LiveSoloCompletionKind CompletionKind { get; init; }
+    public IReadOnlyList<LiveSoloAvailableAction> AvailableActions { get; init; } = [];
+}
+public sealed record LiveSoloAvailableAction(ChallengeActionKind Kind, bool Enabled, ChallengeActionAvailability Availability,
+    LiveSoloFailure? Failure = null, Guid? RuntimeInstanceId = null, Guid? GameplayFactId = null);
 
 public interface ILiveSoloMatchStore
 {

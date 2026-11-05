@@ -5,8 +5,7 @@ using NoCTF.Domain.Competitions.Awd;
 namespace NoCTF.GameModes.Awd.Scoring;
 
 public readonly record struct AwdRankingValues(Guid TeamId, long TotalScore, long AttackPoints,
-    int HealthyRounds, int AttackCount, DateTimeOffset? LastAttackAt, DateTimeOffset RegisteredAt,
-    DateTimeOffset? TheoryAchievedAt = null);
+    int HealthyRounds, int AttackCount, DateTimeOffset? LastAttackAt, DateTimeOffset RegisteredAt);
 
 public static class AwdTeamRanking
 {
@@ -23,12 +22,8 @@ public static class AwdTeamRanking
         IReadOnlyList<AwdTieBreakCriterion> rules, Func<T, AwdRankingValues> values)
     {
         var ordered = teams.OrderByDescending(team => values(team).TotalScore);
-        var usesDefaultRules = rules.SequenceEqual(AwdTieBreakPolicy.Default);
         foreach (var rule in rules)
         {
-            // Keep the default theory/registration fallback without overriding an explicit custom order.
-            if (usesDefaultRules && rule.Field == AwdTieBreakField.RegistrationTime)
-                ordered = ordered.ThenBy(team => values(team).TheoryAchievedAt ?? DateTimeOffset.MaxValue);
             var ascending = rule.Direction == AwdSortDirection.Ascending;
             ordered = rule.Field switch
             {
@@ -46,7 +41,6 @@ public static class AwdTeamRanking
                 _ => throw new InvalidOperationException("Unsupported AWD tie-break field.")
             };
         }
-        return ordered.ThenBy(team => values(team).TheoryAchievedAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(team => values(team).TeamId);
+        return ordered.ThenBy(team => values(team).TeamId);
     }
 }

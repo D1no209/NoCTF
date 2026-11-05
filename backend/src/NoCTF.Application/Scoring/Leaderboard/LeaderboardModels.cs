@@ -303,9 +303,6 @@ public sealed record ScoreboardTeam(
     IReadOnlyList<ScoreboardAdjustment> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlot> Slots)
 {
-    public long TheoryScore { get; init; }
-    public bool HasTheorySubmission { get; init; }
-    public DateTimeOffset? TheoryAchievedAt { get; init; }
     public long ScoreOutsideWindow { get; init; }
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
@@ -338,7 +335,6 @@ public sealed record ScoreboardSnapshot(
     IReadOnlyList<ScoreboardActor> Actors,
     IReadOnlyList<ScoreboardTeam> Teams)
 {
-    public bool TheoryEnabled { get; init; }
     public IReadOnlyList<ScoreboardTrack> Tracks { get; init; } = [];
     public bool TracksEnabled { get; init; } = true;
     public IReadOnlyList<ScoreboardCurrentChallengeScore> CurrentChallengeScores { get; init; } = [];

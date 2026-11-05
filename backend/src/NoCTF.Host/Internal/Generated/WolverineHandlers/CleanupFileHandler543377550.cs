@@ -27,8 +27,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider = timeProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
@@ -41,13 +39,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await fileCleanupMessageHandler.Handle(cleanupFile, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: CleanupFileHandler543377550
     
     
 }
-

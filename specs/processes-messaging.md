@@ -10,7 +10,7 @@ Task 或临时 local queue。
 
 业务写入与 NATS 发布不提供跨系统原子事务；除 Competition Webhook 的专用事务 Outbox/投递账本外，数据库提交成功后由
 `IPostCommitMessagePublisher` 发布。关键流程必须保留可扫描的 Pending 状态并能重新派发。
-消费端使用状态、唯一键和业务幂等键收敛；稳定业务键同时写入 `Nats-Msg-Id`，但不得只依赖
+消费端使用状态、唯一键和业务幂等键收敛；直接投递的 `Nats-Msg-Id` 由稳定业务键与实际目的地址共同构成，但不得只依赖
 JetStream duplicate window。所有消费 endpoint 使用 JetStream durable consumer；同一业务键重投只产生一次业务效果。重试策略按 queue
 和强类型失败类别配置，确定性业务失败不得无限重试。
 
@@ -21,7 +21,7 @@ Competition Webhook 的事件与 Outbox 同事务保存，Worker 恢复扫描可
 
 ### Competing consumers
 
-只需一个消费者执行的消息发布到一个命名 JetStream work-queue stream。多个 Worker 监听同一 durable consumer，
+只需一个消费者执行的消息发布到一个命名 JetStream stream。多个 Worker 监听同一 durable consumer，
 由 NATS 竞争消费；扩容不得复制业务效果。
 
 ### 显式 fan-out
@@ -46,17 +46,21 @@ Wolverine 在 `[StickyHandler("name")]` 未配置同名 endpoint 时会静默生
 | `noctf-webhook` | 赛事 Webhook 投递 | 独立队列及重试策略 |
 | `noctf-livesolo-media` | LiveSolo 媒体与录像处理 | 独立队列，隔离业务评测 |
 
-使用 NATS 2.12 原生定时投递的 Control、Gameplay、Background stream 必须同时覆盖正式
-subject 与 `<subject>.scheduled`；consumer 只监听正式 subject。Runner stream 的
-`noctf.v2.runner.>` 通配符覆盖两者。调度控制消息与目标 subject 相同会被 NATS 拒绝，
-漏配 `.scheduled` 则发布不会收到 JetStream 确认。
+原生定时投递使用 Wolverine 6.50.2 与 NATS Server 2.14.7。Control、Gameplay、Background、LiveSoloMedia
+stream 同时覆盖正式 subject 与 `<subject>.scheduled.>`。每次调度使用独立的
+`<subject>.scheduled.<envelope-id>`，防止不同任务相互覆盖。Runner stream 的 `noctf.v2.runner.>`
+覆盖节点消息及其调度控制消息；业务 consumer 排除调度控制消息，只处理到期后生成的消息。
+
+这些可调度 stream 使用 Limits retention。Interest 或 Workqueue retention 可能在任务到期前删除控制消息。
+Limits stream 的已消费消息继续占用存储，部署时需要监测实际 stream 字节数并制定保留策略；清理范围必须排除未到期调度和未确认业务消息。
+原生定时消息通过 JetStream consumer 验证，Core NATS 订阅不能作为持久保存或定时消费的证据。
 
 Runner 任务由 Worker 依据 schema 3 presence 与关系化 capacity ledger 选择具体 RunnerId，再直接投递该节点命名 JetStream subject；
 Runner 不监听 pool queue。队列名、目的地和消息类型必须由领域/Application 有界类型构建，不能用任意
 字符串穿透业务层。
 
 Leader 每 5 秒从关系事实重新派发滞留的 Runtime 和纯 GameplayFact 评测；GameplayFact
-扫描只覆盖旧的 Queued，以及超过 60 秒仍为 Processing 的 Flag/Break/Hint/手工调整，
+扫描只覆盖旧的 Queued，以及超过 60 秒仍为 Processing 的 Break/Hint/手工调整，
 不重放外部 Fix/Checker 工作。扫描分页游标只随消息传递，不持久化。
 
 ## Singular Agent 调度

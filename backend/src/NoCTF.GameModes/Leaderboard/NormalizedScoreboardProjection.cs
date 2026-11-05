@@ -58,7 +58,7 @@ internal static class NormalizedScoreboardProjection
                 fact.CompetitionChallengeId!.Value,
                 fact.Kind switch
                 {
-                    GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
+                    GameplayFactKind.BreakAttempt when input.Mode == GameMode.Ctf => ScoreboardEntryKind.Solve,
                     GameplayFactKind.FixAttempt when input.Mode == GameMode.Ctf =>
                         ScoreboardEntryKind.Solve,
                     GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack,
@@ -531,10 +531,7 @@ internal static class NormalizedScoreboardProjection
             var slot = GetSlot(slots, group.Key.Item1, column, null);
             aggregateCells.TryGetValue(group.Key, out var aggregateCell);
             var challengeConfiguration = challengeConfigurations[group.Key.Item2];
-            var interactionKind = challenges[group.Key.Item2].InteractionKind;
-            var expectedKind = interactionKind == CtfInteractionKind.PatchVerification
-                ? GameplayFactKind.FixAttempt
-                : GameplayFactKind.FlagAttempt;
+            var expectedKind = GameplayFactKind.BreakAttempt;
             var wrongPenalty = challengeConfiguration.WrongSubmissionPenalty ?? defaultWrongPenalty;
             var manualTotal = group
                 .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
@@ -553,7 +550,7 @@ internal static class NormalizedScoreboardProjection
             {
                 switch (fact.Kind)
                 {
-                    case GameplayFactKind.FlagAttempt when expectedKind == GameplayFactKind.FlagAttempt:
+                    case GameplayFactKind.BreakAttempt when expectedKind == GameplayFactKind.BreakAttempt:
                     case GameplayFactKind.FixAttempt when expectedKind == GameplayFactKind.FixAttempt:
                         {
                             var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
@@ -636,7 +633,7 @@ internal static class NormalizedScoreboardProjection
             }
         }
         // Submission activity is displayed in its receipt round; score components belong to issuance rounds.
-        foreach (var fact in input.GameplayFacts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
+        foreach (var fact in input.GameplayFacts.Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
                      && fact.TeamId is Guid team && validTeams.Contains(team)).OrderBy(fact => fact.OccurredAt))
         {
             if (fact.CompetitionChallengeId is not Guid challenge || fact.ReferenceId is not Guid roundId
@@ -848,7 +845,7 @@ internal static class NormalizedScoreboardProjection
             var manual = 0L;
             foreach (var fact in group.OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.GameplayFactId))
             {
-                if (fact.Kind == GameplayFactKind.KohControlObservation)
+                if (fact.Kind == GameplayFactKind.ControlObservation)
                 {
                     slot.AddFact(
                         fact,
@@ -939,9 +936,7 @@ internal static class NormalizedScoreboardProjection
     private static bool IsCtfInteractionFact(
         LeaderboardGameplayFact fact,
         LeaderboardChallengeFact challenge) =>
-        challenge.InteractionKind == CtfInteractionKind.PatchVerification
-            ? fact.Kind == GameplayFactKind.FixAttempt
-            : fact.Kind == GameplayFactKind.FlagAttempt;
+        fact.Kind == GameplayFactKind.BreakAttempt;
 
     private static DateTimeOffset EffectiveClockToWallTime(
         LeaderboardProjectionInput input,

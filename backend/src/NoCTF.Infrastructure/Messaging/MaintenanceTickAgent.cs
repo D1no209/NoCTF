@@ -307,6 +307,8 @@ public sealed class MaintenanceTickAgent(
             ExpireAccountSourceAddresses value => bus.PublishAsync(value),
             DispatchQueuedRuntimes value => bus.PublishAsync(value),
             DispatchPendingGameplayFacts value => bus.PublishAsync(value),
+            NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests value => bus.PublishAsync(value),
+            RecoverFixExecutions value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => bus.PublishAsync(value),
@@ -314,8 +316,8 @@ public sealed class MaintenanceTickAgent(
             NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => bus.PublishAsync(value),
             NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => bus.PublishAsync(value),
             NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => bus.PublishAsync(value),
-            NoCTF.Application.Theory.Papers.SweepTheoryActivity value => bus.PublishAsync(value),
-            NoCTF.Application.Theory.Activities.ApplyTheoryCorrection value => bus.PublishAsync(value),
+            NoCTF.Application.Questionnaires.Sessions.SweepQuestionnaireActivity value => bus.PublishAsync(value),
+            NoCTF.Application.Questionnaires.Activities.ApplyQuestionnaireCorrection value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -328,6 +330,10 @@ public sealed class MaintenanceTickAgent(
             now, TimeSpan.FromSeconds(5), new DispatchQueuedRuntimes(now)));
         AddFixed(new("gameplay-fact-recovery", ClusterScheduleKind.GameplayFactRecovery,
             now, TimeSpan.FromSeconds(5), new DispatchPendingGameplayFacts(now)));
+        AddFixed(new("template-capability-test-recovery", ClusterScheduleKind.TemplateCapabilityTestRecovery,
+            now, TimeSpan.FromSeconds(5), new NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests()));
+        AddFixed(new("fix-execution-recovery", ClusterScheduleKind.FixExecutionRecovery,
+            now, TimeSpan.FromSeconds(5), new RecoverFixExecutions()));
         AddFixed(new("account-source-retention", ClusterScheduleKind.AccountPrivacyRetention,
             now, TimeSpan.FromHours(1), new ExpireAccountSourceAddresses(now)));
         AddFixed(new(
@@ -360,11 +366,13 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.AccountPrivacyRetention => "account_privacy_retention",
         ClusterScheduleKind.RuntimeDispatch => "runtime_dispatch",
         ClusterScheduleKind.GameplayFactRecovery => "gameplay_fact_recovery",
+        ClusterScheduleKind.TemplateCapabilityTestRecovery => "template_capability_test_recovery",
+        ClusterScheduleKind.FixExecutionRecovery => "fix_execution_recovery",
         ClusterScheduleKind.LiveSoloRound => "live_solo_round",
         ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
         ClusterScheduleKind.LiveSoloCapture => "live_solo_capture",
         ClusterScheduleKind.ChallengeTiming => "challenge_timing",
-        ClusterScheduleKind.Theory => "theory",
+        ClusterScheduleKind.Questionnaire => "questionnaire",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

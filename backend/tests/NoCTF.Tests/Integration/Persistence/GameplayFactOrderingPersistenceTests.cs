@@ -61,7 +61,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                     .ProcessAsync(fact.Id, fact.ConcurrencyStamp, ct);
             await using var verify = new NoCtfDbContext(options);
             await Assert.That(await verify.TeamProgressionNodeStates.CountAsync(ct)).IsEqualTo(0);
-            var completed = await verify.GameplayFacts.SingleAsync(item => item.Id == fact.Id, ct);
+            var completed = await verify.GameplayFacts.AsSplitQuery().SingleAsync(item => item.Id == fact.Id, ct);
             await Assert.That(completed.Result).IsEqualTo(GameplayFactResult.Correct);
             var adjudication = await verify.CompetitionEvents.SingleAsync(item => item.GameplayFactId == fact.Id
                 && item.Kind == CompetitionEventKind.GameplayFactAdjudicated, ct);
@@ -169,7 +169,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             }
             await Task.WhenAll(factIds.Select(Deliver));
             await using var verify = new NoCtfDbContext(options);
-            var hints = await verify.GameplayFacts.AsNoTracking().Where(item => factIds.Contains(item.Id)).ToArrayAsync(ct);
+            var hints = await verify.GameplayFacts.AsNoTracking().AsSplitQuery().Where(item => factIds.Contains(item.Id)).ToArrayAsync(ct);
             await Assert.That(hints.All(item => item.State == GameplayFactState.Completed)).IsTrue();
             await Assert.That(hints.Count(item => item.Result == GameplayFactResult.Unlocked)).IsEqualTo(1);
             await Assert.That(hints.Count(item => sameHint ? item.Result == GameplayFactResult.Duplicate
@@ -223,16 +223,16 @@ public sealed class GameplayFactOrderingPersistenceTests
             template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate
             {
                 ChallengeId = template.Id,
-                FlagSource = PersistedRuntimeFlagSource.PerTeam,
                 Services = [new() { ChallengeId = template.Id, Name = "target", Image = "alpine:3" }]
             };
+            ((CtfCompetitionChallengeRules)(await db.CompetitionChallenges.AsSplitQuery().SingleAsync(ct)).Rules!).Runtime.FlagSource = PersistedRuntimeFlagSource.PerTeam;
+            template.Definition.Break!.EnvironmentTargets = [new() { ServiceName = "target", VariableName = "FLAG" }];
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
             commands.Texts.Clear();
             var current = await store.FindAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, true, false, ct);
             await Assert.That(current!.HasRuntime).IsTrue();
             await Assert.That(current.UsesDynamicFlag).IsTrue();
-            await Assert.That(current.InteractionKind).IsEqualTo(CtfInteractionKind.FlagSubmission);
             await Assert.That(db.ChangeTracker.Entries().Any()).IsFalse();
             await Assert.That(commands.Texts.Count).IsGreaterThan(0);
             Console.WriteLine($"ChallengeCapabilityRead SQL commands: {commands.Texts.Count}");
@@ -255,7 +255,7 @@ public sealed class GameplayFactOrderingPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    [Arguments(GameplayFactKind.FlagAttempt)]
+    [Arguments(GameplayFactKind.BreakAttempt)]
     [Arguments(GameplayFactKind.ManualAdjustment)]
     public async Task Duplicate_delivery_and_old_revision_do_not_complete_twice(GameplayFactKind kind, CancellationToken ct)
     {
@@ -300,7 +300,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await Assert.That(writes.All(sql => sql.LastIndexOf("WHERE", StringComparison.OrdinalIgnoreCase) is var where && where >= 0
                 && sql[where..].Contains("concurrency_stamp", StringComparison.OrdinalIgnoreCase))).IsTrue();
             await using var verify = new NoCtfDbContext(options);
-            var saved = await verify.GameplayFacts.SingleAsync(item => item.Id == fact.Id, ct);
+            var saved = await verify.GameplayFacts.AsSplitQuery().SingleAsync(item => item.Id == fact.Id, ct);
             await Assert.That(saved.State).IsEqualTo(GameplayFactState.Completed);
             await Assert.That(saved.Result).IsEqualTo(kind == GameplayFactKind.ManualAdjustment
                 ? GameplayFactResult.Applied : GameplayFactResult.Correct);
@@ -346,7 +346,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await using (var configure = new NoCtfDbContext(options))
             {
                 var challenge = await configure.CompetitionChallenges.AsSplitQuery().SingleAsync(ct);
-                challenge.Rules!.MaxFlagAttempts = 3;
+                ((CtfCompetitionChallengeRules)challenge.Rules!).MaxFlagAttempts = 3;
                 await configure.SaveChangesAsync(ct);
             }
             var deliveries = new List<EvaluateGameplayFact>();
@@ -362,7 +362,8 @@ public sealed class GameplayFactOrderingPersistenceTests
                         [fixture.Flag], fixture.Now.AddMilliseconds(index), ct);
                 await Assert.That(result.Succeeded).IsTrue();
                 var message = outgoing.Messages.OfType<EvaluateGameplayFact>().Single();
-                var saved = await intakeDb.GameplayFacts.AsNoTracking().SingleAsync(item => item.Id == message.GameplayFactId, ct);
+                var saved = await intakeDb.GameplayFacts.AsNoTracking().Where(item => item.Id == message.GameplayFactId)
+                    .Select(item => new { item.ConcurrencyStamp }).SingleAsync(ct);
                 await Assert.That(message.ExpectedConcurrencyStamp).IsEqualTo(saved.ConcurrencyStamp);
                 deliveries.Add(message);
             }
@@ -373,7 +374,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                 var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
                     outgoing, new TestDbContextFactory(workerDb), new NoCTF.Persistence.PostgreSql.PostgreSqlConstraintClassifier());
                 await processor.ProcessAsync(message.GameplayFactId, message.ExpectedConcurrencyStamp, ct);
-                var saved = await workerDb.GameplayFacts.AsNoTracking().SingleAsync(item => item.Id == message.GameplayFactId, ct);
+                var saved = await workerDb.GameplayFacts.AsNoTracking().AsSplitQuery().SingleAsync(item => item.Id == message.GameplayFactId, ct);
                 await Assert.That(saved.State).IsEqualTo(GameplayFactState.Completed);
                 await Assert.That(outgoing.Messages.OfType<GameplayFactStateChanged>().Single().ConcurrencyStamp)
                     .IsEqualTo(saved.ConcurrencyStamp);
@@ -389,14 +390,10 @@ public sealed class GameplayFactOrderingPersistenceTests
     }
 
     [Test]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, true)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, true)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.BreakAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AttackTarget, RuntimeKind.Container, false)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.BreakAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AttackTarget, RuntimeKind.Container, true)]
     [Timeout(300_000)]
     public async Task Old_correct_submission_never_stops_a_reopened_runtime_but_TTL_still_does(
         GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, RuntimeKind runtimeKind,
@@ -454,7 +451,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             {
                 await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
                 await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == unrelatedId, ct)).State).IsEqualTo(RuntimeState.Running);
-                await Assert.That((await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct)).Result).IsEqualTo(GameplayFactResult.Correct);
+                await Assert.That((await verify.GameplayFacts.AsSplitQuery().SingleAsync(x => x.Id == factId, ct)).Result).IsEqualTo(GameplayFactResult.Correct);
             }
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(10), ct);
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(11), ct);
@@ -471,9 +468,9 @@ public sealed class GameplayFactOrderingPersistenceTests
     }
 
     [Test]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
-    [Arguments(GameMode.Awd, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.BreakAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awd, GameplayFactKind.BreakAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AttackTarget)]
     [Timeout(300_000)]
     public async Task Reconciliation_stops_only_modes_whose_correct_result_ends_the_runtime(
         GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, CancellationToken ct)
@@ -499,7 +496,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             {
                 await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Running);
                 // Model recovery of a persisted correct result whose stop command was not yet applied.
-                var fact = await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct);
+                var fact = await verify.GameplayFacts.AsSplitQuery().SingleAsync(x => x.Id == factId, ct);
                 fact.Result = GameplayFactResult.Correct;
                 await verify.SaveChangesAsync(ct);
             }
@@ -529,8 +526,8 @@ public sealed class GameplayFactOrderingPersistenceTests
     }
 
     [Test]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.BreakAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AttackTarget)]
     [Timeout(300_000)]
     public async Task Correct_flag_stops_only_the_corresponding_attack_runtime(
         GameMode mode,
@@ -570,7 +567,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                         fixture,
                         unrelatedRuntimeId,
                         fixture.TeamIds[0],
-                        RuntimePurpose.AwdpTarget,
+                        RuntimePurpose.FixTarget,
                         defenseFactId));
                 }
                 setup.GameplayFacts.Add(Fact(
@@ -646,7 +643,7 @@ public sealed class GameplayFactOrderingPersistenceTests
 
             await using (var afterFirst = new NoCtfDbContext(options))
             {
-                var facts = await afterFirst.GameplayFacts.AsNoTracking()
+                var facts = await afterFirst.GameplayFacts.AsNoTracking().AsSplitQuery()
                     .OrderBy(item => item.OccurredAt)
                     .ThenBy(item => item.Id)
                     .ToArrayAsync(cancellationToken);
@@ -657,7 +654,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ProcessAsync(options, laterId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var results = await verification.GameplayFacts.AsNoTracking()
+            var results = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .OrderBy(item => item.OccurredAt)
                 .ThenBy(item => item.Id)
                 .Select(item => item.Result)
@@ -696,7 +693,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ProcessAsync(options, lowerId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var facts = await verification.GameplayFacts.AsNoTracking()
+            var facts = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .OrderBy(item => item.Id)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(facts[0].Id).IsEqualTo(lowerId);
@@ -738,7 +735,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ProcessAsync(options, factIds[2], outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var facts = await verification.GameplayFacts.AsNoTracking()
+            var facts = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .OrderBy(item => item.OccurredAt)
                 .ThenBy(item => item.Id)
                 .ToArrayAsync(cancellationToken);
@@ -780,7 +777,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ProcessAsync(options, factId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var fact = await verification.GameplayFacts.AsNoTracking()
+            var fact = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .SingleAsync(item => item.Id == factId, cancellationToken);
             await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
             await Assert.That(outbox.Messages.OfType<BloodAwarded>()).IsEmpty();
@@ -830,7 +827,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await PublishBloodAsync(options, fixture.CompetitionId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var facts = await verification.GameplayFacts.AsNoTracking()
+            var facts = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .OrderBy(item => item.OccurredAt)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(facts.All(item => item.Result == GameplayFactResult.Correct)).IsTrue();
@@ -879,7 +876,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await PublishBloodAsync(options, fixture.CompetitionId, outbox, cancellationToken);
 
             await using var verification = new NoCtfDbContext(options);
-            var fact = await verification.GameplayFacts.AsNoTracking()
+            var fact = await verification.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .SingleAsync(item => item.Id == factId, cancellationToken);
             await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
             await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
@@ -911,7 +908,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             var otherChallengeId = Guid.CreateVersion7();
             await using (var setup = new NoCtfDbContext(options))
             {
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = otherTemplateId,
                     OwnerId = fixture.OwnerId,
@@ -1082,7 +1079,7 @@ public sealed class GameplayFactOrderingPersistenceTests
         competition.CreatedAt = now;
         competition.UpdatedAt = now;
         db.Competitions.Add(competition);
-        var challenge = ChallengeGeneratedCatalog.Create(mode);
+        var challenge = new Challenge();
         challenge.Id = challengeId;
         challenge.OwnerId = ownerId;
         challenge.Visibility = ChallengeVisibility.Private;
@@ -1138,7 +1135,7 @@ public sealed class GameplayFactOrderingPersistenceTests
         DateTimeOffset occurredAt,
         GameplayFactState state = GameplayFactState.Queued,
         GameplayFactResult? result = null,
-        GameplayFactKind kind = GameplayFactKind.FlagAttempt)
+        GameplayFactKind kind = GameplayFactKind.BreakAttempt)
     {
         var fact = GameplayFactGeneratedCatalog.Create(kind);
         fact.Id = id;

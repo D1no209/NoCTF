@@ -16,7 +16,6 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class ChallengeTemplateContentPatchRequest
 {
-    public required GameModeProtocol Mode { get; set; }
     public required ChallengeVisibilityProtocol Visibility { get; set; }
     public required string Title { get; set; }
     public required string? Description { get; set; }
@@ -52,8 +51,6 @@ public sealed class PatchChallengeTemplateValidator
         RuleFor(request => request)
             .Must(request => request.Content is not null || request.Permissions is not null)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchChallengeTemplateValidationLeastOneChallengeTemplate)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchChallengeTemplateValidationLeastOneChallengeTemplate));
-        RuleFor(request => request.Content!.Mode).IsInEnum()
-            .When(request => request.Content is not null);
         RuleFor(request => request.Content!.Visibility).IsInEnum()
             .When(request => request.Content is not null);
         RuleFor(request => request.Content!.Title).NotEmpty().MaximumLength(160)
@@ -63,9 +60,7 @@ public sealed class PatchChallengeTemplateValidator
         RuleFor(request => request.Content!.Definition).NotNull()
             .When(request => request.Content is not null);
         RuleFor(request => request.Content!.Definition)
-            .Must((request, definition) =>
-                ChallengeDefinitionContractMapper.HasValidShape(definition)
-                && definition!.Mode == request.Content!.Mode)
+            .Must(ChallengeDefinitionContractMapper.HasValidShape)
             .When(request => request.Content is not null)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch));
         RuleFor(request => request.Permissions!.OwnerId).NotEmpty()
@@ -93,7 +88,6 @@ public static partial class ChallengeTemplatePatchMapper
     [MapperIgnoreTarget(nameof(Challenge.DeletedAt))]
     [MapperIgnoreTarget(nameof(Challenge.Attachments))]
     [MapperIgnoreTarget(nameof(Challenge.Definition))]
-    [MapperIgnoreTarget(nameof(Challenge.Mode))]
     [MapperIgnoreTarget(nameof(Challenge.CatalogScope))]
     public static void ApplyContentAsTemplateManager(
         ChallengeTemplateContentPatchRequest request,
@@ -105,7 +99,6 @@ public static partial class ChallengeTemplatePatchMapper
         target.Direction = request.Direction;
     }
 
-    [MapperIgnoreTarget(nameof(Challenge.Mode))]
     [MapperIgnoreTarget(nameof(Challenge.CatalogScope))]
     [MapperIgnoreTarget(nameof(Challenge.Visibility))]
     [MapperIgnoreTarget(nameof(Challenge.Title))]
@@ -169,7 +162,7 @@ public sealed class PatchChallengeTemplateEndpoint(
             && current.OwnerId != user.UserId)
             return TypedResults.Forbid();
 
-        var target = ChallengeGeneratedCatalog.Create(current.Mode);
+        var target = new Challenge();
         target.Id = current.Id;
         target.OwnerId = current.OwnerId;
         target.ManagerIds = current.ManagerIds.ToArray();
@@ -186,7 +179,6 @@ public sealed class PatchChallengeTemplateEndpoint(
             ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(request.Content!, target);
             target.Definition = ChallengeDefinitionContractMapper.ToDomain(
                 challengeId,
-                target.Mode,
                 request.Content!.Definition);
         }
         if ((sections & ChallengeTemplatePatchSection.Permissions) != 0)
@@ -250,7 +242,6 @@ public sealed class PatchChallengeTemplateEndpoint(
                     challengeId,
                     user.UserId,
                     user.IsAdministrator,
-                    target.Mode,
                     target.Visibility,
                     target.Title,
                     target.Description,
@@ -289,13 +280,12 @@ public sealed class PatchChallengeTemplateEndpoint(
         result.State switch
         {
             ChallengeTemplateWriteState.NotFoundOrForbidden => TypedResults.NotFound(),
-            ChallengeTemplateWriteState.ActiveCompetitionModeConflict
+            ChallengeTemplateWriteState.ReferencedCapabilityConflict
                 or ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict
                 or ChallengeTemplateWriteState.OwnerIncludedInManagerSet
                 or ChallengeTemplateWriteState.UserNotFound
                 or ChallengeTemplateWriteState.RoleNotEligible
-                or ChallengeTemplateWriteState.ExperimentalFeatureDisabled
-                or ChallengeTemplateWriteState.InteractionKindConflict =>
+                or ChallengeTemplateWriteState.PendingExecutionConflict =>
                 TypedResults.Conflict(ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest
                 or ChallengeTemplateWriteState.InvalidDefinition =>

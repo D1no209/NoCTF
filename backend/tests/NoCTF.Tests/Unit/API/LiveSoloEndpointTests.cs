@@ -145,11 +145,11 @@ public sealed class LiveSoloEndpointTests
         using var listing = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
         await Assert.That(listing.RootElement.GetProperty("items")[0].GetProperty("definition").ValueKind).IsEqualTo(JsonValueKind.Null);
         await Assert.That(listing.RootElement.GetProperty("canManage").GetBoolean()).IsFalse();
-        using var create = await client.PostAsJsonAsync(path, new { competitionId = Guid.NewGuid(), actorId = Guid.NewGuid(), title = "Synthetic pool", direction = "Web", definition = new { mode = "LiveSolo", liveSolo = new { } } });
+        using var create = await client.PostAsJsonAsync(path, new { competitionId = Guid.NewGuid(), actorId = Guid.NewGuid(), title = "Synthetic pool", direction = "Web", definition = new { capabilities = new[] { new { kind = "Break", @break = new { } } } } });
         await Assert.That(create.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await pool.Received(1).CreateAsync(Arg.Is<CreateLiveSoloPoolQuestion>(x => x != null && x.CompetitionId == competition && x.ActorId == Actor), Arg.Any<CancellationToken>());
-        using var invalidMode = await client.PostAsJsonAsync(path, new { title = "CTF invalid", direction = "Web", definition = new { mode = "Ctf", ctf = new { interactionKind = "FlagSubmission" } } });
-        await Assert.That(invalidMode.StatusCode).IsEqualTo(HttpStatusCode.UnprocessableEntity);
+        using var invalidCapabilities = await client.PostAsJsonAsync(path, new { title = "Missing capability", direction = "Web", definition = new { capabilities = Array.Empty<object>() } });
+        await Assert.That(invalidCapabilities.StatusCode).IsEqualTo(HttpStatusCode.UnprocessableEntity);
         using var removedCopy = await client.PostAsJsonAsync($"/api/v1/competitions/{competition}/live-solo/template-copies", new { sourceChallengeId = Guid.NewGuid() });
         await Assert.That(removedCopy.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
@@ -560,6 +560,7 @@ public sealed class LiveSoloEndpointTests
         }
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
+        builder.Services.AddSingleton<IFixUploadTargetAccess, FixUploadTargetAccess>();
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");
         builder.Services.AddSingleton(source); builder.Services.AddSingleton(Substitute.For<IPatchUploadStore>());
         builder.Services.AddSingleton(new PostCommitDispatchStatus()); builder.Services.Configure<RequestAdmissionOptions>(_ => { });

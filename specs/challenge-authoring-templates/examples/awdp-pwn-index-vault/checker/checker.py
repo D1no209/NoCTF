@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+import datetime
 import json
 import os
 import socket
@@ -75,7 +74,13 @@ def evaluate(host: str, ready_timeout: int) -> str:
 def publish(outcome: str) -> None:
     callback_url = os.environ["NOCTF_CALLBACK_URL"]
     callback_token = os.environ["NOCTF_CALLBACK_TOKEN"]
-    body = json.dumps({"outcome": outcome}, separators=(",", ":")).encode("utf-8")
+    functional = outcome != "ServiceAbnormal"
+    probes = [
+        {"kind": "Functionality", "result": "Passed" if functional else "TargetFailure", "reason": "None" if functional else "FunctionalCheckFailed"},
+        {"kind": "Vulnerability", "result": "NotExecuted" if not functional else "TargetFailure" if outcome == "ExploitSucceeded" else "Passed",
+         "reason": "FunctionalCheckFailed" if not functional else "VulnerabilityPresent" if outcome == "ExploitSucceeded" else "None"},
+    ]
+    body = json.dumps({"probes": probes, "flagContexts": [], "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}, separators=(",", ":")).encode("utf-8")
     request = urllib.request.Request(
         callback_url,
         data=body,

@@ -112,7 +112,6 @@ public class WolverinePostCommitMessagePublisher(
             ScheduledTime = scheduledAt,
             DeduplicationId = identity
         };
-        options.WithHeader("Nats-Msg-Id", identity);
         return options;
     }
 }

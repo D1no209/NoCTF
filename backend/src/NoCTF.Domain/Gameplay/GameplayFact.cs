@@ -11,9 +11,9 @@ public abstract class GameplayFact : IConcurrencyTracked
     protected GameplayFact(GameplayFactKind kind) => Kind = kind;
     public Guid Id { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
-    public Guid CompetitionId { get; set; }
+    public Guid? CompetitionId { get; set; }
     public Guid? CompetitionChallengeId { get; set; }
-    public Guid? TheoryPaperId { get; set; }
+    public Guid? QuestionnaireAssignmentId { get; set; }
     public Guid? TeamId { get; set; }
     public Guid? VictimTeamId { get; set; }
     public Guid? ActorUserId { get; set; }
@@ -31,6 +31,8 @@ public abstract class GameplayFact : IConcurrencyTracked
     public NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility { get; set; }
     public Guid AppliedTimingRevision { get; set; }
     public GameplayFactFailureCode? FailureCode { get; set; }
+    public List<NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome> CapabilityOutcomes { get; set; } = [];
+    public NoCTF.Domain.Challenges.Capabilities.FixExecutionDetails? FixExecution { get; set; }
     public FlagAcquisitionEvidence? AcquisitionEvidence { get; set; }
     public NoCTF.Domain.Competitions.Awd.AwdFactDetails? Awd { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
@@ -38,16 +40,15 @@ public abstract class GameplayFact : IConcurrencyTracked
 
 public enum GameplayFactKind : short
 {
-    FlagAttempt,
     BreakAttempt,
     FixAttempt,
     HintUnlock,
     ManualAdjustment,
-    AwdServiceTransition,
-    KohControlObservation,
+    CheckObservation,
+    ControlObservation,
     AttachmentDownload,
     WriteUpUnlock,
-    TheoryPaperSubmission
+    QuestionnaireAttempt
 }
 
 public enum GameplayFactReferenceKind : short
@@ -124,10 +125,6 @@ public enum GameplayFactFailureCode : short
     InsufficientScore,
     HintUnavailable,
     AwdpPlatformFailed,
-    PatchStillExploitable,
-    PatchExecutionFailed,
-    PatchServiceAbnormal,
-    PatchVerificationPlatformFailed,
     StaticFlagWithoutContainer,
     StaticFlagWithoutAttachment,
     StaticFlagWithoutContainerAndAttachment,
@@ -137,5 +134,11 @@ public enum GameplayFactFailureCode : short
     FlagNotIssued,
     FlagNotYetActive,
     FlagNotScorable,
-    AwdReceiptUnavailable
+    AwdReceiptUnavailable,
+    FixExecutionFailed,
+    FixExecutionTimedOut,
+    FixExecutionUncertain,
+    FixPlatformFailure,
+    FixStillExploitable,
+    FixServiceAbnormal
 }

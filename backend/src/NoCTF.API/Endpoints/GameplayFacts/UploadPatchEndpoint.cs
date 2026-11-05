@@ -67,7 +67,7 @@ public sealed class UploadPatchEndpoint(
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
-        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix");
+        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.PatchUpload)));
         Options(builder => builder.WithMetadata(
@@ -80,9 +80,9 @@ public sealed class UploadPatchEndpoint(
                 StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
-            summary.Summary = "Upload the only Fix archive accepted by an AWDP defense target.";
+            summary.Summary = "Submit a Fix archive to the team's authorized Runtime target.";
             summary.Description =
-                "Atomically binds one archive and one Fix attempt to the clean disposable target. Verification starts immediately when the target is running, or automatically after provisioning completes.";
+                "The competition rules select persistent maintenance or isolated Fix verification. The server binds the complete validated archive to one accepted attempt.";
         });
     }
 
@@ -106,8 +106,7 @@ public sealed class UploadPatchEndpoint(
             request.File.ContentType,
             stream,
             timeProvider.GetUtcNow(),
-            ct,
-            NoCTF.Domain.Runtime.RuntimePurpose.AwdpTarget);
+            ct);
         if (result.FailureCode == PatchUploadFailureCode.PatchUploadNotAvailable)
             return TypedResults.NotFound();
         if (!result.Succeeded)

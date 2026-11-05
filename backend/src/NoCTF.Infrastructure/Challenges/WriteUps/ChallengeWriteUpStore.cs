@@ -218,7 +218,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
             if (canonical.Length==0 && await db.ChallengeFlags.AnyAsync(flag=>flag.DeletedAt==null&&(flag.Type==ChallengeFlagType.Template&&flag.ChallengeId==context.Challenge.ChallengeId
                 || flag.Type==ChallengeFlagType.Competition&&flag.CompetitionChallengeId==context.Challenge.Id
                 || flag.Type==ChallengeFlagType.Team&&flag.CompetitionChallengeId==context.Challenge.Id&&flag.SpecificationKind==SpecificationKind.Attachment),ct))
-                canonical=[await db.LiveSoloChallengeSources.Where(x=>x.ChallengeId==context.Challenge.ChallengeId).Select(x=>(Guid?)x.CanonicalChallengeId).SingleOrDefaultAsync(ct)??context.Challenge.ChallengeId];
+                canonical=[await db.ChallengeSources.Where(x=>x.ChallengeId==context.Challenge.ChallengeId).Select(x=>(Guid?)x.CanonicalChallengeId).SingleOrDefaultAsync(ct)??context.Challenge.ChallengeId];
             var matchId=await db.LiveSoloRoundQuestions.Where(x=>x.Id==scopeId).Join(db.LiveSoloRounds,q=>q.RoundId,r=>r.Id,(q,r)=>r.MatchId).SingleAsync(ct);
             foreach(var id in canonical) if(!await db.LiveSoloQuestionExposures.AnyAsync(x=>x.CompetitionId==command.CompetitionId&&x.CanonicalChallengeId==id,ct))
                 db.LiveSoloQuestionExposures.Add(new(){CompetitionId=command.CompetitionId,CanonicalChallengeId=id,MatchId=matchId,PublicAt=command.Now});

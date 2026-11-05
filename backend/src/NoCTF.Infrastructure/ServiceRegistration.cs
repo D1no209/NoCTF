@@ -17,7 +17,7 @@ using NoCTF.Infrastructure.Exports;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.LiveSolo;
-using NoCTF.Infrastructure.Theory;
+using NoCTF.Infrastructure.Questionnaires;
 
 namespace NoCTF.Infrastructure;
 
@@ -55,7 +55,7 @@ public static class ServiceRegistration
         services.AddNoCtfNotifications(development);
         services.AddNoCtfTeams();
         services.AddNoCtfChallenges();
-        services.AddNoCtfTheory(development || exporting);
+        services.AddNoCtfQuestionnaires(development || exporting);
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(configuration, development || exporting);
         services.AddNoCtfLiveSolo(configuration);

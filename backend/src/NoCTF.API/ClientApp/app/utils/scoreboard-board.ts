@@ -101,8 +101,6 @@ export interface ScoreboardTeam {
   attackScore: number | null
   defenseScore: number | null
   globalAdjustmentCount: number
-  theoryScore: number
-  hasTheorySubmission: boolean
   members: ScoreboardMember[]
   /** Null identifies snapshots written before achievement attribution was available. */
   achievements: ScoreboardAchievement[] | null
@@ -121,7 +119,6 @@ export interface ScoreboardSnapshot {
   challengeCatalogRevision: string
   generatedAt: string
   currentRoundId: string | null
-  theoryEnabled: boolean
   tracksEnabled: boolean
   tracks: NoCtfapiEndpointsCompetitionsScoreboardTrackResponse[]
   visibility: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null
@@ -191,8 +188,6 @@ function scoreboardTeam(
     attackScore: team.attackScore ?? null,
     defenseScore: team.defenseScore ?? null,
     globalAdjustmentCount: team.globalAdjustmentCount ?? 0,
-    theoryScore: team.theoryScore ?? 0,
-    hasTheorySubmission: team.hasTheorySubmission ?? false,
     members,
     achievements: team.achievements === null || team.achievements === undefined
       ? null
@@ -256,7 +251,6 @@ export function normalizeScoreboardSnapshot(
     challengeCatalogRevision: response.challengeCatalogRevision ?? '',
     generatedAt: response.generatedAt ?? '',
     currentRoundId: response.currentRoundId ?? null,
-    theoryEnabled: response.theoryEnabled ?? false,
     tracksEnabled: response.tracksEnabled ?? true,
     tracks: response.tracks ?? [],
     visibility: response.visibility ?? null,

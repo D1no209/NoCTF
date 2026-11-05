@@ -21,7 +21,7 @@ spec:
         noctf.io/node-role: platform
       containers:
       - name: nats
-        image: docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d
+        image: docker.m.daocloud.io/library/nats:2.14.7-alpine@sha256:4063edae0717ba5f7501bfde75f97fd9b57f5b93597b92c70b6a6fbbf6a74e06
         ports:
         - containerPort: 4222
         resources:

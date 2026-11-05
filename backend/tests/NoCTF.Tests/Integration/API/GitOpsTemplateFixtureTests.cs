@@ -65,7 +65,7 @@ public sealed class GitOpsTemplateFixtureTests
                 await Assert.That(ChallengeDefinitionContractMapper.HasValidShape(definition)).IsTrue();
                 await Assert.That(CompetitionChallengeRulesContractMapper.HasValidShape(rules)).IsTrue();
                 _ = ChallengeDefinitionContractMapper.ToDomain(
-                    Guid.NewGuid(), (GameMode)mode, definition);
+                    Guid.NewGuid(), definition);
                 _ = CompetitionChallengeRulesContractMapper.ToDomain(
                     Guid.NewGuid(), (GameMode)mode, rules);
             }

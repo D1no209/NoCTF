@@ -32,8 +32,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider2 = __timeProvider2;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
@@ -46,13 +44,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await NoCTF.Worker.Competitions.StaffWebhooks.StaffWebhookMessageHandler.Handle(deliverStaffWebhook, staffWebhookStore, _competitionWebhookSender, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: DeliverStaffWebhookHandler445896360
     
     
 }
-

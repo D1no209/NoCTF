@@ -77,7 +77,7 @@ public sealed class PersistedRunnerCapacityGateTests
                 for (var index = 0; index < ids.Length; index++)
                 {
                     var challengeId = Guid.NewGuid();
-                    setup.Challenges.Add(new AwdpChallenge
+                    setup.Challenges.Add(new Challenge
                     {
                         Id = challengeId,
                         OwnerId = fixture.OwnerId,

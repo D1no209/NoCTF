@@ -319,7 +319,7 @@ public sealed partial class StaffWebhookCaptureScopeTests
                 Email = "other@example.test", NormalizedEmail = "OTHER@EXAMPLE.TEST", PasswordHash = "PROTECTED_PASSWORD" });
         db.Competitions.Add(new CtfCompetition { Id = fixture.CompetitionId, OwnerId = fixture.OwnerId, Title = "Staff capture corpus",
             ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), StartAt = start, EndAt = fixture.Now.AddDays(1) });
-        db.Challenges.Add(new CtfChallenge { Id = fixture.TemplateId, OwnerId = fixture.OwnerId, Title = "Challenge", Direction = "Web",
+        db.Challenges.Add(new Challenge { Id = fixture.TemplateId, OwnerId = fixture.OwnerId, Title = "Challenge", Direction = "Web",
             Description = "PROTECTED_DESCRIPTION", Definition = TestConfigurations.Definition(GameMode.Ctf) });
         db.CompetitionChallenges.Add(new CtfCompetitionChallenge { Id = fixture.ChallengeId, CompetitionId = fixture.CompetitionId,
             ChallengeId = fixture.TemplateId, Rules = TestConfigurations.Rules(GameMode.Ctf) });
@@ -379,7 +379,7 @@ public sealed partial class StaffWebhookCaptureScopeTests
         SourceId = fixture.OwnerId, QuestionStatus = CompetitionQuestionStatus.Pending, QuestionActorRole = role, SentAt = at, Body = "PROTECTED_REPLY_BODY"
     };
 
-    private static FlagAttemptGameplayFact Incident(CaptureFixture fixture, Guid id, DateTimeOffset at) => new()
+    private static BreakAttemptGameplayFact Incident(CaptureFixture fixture, Guid id, DateTimeOffset at) => new()
     {
         Id = id, CompetitionId = fixture.CompetitionId, CompetitionChallengeId = fixture.ChallengeId, TeamId = fixture.TeamId,
         VictimTeamId = fixture.RelatedTeamId, ActorUserId = fixture.OwnerId, State = GameplayFactState.Completed,

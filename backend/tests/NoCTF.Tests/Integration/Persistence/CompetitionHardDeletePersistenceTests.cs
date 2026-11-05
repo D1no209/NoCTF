@@ -73,7 +73,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                         now,
                         deletedAt: now,
                         posterFileId));
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
@@ -118,7 +118,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                     Result = GameplayFactResult.Correct,
                     UpdatedAt = now
                 });
-                setup.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
+                setup.RuntimeInstances.Add(new FixTargetRuntimeInstance
                 {
                     Id = runtimeId,
                     GameplayFactId = gameplayFactId,

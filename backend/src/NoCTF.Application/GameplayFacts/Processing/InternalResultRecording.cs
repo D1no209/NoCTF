@@ -23,6 +23,11 @@ public sealed record AwdCheckResult(
     DateTimeOffset ObservedAt,
     DateTimeOffset ReceivedAt);
 
+public sealed record AwdCapabilityCheckResult(Guid RuntimeInstanceId, Guid GameplayFactId, Guid AttemptId,
+    IReadOnlyList<NoCTF.Application.Challenges.Capabilities.CheckProbeEvidence> Probes,
+    IReadOnlyList<NoCTF.Application.Challenges.Capabilities.CheckFlagContextEvidence> FlagContexts,
+    DateTimeOffset ObservedAt, DateTimeOffset ReceivedAt);
+
 public static class AwdCheckerOutcomeMapper
 {
     public static GameplayFactResult? ToGameplayFactResult(AwdHealth health) => health switch
@@ -56,22 +61,28 @@ public sealed record AwdpFixResult(
     }
 }
 
+public sealed record FixCheckResult(Guid GameplayFactId, Guid RuntimeInstanceId,
+    IReadOnlyList<NoCTF.Application.Challenges.Capabilities.CheckProbeEvidence> Probes, DateTimeOffset ObservedAt, DateTimeOffset ReceivedAt);
+
 public interface IInternalResultStore
 {
+    Task<InternalResultDisposition> CompleteFixWorkAsync(NoCTF.Application.Messaging.CompleteFixExecutionWork result, CancellationToken cancellationToken);
+    Task<InternalResultDisposition> FinalizeFixExecutionAsync(Guid gameplayFactId, Guid runtimeInstanceId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<InternalResultDisposition> RecordAwdCapabilityCheckAsync(AwdCapabilityCheckResult result, CancellationToken cancellationToken);
+    Task<InternalResultDisposition> RecordFixCheckAsync(FixCheckResult result, CancellationToken cancellationToken);
     Task<InternalResultDisposition> RecordAwdAsync(
         AwdCheckResult result,
         CancellationToken cancellationToken);
     Task<InternalResultDisposition> RecordAwdpAsync(
         AwdpFixResult result,
         CancellationToken cancellationToken);
-    Task<InternalResultDisposition> RecordPatchVerificationAsync(
-        AwdpFixResult result,
-        CancellationToken cancellationToken) =>
-        RecordAwdpAsync(result, cancellationToken);
 }
 
 public sealed class RecordInternalResult(IInternalResultStore store)
 {
+    public Task<InternalResultDisposition> AwdCapabilityCheckAsync(AwdCapabilityCheckResult result, CancellationToken ct = default) =>
+        store.RecordAwdCapabilityCheckAsync(result, ct);
+    public Task<InternalResultDisposition> FixCheckAsync(FixCheckResult result, CancellationToken ct = default) => store.RecordFixCheckAsync(result, ct);
     public Task<InternalResultDisposition> AwdAsync(
         AwdCheckResult result,
         CancellationToken ct = default) =>
@@ -82,8 +93,4 @@ public sealed class RecordInternalResult(IInternalResultStore store)
         CancellationToken ct = default) =>
         store.RecordAwdpAsync(result, ct);
 
-    public Task<InternalResultDisposition> PatchVerificationAsync(
-        AwdpFixResult result,
-        CancellationToken ct = default) =>
-        store.RecordPatchVerificationAsync(result, ct);
 }

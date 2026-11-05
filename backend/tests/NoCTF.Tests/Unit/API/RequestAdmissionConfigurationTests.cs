@@ -65,7 +65,7 @@ public sealed class RequestAdmissionConfigurationTests
             admission,
             source,
             options,
-            Substitute.For<IPatchUploadStore>(),
+            new FixUploadTargetAccess([]),
             new PostCommitDispatchStatus());
     }
 

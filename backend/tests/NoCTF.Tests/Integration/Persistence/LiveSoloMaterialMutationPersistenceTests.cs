@@ -31,7 +31,7 @@ public sealed class LiveSoloMaterialMutationPersistenceTests
             var gate = new LiveSoloMaterialMutationGate(fixture.Db);
             var bank = new ChallengeBankStore(fixture.Db, material: gate);
             var template = fixture.Templates[0];
-            var command = new UpdateChallengeTemplateCommand(template.Id, fixture.Owner.Id, true, GameMode.LiveSolo, ChallengeVisibility.Private,
+            var command = new UpdateChallengeTemplateCommand(template.Id, fixture.Owner.Id, true, ChallengeVisibility.Private,
                 template.Title, "changed active text", template.Direction, template.Definition!, fixture.Now);
             await Assert.That(async () => await bank.UpdateAsync(command, ct)).Throws<ChallengeMaterialMutationException>();
             var flags = new ChallengeFlagManagementStore(fixture.Db, new ChallengeRuntimeTemplateCatalog(), gate);

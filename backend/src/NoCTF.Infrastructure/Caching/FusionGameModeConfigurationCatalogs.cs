@@ -13,6 +13,8 @@ public sealed class FusionChallengeRuntimeTemplateCatalog(
 {
     public ChallengeRuntimeTemplate? Get(ChallengeDefinition? definition) =>
         inner.Get(definition);
+    public ChallengeRuntimeTemplate? Get(ChallengeDefinition? definition, CompetitionChallengeRules rules) =>
+        inner.Get(definition, rules);
 }
 
 public sealed class FusionAwdRoundConfigurationCatalog(
@@ -25,7 +27,7 @@ public sealed class FusionAwdRoundConfigurationCatalog(
 public sealed class FusionAwdFlagInjectionConfigurationCatalog(
     AwdFlagInjectionConfigurationCatalog inner) : IAwdFlagInjectionConfigurationCatalog
 {
-    public AwdFlagInjectionSettings? Get(AwdChallengeDefinition definition) =>
+    public AwdFlagInjectionSettings? Get(ChallengeDefinition definition) =>
         inner.Get(definition);
 }
 

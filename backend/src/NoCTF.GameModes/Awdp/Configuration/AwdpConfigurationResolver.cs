@@ -1,4 +1,5 @@
 using NoCTF.GameModes.Flags;
+using NoCTF.Application.Challenges.Capabilities;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -28,9 +29,9 @@ public static class AwdpConfigurationResolver
             definition.Runtime,
             definition.PatchEntrypoint ?? DefaultPatchEntrypoint,
             definition.PatchCommand,
-            definition.PatchTimeoutSeconds ?? AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds,
+            definition.PatchTimeoutSeconds ?? FixExecutionBudget.DefaultPatchTimeoutSeconds,
             definition.Checker,
-            definition.ReadyTimeoutSeconds ?? AwdpFixExecutionBudget.DefaultReadyTimeoutSeconds,
+            definition.ReadyTimeoutSeconds ?? FixExecutionBudget.DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes
                 ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
             rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default,
@@ -39,8 +40,8 @@ public static class AwdpConfigurationResolver
     public static AwdpEffectiveConfiguration Resolve(
         AwdpCompetitionModeConfiguration competition,
         AwdpCompetitionChallengeRules rules,
-        AwdpChallengeDefinition definition) => Resolve(
+        ChallengeDefinition definition) => Resolve(
         TypedGameModeConfiguration.Awdp(competition),
         TypedGameModeConfiguration.Awdp(rules),
-        TypedGameModeConfiguration.Awdp(definition));
+        TypedGameModeConfiguration.Awdp(definition) with { Runtime = TypedGameModeConfiguration.Runtime(definition, rules) });
 }

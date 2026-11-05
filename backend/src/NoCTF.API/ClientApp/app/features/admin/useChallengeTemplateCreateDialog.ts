@@ -2,13 +2,12 @@ import type { UiMessage } from '../../utils/i18n'
 import { message as describeMessage } from '../../utils/i18n'
 import { markRaw, proxyRefs, toRefs } from 'vue'
 import { toast } from '../../utils/message-toast'
-import { adminChallengeBankCreateTemplate, adminChallengeBankListTemplates, adminChallengeBankGetTemplate, copyLiveSoloTemplate } from '../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import { adminChallengeBankCreateTemplate, adminChallengeBankListTemplates, adminChallengeBankGetTemplate, adminChallengeBankCopyTemplate } from '../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol } from '../../api'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
 import { challengeDirectionOptions, directionLabel } from '../../utils/directions'
 import { defaultDefinition, definitionContractToModel } from '../../utils/game-config'
-import { gameModeOptions, isGameMode } from '../../utils/game-modes'
 import DefinitionEditorComponent from './DefinitionEditor.vue'
 
 type Events = {
@@ -25,13 +24,12 @@ export function useChallengeTemplateCreateDialog(
   const sourceId = ref<string | null>(null), sourceKeyword = ref(''), copyAttachments = ref(true), copyFlags = ref(false)
   const source = ref<import('../../api').NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse | null>(null)
   const sources = useOffsetPagination<import('../../api').NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse>(async ({ offset, limit }) => {
-    const result = await adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, desc: false, mode: 'Ctf', offset, limit, keyword: sourceKeyword.value || undefined } })
+    const result = await adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, desc: false, requiredCapabilities: [], offset, limit, keyword: sourceKeyword.value || undefined } })
     if (result.error || !result.data) throw result.error
     return result.data
   })
-  const sourceOptions = computed(() => sources.items.value.filter(x => x.id && x.interactionKind === 'FlagSubmission').map(x => ({ value: x.id!, label: x.title ?? '—' })))
-  const copySupported = computed(() => source.value?.definition?.ctf?.interactionKind !== 'PatchVerification'
-    && !source.value?.definition?.checker && (!source.value?.definition?.runtime || source.value.definition.runtime.kind === 'Container'))
+  const sourceOptions = computed(() => sources.items.value.filter(x => x.id).map(x => ({ value: x.id!, label: x.title ?? '—' })))
+  const copySupported = computed(() => (source.value?.definition?.capabilities.length ?? 0) > 0)
   async function searchSources() { sources.reset(); await sources.loadPage() }
   async function setVariant(value: unknown) { if (pending.value || (value !== 'blank' && value !== 'copy')) return; variant.value = value; if (value === 'copy') await searchSources() }
   async function selectSource(value: string) {
@@ -42,12 +40,11 @@ export function useChallengeTemplateCreateDialog(
     source.value = result.data
   }
   const title = ref('')
-  const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
   const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
   const direction = ref<(typeof challengeDirectionOptions)[number]>('Misc')
   const description = ref('')
   const definition = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
-    defaultDefinition(mode.value),
+    defaultDefinition(),
   )
   const saveErrors = ref<UiMessage[]>([])
   const saveAttempted = ref(false)
@@ -60,11 +57,10 @@ export function useChallengeTemplateCreateDialog(
   function reset() {
     variant.value = 'blank'; sourceId.value = null; source.value = null; sourceKeyword.value = ''; copyAttachments.value = true; copyFlags.value = false
     title.value = ''
-    mode.value = 'Ctf'
     visibility.value = 'Private'
     direction.value = 'Misc'
     description.value = ''
-    definition.value = defaultDefinition('Ctf')
+    definition.value = defaultDefinition()
     saveErrors.value = []
     saveAttempted.value = false
   }
@@ -75,20 +71,13 @@ export function useChallengeTemplateCreateDialog(
     emit('update:open', value)
   }
 
-  function changeMode(value: unknown): void {
-    if (!isGameMode(value)) return
-    definition.value = defaultDefinition(value)
-    mode.value = value
-    variant.value = 'blank'
-  }
-
   async function submit(): Promise<void> {
     if (pending.value) return
-    if (mode.value === 'LiveSolo' && variant.value === 'copy') {
-      if (!source.value?.id || !source.value.concurrencyStamp || !copySupported.value) return
+    if (variant.value === 'copy') {
+      if (!source.value?.id || !copySupported.value) return
       pending.value = true
       try {
-        const result = await copyLiveSoloTemplate({ body: { sourceChallengeId: source.value.id, expectedSourceStamp: source.value.concurrencyStamp, copyAttachments: copyAttachments.value, copyFlags: copyFlags.value } })
+        const result = await adminChallengeBankCopyTemplate({ body: { sourceChallengeId: source.value.id, copyAttachments: copyAttachments.value, copyFlags: copyFlags.value } })
         if (result.error || !result.data?.challengeId) { saveErrors.value = challengeTemplateWriteErrorMessages(result.error); toast.error(saveErrors.value[0] ?? translate('liveSolo.error.operation')); return }
         const id = result.data.challengeId; reset(); emit('created', id)
       } catch (cause) { saveErrors.value = challengeTemplateWriteErrorMessages(cause); toast.error(saveErrors.value[0] ?? translate('liveSolo.error.operation')) } finally { pending.value = false }
@@ -97,10 +86,9 @@ export function useChallengeTemplateCreateDialog(
     saveAttempted.value = true
     saveErrors.value = []
     const validationErrors = validateChallengeTemplateDraft({
-      mode: mode.value,
       title: title.value,
       direction: direction.value,
-      definition: definitionContractToModel(definition.value, mode.value),
+      definition: definitionContractToModel(definition.value),
     })
     if (validationErrors.length > 0) {
       saveErrors.value = validationErrors
@@ -113,7 +101,6 @@ export function useChallengeTemplateCreateDialog(
       const { data, error } = await adminChallengeBankCreateTemplate({
         body: {
           title: title.value.trim(),
-          mode: mode.value,
           visibility: visibility.value,
           direction: directionLabel(direction.value),
           description: description.value.trim() || null,
@@ -145,8 +132,6 @@ export function useChallengeTemplateCreateDialog(
     variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources,
     sourcePage: sources.page, sourcePageCount: sources.pageCount, sourceTotal: sources.total, sourceLimit: sources.limit, sourceLoading: sources.loading, sourcePageChange: sources.loadPage, sourceLimitChange: sources.setPageSize,
     title,
-    mode,
-    modeOptions: gameModeOptions,
     visibility,
     direction,
     description,
@@ -156,7 +141,6 @@ export function useChallengeTemplateCreateDialog(
     titleInvalid,
     directionInvalid,
     directionOptions: challengeDirectionOptions,
-    changeMode,
     setOpen,
     submit,
     DefinitionEditor,

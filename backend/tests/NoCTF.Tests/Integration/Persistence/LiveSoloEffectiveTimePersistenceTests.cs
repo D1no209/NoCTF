@@ -84,8 +84,9 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
-            fixture.Templates[0].Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Allocation = PersistedRuntimeAllocation.PerTeam,
-                FlagSource = PersistedRuntimeFlagSource.Static, Services = [new() { Name = "web", Image = "example/web:test" }] };
+            fixture.Templates[0].Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "web", Image = "example/web:test" }] };
+            ((NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules)fixture.Entries[0].Rules!).Runtime = new()
+                { Allocation = PersistedRuntimeAllocation.PerTeam, FlagSource = PersistedRuntimeFlagSource.Static };
             await fixture.Db.SaveChangesAsync(ct);
             var placement = Substitute.For<IRuntimePlacementPolicy>(); placement.Resolve(RuntimeKind.Container).Returns(new RuntimePlacement(RuntimeProvider.Docker, "test"));
             var control = new ScopedRuntimeControl(fixture.Db, new ChallengeRuntimeTemplateCatalog(), placement,
@@ -108,8 +109,10 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             foreach (var template in fixture.Templates)
-                template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Allocation = PersistedRuntimeAllocation.PerTeam,
-                    FlagSource = PersistedRuntimeFlagSource.Static, Services = [new() { Name = "web", Image = "example/web:test" }] };
+                template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "web", Image = "example/web:test" }] };
+            foreach (var entry in fixture.Entries)
+                ((NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules)entry.Rules!).Runtime = new()
+                    { Allocation = PersistedRuntimeAllocation.PerTeam, FlagSource = PersistedRuntimeFlagSource.Static };
             fixture.Competition.MaxConcurrentRuntimeInstancesPerTeam = 1; await fixture.Db.SaveChangesAsync(ct);
             await fixture.PrepareAsync(ct, expectedPreparationFailure: NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.ResourceCapacityExceeded);
             await Assert.That(await fixture.Db.LiveSoloRounds.CountAsync(ct)).IsEqualTo(0);

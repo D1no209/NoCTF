@@ -31,16 +31,12 @@ public static class LiveSoloConfigurationValidator
         return errors;
     }
 
-    public static IReadOnlyList<string> ValidateDefinition(LiveSoloChallengeDefinition value)
+    public static IReadOnlyList<string> ValidateDefinition(ChallengeDefinition value)
     {
         if (value.Runtime is not null and not ContainerChallengeRuntimeTemplate)
             return ["LiveSolo supports independent container environments only."];
-        if (value.Runtime is { Allocation: not PersistedRuntimeAllocation.PerTeam })
-            return ["LiveSolo Runtime resources must be independent per team."];
-        if (value.Checker is not null || value.PatchEntrypoint is not null || value.PatchTimeoutSeconds is not null
-            || value.MaximumPatchUploadBytes is not null || value.CheckerFixInput
-            || value.StringItems.Any(x => x.Kind is ChallengeDefinitionStringKind.PatchCommand or ChallengeDefinitionStringKind.CheckerCommand))
-            return ["LiveSolo accepts FlagSubmission definitions, not PatchVerification or checker-based interactions."];
+        if (value.Break is null && (value.Fix is null || value.Check is null))
+            return ["LiveSolo requires Break or both Fix and Check capabilities."];
         return [];
     }
 

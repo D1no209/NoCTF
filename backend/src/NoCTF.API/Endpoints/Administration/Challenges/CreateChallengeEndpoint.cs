@@ -94,11 +94,11 @@ public sealed class CreateChallengeEndpoint(
                 or ChallengeMutationFailure.TemplateNotFound =>
                 TypedResults.NotFound(),
             ChallengeMutationFailure.ResourceIdConflict
+                or ChallengeMutationFailure.RequiredCapabilitiesMissing
                 or ChallengeMutationFailure.ChallengeOrderConflict
-                or ChallengeMutationFailure.ChallengeTemplateConflict
-                or ChallengeMutationFailure.ExperimentalFeatureDisabled =>
+                or ChallengeMutationFailure.ChallengeTemplateConflict =>
                 TypedResults.Conflict(
-                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
+                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value, result.MissingCapabilities)),
             ChallengeMutationFailure.MultipleScorePresetTags or ChallengeMutationFailure.InvalidScorePresetCurve => ApiProblems.Problem(statusCode: 400,
                 detail: ApiMessages.For(result.Failure),
                 extensions: new Dictionary<string, object?> { ["code"] = result.Failure.Value.ToString() }),
@@ -107,8 +107,8 @@ public sealed class CreateChallengeEndpoint(
                 or ChallengeMutationFailure.InvalidTags
                 or ChallengeMutationFailure.InvalidTiming
                 or ChallengeMutationFailure.TimingUnsupported
-                or ChallengeMutationFailure.InvalidOrder
-                or ChallengeMutationFailure.TemplateModeMismatch =>
+                or ChallengeMutationFailure.CompetitionModeMismatch
+                or ChallengeMutationFailure.InvalidOrder =>
                 ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
                     title: ApiMessages.Get(ApiMessageId.CreateChallengeTitleChallengeWasCreated),

@@ -50,7 +50,7 @@ public sealed class ChallengeWriteUpPersistenceTests
                 ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1), EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
                 SingleWriteUpsEnabled = true, CreatedAt = now, UpdatedAt = now };
-            var template = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "WriteUp source", Direction = "Web",
+            var template = new Challenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "WriteUp source", Direction = "Web",
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now };
             var challenge = new CtfCompetitionChallenge { Id = Guid.NewGuid(), CompetitionId = competition.Id, ChallengeId = template.Id,
                 IsPublished = true, Rules = TestConfigurations.Rules(GameMode.Ctf), UpdatedAt = now };
@@ -138,9 +138,9 @@ public sealed class ChallengeWriteUpPersistenceTests
                 StartAt = now.AddHours(-1), EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
                 SingleWriteUpsEnabled = true, CreatedAt = now, UpdatedAt = now };
             var a = Competition("A"); var b = Competition("B");
-            var template = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "shared template", Direction = "Web",
+            var template = new Challenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "shared template", Direction = "Web",
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now };
-            var secondTemplate = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "other template", Direction = "Web",
+            var secondTemplate = new Challenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "other template", Direction = "Web",
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now };
             CtfCompetitionChallenge Challenge(Guid competitionId) => new() { Id = Guid.NewGuid(), CompetitionId = competitionId,
                 ChallengeId = template.Id, IsPublished = true, Rules = TestConfigurations.Rules(GameMode.Ctf), UpdatedAt = now };
@@ -189,7 +189,7 @@ public sealed class ChallengeWriteUpPersistenceTests
             await Assert.That(await db.GameplayFacts.Where(x => x.Kind == GameplayFactKind.WriteUpUnlock)
                 .Select(x => x.State).SingleAsync(ct)).IsEqualTo(GameplayFactState.Completed);
             await Assert.That((await store.ReadContentAsync(a.Id, second.Id, two.PublishedVersionId.Value, reader.Id, false, now, ct)).Failure).IsEqualTo(ChallengeWriteUpFailure.Forbidden);
-            db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = a.Id,
+            db.GameplayFacts.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = a.Id,
                 CompetitionChallengeId = first.Id, TeamId = readerA.Id, ActorUserId = reader.Id, State = GameplayFactState.Completed,
                 Result = GameplayFactResult.Correct, OccurredAt = now.AddSeconds(1), UpdatedAt = now.AddSeconds(1) });
             await db.SaveChangesAsync(ct);

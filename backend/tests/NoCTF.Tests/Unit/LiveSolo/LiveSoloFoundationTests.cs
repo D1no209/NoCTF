@@ -28,8 +28,8 @@ public sealed class LiveSoloFoundationTests
         await Assert.That(value.MaximumRosterMembers).IsEqualTo(2);
         await Assert.That(value.MaximumViewers).IsEqualTo(50);
         await Assert.That(LiveSoloConfigurationValidator.Validate(value)).IsEmpty();
-        await Assert.That(new GameModeChallengeConfigurationCatalog().CreateDefaultDefinition(GameMode.LiveSolo, Guid.NewGuid()))
-            .IsTypeOf<LiveSoloChallengeDefinition>();
+        await Assert.That(new GameModeChallengeConfigurationCatalog().CreateDefaultRules(GameMode.LiveSolo, Guid.NewGuid()))
+            .IsTypeOf<NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules>();
     }
 
     [Test]

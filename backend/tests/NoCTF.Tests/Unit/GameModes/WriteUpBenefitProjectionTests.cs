@@ -21,13 +21,13 @@ public sealed class WriteUpBenefitProjectionTests
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var facts = new List<LeaderboardGameplayFact>();
-        if (mode == GameMode.Ctf) facts.Add(Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct));
+        if (mode == GameMode.Ctf) facts.Add(Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct));
         if (mode == GameMode.Awdp)
         {
             facts.Add(Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct));
             facts.Add(Fact(team, challenge, GameplayFactKind.FixAttempt, GameplayFactResult.Correct, Start.AddSeconds(1)));
         }
-        if (mode == GameMode.Koh) facts.Add(Fact(team, challenge, GameplayFactKind.KohControlObservation, GameplayFactResult.Controlled));
+        if (mode == GameMode.Koh) facts.Add(Fact(team, challenge, GameplayFactKind.ControlObservation, GameplayFactResult.Controlled));
         facts.Add(Fact(team, challenge, GameplayFactKind.ManualAdjustment, GameplayFactResult.Applied) with { Value = "-37" });
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), mode, [new(team, "team", false, false)], facts,
             [new(challenge, "Web", "challenge", false)], TestConfigurations.Competition(mode), Start,
@@ -58,9 +58,8 @@ public sealed class WriteUpBenefitProjectionTests
         await Assert.That(Project(paidHintInput).Snapshot.Teams.Single().TotalScore).IsEqualTo(plain.TotalScore - 9);
         await Assert.That(scoreCalculator.Calculate(input with
         {
-            WriteUpUnlocks = [new(Guid.NewGuid(), team, challenge, 20, Start.AddMinutes(1))],
-            TheoryScores = [new(team, 17, Start, true)]
-        }, team)).IsEqualTo(actual.TotalScore + (mode == GameMode.Koh ? 0 : 17));
+            WriteUpUnlocks = [new(Guid.NewGuid(), team, challenge, 20, Start.AddMinutes(1))]
+        }, team)).IsEqualTo(actual.TotalScore);
         var gross = plain.ChallengeBenefits.Single().GrossPoints;
         await Assert.That(gross).IsGreaterThan(0);
         var deduction = ChallengeWriteUpPolicy.Deduction(gross, 20);
@@ -80,8 +79,8 @@ public sealed class WriteUpBenefitProjectionTests
         var team = Guid.NewGuid(); var other = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Ctf,
             [new(team, "assisted", false, false), new(other, "independent", false, false)],
-            [Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, Start.AddSeconds(5)),
-             Fact(other, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, Start.AddSeconds(10))],
+            [Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, Start.AddSeconds(5)),
+             Fact(other, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, Start.AddSeconds(10))],
             [new(challenge, "Web", "challenge", false)], ProjectedAt: Start.AddMinutes(1),
             WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, percent, Start)]);
         var result = Project(input);
@@ -102,7 +101,7 @@ public sealed class WriteUpBenefitProjectionTests
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Ctf, [new(team, "team", false, false)],
-            [Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct)],
+            [Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct)],
             [new(challenge, "Web", "challenge", false)], ProjectedAt: Start.AddMinutes(1),
             WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, 20, Start.AddSeconds(1))]);
         var row = Project(input).Snapshot.Teams.Single();
@@ -135,7 +134,7 @@ public sealed class WriteUpBenefitProjectionTests
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid(); var solveAt = Start.AddMinutes(10);
         var projection = Project(new(Guid.NewGuid(), GameMode.Ctf, [new(team, "team", false, false)],
-            [Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, solveAt)],
+            [Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, solveAt)],
             [new(challenge, "Web", "challenge", false)], ProjectedAt: Start.AddHours(1),
             WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, percent, Start)]));
         var reader = Substitute.For<IScoreboardTrendFactReader>();

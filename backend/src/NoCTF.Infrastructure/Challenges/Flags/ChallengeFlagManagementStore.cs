@@ -242,7 +242,7 @@ public sealed class ChallengeFlagManagementStore(
         return scope.ChallengeId is Guid challengeId
             ? await db.Challenges.AsNoTracking()
                 .Where(item => item.Id == challengeId)
-                .Select(item => new ChallengeFlagSupport(item.Mode, item.Definition))
+                .Select(item => new ChallengeFlagSupport(item.Definition))
                 .AsSplitQuery()
                 .SingleAsync(ct)
             : await db.CompetitionChallenges.AsNoTracking()
@@ -252,7 +252,7 @@ public sealed class ChallengeFlagManagementStore(
                     db.Challenges.AsNoTracking(),
                     item => item.ChallengeId,
                     template => template.Id,
-                    (_, template) => new ChallengeFlagSupport(template.Mode, template.Definition))
+                    (_, template) => new ChallengeFlagSupport(template.Definition))
                 .AsSplitQuery()
                 .SingleAsync(ct);
     }
@@ -270,6 +270,6 @@ public sealed class ChallengeFlagManagementStore(
         || flag.ValidStart is not null
         || flag.ValidUntil is not null;
 
-    private sealed record ChallengeFlagSupport(GameMode Mode, ChallengeDefinition? Definition);
+    private sealed record ChallengeFlagSupport(ChallengeDefinition? Definition);
 
 }

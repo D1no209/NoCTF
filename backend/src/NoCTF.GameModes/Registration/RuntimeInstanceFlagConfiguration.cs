@@ -12,21 +12,21 @@ public static class RuntimeInstanceFlagConfiguration
 {
     public static PerTeamFlagTemplate Resolve(CompetitionModeConfiguration competition, CompetitionChallengeRules rules, ChallengeDefinition definition)
     {
-        if (competition is AwdpCompetitionModeConfiguration awdp && rules is AwdpCompetitionChallengeRules awdpRules && definition is AwdpChallengeDefinition awdpDefinition)
+        if (competition is AwdpCompetitionModeConfiguration awdp && rules is AwdpCompetitionChallengeRules awdpRules && definition.Break is not null)
         {
-            var configuration = AwdpConfigurationResolver.Resolve(awdp, awdpRules, awdpDefinition);
+            var configuration = AwdpConfigurationResolver.Resolve(awdp, awdpRules, definition);
             if (configuration.Runtime is not { Allocation: RuntimeAllocation.PerTeam, FlagSource: RuntimeFlagSource.PerTeam,
-                Definition: ContainerRuntimeDefinition { Services: [{ FlagEnvironmentVariableName.Length: > 0 }] } })
+                Definition: ContainerRuntimeDefinition container } || !container.Services.Any(service => service.FlagEnvironmentVariableName is { Length: > 0 }))
                 throw new InvalidOperationException("AWDP generation flags require a PerTeam Container runtime flag environment variable.");
             return configuration.FlagTemplate;
         }
-        if (competition is LiveSoloCompetitionModeConfiguration && rules is LiveSoloCompetitionChallengeRules && definition is LiveSoloChallengeDefinition)
+        if (competition is LiveSoloCompetitionModeConfiguration && rules is LiveSoloCompetitionChallengeRules soloRules && definition.Break is not null)
         {
-            var runtime = TypedGameModeConfiguration.Runtime(definition.Runtime);
+            var runtime = TypedGameModeConfiguration.Runtime(definition, rules);
             if (runtime is not { Allocation: RuntimeAllocation.PerTeam, FlagSource: RuntimeFlagSource.PerTeam,
                 Definition: ContainerRuntimeDefinition } || !((ContainerRuntimeDefinition)runtime.Definition).Services.Any(x => x.FlagEnvironmentVariableName is { Length: > 0 }))
                 throw new InvalidOperationException("Generation-specific flags require a per-team environment injection target.");
-            var template = rules.HasFlagTemplate ? rules.FlagTemplate : definition.HasFlagTemplate ? definition.FlagTemplate : competition.FlagTemplate;
+            var template = soloRules.HasFlagTemplate ? soloRules.FlagTemplate : definition.Break.HasFlagTemplate ? definition.Break.FlagTemplate : competition.FlagTemplate;
             return new(template.Header, template.BodyTemplate, template.LeetLiteralText);
         }
         throw new InvalidOperationException("The mode does not support generation-specific Flag configuration.");

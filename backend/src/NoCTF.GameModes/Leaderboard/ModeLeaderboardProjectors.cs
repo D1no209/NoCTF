@@ -61,7 +61,7 @@ internal static class CtfLeaderboardProjection
                           && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
                           && (challenges.Count == 0
-                              ? fact.Kind == GameplayFactKind.FlagAttempt
+                              ? fact.Kind == GameplayFactKind.BreakAttempt
                               : IsInteractionFact(fact, challenges))
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.OccurredAt)
@@ -140,7 +140,7 @@ internal static class CtfLeaderboardProjection
         var wrongFacts = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
                 && (challenges.Count == 0
-                    ? fact.Kind == GameplayFactKind.FlagAttempt
+                    ? fact.Kind == GameplayFactKind.BreakAttempt
                     : IsInteractionFact(fact, challenges))
                 && fact.Result == GameplayFactResult.Wrong)
             .Select(fact =>
@@ -245,9 +245,7 @@ internal static class CtfLeaderboardProjection
     {
         if (fact.CompetitionChallengeId is not Guid challengeId)
             return false;
-        var interaction = challenges.GetValueOrDefault(challengeId)?.InteractionKind
-            ?? CtfInteractionKind.FlagSubmission;
-        return CtfCompletionEligibility.Matches(fact.Kind, interaction);
+        return CtfCompletionEligibility.Matches(fact.Kind);
     }
 
     private static CtfChallengeConfiguration ParseChallenge(CompetitionChallengeRules? value,
@@ -439,7 +437,7 @@ internal static class KohLeaderboardProjection
         var rawObservations = input.GameplayFacts
             .Where(fact => fact is
             {
-                Kind: GameplayFactKind.KohControlObservation,
+                Kind: GameplayFactKind.ControlObservation,
                 CompetitionChallengeId: not null
             }
             && (!hasChallengeCatalog
@@ -452,7 +450,7 @@ internal static class KohLeaderboardProjection
         foreach (var observation in rawObservations)
         {
             var challengeId = observation.CompetitionChallengeId!.Value;
-            if (observation.Result == GameplayFactResult.Uncontrolled)
+            if (observation.State != GameplayFactState.Completed || observation.Result != GameplayFactResult.Controlled)
             {
                 currentKings.Remove(challengeId);
                 continue;

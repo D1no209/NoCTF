@@ -73,7 +73,7 @@ public sealed class OwnershipTransferPersistenceTests
             });
 
             var challengeId = Guid.CreateVersion7();
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = previousOwnerId,
@@ -138,7 +138,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .IsEqualTo(1);
 
             var concurrentChallengeId = Guid.CreateVersion7();
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = concurrentChallengeId,
                 OwnerId = previousOwnerId,
@@ -366,7 +366,7 @@ public sealed class OwnershipTransferPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
@@ -483,7 +483,7 @@ public sealed class OwnershipTransferPersistenceTests
             db.Users.AddRange(
                 Organizer(previousOwnerId, "attachment-previous-owner", now),
                 Organizer(newOwnerId, "attachment-new-owner", now));
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = previousOwnerId,

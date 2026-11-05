@@ -70,7 +70,7 @@ public sealed class ChallengeTestFlagInjectionStore(
         if (target is null)
             return null;
 
-        if (target.Definition is not AwdChallengeDefinition definition)
+        if (target.Definition is not ChallengeDefinition { Break: not null } definition)
             return null;
         var injection = configurations.Get(definition);
         if (injection is null)

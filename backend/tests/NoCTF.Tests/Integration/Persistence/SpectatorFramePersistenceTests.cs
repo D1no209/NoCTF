@@ -50,7 +50,7 @@ public sealed class SpectatorFramePersistenceTests
             competition.ModeConfiguration = TestConfigurations.Competition(mode); competition.FlagDerivationSecret = new byte[32];
             competition.StartAt = now.AddHours(-1); competition.EndAt = now.AddHours(1); competition.Status = CompetitionStatus.Running;
             competition.CreatedAt = now; competition.UpdatedAt = now; db.Competitions.Add(competition);
-            Challenge challenge = mode == GameMode.Awd ? new AwdChallenge() : new KohChallenge();
+            var challenge = new Challenge();
             challenge.Id = challengeId; challenge.OwnerId = userId; challenge.Title = "Point"; challenge.Direction = "Web";
             challenge.Definition = TestConfigurations.Definition(mode); challenge.CreatedAt = now; challenge.UpdatedAt = now; db.Challenges.Add(challenge);
             CompetitionChallenge instance = mode == GameMode.Awd ? new AwdCompetitionChallenge() : new KohCompetitionChallenge();
@@ -64,7 +64,7 @@ public sealed class SpectatorFramePersistenceTests
             }
             GameplayFact Fact(Guid? team, DateTimeOffset at, GameplayFactResult? result, GameplayFactState state = GameplayFactState.Completed)
             {
-                GameplayFact fact = mode == GameMode.Awd ? new AwdServiceTransitionGameplayFact() : new KohControlObservationGameplayFact();
+                GameplayFact fact = mode == GameMode.Awd ? new CheckObservationGameplayFact() : new ControlObservationGameplayFact();
                 fact.Id = Guid.CreateVersion7(); fact.CompetitionId = competitionId; fact.CompetitionChallengeId = instanceId;
                 fact.TeamId = team; fact.OccurredAt = at; fact.UpdatedAt = at; fact.Result = result; fact.State = state;
                 if (mode == GameMode.Awd) fact.Awd = new() { ReceivedRoundId = at < now.AddMinutes(-36) ? previousRound : round,
@@ -86,7 +86,7 @@ public sealed class SpectatorFramePersistenceTests
                 db.AwdRoundRules.Add(new AwdRoundRules { Id = rulesId, CompetitionId = competitionId, RoundId = round,
                     CompetitionChallengeId = instanceId, Revision = 1, EffectiveAt = now.AddMinutes(-36),
                     Teams = [new() { TeamId = teamId }, new() { TeamId = defenderId }] });
-                FlagAttemptGameplayFact Attack(Guid source, Guid victim, int minute) => new()
+                BreakAttemptGameplayFact Attack(Guid source, Guid victim, int minute) => new()
                 {
                     Id = Guid.CreateVersion7(), CompetitionId = competitionId, CompetitionChallengeId = instanceId,
                     TeamId = source, VictimTeamId = victim, ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = round,
@@ -149,7 +149,7 @@ public sealed class SpectatorFramePersistenceTests
             }
             else
             {
-                await Assert.That(frame.Points.Single().ControllerId).IsEqualTo(teamId);
+                await Assert.That(frame.Points.Single().ControllerId).IsNull();
                 await Assert.That(frame.Points.Single().Health).IsEqualTo(SpectatorHealth.Unknown);
                 await Assert.That(frame.Changes.Count).IsEqualTo(2);
                 await Assert.That(frame.Changes.All(x => x.ControllerId == teamId)).IsTrue();

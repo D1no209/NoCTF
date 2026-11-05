@@ -16,9 +16,9 @@ internal static class FlagAcquisitionEvidenceReader
         DateTimeOffset submittedAt, bool practice, CancellationToken ct)
     {
         var evidence = new FlagAcquisitionEvidence { CapturedAt = submittedAt };
-        var runtime = templates.Get(scope.ChallengeDefinition);
+        var runtime = templates.Get(scope.ChallengeDefinition, scope.ChallengeRules);
         if (scope.Mode != GameMode.Ctf || practice
-            || scope.ChallengeDefinition is not CtfChallengeDefinition { InteractionKind: CtfInteractionKind.FlagSubmission }
+            || scope.ChallengeDefinition?.Break is null
             || runtime is { FlagSource: not RuntimeFlagSource.Static })
             return evidence;
         evidence.Scope = FlagAcquisitionScope.FormalStaticCtf;
@@ -32,7 +32,7 @@ internal static class FlagAcquisitionEvidenceReader
 
         var legacy = await db.GameplayFacts.AsNoTracking().AnyAsync(fact =>
             fact.CompetitionId == scope.CompetitionId && fact.CompetitionChallengeId == scope.CompetitionChallengeId
-            && fact.TeamId == scope.TeamId && fact.Kind == GameplayFactKind.FlagAttempt
+            && fact.TeamId == scope.TeamId && fact.Kind == GameplayFactKind.BreakAttempt
             && fact.AcquisitionEvidence == null && fact.OccurredAt <= submittedAt, ct);
         if (legacy)
         {

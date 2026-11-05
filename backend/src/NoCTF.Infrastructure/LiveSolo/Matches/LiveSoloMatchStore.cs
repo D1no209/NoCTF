@@ -192,7 +192,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
                 return new(null, LiveSoloFailure.InvalidConfiguration);
             var definitions = await db.CompetitionChallenges.Where(x => entries.Select(e => e.CompetitionChallengeId).Contains(x.Id))
                 .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (_, template) => template.Definition!).AsSplitQuery().ToArrayAsync(ct);
-            if (definitions.Any(x => x is not LiveSoloChallengeDefinition definition || LiveSoloConfigurationValidator.ValidateDefinition(definition).Count != 0))
+            if (definitions.Any(x => x is null || LiveSoloConfigurationValidator.ValidateDefinition(x).Count != 0))
                 return new(null, LiveSoloFailure.UnsupportedEnvironment);
             group.Name = candidate.Name; group.RoundLimitSeconds = input.LimitSeconds; group.Reserve = input.Reserve;
             group.ConcurrencyStamp = Guid.NewGuid();

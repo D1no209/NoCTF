@@ -4,12 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 EXPECTED_TOKEN = os.environ["EXPECTED_TOKEN"]
-ALLOWED_OUTCOMES = {
-    "ExploitSucceeded",
-    "DefenseSucceeded",
-    "ServiceAbnormal",
-}
-last_outcome = {"outcome": None}
+last_evidence = {}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -18,7 +13,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(200)
             return
         if self.path == "/last":
-            body = json.dumps(last_outcome, separators=(",", ":")).encode("utf-8")
+            body = json.dumps(last_evidence, separators=(",", ":")).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -36,10 +31,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length))
-        if payload.get("outcome") not in ALLOWED_OUTCOMES or len(payload) != 1:
+        if {probe.get("kind") for probe in payload.get("probes", [])} != {"Functionality", "Vulnerability"} or not payload.get("observedAt"):
             self.respond(422)
             return
-        last_outcome["outcome"] = payload["outcome"]
+        last_evidence.clear()
+        last_evidence.update(payload)
         print(json.dumps(payload, separators=(",", ":")), flush=True)
         self.respond(204)
 

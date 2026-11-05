@@ -40,8 +40,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider4 = __timeProvider4;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
@@ -59,13 +57,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await awdMessageHandler.Handle(awdFlagInjectionFailed, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: AwdFlagInjectionFailedHandler541375746
     
     
 }
-

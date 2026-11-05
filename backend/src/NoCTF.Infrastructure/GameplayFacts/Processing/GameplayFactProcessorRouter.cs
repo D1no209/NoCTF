@@ -39,7 +39,7 @@ public sealed class GameplayFactProcessorRouter(NoCtfDbContext db, GameplayFactP
             NoCtfTelemetry.RecordGameplayFactDelivery(GameplayFactDeliveryOutcome.Stale);
             return;
         }
-        if (scope.Fact.Kind is GameplayFactKind.TheoryPaperSubmission or GameplayFactKind.WriteUpUnlock)
+        if (scope.Fact.Kind == GameplayFactKind.WriteUpUnlock)
         {
             var stamp = Guid.NewGuid();
             var now = clock.GetUtcNow();
@@ -47,10 +47,7 @@ public sealed class GameplayFactProcessorRouter(NoCtfDbContext db, GameplayFactP
                     && item.ConcurrencyStamp == expectedConcurrencyStamp && item.State == GameplayFactState.Queued
                     && (item.Kind == GameplayFactKind.WriteUpUnlock
                         && db.WriteUpUnlockReceipts.Any(receipt => receipt.GameplayFactId == item.Id)
-                        || item.Kind == GameplayFactKind.TheoryPaperSubmission
-                        && db.TheoryPapers.Any(paper => paper.Id == item.TheoryPaperId
-                            && (paper.State == NoCTF.Domain.Theory.Papers.TheoryPaperState.Submitted
-                                || paper.State == NoCTF.Domain.Theory.Papers.TheoryPaperState.Voided))))
+                        ))
                 .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.State, GameplayFactState.Completed)
                     .SetProperty(item => item.UpdatedAt, now)
                     .SetProperty(item => item.ConcurrencyStamp, stamp), ct);

@@ -11,7 +11,6 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
     {
         builder.ToTable("challenges");
         builder.HasKey(challenge => challenge.Id);
-        builder.HasAlternateKey(challenge => new { challenge.Id, challenge.Mode });
         builder.HasQueryFilter(challenge => challenge.DeletedAt == null);
         builder.Property(challenge => challenge.Title).HasMaxLength(160);
         builder.HasIndex(challenge => challenge.NormalizedTitle);
@@ -22,15 +21,6 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
             .HasForeignKey(manager => manager.ChallengeId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(challenge => challenge.Managers).AutoInclude();
-        builder.HasDiscriminator(challenge => challenge.Mode)
-            .HasValue<CtfChallenge>(GameMode.Ctf)
-            .HasValue<AwdChallenge>(GameMode.Awd)
-            .HasValue<AwdpChallenge>(GameMode.Awdp)
-            .HasValue<KohChallenge>(GameMode.Koh)
-            .HasValue<LiveSoloChallenge>(GameMode.LiveSolo);
-        builder.Property(challenge => challenge.Mode)
-            .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(8);
         builder.HasOne(challenge => challenge.Definition)
             .WithOne()
             .HasForeignKey<ChallengeDefinition>(definition => definition.ChallengeId)

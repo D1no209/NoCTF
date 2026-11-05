@@ -25,7 +25,12 @@ public sealed class RetryCompetitionWebhookDeliveryValidator : Validator<RetryCo
 }
 
 public sealed record RetryCompetitionWebhookDeliveryResponse(Guid EventId, Guid TargetId);
-public sealed record RetryCompetitionWebhookDeliveryConflict(CompetitionWebhookRetryFailure Failure);
+public sealed record RetryCompetitionWebhookDeliveryConflict(CompetitionWebhookRetryFailure Failure)
+{
+    public string Detail => ApiMessages.For(Failure).Text;
+    public string MessageKey => ApiMessages.For(Failure).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class RetryCompetitionWebhookDeliveryEndpoint(
     RetryCompetitionWebhookDelivery retry, ICompetitionModerationAuthorizer authorizer, IUserContext user)

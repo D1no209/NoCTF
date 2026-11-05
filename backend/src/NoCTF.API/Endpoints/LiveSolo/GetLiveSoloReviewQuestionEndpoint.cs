@@ -27,9 +27,8 @@ public sealed class GetLiveSoloReviewQuestionEndpoint(ReadLiveSoloReview review,
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await review.ReadAsync(new(req.CompetitionId, req.MatchId, user.UserId, req.Staff, clock.GetUtcNow()), req.QuestionId, ct);
         if (result is null) return TypedResults.NotFound();
-        var q = result.Question;
-        return TypedResults.Ok(new LiveSoloReviewContentResponse(new(q.Id, q.CompetitionChallengeId, q.Position, q.Title, q.Description, q.Direction,
-            q.Tags, q.OpenedAt, null), result.Hints.Select(x => new LiveSoloHintResponse(x.Id, x.Content, x.PublishedAt)).ToArray(),
+        return TypedResults.Ok(new LiveSoloReviewContentResponse(LiveSoloQuestionResponse.From(result.Question),
+            result.Hints.Select(x => new LiveSoloHintResponse(x.Id, x.Content, x.PublishedAt)).ToArray(),
             result.Attachments.Select(x => new LiveSoloAttachmentResponse(x.Id, x.FileName, x.ContentType, x.ByteLength)).ToArray(), result.Historical));
     }
 }

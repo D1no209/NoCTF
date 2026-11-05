@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, onlyMine, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
+const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, onlyMine, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -44,7 +44,7 @@ const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directi
         <TableHeader class="bg-muted/30">
           <TableRow>
             <TableHead class="w-[38%]">{{ $t('common.label.title') }}</TableHead>
-            <TableHead>{{ $t('administration.label.mode') }}</TableHead>
+            <TableHead>{{ $t('administration.capability.title') }}</TableHead>
             <TableHead>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -86,10 +86,7 @@ const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directi
               </NuxtLink>
             </TableCell>
             <TableCell>
-              <component :is="AdminGameModeBadge" :mode="template.mode" />
-              <Badge v-if="template.interactionKind === 'PatchVerification'" variant="secondary" class="ml-2">
-                {{ $t('common.label.patchVerification') }}
-              </Badge>
+              <div class="flex flex-wrap gap-1"><Badge v-for="capability in template.capabilities" :key="capability" variant="secondary">{{ capability }}</Badge></div>
             </TableCell>
             <TableCell>{{ directionLabel(template.direction) }}</TableCell>
             <TableCell>

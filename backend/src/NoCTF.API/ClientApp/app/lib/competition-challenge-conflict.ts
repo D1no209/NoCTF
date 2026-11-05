@@ -14,7 +14,8 @@ function readConflictCode(error: unknown): NoCtfapiEndpointsAdministrationChalle
     case 'ResourceIdConflict':
     case 'LifecycleStateConflict':
     case 'ChallengeTemplateNotFound':
-    case 'ChallengeTemplateModeMismatch':
+    case 'CompetitionModeMismatch':
+    case 'RequiredCapabilitiesMissing':
       return error.code
     default:
       return undefined

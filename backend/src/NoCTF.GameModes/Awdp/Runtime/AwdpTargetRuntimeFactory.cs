@@ -3,7 +3,7 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.GameModes.Awdp.Runtime;
 
-using NoCTF.GameModes.PatchVerification.Runtime;
+using NoCTF.Application.Challenges.Capabilities;
 
 public static class AwdpTargetRuntimeFactory
 {
@@ -16,7 +16,7 @@ public static class AwdpTargetRuntimeFactory
         ChallengeRuntimeTemplate template,
         RuntimePlacement placement,
         DateTimeOffset now)
-        => PatchVerificationTargetRuntimeFactory.Create(
+        => FixTargetRuntimeFactory.Create(
             teamId,
             gameplayFactId,
             competitionId,
@@ -24,6 +24,6 @@ public static class AwdpTargetRuntimeFactory
             runtimeInstanceId,
             template,
             placement,
-            RuntimePurpose.AwdpTarget,
+            RuntimePurpose.FixTarget,
             now);
 }

@@ -358,7 +358,7 @@ public sealed class UserProfilePersistenceTests
         Guid id,
         Guid ownerId,
         string direction,
-        DateTimeOffset now) => new CtfChallenge
+        DateTimeOffset now) => new Challenge
     {
         Id = id,
         OwnerId = ownerId,
@@ -389,7 +389,7 @@ public sealed class UserProfilePersistenceTests
         Guid competitionChallengeId,
         Guid teamId,
         Guid userId,
-        DateTimeOffset occurredAt) => new FlagAttemptGameplayFact
+        DateTimeOffset occurredAt) => new BreakAttemptGameplayFact
     {
         Id = Guid.CreateVersion7(occurredAt),
         CompetitionId = competitionId,

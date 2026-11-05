@@ -194,7 +194,7 @@ describe('participant challenge progress', () => {
     expect(detail).toContain('@submitted="refreshSubmissionHistory"')
     expect(history).toContain('listGameplayFactsEndpoint({')
     expect(history).toContain('getGameplayFactValueEndpoint({')
-    expect(history).toContain("submission.kind === 'FlagAttempt' || submission.kind === 'BreakAttempt'")
+    expect(history).toContain("submission.kind === 'BreakAttempt'")
     expect(history).toContain('@click="openSubmittedValue(submission)"')
     expect(history).toContain("$t('challenges.label.viewFlag')")
     expect(history).toContain('submittedValue.value = data.value ?? null')

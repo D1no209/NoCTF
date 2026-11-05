@@ -151,14 +151,14 @@ public sealed class NoCtfTelemetryTests
         });
         listener.Start();
 
-        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FlagAttempt, 4);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 4);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 2);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.HintUnlock, 5);
 
         await Assert.That(measurements).IsEquivalentTo(
         [
-            ("flag", 4L),
+            ("break", 4L),
             ("break", 2L),
             ("fix", 1L)
         ]);
@@ -199,7 +199,7 @@ public sealed class NoCtfTelemetryTests
         listener.Start();
 
         NoCtfTelemetry.RecordGameplayFactProcessing(
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             GameplayFactState.Completed,
             GameplayFactResult.Correct,
             0.25);
@@ -209,7 +209,7 @@ public sealed class NoCtfTelemetryTests
             GameplayFactResult.Wrong,
             0.5);
         NoCtfTelemetry.RecordGameplayFactProcessing(
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             GameplayFactState.PlatformFailed,
             null,
             1.25);

@@ -113,7 +113,7 @@ AWD 正确提交不产生阻止后续输入的“题目已解”状态，选手�
 
 Checker 报告连接、当前业务、逐 Flag/Store 读写、稳定原因和观察时间，服务端结合已派发义务验证完整性。未检查项目不是通过；不允许 Checker 自行省略平台已要求的历史项。
 
-每次执行尝试有独立身份，关联同一个计划样本的 GameplayFact。Runner 原子领取待执行尝试，容器 OperationId 使用该尝试身份；旧尝试不能重新申请资源、读取新尝试材料或覆盖新回执。任务令牌绑定 Runtime、GameplayFact 和尝试，Checker 从内部 `GET /api/internal/v1/awd/check-task` 按需读取固定清单；Flag 和私有读取上下文不通过环境变量批量传输，材料响应禁止缓存。命名服务地址单独交给 Checker。`POST /api/internal/v1/awd/check-results` 接收 Connection、Functionality、逐 Flag 的 Write/Read、ObservedAt，以及写入时产生的私有上下文和公开定位信息；接收时间由 API 生成，历史身份、义务和结算资格不能由回调指定。
+每次执行尝试有独立身份，关联同一个计划样本的 GameplayFact。Runner 原子领取待执行尝试，容器 OperationId 使用该尝试身份；旧尝试不能重新申请资源、读取新尝试材料或覆盖新回执。任务令牌绑定 Runtime、GameplayFact 和尝试，Checker 从内部 `GET /api/internal/v1/awd/check-task` 按需读取固定清单；Flag 和私有读取上下文不通过环境变量批量传输，材料响应禁止缓存。命名服务地址单独交给 Checker。`POST /api/internal/v1/capabilities/check-results` 接收 Connection、Functionality、逐 Flag 的 FlagWrite、CurrentFlagRead、HistoricalFlagRead 探针及 ObservedAt；FlagContexts 保存私有上下文和公开定位信息。接收时间由 API 生成，历史身份、义务和结算资格不能由回调指定。
 
 默认轮末计划任务在结束前 30 秒启动，执行期限为轮末；单次最多 30 秒。失败较快时最多两次重试、相隔 5 秒，剩余预算不足则不启动；30 秒超时可能直接耗尽预算。中间检查每 30 秒一次，与轮末任务重合时合并，不能重复结算。
 

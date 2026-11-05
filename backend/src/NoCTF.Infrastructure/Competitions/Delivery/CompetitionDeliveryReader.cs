@@ -35,6 +35,8 @@ public sealed class CompetitionDeliveryReader(NoCtfDbContext db, IChallengeRunti
         var page = await ordered.Skip(query.Offset).Take(query.Limit).ToArrayAsync(ct);
         if (page.Length == 0) return new([], total);
         var entryIds = page.Select(item => item.CompetitionChallengeId).Distinct().ToArray();
+        var rules = await db.CompetitionChallenges.AsNoTracking().Where(item => entryIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Rules }).AsSplitQuery().ToDictionaryAsync(item => item.Id, item => item.Rules!, ct);
         var templateIds = page.Select(item => item.ChallengeId).Distinct().ToArray();
         var teamIds = page.Select(item => item.TeamId).Distinct().ToArray();
         var templates = await db.Challenges.AsNoTracking().Where(item => templateIds.Contains(item.Id))
@@ -63,7 +65,7 @@ public sealed class CompetitionDeliveryReader(NoCtfDbContext db, IChallengeRunti
         {
             var template = templates[item.ChallengeId];
             var random = randomTemplates.Contains(item.ChallengeId);
-            var perTeam = runtimeTemplates.Get(template.Definition)?.FlagSource == NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam;
+            var perTeam = runtimeTemplates.Get(template.Definition, rules[item.CompetitionChallengeId])?.FlagSource == NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam;
             var staticFlags = StaticFlagConfiguration.SupportsManualFlags(template.Definition, runtimeTemplates);
             var selected = flags.Where(flag => (flag.CompetitionChallengeId == item.CompetitionChallengeId
                     || flag.ChallengeId == item.ChallengeId) && (flag.TeamId == null || flag.TeamId == item.TeamId))
@@ -76,7 +78,7 @@ public sealed class CompetitionDeliveryReader(NoCtfDbContext db, IChallengeRunti
                     SpecificationKind.RuntimeInstance => flag.TeamId == item.TeamId && flag.SpecificationId is Guid runtimeId
                         && runtimes.TryGetValue(runtimeId, out var runtime) && runtime.TeamId == item.TeamId
                         && runtime.CompetitionChallengeId == item.CompetitionChallengeId
-                        && runtime.Purpose is RuntimePurpose.Player or RuntimePurpose.AwdpAttack or RuntimePurpose.Practice,
+                        && runtime.Purpose is RuntimePurpose.Player or RuntimePurpose.AttackTarget or RuntimePurpose.Practice,
                     null => mode == GameMode.Ctf && staticFlags && !random,
                     _ => false
                 })

@@ -24,18 +24,18 @@ Worker 按 PollIntervalSeconds（Competition 默认、题覆盖）HTTP GET 展�
 - Running 执行；Paused 停止不补，Resume 立即一次；Finished 停止；
 - OccurredAt=实际完成/失败服务端时间，不伪造计划时间。
 
-每个已发布题只有一条 Wolverine scheduled poll 链：生命周期事务创建首条消息；Handler 完成观测并提交 KohControlObservation GameplayFact 时，在同一 Inbox/Outbox 事务安排下一条。消息携带计划 due time；Wolverine Inbox 以 MessageId 去重。若完成时已错过 interval，下一 due 推进到第一个未来边界，不补观测。每次实际完成轮询都创建事实，即使连续由同队控制。HTTP GET 发生在数据库事务外。
+集群调度器在 NATS KV 租约保护下，从关系型事实重建每题下一次观察时间。持久消息通过 JetStream 投递，处理前检查当前比赛和题目状态。Control 读取在数据库事务外执行，完成后创建 ControlObservation 及当前 Control 证据；观察事务提交后发布事件。下一次观察从已保存结果推导，不另外持久化递归调度链。每次完成的观察均保存事实，即使连续由同队控制。
 
 每次观测独立，不延续上一控制者：
 
 | 状态 | GameplayFact |
 |---|---|
-| 唯一 Team Flag | KohObservation + Correct + TeamId |
-| 2xx 无匹配/格式非法 | Wrong / Uncontrolled |
+| 唯一有效 Team Flag | ControlObservation + Controlled + TeamId |
+| 明确无人控制 | ControlObservation + Uncontrolled |
 | 非2xx/连接/超时 | PlatformFailed + ProducerUnavailable/Timeout |
 | 匹配不同 Team 多个 | PlatformFailed + AmbiguousFlagMatch |
 
-只有 Correct 获得 `ControlPointsPerInterval`（非负，Competition 默认、题覆盖）。不补跑意味着缺失 poll 没有事件/分数。Ban Team 的事实被投影排除。
+只有有效 Controlled 观察获得 `ControlPointsPerInterval`（非负，Competition 默认、题覆盖）。无法确定时不延续上一次控制收益，保留失败原因。未发生的观察不产生事实或分数，封禁队伍的事实不参与收益。
 
 ## 排名
 

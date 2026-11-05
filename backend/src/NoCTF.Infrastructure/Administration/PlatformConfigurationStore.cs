@@ -18,7 +18,7 @@ public sealed class PlatformConfigurationStore(
     IFusionCacheProvider? cacheProvider = null,
     IPostCommitMessagePublisher? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null)
-    : IPlatformConfigurationStore, IExperimentalFeatureReader
+    : IPlatformConfigurationStore
 {
     private const short SettingsId = 1;
     private const string CacheKey = "platform-configuration";
@@ -39,9 +39,6 @@ public sealed class PlatformConfigurationStore(
         return view with {LiveSoloVideo=await NoCTF.Infrastructure.LiveSolo.Media.LiveSoloVideoConfigurationReader.ReadAsync(db,ct)};
     }
 
-    public async Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken ct) =>
-        (await GetAsync(ct)).CtfPatchVerificationEnabled;
-
     public async Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
@@ -55,19 +52,6 @@ public sealed class PlatformConfigurationStore(
         settings.Name = name;
         settings.Description = description;
         if (publicBaseUrl is not null) settings.PublicBaseUrl = publicBaseUrl;
-        settings.UpdatedAt = now;
-        return await SaveAsync(settings, ct);
-    }
-
-    public async Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
-        bool ctfPatchVerificationEnabled,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
-            candidate => candidate.Id == SettingsId,
-            ct);
-        settings.CtfPatchVerificationEnabled = ctfPatchVerificationEnabled;
         settings.UpdatedAt = now;
         return await SaveAsync(settings, ct);
     }
@@ -139,13 +123,13 @@ public sealed class PlatformConfigurationStore(
             settings.Description,
             settings.LogoFileId,
             settings.UpdatedAt,
-            settings.CtfPatchVerificationEnabled,new(settings.LiveSoloVideoMaximumWidth,settings.LiveSoloVideoMaximumHeight,
+            new(settings.LiveSoloVideoMaximumWidth,settings.LiveSoloVideoMaximumHeight,
                 settings.LiveSoloVideoMaximumFramesPerSecond,settings.LiveSoloVideoMaximumBitrateBitsPerSecond,
                 settings.LiveSoloVideoMaximumBitrateBitsPerSecond,settings.LiveSoloVideoPolicyStamp), settings.PublicBaseUrl);
 }
 
 public sealed class NoOpPlatformConfigurationStore
-    : IPlatformConfigurationStore, IExperimentalFeatureReader
+    : IPlatformConfigurationStore
 {
     private static readonly PlatformConfigurationView Default =
         new("NoCTF", null, null, DateTimeOffset.UnixEpoch);
@@ -153,8 +137,6 @@ public sealed class NoOpPlatformConfigurationStore
     public Task<PlatformConfigurationView> GetAsync(CancellationToken cancellationToken) =>
         Task.FromResult(Default);
 
-    public Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(false);
     public Task<PlatformConfigurationView> UpdateLiveSoloVideoAsync(int width,int height,int framesPerSecond,int bitrateBitsPerSecond,DateTimeOffset now,CancellationToken ct)=>
         Task.FromResult(Default with {LiveSoloVideo=new(width,height,framesPerSecond,bitrateBitsPerSecond,bitrateBitsPerSecond,Guid.NewGuid()),UpdatedAt=now});
 
@@ -169,16 +151,6 @@ public sealed class NoOpPlatformConfigurationStore
             PublicBaseUrl = publicBaseUrl ?? Default.PublicBaseUrl,
             Name = name,
             Description = description,
-            UpdatedAt = now
-        });
-
-    public Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
-        bool ctfPatchVerificationEnabled,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(Default with
-        {
-            CtfPatchVerificationEnabled = ctfPatchVerificationEnabled,
             UpdatedAt = now
         });
 

@@ -1,6 +1,6 @@
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
-import { markRaw, toRefs, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { markRaw, toRefs, ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { watchCompetition } from '../../../composables/useCompetitionHub'
 
 import { listRuntimeTargetsEndpoint } from '../../../api'
@@ -10,6 +10,7 @@ import AwdPublicRulesComponent from '../awd/AwdPublicRules.vue'
 import AwdAttackInfoComponent from '../awd/AwdAttackInfo.vue'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
+import PersistentFixSubmitComponent from '../PersistentFixSubmit.vue'
 
 /** Owns state, effects and commands for AwdPanel. */
 export function useAwdPanel(props: Readonly<{
@@ -85,7 +86,9 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
       FlagSubmit,
       AwdPublicRules: markRaw(AwdPublicRulesComponent),
       RuntimeAccessUrl,
-      RuntimeCard
+      RuntimeCard,
+      PersistentFixSubmit: markRaw(PersistentFixSubmitComponent),
+      persistentFixAction: computed(() => props.challenge.availableActions?.find(action => action.kind === 'SubmitFix'))
     }
 }
 

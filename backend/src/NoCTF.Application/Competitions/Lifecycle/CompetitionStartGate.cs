@@ -41,8 +41,7 @@ public enum StartGateFailureCode
     ChallengeRulesInvalid,
     RuntimeDefinitionInvalid,
     TrackConfigurationInvalid,
-    TeamTrackInvalid,
-    ExperimentalFeatureDisabled
+    TeamTrackInvalid
 }
 
 public sealed record StartGateError(
@@ -60,8 +59,7 @@ public interface ICompetitionStartGateStore
 public sealed class CompetitionStartGate(
     ICompetitionStartGateStore store,
     ICompetitionConfigurationValidator competitionConfigurations,
-    IChallengeConfigurationCatalog challengeConfigurations,
-    IExperimentalFeatureReader? experimentalFeatures = null)
+    IChallengeConfigurationCatalog challengeConfigurations)
 {
     public async Task<IReadOnlyList<StartGateError>?> ValidateAsync(
         Guid competitionId,
@@ -79,18 +77,6 @@ public sealed class CompetitionStartGate(
                 StartGateFailureCode.CompetitionNotPublished,
                 null,
                 "The competition must be Published before it can start."));
-        var hasPatchVerification = snapshot.Mode == GameMode.Ctf
-            && snapshot.Challenges.Any(challenge => challenge.Published
-                && challenge.Definition is CtfChallengeDefinition
-                    { InteractionKind: CtfInteractionKind.PatchVerification });
-        if (hasPatchVerification
-            && !(await IsPatchVerificationEnabledAsync(ct)))
-        {
-            errors.Add(new(
-                StartGateFailureCode.ExperimentalFeatureDisabled,
-                null,
-                "CTF PatchVerification is disabled in platform settings."));
-        }
         var publishedChallengeConfigurations = startChallenges
             .Select(challenge => new ChallengeConfigurationSections(
                 NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(challenge.Rules, challenge.ScorePreset),
@@ -168,9 +154,10 @@ public sealed class CompetitionStartGate(
                     $"Challenge mode {challenge.ChallengeMode} does not match competition mode {snapshot.Mode}."));
                 continue;
             }
-            foreach (var message in challengeConfigurations.ValidateRules(
+            foreach (var message in challengeConfigurations.ValidateRulesForDefinition(
                          snapshot.Mode,
                          NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(challenge.Rules, challenge.ScorePreset),
+                         challenge.Definition,
                          snapshot.Configuration,
                          snapshot.ApprovedTeamCount))
                 errors.Add(new(
@@ -196,7 +183,4 @@ public sealed class CompetitionStartGate(
             .ToArray();
     }
 
-    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
 }

@@ -13,7 +13,7 @@ function runtime(
 
 describe('admin runtime team presentation', () => {
   test('shows the bound team for an AWDP attack runtime', () => {
-    expect(adminRuntimeTeamLabel(runtime('AwdpAttack', {
+    expect(adminRuntimeTeamLabel(runtime('AttackTarget', {
       teamId: 'team-1',
       sourceTeamId: 'team-1',
       sourceTeamName: 'TEST TEAM1',
@@ -21,13 +21,13 @@ describe('admin runtime team presentation', () => {
   })
 
   test('labels an AWDP target as one-time verification and includes attribution when available', () => {
-    expect(adminRuntimeTeamLabel(runtime('AwdpTarget', {
+    expect(adminRuntimeTeamLabel(runtime('FixTarget', {
       teamId: null,
       sourceTeamId: 'team-1',
       sourceTeamName: 'TEST TEAM1',
     }), t)).toBe('一次性 Fix 验证 Target · TEST TEAM1')
 
-    expect(adminRuntimeTeamLabel(runtime('AwdpTarget', {
+    expect(adminRuntimeTeamLabel(runtime('FixTarget', {
       teamId: null,
       sourceTeamId: null,
       sourceTeamName: null,
@@ -42,6 +42,12 @@ describe('admin runtime team presentation', () => {
     }), t)).toBe('共享')
   })
 
+  test('attributes a scoped Fix target to its source team', () => {
+    expect(adminRuntimeTeamLabel(runtime('ScopedFixTarget', {
+      teamId: null, sourceTeamId: 'team-1', sourceTeamName: 'Scoped team',
+    }), t)).toBe('一次性 Fix 验证 Target · Scoped team')
+  })
+
   test('labels challenge-template test runtimes without inventing a team', () => {
     expect(adminRuntimeTeamLabel(runtime('TemplateTest', {
       teamId: null,
@@ -51,10 +57,10 @@ describe('admin runtime team presentation', () => {
   })
 
   test('never mislabels an unbound AWDP attack runtime as shared', () => {
-    expect(adminRuntimeTeamLabel(runtime('AwdpAttack', {
+    expect(adminRuntimeTeamLabel(runtime('AttackTarget', {
       teamId: null,
       sourceTeamId: null,
       sourceTeamName: null,
-    }), t)).toBe('未绑定队伍的 AWDP 攻击环境')
+    }), t)).toBe('未绑定队伍的攻击环境')
   })
 })

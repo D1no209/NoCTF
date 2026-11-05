@@ -70,7 +70,7 @@ public sealed class ManualAdjustmentLeaderboardInvalidationPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = actorId,

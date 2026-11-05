@@ -25,7 +25,7 @@ public sealed class SignalRPublisherTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             GameplayFactState.Completed,
             GameplayFactResult.Correct,
             null,
@@ -40,7 +40,7 @@ public sealed class SignalRPublisherTests
             Arg.Is<GameplayFactStatusResponse>(notification =>
                 notification != null
                 && notification.GameplayFactId == view.GameplayFactId
-                && notification.Kind == GameplayFactKindProtocol.FlagAttempt
+                && notification.Kind == GameplayFactKindProtocol.BreakAttempt
                 && notification.State == GameplayFactStateProtocol.Completed
                 && notification.Result == GameplayFactResultProtocol.Correct),
             CancellationToken.None);

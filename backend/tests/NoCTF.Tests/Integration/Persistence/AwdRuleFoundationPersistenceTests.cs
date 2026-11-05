@@ -20,7 +20,7 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class AwdRuleFoundationPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public async Task MigrationPreservesAwdpAndRoundPoliciesUseRealRelationalConstraints(CancellationToken ct)
+    public async Task BaselinePreservesAwdpAndRoundPoliciesUseRealRelationalConstraints(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -30,10 +30,7 @@ public sealed class AwdRuleFoundationPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString(), provider => provider.MigrationsAssembly("NoCTF.Persistence.PostgreSql"))
                 .UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            var migrations = db.Database.GetMigrations().ToArray();
-            var index = Array.FindIndex(migrations, name => name.EndsWith("_AwdRuleFoundations", StringComparison.Ordinal));
-            await Assert.That(index).IsGreaterThan(0);
-            await db.GetService<IMigrator>().MigrateAsync(migrations[index - 1], ct);
+            await db.Database.MigrateAsync(ct);
             var now = DateTimeOffset.UtcNow;
             var user = new User { Id = Guid.NewGuid(), UserName = "awd-foundation", Email = "awd-foundation@example.test", PasswordHash = "unused", CreatedAt = now };
             db.Users.Add(user);
@@ -56,14 +53,16 @@ public sealed class AwdRuleFoundationPersistenceTests
                 Id = Guid.NewGuid(), OwnerId = user.Id, Title = "AWD", StartAt = now, EndAt = now.AddHours(1), CreatedAt = now, UpdatedAt = now
             };
             awd.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(GameMode.Awd, awd.Id);
-            var template = new AwdChallenge
+            var template = new Challenge
             {
                 Id = Guid.NewGuid(), OwnerId = user.Id, Title = "Service", CreatedAt = now, UpdatedAt = now
             };
             var storeId = Guid.NewGuid();
-            template.Definition = new AwdChallengeDefinition
+            template.Definition = new ChallengeDefinition
             {
-                FlagStores = [new() { Id = storeId, Name = "orders", Position = 0 }]
+                Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = "challenge:test" }] },
+                Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
+                { FlagStores = [new() { Id = storeId, Name = "orders", Position = 0, TargetServiceName = "main" }] }]
             };
             var challenge = new AwdCompetitionChallenge
             {

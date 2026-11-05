@@ -6,6 +6,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
@@ -74,7 +75,7 @@ public sealed class RuntimeInstanceStore(
                 && instance.ActiveSlot != null
                 && (instance.Purpose == RuntimePurpose.Player
                     || instance.Purpose == RuntimePurpose.Practice
-                    || instance.Purpose == RuntimePurpose.AwdpAttack)
+                    || instance.Purpose == RuntimePurpose.AttackTarget)
                 && (instance.State == RuntimeState.Queued
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running
@@ -148,7 +149,7 @@ public sealed class RuntimeInstanceStore(
         var purpose = scope.Status == CompetitionStatus.Finished
             ? RuntimePurpose.Practice
             : scope.Mode == GameMode.Awdp
-                ? RuntimePurpose.AwdpAttack
+                ? RuntimePurpose.AttackTarget
                 : RuntimePurpose.Player;
         var runtime = await db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(instance =>
@@ -255,6 +256,10 @@ public sealed class RuntimeInstanceStore(
             .FirstOrDefaultAsync(ct);
 
         RuntimeInstance entity;
+        if (current is not null && command.Action is (RuntimeAction.Reset or RuntimeAction.Stop)
+            && await db.GameplayFacts.AnyAsync(fact => fact.FixExecution != null && fact.FixExecution.RuntimeInstanceId == current.Id
+                && (fact.State == GameplayFactState.Pending || fact.State == GameplayFactState.Processing), ct))
+            return new(null, RuntimeMutationFailure.Conflict);
         switch (command.Action)
         {
             case RuntimeAction.Start:
@@ -435,7 +440,7 @@ public sealed class RuntimeInstanceStore(
         RuntimeMutationCommand command,
         CancellationToken cancellationToken)
     {
-        var template = templates.Get(scope.Definition)
+        var template = templates.Get(scope.Definition, scope.Rules)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
         if (PurposeFor(scope) == RuntimePurpose.Practice
             && template.RuntimeKind is not RuntimeKind.Container)
@@ -515,8 +520,9 @@ public sealed class RuntimeInstanceStore(
                     configuration.CompetitionId == item.Competition.Id)
                 && db.Set<AwdpCompetitionChallengeRules>().Any(rules =>
                     rules.CompetitionChallengeId == item.Challenge.Id)
-                && db.Set<AwdpChallengeDefinition>().Any(definition =>
-                    definition.ChallengeId == item.Template.Id)))
+                && db.Set<ChallengeDefinition>().Any(definition =>
+                    definition.ChallengeId == item.Template.Id
+                    && definition.Capabilities.Any(capability => capability.Kind == NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind.Break))))
             .SingleOrDefaultAsync(ct);
 
     private async Task<RuntimeScope?> ResolveScopeAsync(
@@ -590,13 +596,13 @@ public sealed class RuntimeInstanceStore(
         scope.Status == CompetitionStatus.Finished
             ? RuntimePurpose.Practice
             : scope.Mode == GameMode.Awdp
-                ? RuntimePurpose.AwdpAttack
+                ? RuntimePurpose.AttackTarget
                 : RuntimePurpose.Player;
 
     private static bool IsValidAwdpConfiguration(RuntimeScope scope) =>
         scope.CompetitionConfiguration is AwdpCompetitionModeConfiguration
         && scope.Rules is AwdpCompetitionChallengeRules
-        && scope.Definition is AwdpChallengeDefinition;
+        && scope.Definition?.Break is not null;
 
     private static bool CanReset(RuntimeInstance instance) =>
         instance.State is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running;

@@ -17,7 +17,7 @@ public sealed class AwdCheckAdjudicationStore(NoCtfDbContext db, ICompetitionEve
     public async Task<AwdCheckListView> ListAsync(AwdCheckListQuery request, CancellationToken ct)
     {
         var query = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == request.CompetitionId
-                && fact.Kind == GameplayFactKind.AwdServiceTransition && fact.CompetitionChallengeId != null && fact.Awd != null && fact.TeamId != null
+                && fact.Kind == GameplayFactKind.CheckObservation && fact.CompetitionChallengeId != null && fact.Awd != null && fact.TeamId != null
                 && (request.Settlement == null || fact.Awd.Settlement == request.Settlement)
                 && (request.TeamId == null || fact.TeamId == request.TeamId)
                 && (request.CompetitionChallengeId == null || fact.CompetitionChallengeId == request.CompetitionChallengeId))
@@ -85,7 +85,7 @@ public sealed class AwdCheckAdjudicationStore(NoCtfDbContext db, ICompetitionEve
     private IQueryable<GameplayFact> Query(Guid competitionId, Guid gameplayFactId) =>
         db.GameplayFacts.Include(fact => fact.Awd).ThenInclude(evidence => evidence!.Flags)
             .Where(fact => fact.CompetitionId == competitionId && fact.Id == gameplayFactId
-                && fact.Kind == GameplayFactKind.AwdServiceTransition && fact.CompetitionChallengeId != null && fact.Awd != null
+                && fact.Kind == GameplayFactKind.CheckObservation && fact.CompetitionChallengeId != null && fact.Awd != null
                 && fact.TeamId != null && fact.ReferenceId != null);
 
     private static AwdCheckEvidenceView View(GameplayFact fact) => new(fact.Id,

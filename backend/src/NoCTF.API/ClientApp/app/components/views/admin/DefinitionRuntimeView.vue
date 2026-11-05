@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlExposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings, egressPolicyOptions, onUpdateModelValueRuntimeEgressPolicy } = toRefs(viewProps.state)
+const { bytesToMib, cpuMillicoresToCores, hasServices, kindOptions, switchKind, exposureOptions, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeUrlBindings, egressPolicyOptions, onUpdateModelValueRuntimeEgressPolicy } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -13,7 +13,7 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
         <FieldLabel>{{ $t('runtime.label.operatingEnvironmentType') }}</FieldLabel>
         <Select
           :model-value="runtime.definition.kind"
-          :disabled="disabled || mode === 'Awdp'"
+          :disabled="disabled"
           @update:model-value="switchKind(String($event))"
         >
           <SelectTrigger class="w-full">
@@ -28,9 +28,6 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
           </SelectContent>
         </Select>
       </Field>
-      <Badge variant="secondary" class="mb-1 h-8 px-3">
-        {{ runtime.allocation === 'Shared' ? $t('common.label.share') : $t('runtime.label.teamIndependent') }}
-      </Badge>
     </div>
 
     <Field>
@@ -50,27 +47,11 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
       <FieldDescription>{{ $t('runtime.description.egressPolicy') }}</FieldDescription>
     </Field>
 
-    <Field v-if="showDynamicFlagInjection" orientation="horizontal">
-      <Switch
-        id="ctf-dynamic-flag-injection"
-        :model-value="dynamicFlagInjection"
-        :disabled="disabled"
-        @update:model-value="setDynamicFlagInjection($event === true)"
-      />
-      <div>
-        <FieldLabel for="ctf-dynamic-flag-injection" class="font-normal">
-          {{ $t('runtime.label.dynamicFlagInjection') }}
-        </FieldLabel>
-      </div>
-    </Field>
-
     <component :is="DefinitionContainer"
       v-if="runtime.definition.kind === 'container'"
       :definition="runtime.definition"
       :model="model"
-      :single-service-only="singleServiceOnly"
-      :mode="mode"
-      :flag-source="runtime.flagSource"
+      :single-service-only="false"
       :disabled="disabled"
     />
     <DefinitionSection v-else :title="$t('runtime.label.operatingEnvironmentType')" :collapsible="false">
@@ -85,21 +66,6 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
     </DefinitionSection>
 
     <DefinitionSection :title="$t('runtime.label.accessEntrance')" :collapsible="false" accent-title>
-      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp' && mode !== 'LiveSolo'">
-        <FieldLabel>{{ $t('runtime.label.flagSource') }}</FieldLabel>
-        <Select
-          :model-value="runtime.flagSource"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueRuntimeFlagSource"
-        >
-          <SelectTrigger class="w-full sm:max-w-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
       <Field>
         <component :is="UrlBindingList"
           :model-value="runtime.urlBindings"
@@ -108,18 +74,6 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
           :service-names="serviceNames"
           :disabled="disabled"
           @update:model-value="onUpdateModelValueRuntimeUrlBindings"
-        />
-      </Field>
-      <Field v-if="mode === 'Koh'">
-        <FieldLabel>{{ $t('runtime.label.controlCheckEntry') }}</FieldLabel>
-        <component :is="UrlBindingList"
-          v-model="controlBindingList"
-          :exposure-options="controlExposureOptions"
-          :show-service-name="hasServices"
-          :service-names="serviceNames"
-          :add-label="$t('runtime.definitionRuntime.label.setControlCheckEntry')"
-          :allow-custom-display="false"
-          :disabled="disabled"
         />
       </Field>
     </DefinitionSection>
@@ -155,17 +109,6 @@ const { bytesToMib, cpuMillicoresToCores, hasServices, showDynamicFlagInjection,
             :placeholder="$t('runtime.resources.pidPlaceholder')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeLimitsPidsLimit"
-          />
-        </Field>
-        <Field>
-          <FieldLabel>{{ $t('runtime.label.instanceSurvivalTimeSeconds') }}</FieldLabel>
-          <NullableNumberInput
-            :model-value="runtime.ttlSeconds"
-            :min="1"
-            :max="604800"
-            :placeholder="$t('runtime.defaults.lifetimeSeconds')"
-            :disabled="disabled"
-            @update:model-value="onUpdateModelValueRuntimeTtlSeconds"
           />
         </Field>
         <Field>

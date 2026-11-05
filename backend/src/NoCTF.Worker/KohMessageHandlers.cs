@@ -15,19 +15,18 @@ using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using Wolverine.Attributes;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.Worker;
 
 [NonTransactional]
 public sealed class KohPollingHandler(
     NoCtfDbContext db,
-    IKohControlClient client,
+    ObserveControl control,
     IKohProducerConfigurationCatalog configurations,
-    IChallengeRuntimeTemplateCatalog runtimeTemplates,
     TimeProvider timeProvider)
 {
-    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
-
     public async Task<RecordKohObservation?> Handle(
         PollKohChallenge message,
         CancellationToken cancellationToken)
@@ -81,27 +80,25 @@ public sealed class KohPollingHandler(
         var controlUrl = runtime is null
             ? null
             : ResolveControlUrl(
-                runtimeTemplates,
                 runtime.Template.Definition,
                 runtime.Runtime.RuntimeKind,
                 runtime.Runtime.RuntimeProvider,
                 runtime.Runtime.ProviderReceipt!);
 
-        KohControlResponse response;
-        if (controlUrl is null
-            || controlUrl.Scheme is not ("http" or "https"))
+        var definition = runtime?.Template.Definition?.Control
+            ?? await db.Set<ControlCapabilityDefinition>().AsNoTracking().SingleOrDefaultAsync(value => value.ChallengeId == target.Challenge.ChallengeId, cancellationToken);
+        if (definition is null) return null;
+        var execution = await control.ExecuteAsync(new(message.GameplayFactId, runtime?.Runtime.Id, definition,
+            controlUrl, timeProvider.GetUtcNow() + timeout), cancellationToken);
+        var outcome = execution.Value?.ToGameplayOutcome() ?? new ControlOutcome
         {
-            response = KohControlResponse.Unavailable();
-        }
-        else
-        {
-            response = await client.ObserveAsync(controlUrl, timeout, cancellationToken);
-        }
-
-        var observedAt = timeProvider.GetUtcNow();
+            GameplayFactId = message.GameplayFactId, RuntimeInstanceId = runtime?.Runtime.Id, ObservedAt = timeProvider.GetUtcNow(),
+            Result = ControlResult.Indeterminate, ExecutionState = CapabilityExecutionState.PlatformFailed, ExecutionFailure = execution.FailureCode
+        };
+        var observedAt = outcome.ObservedAt;
         var decision = await DecideAsync(
             message.CompetitionChallengeId,
-            response,
+            outcome,
             observedAt,
             cancellationToken);
         return new(
@@ -113,17 +110,17 @@ public sealed class KohPollingHandler(
             decision.FailureCode,
             message.RunningSince,
             message.DueAt,
-            observedAt);
+            observedAt,
+            outcome);
     }
 
     private static Uri? ResolveControlUrl(
-        IChallengeRuntimeTemplateCatalog templates,
         ChallengeDefinition? definition,
         RuntimeKind runtimeKind,
         RuntimeProvider provider,
         RuntimeReceipt providerReceipt)
     {
-        var binding = templates.Get(definition)?.ControlCheckUrlBinding;
+        var binding = definition?.Control;
         if (binding is null || runtimeKind != RuntimeKind.Container)
             return null;
         if (providerReceipt is not ContainerRuntimeReceipt receipt
@@ -140,28 +137,18 @@ public sealed class KohPollingHandler(
 
     private async Task<KohDecision> DecideAsync(
         Guid competitionChallengeId,
-        KohControlResponse response,
+        ControlOutcome outcome,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken)
     {
-        if (response.Kind == KohControlResponseKind.Timeout)
+        if (outcome.ExecutionFailure == CapabilityExecutionFailure.DeadlineExceeded)
             return new(null, null, GameplayFactFailureCode.ProducerTimeout);
-        if (response.Kind == KohControlResponseKind.Unavailable)
+        if (outcome.Result == ControlResult.Indeterminate)
             return new(null, null, GameplayFactFailureCode.ProducerUnavailable);
-        if (response.Body.Length is 0 or > 4096 || response.Body.Span.Contains((byte)0))
+        if (outcome.Result == ControlResult.Uncontrolled)
             return new(null, GameplayFactResult.Uncontrolled, null);
-
-        string flag;
-        try
-        {
-            flag = StrictUtf8.GetString(response.Body.Span);
-        }
-        catch (DecoderFallbackException)
-        {
-            return new(null, GameplayFactResult.Uncontrolled, null);
-        }
-
-        var hash = SHA256.HashData(response.Body.Span);
+        var flag = outcome.ControllerIdentifier ?? throw new InvalidOperationException("A controlled observation requires an identifier.");
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(flag));
         var matches = await db.ChallengeFlags.AsNoTracking()
             .Where(candidate => candidate.CompetitionChallengeId == competitionChallengeId
                 && candidate.TeamId != null
@@ -228,7 +215,14 @@ public sealed class KohObservationHandler(
             .AnyAsync(fact => fact.Id == message.GameplayFactId, cancellationToken))
             return;
 
-        db.GameplayFacts.Add(new KohControlObservationGameplayFact
+        if (message.Outcome.GameplayFactId != message.GameplayFactId || message.Outcome.ObservedAt != message.ObservedAt)
+            throw new InvalidOperationException("The control evidence does not match its observation.");
+        if (message.Outcome.RuntimeInstanceId is { } runtimeId && !await db.RuntimeInstances.AnyAsync(runtime => runtime.Id == runtimeId
+                && runtime.CompetitionId == message.CompetitionId && runtime.CompetitionChallengeId == message.CompetitionChallengeId
+                && runtime.State == RuntimeState.Running, cancellationToken))
+            return;
+
+        db.GameplayFacts.Add(new ControlObservationGameplayFact
         {
             Id = message.GameplayFactId,
             CompetitionId = message.CompetitionId,
@@ -239,6 +233,7 @@ public sealed class KohObservationHandler(
                 : GameplayFactState.Completed,
             Result = message.Result,
             FailureCode = message.FailureCode,
+            CapabilityOutcomes = [message.Outcome],
             OccurredAt = message.ObservedAt,
             UpdatedAt = timeProvider.GetUtcNow()
         });
@@ -253,7 +248,7 @@ public sealed class KohObservationHandler(
             TeamId: message.TeamId,
             CompetitionChallengeId: message.CompetitionChallengeId,
             GameplayFactId: message.GameplayFactId,
-            GameplayFactKind: GameplayFactKind.KohControlObservation,
+            GameplayFactKind: GameplayFactKind.ControlObservation,
             GameplayFactState: message.Result is null
                 ? GameplayFactState.PlatformFailed
                 : GameplayFactState.Completed,

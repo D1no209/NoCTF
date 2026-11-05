@@ -240,7 +240,7 @@ const { isAwd, AwdCheckReview, isSolo, canRejudge, soloResults, adminUserPath, a
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(s.id)">{{ $t('common.label.details') }}</Button>
-                <Button v-if="canJudge && (s.kind === 'FlagAttempt' || s.kind === 'BreakAttempt')" variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('administration.label.readFlag') }}</Button>
+                <Button v-if="canJudge && s.kind === 'BreakAttempt'" variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('administration.label.readFlag') }}</Button>
                 <Button v-if="canDownloadPatch && s.kind === 'FixAttempt'" variant="ghost" size="sm" :disabled="patchDownloading.has(s.id ?? '')" @click="downloadPatch(s.id)">
                   <Spinner v-if="patchDownloading.has(s.id ?? '')" data-icon="inline-start" />
                   <Download v-else data-icon="inline-start" />{{ $t('administration.label.downloadPatch') }}

@@ -2,6 +2,7 @@ using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Application.Challenges.Capabilities;
 
 namespace NoCTF.Tests.Unit.Runner;
 
@@ -17,14 +18,14 @@ public sealed class AwdpFixVerificationRecoveryTests
         var deadline = DateTimeOffset.UtcNow.AddMinutes(2);
         const string runnerId = "runner-a";
 
-        var message = new RunAwdpFixVerification(
+        var message = new RunFixExecution(
             factId,
             challengeId,
             patchId,
             runtimeId,
             deadline,
             runnerId);
-        var fence = new AwdpFixExecutionFenceRequest(
+        var fence = new FixExecutionFenceRequest(
             factId,
             challengeId,
             patchId,
@@ -43,7 +44,7 @@ public sealed class AwdpFixVerificationRecoveryTests
         var factId = Guid.CreateVersion7();
         var runtimeId = Guid.CreateVersion7();
         var cleanedAt = DateTimeOffset.UtcNow;
-        var completion = new CompleteAwdpFixRecovery(
+        var completion = new RecoverFixExecution(
             factId,
             runtimeId,
             "runner-a",

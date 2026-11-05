@@ -1,7 +1,4 @@
-import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
-import {
-  applyCtfInteraction,
-} from '../../utils/game-config'
+import type { DefinitionModel } from '../../utils/game-config'
 
 function cloneDefinition(value: DefinitionModel): DefinitionModel {
   // DefinitionModel 是 JSON 数据；序列化可读取任意层级的响应式代理并保留独立副本。
@@ -18,41 +15,25 @@ export function mergeChallengeRuntimeDefinition(
   return merged
 }
 
-/** Replaces mode-owned fields while retaining the last persisted Runtime. */
-export function mergeChallengeModeDefinition(
-  persistedMode: GameModeValue,
+/** Replaces capability fields while retaining the last persisted Runtime. */
+export function mergeChallengeCapabilityDefinition(
   persistedDefinition: DefinitionModel,
-  draftMode: GameModeValue,
   draft: DefinitionModel,
 ): DefinitionModel {
   const savedDraft = cloneDefinition(draft)
-  if (draftMode !== persistedMode)
-    return savedDraft
-
-  const persisted = cloneDefinition(persistedDefinition)
-  persisted.interactionKind = savedDraft.interactionKind
-  persisted.checker = savedDraft.checker
-  persisted.checkerJob = savedDraft.checkerJob
-  persisted.awdFlagStores = savedDraft.awdFlagStores
-  persisted.flagInjection = savedDraft.flagInjection
-  persisted.flagTemplate = savedDraft.flagTemplate
-  persisted.patchEntrypoint = savedDraft.patchEntrypoint
-  persisted.patchCommand = savedDraft.patchCommand
-  persisted.patchTimeoutSeconds = savedDraft.patchTimeoutSeconds
-  persisted.readyTimeoutSeconds = savedDraft.readyTimeoutSeconds
-  persisted.maximumPatchUploadBytes = savedDraft.maximumPatchUploadBytes
-  persisted.checkerFixInput = savedDraft.checkerFixInput
-  if (draftMode === 'Ctf')
-    applyCtfInteraction(persisted, savedDraft.interactionKind)
-  return persisted
+  savedDraft.runtime = cloneDefinition(persistedDefinition).runtime
+  return savedDraft
 }
 
 export function challengeRuntimeDefinitionsEqual(
-  _mode: GameModeValue,
   left: DefinitionModel,
   right: DefinitionModel,
 ): boolean {
   return deepEqual(left.runtime, right.runtime)
+}
+
+export function challengeCapabilityDefinitionsEqual(left: DefinitionModel, right: DefinitionModel): boolean {
+  return deepEqual({ ...left, runtime: null }, { ...right, runtime: null })
 }
 
 function deepEqual(left: unknown, right: unknown): boolean {

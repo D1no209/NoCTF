@@ -199,15 +199,6 @@ internal sealed class LiveSoloQuestionGroupItemConfiguration : IEntityTypeConfig
         builder.HasOne<CompetitionChallenge>().WithMany().HasForeignKey(x => x.CompetitionChallengeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
-internal sealed class LiveSoloChallengeSourceConfiguration : IEntityTypeConfiguration<LiveSoloChallengeSource>
-{
-    public void Configure(EntityTypeBuilder<LiveSoloChallengeSource> builder)
-    {
-        builder.ToTable("live_solo_challenge_sources"); builder.HasKey(x => x.ChallengeId);
-        builder.HasOne<Challenge>().WithOne().HasForeignKey<LiveSoloChallengeSource>(x => x.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasIndex(x => x.CanonicalChallengeId);
-    }
-}
 internal sealed class LiveSoloQuestionExposureConfiguration : IEntityTypeConfiguration<LiveSoloQuestionExposure>
 {
     public void Configure(EntityTypeBuilder<LiveSoloQuestionExposure> builder)

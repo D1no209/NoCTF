@@ -25,7 +25,7 @@ public sealed class AwdpTargetRuntimeFactoryTests
             new RuntimePlacement(RuntimeProvider.Docker, "awdp"),
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
-        await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
+        await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.FixTarget);
         await Assert.That(target.GameplayFactId).IsEqualTo(gameplayFactId);
         await Assert.That(target.TeamId).IsEqualTo(teamId);
         await Assert.That(target.State).IsEqualTo(RuntimeState.Queued);

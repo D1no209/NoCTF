@@ -14,8 +14,8 @@ public sealed class ChallengeTimingScoringTests
     {
         var team = Guid.NewGuid(); var question = Guid.NewGuid();
         var input = Input(GameMode.Awd, team, question,
-            [Fact(team, question, GameplayFactKind.AwdServiceTransition, GameplayFactResult.ServiceUp, 0),
-             Fact(team, question, GameplayFactKind.AwdServiceTransition, GameplayFactResult.ServiceDown, 70)],
+            [Fact(team, question, GameplayFactKind.CheckObservation, GameplayFactResult.ServiceUp, 0),
+             Fact(team, question, GameplayFactKind.CheckObservation, GameplayFactResult.ServiceDown, 70)],
             new(null, Start.AddSeconds(cutoff))) with { AwdRounds = [
                 new(question, team, Guid.NewGuid(), Start, Start.AddSeconds(60)),
                 new(question, team, Guid.NewGuid(), Start.AddSeconds(60), Start.AddSeconds(120))] };
@@ -49,8 +49,8 @@ public sealed class ChallengeTimingScoringTests
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var facts = new[] {
-            Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, 90),
-            Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Wrong, 91),
+            Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, 90),
+            Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, 91),
             Fact(team, challenge, GameplayFactKind.ManualAdjustment, GameplayFactResult.Applied, 92) with { Value = "25" }
         };
         var input = Input(GameMode.Ctf, team, challenge, facts, new(null, Start.AddSeconds(60)));
@@ -67,8 +67,8 @@ public sealed class ChallengeTimingScoringTests
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
         var input = Input(GameMode.Koh, team, challenge,
-            [Fact(team, challenge, GameplayFactKind.KohControlObservation, GameplayFactResult.Controlled, 59),
-             Fact(team, challenge, GameplayFactKind.KohControlObservation, GameplayFactResult.Controlled, 60)],
+            [Fact(team, challenge, GameplayFactKind.ControlObservation, GameplayFactResult.Controlled, 59),
+             Fact(team, challenge, GameplayFactKind.ControlObservation, GameplayFactResult.Controlled, 60)],
             new(null, Start.AddSeconds(60)));
         var projection = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
         var direct = new KohLeaderboardProjector().Project(input);
@@ -81,7 +81,7 @@ public sealed class ChallengeTimingScoringTests
     public async Task Late_attack_has_no_attacker_gain_or_victim_loss(GameMode mode)
     {
         var team = Guid.NewGuid(); var victim = Guid.NewGuid(); var challenge = Guid.NewGuid();
-        var kind = mode == GameMode.Awd ? GameplayFactKind.FlagAttempt : GameplayFactKind.BreakAttempt;
+        var kind = GameplayFactKind.BreakAttempt;
         var fact = Fact(team, challenge, kind, GameplayFactResult.Correct, 90) with {
             VictimTeamId = victim, ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = Guid.NewGuid()
         };

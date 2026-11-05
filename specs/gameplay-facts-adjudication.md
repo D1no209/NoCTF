@@ -4,24 +4,19 @@
 
 `GameplayFact` 同时表示客观比赛行为、当前处理状态、当前唯一结果和稳定失败原因。不存在 Submission、ScoringEvent、CurrentScoringEventId、ProcessingVersion、ClaimId、callback body hash、判定配置 revision 或判定历史表。
 
-Kind：FlagAttempt、BreakAttempt、FixAttempt、HintUnlock、ManualAdjustment、AwdServiceTransition、KohControlObservation。状态流为：
-
-```text
-Pending/Queued -> Processing -> Completed
-                         \-> PlatformFailed
-```
+能力行为使用 BreakAttempt、FixAttempt、CheckObservation、ControlObservation、QuestionnaireAttempt。提示、附件、题解和人工调分保留对应业务种类。处理依次进入 Pending 或 Queued、Processing，最终进入 Completed 或 PlatformFailed。
 
 首次平台失败保持 `Result=null`。重判开始只把 State 设为 Queued，旧 Result 继续供排行榜使用；成功时覆盖 Result/FailureCode，平台失败时保留已有 Result 并把 FailureCode 更新为最新平台原因。不复制事实，也不保留旧判定。
 
-Flag 与 Break 保存原文 `Value` 和 32-byte SHA-256。Fix、Hint、AWD Round 通过同时为空或同时存在的 `(ReferenceKind, ReferenceId)` 关联；多态目标由 Application/Infrastructure 在事务内验证。
+Break 保存 Flag 原文 `Value` 和 32-byte SHA-256。Fix、Hint、AWD Round 通过同时为空或同时存在的 `(ReferenceKind, ReferenceId)` 关联；多态目标由 Application/Infrastructure 在事务内验证。每项能力的当前结果按事实及能力种类唯一保存，关系型证据与比赛判定一致更新。
 
 ManualAdjustment 由管理员创建即为 Completed/Applied，Value 是非零 canonical signed Int32。AWD 每次 Checker 执行先创建独立事实，健康和不健康分别收敛为 ServiceUp/ServiceDown；当前状态取 `(OccurredAt, Id)` 最大的已完成事实。KoH 每次完成的轮询都创建事实，Producer/Timeout/Ambiguous 记为 PlatformFailed。
 
 ## 接入与尝试
 
-Flag、Break、Hint 先创建事实并通过 Wolverine Outbox 发布 `EvaluateGameplayFact(GameplayFactId)`。AWDP Fix 可在一次性 Target 为 Queued、Provisioning 或 Running 时，由唯一一次 Patch 上传创建 Pending FixAttempt；Target Running 后 Worker 将其推进为 Processing 并发布 `RunAwdpFixVerification`。消息和内部 JWT 不携带事实处理版本或 callback hash。批量领取按 `(TeamId, CompetitionChallengeId, Kind)` 和 `(OccurredAt, Id)`，使用短事务及 `FOR UPDATE SKIP LOCKED`；PlatformFailed 是否消耗尝试沿用各模式规则。
+Break、Hint 先创建事实，事务提交后通过 IPostCommitMessagePublisher 发布评测消息。AWDP 和 LiveSolo 修补在独立目标绑定上传及 FixAttempt，随后执行 Fix 和 Check；AWD 可将修补应用到本队持久 Runtime。待处理状态由恢复扫描重新分发，消费者检查当前事实状态、目标 UUID 和执行身份。准入使用并发标识、唯一约束及 Serializable 事务；PlatformFailed 是否消耗尝试由调用方规则决定。
 
-Fix 事务在同一个按 Team/题/Kind 串行的临界区内验证 Competition、CompetitionChallenge、Team、一次性 AwdpTarget 与上传者，锁定 Target/File，并创建相互绑定的 PatchUpload、FixAttempt 和 Outbox。RuntimeInstance 与 PatchUpload 的部分唯一索引、Target 上的 GameplayFactId 共同保证一个 Target 只能消费一次；PatchUpload 不保存 ConsumedAt，消费事实由 GameplayFact Reference 与 Target 绑定共同确定。
+Fix 受理事务验证比赛、题目、队伍、目标、上传者和不可变 File，创建相互绑定的 PatchUpload 与 FixAttempt。独立验证目标只能被一次正式尝试消费。持久目标通过执行详情及资源协调阻止冲突修改，失败后的部分外部修改保留；不确定执行先确认终止状态，再恢复操作。重投不会自动再次执行修补包。
 
 ## 重判与作弊事件
 
@@ -31,14 +26,14 @@ ForeignTeamFlagDetected 作弊事件直接以 GameplayFactId 为身份；Confirm
 
 ## API 可见性
 
-玩家查询 `/competitions/{competitionId}/gameplay-facts` 及单项状态，只能读取自己 Team 的 FlagAttempt、BreakAttempt、FixAttempt、HintUnlock，且不返回 Value。系统事实、管理员事实及其他队事实不可见。
+玩家查询 `/competitions/{competitionId}/gameplay-facts` 及单项状态，只能读取自己 Team 的 BreakAttempt、FixAttempt、HintUnlock，且不返回 Value。系统事实、管理员事实及其他队事实不可见。独立 QuestionnaireAttempt 通过真实 Assignment 关联活动及试卷，不填写比赛或队伍身份，不进入比赛查询和成绩。
 
 管理路由统一位于 `/admin/competitions/{competitionId}/gameplay-facts`，支持 Challenge、Team、VictimTeam、Actor、Kind、State、Result、FailureCode、时间、Value 精确匹配和 Reference 筛选；排序固定为 `(OccurredAt desc, Id desc)` 的 signed keyset pagination。
 
 ## 历史差异预览
 
 工作人员可按 signed keyset cursor 读取有界、只读的裁决预览。CTF 分析当前正式比赛窗口内的
-FlagAttempt 与 PatchVerification FixAttempt；AWDP 保留 BreakAttempt 的历史
+BreakAttempt；AWDP 保留 BreakAttempt 的历史
 Duplicate / DuplicateAchievement 异常识别。其他赛制不在此预览范围内。
 
 事实、资格和事件在同一 RepeatableRead 快照读取。每次最多扫描 500 条事实，每条事实保留

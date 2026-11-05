@@ -89,11 +89,11 @@ public sealed class MfaPersistenceTests
         var primary = new AuthenticationContext(AuthenticationMethod.Password, clock.GetUtcNow());
         var local = primary with { MfaSource = MfaSource.Totp, MfaAuthenticatedAt = clock.GetUtcNow(), CredentialId = credential.Id };
         var navigation = new NavigationCapabilitiesReader(db);
-        await Assert.That(await navigation.ReadAsync(ordinary.Id, ct)).IsEqualTo(new NavigationCapabilities(false, false));
-        await Assert.That(await navigation.ReadAsync(owner.Id, ct)).IsEqualTo(new NavigationCapabilities(false, true));
-        await Assert.That(await navigation.ReadAsync(observer.Id, ct)).IsEqualTo(new NavigationCapabilities(false, true));
-        await Assert.That(await navigation.ReadAsync(administrator.Id, ct)).IsEqualTo(new NavigationCapabilities(true, true));
-        await Assert.That(await navigation.ReadAsync(organizer.Id, ct)).IsEqualTo(new NavigationCapabilities(true, false));
+        await Assert.That(await navigation.ReadAsync(ordinary.Id, ct)).IsEqualTo(new NavigationCapabilities(false));
+        await Assert.That(await navigation.ReadAsync(owner.Id, ct)).IsEqualTo(new NavigationCapabilities(true));
+        await Assert.That(await navigation.ReadAsync(observer.Id, ct)).IsEqualTo(new NavigationCapabilities(true));
+        await Assert.That(await navigation.ReadAsync(administrator.Id, ct)).IsEqualTo(new NavigationCapabilities(true));
+        await Assert.That(await navigation.ReadAsync(organizer.Id, ct)).IsEqualTo(new NavigationCapabilities(false));
         await Assert.That(await navigation.ReadAsync(disabled.Id, ct)).IsNull();
         await CheckAsync((ordinary.Id, primary, null), (administrator.Id, primary, null), (mandated.Id, primary, MfaFailure.NotEnrolled),
             (enrolled.Id, primary, MfaFailure.LocalMfaRequired), (enrolled.Id, local, null), (bot.Id, null, null),
@@ -109,8 +109,8 @@ public sealed class MfaPersistenceTests
             (manager.Id, primary, MfaFailure.NotEnrolled), (judge.Id, primary, MfaFailure.NotEnrolled),
             (administrator.Id, primary, MfaFailure.NotEnrolled), (organizer.Id, primary, MfaFailure.NotEnrolled), (bot.Id, null, null));
         competition.DeletedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct);
-        await Assert.That(await navigation.ReadAsync(owner.Id, ct)).IsEqualTo(new NavigationCapabilities(false, false));
-        await Assert.That(await navigation.ReadAsync(manager.Id, ct)).IsEqualTo(new NavigationCapabilities(false, false));
+        await Assert.That(await navigation.ReadAsync(owner.Id, ct)).IsEqualTo(new NavigationCapabilities(false));
+        await Assert.That(await navigation.ReadAsync(manager.Id, ct)).IsEqualTo(new NavigationCapabilities(false));
         await CheckAsync((owner.Id, primary, null), (manager.Id, primary, null), (judge.Id, primary, null));
         settings.MfaPolicy = MfaPolicy.RequireAllHumanUsers; await db.SaveChangesAsync(ct);
         await CheckAsync((ordinary.Id, primary, MfaFailure.NotEnrolled), (enrolled.Id, local, null), (bot.Id, null, null));

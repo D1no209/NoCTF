@@ -12,9 +12,11 @@ import { mockRuntimeEndpoint } from './runtime'
 import { createMockBroadcastHistory } from './broadcast-history'
 import { createMockPlatformLogHistory } from './platform-log-history'
 import { createMockLiveSolo } from './live-solo'
-import { createMockTheory } from './theory'
+import { createMockQuestionnaire } from './questionnaire'
+import { createMockCapabilityTests } from './capability-tests'
 import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
 import { validateAppealStatement } from '../app/lib/participant-form-validation'
+import { supportsCompetitionCapabilities } from '../app/features/admin/challenge-competition-placements'
 
 function shape(schema: Data | undefined, value: any, skipDiscriminator = false): any {
   if (!schema) return value
@@ -121,7 +123,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
   const notificationChanges = new Set<() => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
-  const theory = createMockTheory({ state, json, shape, responseSchema })
+  const questionnaire = createMockQuestionnaire({ state, json, shape, responseSchema })
+  const capabilityTests = createMockCapabilityTests(state, json)
   const defaultHumanVerification = () => ({
     enabled: false, runtimeEnabled: true, evaluationEnabled: true, provider: 'None', ready: false,
     capServerUrl: '', capSiteKey: '', capSecretConfigured: false,
@@ -199,7 +202,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
   function templateSummary(item: Data) {
     return {
       id: item.id,
-      mode: item.mode,
+      capabilities: item.definition.capabilities.map((capability: Data) => capability.kind),
       visibility: item.visibility,
       title: item.title,
       direction: item.direction,
@@ -301,7 +304,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (p.attachmentId && !attachment) return problem(404, '演示附件不存在 / Attachment not found')
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
-    if (competition) competition.features = { progressionEnabled: competition.mode === 'Ctf', progressionMapVisible: competition.mode === 'Ctf', hasPublishedTheory: theory.hasPublishedTheory(competition.id) }
+    if (competition) competition.features = { progressionEnabled: competition.mode === 'Ctf', progressionMapVisible: competition.mode === 'Ctf' }
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
     const awdScoringResponse = awdScoring.handle(request, route, p, body, user?.userId)
     if (awdScoringResponse) return awdScoringResponse
@@ -309,8 +312,10 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (awdCheckResponse) return awdCheckResponse
     const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
     if (liveSoloRead !== undefined) return json(shape(responseSchema(operation), liveSoloRead))
-    const theoryResponse = await theory.handle(request, route, p, body, user, operation)
-    if (theoryResponse) return theoryResponse
+    const questionnaireResponse = await questionnaire.handle(request, route, p, body, user, operation)
+    if (questionnaireResponse) return questionnaireResponse
+    const capabilityTestResponse = await capabilityTests.handle(request, route, p, body, user)
+    if (capabilityTestResponse) return capabilityTestResponse
     if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
       return problem(403, 'Mock announcement management requires staff permissions')
     let value: any
@@ -587,7 +592,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         solvedByMyTeam: competition?.mode === 'Ctf' && Boolean(myTeam && state.facts.some(fact =>
           fact.teamId === myTeam.id
           && fact.competitionChallengeId === challenge?.id
-          && fact.kind === 'FlagAttempt'
+          && fact.kind === 'BreakAttempt'
           && fact.result === 'Correct')),
       }
       else if (cleanRoute === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments') {
@@ -595,7 +600,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === challenge!.challengeId && !item.deletedAt) }
       }
       else if (route === '/admin/challenges') {
-        const templates = state.templates.filter(template => url.searchParams.get('onlyMine') !== 'true' || template.ownerId === user?.userId)
+        const required = url.searchParams.getAll('requiredCapabilities')
+        const templates = state.templates.filter(template => (url.searchParams.get('onlyMine') !== 'true' || template.ownerId === user?.userId)
+          && required.every(kind => template.definition.capabilities.some((capability: Data) => capability.kind === kind)))
         const page = list(templates, url)
         const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
         const directions = [...new Set(templates
@@ -809,17 +816,10 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
           state.settings.set('platform/human-verification', updated)
         }
         if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
-        if (body.experimentalFeatures) {
-          state.platform.experimentalFeatures = {
-            ctfPatchVerificationEnabled:
-              body.experimentalFeatures.ctfPatchVerificationEnabled === true,
-          }
-        }
         value = {
           branding: state.platform,
           humanVerification: currentHumanVerification(),
           emailVerification: state.settings.get('platform/email'),
-          experimentalFeatures: state.platform.experimentalFeatures,
         }
       }
       else if (route === '/admin/platform/human-verification/secret' && request.method === 'PUT') {
@@ -888,8 +888,49 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
           statusUrl: `/api/v1/competitions/${p.competitionId}/gameplay-facts/${gameplayFactId}`,
         }
       }
-      else if (route === '/admin/challenges' && request.method === 'POST') { value = { ...state.templates[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, createdAt: now(), updatedAt: now() }; state.templates.push(value) }
-      else if (route === '/admin/challenges/{challengeId}' && request.method === 'PATCH') { if (body.content) Object.assign(template!, body.content, { updatedAt: now() }); if (body.permissions) Object.assign(template!, body.permissions); value = template; state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction })) }
+      else if (route === '/admin/challenges/copies' && request.method === 'POST') {
+        if (!['Administrator', 'Organizer'].includes(user!.role)) return problem(403, 'Resource management permission required')
+        const source = state.templates.find(template => template.id === body.sourceChallengeId && !template.deletedAt)
+        if (!source || source.visibility !== 'Shared' && source.ownerId !== user!.userId && user!.role !== 'Administrator') return problem(404, 'Template not found')
+        const writable = source.ownerId === user!.userId || source.managerIds?.includes(user!.userId) || user!.role === 'Administrator'
+        const sourceAttachments = state.attachments.filter(attachment => attachment.challengeId === source.id && !attachment.deletedAt)
+        if (!writable && (body.copyFlags || body.copyAttachments && sourceAttachments.length)) return problem(403, 'Protected material access required')
+        const copy = structuredClone(source)
+        Object.assign(copy, { id: crypto.randomUUID(), ownerId: user!.userId, managerIds: [], visibility: 'Private',
+          canonicalChallengeId: source.canonicalChallengeId ?? source.id, activeCompetitionReferenceCount: 0, createdAt: now(), updatedAt: now() })
+        const questionnaire = copy.definition.capabilities.find((capability: Data) => capability.kind === 'Questionnaire')?.questionnaire
+        if (questionnaire) {
+          questionnaire.revisionId = crypto.randomUUID(); questionnaire.revisionNumber = 1
+          for (const question of questionnaire.questions) {
+            question.sourceId ??= question.id; question.id = crypto.randomUUID()
+            for (const option of question.options) option.id = crypto.randomUUID()
+          }
+        }
+        state.templates.push(copy)
+        if (body.copyAttachments) for (const attachment of sourceAttachments)
+          state.attachments.push({ ...attachment, id: crypto.randomUUID(), challengeId: copy.id })
+        value = { challengeId: copy.id, canonicalChallengeId: copy.canonicalChallengeId, title: copy.title,
+          attachmentCount: body.copyAttachments ? sourceAttachments.length : 0, flagCount: 0 }
+      }
+      else if (route === '/admin/challenges' && request.method === 'POST') {
+        value = { ...body, id: crypto.randomUUID(), ownerId: user!.userId, managerIds: [], createdAt: now(), updatedAt: now(),
+          capabilities: body.definition.capabilities.map((capability: Data) => capability.kind), activeCompetitionReferenceCount: 0 }
+        state.templates.push(value)
+      }
+      else if (route === '/admin/challenges/{challengeId}' && request.method === 'PATCH') {
+        if (body.content) {
+          const previous = template!.definition.capabilities.find((capability: Data) => capability.kind === 'Questionnaire')?.questionnaire
+          const next = body.content.definition?.capabilities.find((capability: Data) => capability.kind === 'Questionnaire')?.questionnaire
+          if (next && JSON.stringify(previous?.questions) !== JSON.stringify(next.questions)) {
+            next.revisionId = crypto.randomUUID(); next.revisionNumber = (previous?.revisionNumber ?? 0) + 1
+          }
+          Object.assign(template!, body.content, { updatedAt: now() })
+          template!.capabilities = template!.definition.capabilities.map((capability: Data) => capability.kind)
+        }
+        if (body.permissions) Object.assign(template!, body.permissions)
+        value = template
+        state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction }))
+      }
       else if (route === '/admin/competitions/{competitionId}/directions' && request.method === 'PUT') {
         const ids = new Set(body.items.map((item: Data) => item.id))
         if (state.challenges.some(c => c.competitionId === competition!.id && c.directionId && !ids.has(c.directionId))) return Response.json({ code: 'DirectionInUse' }, { status: 409 })
@@ -902,8 +943,10 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       }
       else if (route === '/admin/competitions/{competitionId}/challenges' && request.method === 'POST') {
         if (!validChallengeTags(body.tags ?? [])) return problem(400, 'InvalidTags')
-        const source = state.templates.find(t => t.id === body.challengeId && t.mode === competition!.mode)
-        if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
+        const source = state.templates.find(t => t.id === body.challengeId)
+        if (!source) return problem(404, '演示模板不存在 / Template not found')
+        if (!supportsCompetitionCapabilities(competition!.mode, source.definition.capabilities.map((capability: Data) => capability.kind)))
+          return problem(409, '题目缺少比赛所需能力 / Required capability is missing')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id };
         const direction = directionCatalogs.get(competition!.id)?.find(item => item.name.toLowerCase() === String(source.direction).toLowerCase())
         Object.assign(value, { directionId: direction?.id ?? null, directionIcon: direction?.icon ?? null })
@@ -976,15 +1019,15 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
           && state.facts.some(f => f.teamId === myTeam.id && f.competitionChallengeId === challenge!.id && f.result === 'Correct')
         const fact = model('GameplayFactsGameplayFactListItemResponse', {
           id: crypto.randomUUID(), competitionId: p.competitionId, competitionChallengeId: challenge!.id, teamId: myTeam.id,
-          actorUserId: user!.userId, kind: competition!.mode === 'Awdp' ? 'BreakAttempt' : 'FlagAttempt', state: 'Completed', result: duplicate ? 'Duplicate' : correct ? 'Correct' : 'Wrong', occurredAt: now(), updatedAt: now(), value: body.flag ?? body.flags?.[0],
+          actorUserId: user!.userId, kind: 'BreakAttempt', state: 'Completed', result: duplicate ? 'Duplicate' : correct ? 'Correct' : 'Wrong', occurredAt: now(), updatedAt: now(), value: body.flag ?? body.flags?.[0],
         })
         fact.gameplayFactId = fact.id
         state.facts.unshift(fact)
         const accepted = { gameplayFactId: fact.id, state: 'Completed', statusUrl: `/api/v1/competitions/${p.competitionId}/gameplay-facts/${fact.id}` }
         value = { ...accepted, items: [accepted], gameplayFacts: [accepted] }
       }
-      else if ((route.endsWith('/runtimes') && request.method === 'POST')
-        || (route.endsWith('/runtimes/{runtimeInstanceId}') && (request.method === 'DELETE' || request.method === 'PATCH'))) {
+      else if ((/\/(?:test-)?runtimes$/.test(route) && request.method === 'POST')
+        || (/\/(?:test-)?runtimes\/\{runtimeInstanceId\}$/.test(route) && (request.method === 'DELETE' || request.method === 'PATCH'))) {
         const action = request.method === 'POST' ? (body.replacesRuntimeId ? 'reset' : 'start') : request.method === 'DELETE' ? 'stop' : 'extend'
         let runtime = state.runtimes.find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id && r.state !== 'Stopped')
         if (action === 'start' || action === 'reset') {
@@ -1103,5 +1146,5 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     if (status === 204) return new Response(null, { status, headers: { 'X-NoCTF-Mock': 'true' } })
     return json(shape(responseSchema(operation, String(status)), value), status)
   }
-  return { state, handle, changes, notificationChanges, theoryChanges: theory.changes, userFor }
+  return { state, handle, changes, notificationChanges, questionnaireChanges: questionnaire.changes, userFor }
 }

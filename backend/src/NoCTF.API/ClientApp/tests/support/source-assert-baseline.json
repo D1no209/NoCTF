@@ -1,8 +1,8 @@
 {
   "note": "由 scripts/source-assert-baseline.ts 生成;棘轮只允许这些数字下降。",
-  "textAssertions": 2510,
+  "textAssertions": 2493,
   "sourceTextAssertions": {
-    "total": 1798,
+    "total": 1794,
     "files": {
       "account-upload-limits.test.ts": 6,
       "adjudication-preview-classification.test.ts": 3,
@@ -42,9 +42,9 @@
       "competition-tracks.test.ts": 101,
       "control-screen.test.ts": 54,
       "directions.test.ts": 5,
-      "flag-match-kind.test.ts": 39,
+      "flag-match-kind.test.ts": 37,
       "frontend-audit-closeout.test.ts": 5,
-      "gameplay-fact-filters.test.ts": 7,
+      "gameplay-fact-filters.test.ts": 6,
       "generated-protocol-usage.test.ts": 26,
       "home-auth-actions.test.ts": 4,
       "human-verification.test.ts": 16,
@@ -75,7 +75,7 @@
       "runtime-card.test.ts": 9,
       "runtime-operation-coordinator.test.ts": 7,
       "runtime-url.test.ts": 4,
-      "scoreboard-matrix.test.ts": 106,
+      "scoreboard-matrix.test.ts": 105,
       "scrollbar-position.test.ts": 2,
       "sdk-download.test.ts": 19,
       "sso.test.ts": 35,

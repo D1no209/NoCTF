@@ -14,7 +14,11 @@ public sealed class ActiveRuntimeSlot
         if (instance.GameplayFactId is { } gameplayFactId)
             return $"gameplay-fact:{gameplayFactId:N}";
         if (instance.ChallengeId is { } challengeId)
+        {
+            if (instance.TemplateTestUse == NoCTF.Domain.Challenges.Testing.TemplateTestUse.CapabilityVerification)
+                return $"template-test:{challengeId:N}:verification:{instance.Id:N}";
             return $"template-test:{challengeId:N}";
+        }
         if (instance.CompetitionChallengeId is not { } competitionChallengeId)
             throw new InvalidOperationException(
                 $"Runtime {instance.Id} has no scope from which to build an active slot.");

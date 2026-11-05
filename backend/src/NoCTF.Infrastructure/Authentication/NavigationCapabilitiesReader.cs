@@ -11,9 +11,6 @@ public sealed class NavigationCapabilitiesReader(NoCtfDbContext db) : INavigatio
         db.Users.AsNoTracking().IgnoreAutoIncludes()
             .Where(user => user.Id == userId && user.AccountStatus == UserAccountStatus.Active)
             .Select(user => new NavigationCapabilities(
-                user.Role == UserRole.Administrator || user.Role == UserRole.Organizer
-                    || db.TheoryQuestions.Any(question => question.OwnerId == user.Id
-                        || question.Grants.Any(grant => grant.UserId == user.Id && grant.Permission >= NoCTF.Domain.Theory.Questions.TheoryQuestionPermission.Use)),
                 user.Role == UserRole.Administrator || db.Competitions.Any(competition => competition.DeletedAt == null
                     && (competition.OwnerId == user.Id || competition.Collaborators.Any(collaborator => collaborator.UserId == user.Id)))))
             .SingleOrDefaultAsync(ct);

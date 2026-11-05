@@ -1,6 +1,5 @@
 import { date, id, model, type Data } from './schema'
 import type { createFixtures } from './data/fixtures'
-import { defaultDefinition } from '../app/utils/game-config'
 
 // Fictional local fixtures. Media connections and production operations are never simulated.
 export function createMockLiveSolo(state: ReturnType<typeof createFixtures>) {
@@ -9,7 +8,7 @@ export function createMockLiveSolo(state: ReturnType<typeof createFixtures>) {
     title: 'LiveSolo 对抗演练 · MOCK', tracksEnabled: false, posterUrl: null })
   const challenges = state.challenges.filter(row => row.competitionId === id(2)).slice(0, 4).map((row, index) => {
     const challengeId = id(3, 800 + index)
-    state.templates.push({ ...state.templates[index], id: challengeId, mode: 'LiveSolo', definition: defaultDefinition('LiveSolo') })
+    state.templates.push({ ...state.templates[index], id: challengeId, definition: structuredClone(state.templates[index]!.definition) })
     return { ...row, id: id(4, 800 + index), competitionId, challengeId,
       title: index ? row.title : 'LiveSolo — 长题名与窄屏操作区域验证 / Long challenge title for layout checks' }
   })

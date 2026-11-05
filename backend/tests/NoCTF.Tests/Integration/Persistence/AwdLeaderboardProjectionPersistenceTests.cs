@@ -75,7 +75,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             foreach (var round in rounds)
             {
                 var id = Guid.NewGuid();
-                db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
+                db.GameplayFacts.Add(new CheckObservationGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
                     CompetitionChallengeId = fixture.CompetitionChallenge.Id, TeamId = fixture.Team.Id,
                     ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = round.Id,
                     OccurredAt = round.EndsAt.AddSeconds(-30), UpdatedAt = round.EndsAt.AddSeconds(-5),
@@ -104,7 +104,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
             foreach (var attacker in attackers)
             {
                 var id = Guid.NewGuid();
-                db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
+                db.GameplayFacts.Add(new CheckObservationGameplayFact { Id = id, CompetitionId = fixture.Competition.Id,
                     CompetitionChallengeId = fixture.CompetitionChallenge.Id, TeamId = attacker.Id,
                     ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = rounds[0].Id,
                     OccurredAt = start.AddSeconds(30), UpdatedAt = start.AddSeconds(55),
@@ -139,7 +139,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 {
                     var factId = Guid.NewGuid();
                     var received = start.AddMinutes(2).AddSeconds(10 + ordinal);
-                    db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = factId, CompetitionId = fixture.Competition.Id,
+                    db.GameplayFacts.Add(new BreakAttemptGameplayFact { Id = factId, CompetitionId = fixture.Competition.Id,
                         CompetitionChallengeId = fixture.CompetitionChallenge.Id, TeamId = attacker.Id, VictimTeamId = fixture.Team.Id,
                         OccurredAt = received, UpdatedAt = received, State = GameplayFactState.Completed, Result = GameplayFactResult.Correct,
                         ReferenceKind = GameplayFactReferenceKind.AwdRound, ReferenceId = rounds[0].Id,
@@ -196,7 +196,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
             await Assert.That((await governance.ApplyAsync(candidate with { Now = now.AddMinutes(2) }, preview.Token, ct)).Failure)
                 .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
-            var check = await db.GameplayFacts.FirstAsync(x => x.Kind == GameplayFactKind.AwdServiceTransition, ct);
+            var check = await db.GameplayFacts.FirstAsync(x => x.Kind == GameplayFactKind.CheckObservation, ct);
             check.ConcurrencyStamp = Guid.NewGuid();
             await db.SaveChangesAsync(ct);
             await Assert.That((await governance.ApplyAsync(candidate, preview.Token, ct)).Failure)

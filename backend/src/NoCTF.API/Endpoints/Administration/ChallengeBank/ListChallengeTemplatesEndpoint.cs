@@ -11,14 +11,13 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed record ChallengeTemplateSummaryResponse(
     Guid Id,
-    GameModeProtocol Mode,
+    IReadOnlyList<ChallengeCapabilityProtocol> Capabilities,
     ChallengeVisibilityProtocol Visibility,
     string Title,
     string Direction,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
-    DateTimeOffset UpdatedAt,
-    CtfInteractionKindProtocol InteractionKind)
+    DateTimeOffset UpdatedAt)
 {
     public Guid ConcurrencyStamp { get; init; }
 }
@@ -46,7 +45,7 @@ public sealed class ListChallengeTemplatesRequest : SearchRequest
     public bool OnlyMine { get; set; }
 
     [QueryParam]
-    public GameModeProtocol? Mode { get; set; }
+    public ChallengeCapabilityProtocol[] RequiredCapabilities { get; set; } = [];
 
     [QueryParam]
     public string? Direction { get; set; }
@@ -57,7 +56,8 @@ public sealed class ListChallengeTemplatesValidator : Validator<ListChallengeTem
     public ListChallengeTemplatesValidator()
     {
         PaginationRules.AddSearch(this);
-        RuleFor(request => request.Mode).IsInEnum();
+        RuleForEach(request => request.RequiredCapabilities).IsInEnum();
+        RuleFor(request => request.RequiredCapabilities).Must(values => values.Length <= 5 && values.Distinct().Count() == values.Length);
         RuleFor(request => request.Direction).MaximumLength(96);
     }
 }
@@ -71,6 +71,7 @@ public sealed class ListChallengeTemplatesEndpoint(
     {
         Get("/admin/challenges");
         AuthSchemes("Bearer");
+        Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankListTemplates"));
         Summary(summary =>
         {
@@ -93,19 +94,18 @@ public sealed class ListChallengeTemplatesEndpoint(
                 request.Limit,
                 request.Desc,
                 request.OnlyMine,
-                request.Mode is { } mode ? CompetitionProtocolMapper.ToDomain(mode) : null), ct)));
+                request.RequiredCapabilities.Select(item => (NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind)item).ToArray()), ct)));
 
     private static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
         new(page.Items.Select(item => new ChallengeTemplateSummaryResponse(
             item.Id,
-            CompetitionProtocolMapper.ToProtocol(item.Mode),
+            item.Capabilities.Select(capability => (ChallengeCapabilityProtocol)capability).ToArray(),
             ChallengeTemplateMapper.ToProtocol(item.Visibility),
             item.Title,
             item.Direction,
             item.DeletedAt,
             item.ActiveCompetitionReferenceCount,
-            item.UpdatedAt,
-            ChallengeMapper.ToProtocol(item.InteractionKind)) { ConcurrencyStamp = item.ConcurrencyStamp }).ToArray(),
+            item.UpdatedAt) { ConcurrencyStamp = item.ConcurrencyStamp }).ToArray(),
             page.Total,
             page.Directions);
 }

@@ -1,371 +1,59 @@
-using NoCTF.Application.Challenges.Configuration;
+using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Management;
-using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
 
-public class ChallengeManagementTests
+[Category("Integration")]
+public sealed class ChallengeManagementTests
 {
-    [Test]
-    public async Task Tags_are_normalized_for_create_and_update_without_turning_omission_into_clear()
+    [Test, Timeout(300_000)]
+    public async Task Normalization_partial_updates_visibility_and_soft_deletion_use_real_storage(CancellationToken ct)
     {
-        var store = new Store();
-        await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { Tags = [" Web ", "web", " SQL "] });
-        await Assert.That(store.LastTags!.SequenceEqual(["Web", "SQL"])).IsTrue();
-        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand());
-        await Assert.That(store.LastTags).IsNull();
-        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = [] });
-        await Assert.That(store.LastTags!.Count).IsEqualTo(0);
-        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = [" SQL ", "sql"] });
-        await Assert.That(store.LastTags!.SequenceEqual(["SQL"])).IsTrue();
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Running, ct);
+        var create = new CreateChallenge(fixture.Challenges, fixture.Catalog);
+        var created = await create.ExecuteAsync(new(null, fixture.CompetitionId, fixture.TemplateId, 0, fixture.Now,
+            CustomTitle: "  Custom  ", Tags: [" Web ", "web", " SQL "]), ct);
+        await Assert.That(created.Failure).IsNull(); var id = created.Challenge!.Id;
+        await Assert.That(created.Challenge.CustomTitle).IsEqualTo("Custom");
+        await Assert.That(created.Challenge.Tags).IsEquivalentTo(["Web", "SQL"]);
+        var update = new UpdateChallenge(fixture.Challenges);
+        var unchangedTags = await update.ExecuteAsync(new(fixture.CompetitionId, id, 0, false, fixture.Now.AddSeconds(1), CustomTitle: " "), ct);
+        await Assert.That(unchangedTags.Failure).IsNull();
+        await Assert.That(unchangedTags.Challenge!.Title).IsEqualTo("Reusable");
+        await Assert.That(unchangedTags.Challenge.Tags).IsEquivalentTo(["Web", "SQL"]);
+        await Assert.That(await new ListChallenges(fixture.Challenges).ExecuteAsync(fixture.CompetitionId, false, ct: ct)).IsEmpty();
+        await Assert.That((await new ListChallenges(fixture.Challenges).ExecuteAsync(fixture.CompetitionId, true, ct: ct)).Count).IsEqualTo(1);
+        var cleared = await update.ExecuteAsync(new(fixture.CompetitionId, id, 0, false, fixture.Now.AddSeconds(2), Tags: []), ct);
+        await Assert.That(cleared.Challenge!.Tags).IsEmpty();
+        var delete = new DeleteChallenge(fixture.Challenges);
+        await Assert.That(await delete.ExecuteAsync(fixture.CompetitionId, id, fixture.Now.AddSeconds(3), ct)).IsNull();
+        await Assert.That(await new GetChallenge(fixture.Challenges).ExecuteAsync(fixture.CompetitionId, id, true, ct: ct)).IsNull();
+        await Assert.That(await delete.RestoreAsync(fixture.CompetitionId, id, fixture.Now.AddSeconds(4), ct)).IsNull();
+        await Assert.That(await new GetChallenge(fixture.Challenges).ExecuteAsync(fixture.CompetitionId, id, true, ct: ct)).IsNotNull();
+        await fixture.AssertPublishedEventsAsync(ct);
     }
 
-    [Test]
-    [Arguments("blank")]
-    [Arguments("length")]
-    [Arguments("count")]
-    public async Task Invalid_tags_are_rejected_before_the_store(string invalidCase)
+    [Test, Timeout(300_000)]
+    public async Task Conflicting_identity_order_and_template_return_their_actual_failures(CancellationToken ct)
     {
-        string[] tags = invalidCase switch
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
+        var create = new CreateChallenge(fixture.Challenges, fixture.Catalog); var id = Guid.NewGuid();
+        await Assert.That((await create.ExecuteAsync(new(id, fixture.CompetitionId, fixture.TemplateId, 0, fixture.Now), ct)).Failure).IsNull();
+        await Assert.That((await create.ExecuteAsync(new(id, fixture.CompetitionId, fixture.TemplateId, 1, fixture.Now), ct)).Failure).IsEqualTo(ChallengeMutationFailure.ResourceIdConflict);
+        var other = new Challenge { Id = Guid.NewGuid(), OwnerId = fixture.OwnerId, Title = "Other", Direction = "Web",
+            Definition = new() { Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()] } };
+        fixture.Db.Challenges.Add(other); await fixture.Db.SaveChangesAsync(ct);
+        await Assert.That((await create.ExecuteAsync(new(null, fixture.CompetitionId, other.Id, 0, fixture.Now), ct)).Failure).IsEqualTo(ChallengeMutationFailure.ChallengeOrderConflict);
+        await Assert.That((await create.ExecuteAsync(new(null, fixture.CompetitionId, fixture.TemplateId, 1, fixture.Now), ct)).Failure).IsEqualTo(ChallengeMutationFailure.ChallengeTemplateConflict);
+        var count = await fixture.Db.CompetitionChallenges.CountAsync(ct);
+        foreach (var invalid in new[]
         {
-            "blank" => ["   "],
-            "length" => [new string('x', 41)],
-            _ => Enumerable.Range(0, 21).Select(index => $"tag{index}").ToArray()
-        };
-        var store = new Store();
-        var create = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand() with { Tags = tags });
-        var update = await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = tags });
-        await Assert.That(create.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTags);
-        await Assert.That(update.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTags);
-        await Assert.That(store.CreateCalls + store.MutationCalls).IsEqualTo(0);
+            new CreateCompetitionChallengeCommand(null, fixture.CompetitionId, other.Id, -1, fixture.Now),
+            new CreateCompetitionChallengeCommand(null, fixture.CompetitionId, other.Id, 2, fixture.Now, CustomTitle: new string('x', 161)),
+            new CreateCompetitionChallengeCommand(null, fixture.CompetitionId, other.Id, 2, fixture.Now, Tags: [" "])
+        }) await Assert.That((await create.ExecuteAsync(invalid, ct)).Failure).IsNotNull();
+        await Assert.That(await fixture.Db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(count);
     }
-
-    [Test]
-    [Arguments(CompetitionStatus.Running)]
-    [Arguments(CompetitionStatus.Paused)]
-    [Arguments(CompetitionStatus.Finished)]
-    public async Task CreateChallenge_AllLifecycleStatesAllowMutation(CompetitionStatus status)
-    {
-        var store = new Store { Status = status };
-
-        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
-
-        await Assert.That(result.Failure).IsNull();
-        await Assert.That(result.Challenge).IsNotNull();
-        await Assert.That(store.CreateCalls).IsEqualTo(1);
-    }
-
-    [Test]
-    [Arguments(-1)]
-    public async Task CreateChallenge_InvalidOrder_ReturnsTypedFailure(int order)
-    {
-        var store = new Store();
-
-        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { Order = order });
-
-        await Assert.That(result.Failure).IsEqualTo(ChallengeMutationFailure.InvalidOrder);
-        await Assert.That(result.Challenge).IsNull();
-        await Assert.That(store.CreateCalls).IsEqualTo(0);
-    }
-
-    [Test]
-    [Arguments(ChallengeMutationFailure.ResourceIdConflict)]
-    [Arguments(ChallengeMutationFailure.ChallengeOrderConflict)]
-    [Arguments(ChallengeMutationFailure.ChallengeTemplateConflict)]
-    public async Task CreateChallenge_Conflict_PropagatesTypedFailure(
-        ChallengeMutationFailure expectedFailure)
-    {
-        var store = new Store
-        {
-            CreateResult = new ChallengeMutationResult(null, expectedFailure)
-        };
-
-        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
-
-        await Assert.That(result.Failure).IsEqualTo(expectedFailure);
-    }
-
-    [Test]
-    public async Task CreateChallenge_TemplateModeMismatch_PropagatesTypedFailure()
-    {
-        var store = new Store
-        {
-            CreateResult = new ChallengeMutationResult(
-                null,
-                ChallengeMutationFailure.TemplateModeMismatch)
-        };
-
-        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
-
-        await Assert.That(result.Failure)
-            .IsEqualTo(ChallengeMutationFailure.TemplateModeMismatch);
-    }
-
-    [Test]
-    public async Task CreateChallenge_CustomTitle_IsTrimmedBeforePersistence()
-    {
-        var store = new Store();
-
-        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { CustomTitle = "  Finals Web  " });
-
-        await Assert.That(result.Failure).IsNull();
-        await Assert.That(store.LastCustomTitle).IsEqualTo("Finals Web");
-    }
-
-    [Test]
-    public async Task UpdateChallenge_BlankCustomTitle_RestoresTemplateFallback()
-    {
-        var store = new Store();
-
-        var result = await new UpdateChallenge(store).ExecuteAsync(
-            UpdateCommand() with { CustomTitle = "   " });
-
-        await Assert.That(result.Failure).IsNull();
-        await Assert.That(store.LastCustomTitle).IsNull();
-    }
-
-    [Test]
-    public async Task CustomTitle_OverMaximumLength_IsRejectedBeforeStore()
-    {
-        var store = new Store();
-        var title = new string('x', 161);
-
-        var createResult = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { CustomTitle = title });
-        var updateResult = await new UpdateChallenge(store).ExecuteAsync(
-            UpdateCommand() with { CustomTitle = title });
-
-        await Assert.That(createResult.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTitle);
-        await Assert.That(updateResult.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTitle);
-        await Assert.That(store.CreateCalls).IsEqualTo(0);
-        await Assert.That(store.MutationCalls).IsEqualTo(0);
-    }
-
-    [Test]
-    public async Task ListChallenges_PublicQuery_ExcludesUnpublishedAtStoreBoundary()
-    {
-        var store = new Store();
-
-        await new ListChallenges(store).ExecuteAsync(Guid.NewGuid(), includeUnpublished: false);
-
-        await Assert.That(store.LastIncludeUnpublished).IsFalse();
-    }
-
-    [Test]
-    public async Task GetChallenge_AdminQuery_IncludesUnpublishedAtStoreBoundary()
-    {
-        var store = new Store();
-
-        await new GetChallenge(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), includeUnpublished: true);
-
-        await Assert.That(store.LastIncludeUnpublished).IsTrue();
-    }
-
-    [Test]
-    [Arguments(ChallengeMutation.Update)]
-    [Arguments(ChallengeMutation.Delete)]
-    [Arguments(ChallengeMutation.Restore)]
-    public async Task Mutation_ActiveCompetition_IsAllowed(ChallengeMutation mutation)
-    {
-        var store = new Store { Status = CompetitionStatus.Running };
-
-        var error = await ExecuteMutationAsync(mutation, store);
-
-        await Assert.That(error).IsNull();
-        await Assert.That(store.MutationCalls).IsEqualTo(1);
-    }
-
-    [Test]
-    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.CompetitionNotFound)]
-    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeNotFound)]
-    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeOrderConflict)]
-    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.CompetitionNotFound)]
-    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.ChallengeNotFound)]
-    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.LifecycleStateConflict)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.CompetitionNotFound)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.TemplateNotFound)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.TemplateModeMismatch)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeNotFound)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeOrderConflict)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeTemplateConflict)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.LifecycleStateConflict)]
-    public async Task Mutation_TypedFailure_IsPropagated(
-        ChallengeMutation mutation,
-        ChallengeMutationFailure expectedFailure)
-    {
-        var store = new Store { MutationFailure = expectedFailure };
-
-        var failure = await ExecuteMutationAsync(mutation, store);
-
-        await Assert.That(failure).IsEqualTo(expectedFailure);
-        await Assert.That(store.MutationCalls).IsEqualTo(1);
-    }
-
-    public enum ChallengeMutation
-    {
-        Update,
-        Delete,
-        Restore
-    }
-
-    private static async Task<ChallengeMutationFailure?> ExecuteMutationAsync(
-        ChallengeMutation mutation,
-        Store store,
-        Guid? competitionId = null)
-    {
-        var actualCompetitionId = competitionId ?? Guid.NewGuid();
-        return mutation switch
-        {
-            ChallengeMutation.Update => (await new UpdateChallenge(store)
-                .ExecuteAsync(UpdateCommand(actualCompetitionId))).Failure,
-            ChallengeMutation.Delete => await new DeleteChallenge(store)
-                .ExecuteAsync(
-                    actualCompetitionId,
-                    Guid.NewGuid(),
-                    DateTimeOffset.UtcNow),
-            ChallengeMutation.Restore => await new DeleteChallenge(store)
-                .RestoreAsync(
-                    actualCompetitionId,
-                    Guid.NewGuid(),
-                    DateTimeOffset.UtcNow),
-            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
-        };
-    }
-
-    private static CreateCompetitionChallengeCommand CreateCommand(Guid? competitionId = null) => new(
-        null,
-        competitionId ?? Guid.NewGuid(),
-        Guid.NewGuid(),
-        1,
-        DateTimeOffset.UtcNow);
-
-    private static UpdateCompetitionChallengeCommand UpdateCommand(Guid? competitionId = null) => new(
-        competitionId ?? Guid.NewGuid(),
-        Guid.NewGuid(),
-        2,
-        true,
-        DateTimeOffset.UtcNow);
-
-    private sealed class Store : IChallengeManagementStore
-    {
-        private readonly ChallengeView challenge = new(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Web 100",
-            null,
-            "Description",
-            "Web",
-            1,
-            false,
-            null,
-            false,
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
-
-        public CompetitionStatus? Status { get; init; } = CompetitionStatus.Draft;
-        public ChallengeMutationResult? CreateResult { get; init; }
-        public ChallengeMutationFailure? MutationFailure { get; init; }
-        public int CreateCalls { get; private set; }
-        public int MutationCalls { get; private set; }
-        public bool? LastIncludeUnpublished { get; private set; }
-        public string? LastCustomTitle { get; private set; }
-        public IReadOnlyList<string>? LastTags { get; private set; }
-
-        public Task<ChallengeCompetitionContext?> GetCompetitionAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult(
-                Status is null ? null : new ChallengeCompetitionContext(GameMode.Ctf, Status.Value));
-
-        public Task<ChallengeMutationResult> CreateAsync(
-            CreateCompetitionChallengeCommand command,
-            CompetitionChallengeRules rules,
-            CancellationToken cancellationToken)
-        {
-            CreateCalls++;
-            LastCustomTitle = command.CustomTitle;
-            LastTags = command.Tags;
-            return Task.FromResult(CreateResult ?? new ChallengeMutationResult(challenge, null));
-        }
-
-        public Task<ChallengeView?> FindAsync(
-            Guid competitionId,
-            Guid challengeId,
-            bool includeUnpublished,
-            bool includeDeleted,
-            CancellationToken cancellationToken)
-        {
-            LastIncludeUnpublished = includeUnpublished;
-            return Task.FromResult<ChallengeView?>(challenge);
-        }
-
-        public Task<IReadOnlyList<CompetitionChallengeSummaryView>> ListAsync(
-            Guid competitionId,
-            bool includeUnpublished,
-            bool includeDeleted,
-            CancellationToken cancellationToken)
-        {
-            LastIncludeUnpublished = includeUnpublished;
-            return Task.FromResult<IReadOnlyList<CompetitionChallengeSummaryView>>([
-                new(challenge.Id, challenge.CompetitionId, challenge.ChallengeId,
-                    challenge.Title, challenge.CustomTitle, challenge.Direction,
-                    challenge.Order, challenge.IsPublished, challenge.DeletedAt,
-                    challenge.InteractionKind)
-            ]);
-        }
-
-        public Task<ChallengeMutationResult> UpdateAsync(
-            UpdateCompetitionChallengeCommand command,
-            CancellationToken cancellationToken)
-        {
-            MutationCalls++;
-            LastCustomTitle = command.CustomTitle;
-            LastTags = command.Tags;
-            return Task.FromResult(MutationFailure is null
-                ? new ChallengeMutationResult(challenge)
-                : new ChallengeMutationResult(null, MutationFailure));
-        }
-
-        public Task<ChallengeMutationFailure?> SoftDeleteAsync(
-            Guid competitionId,
-            Guid challengeId,
-            DateTimeOffset now,
-            CancellationToken cancellationToken)
-        {
-            MutationCalls++;
-            return Task.FromResult(MutationFailure);
-        }
-
-        public Task<ChallengeMutationFailure?> RestoreAsync(
-            Guid competitionId,
-            Guid challengeId,
-            DateTimeOffset now,
-            CancellationToken cancellationToken)
-        {
-            MutationCalls++;
-            return Task.FromResult(MutationFailure);
-        }
-    }
-
-    private sealed class Catalog : IChallengeConfigurationCatalog
-    {
-        public CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid id) =>
-            new CtfCompetitionChallengeRules { CompetitionChallengeId = id };
-        public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid id) =>
-            new CtfChallengeDefinition { ChallengeId = id };
-
-        public IReadOnlyList<string> Validate(
-            GameMode mode,
-            CompetitionChallengeRules rules,
-            CompetitionModeConfiguration competitionConfiguration,
-            int eligibleTeamCount) => [];
-        public IReadOnlyList<string> ValidateDefinition(
-            GameMode mode,
-            ChallengeDefinition definition) => [];
-    }
-
 }

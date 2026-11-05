@@ -139,16 +139,16 @@ internal static class GameplayFactAdmissionPersistence
                     && (practicePhase || scope.SubmissionDeadlineAt == null || fact.OccurredAt < scope.SubmissionDeadlineAt))
                 .GroupBy(submission => submission.Kind)
                 .Select(group => new AttemptSummary(group.Key, group.Count(),
-                    group.Any(fact => fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)))
+                    group.Any(fact => fact.State == GameplayFactState.Completed
+                        && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))))
                 .ToDictionaryAsync(item => item.Kind, cancellationToken)
             : new Dictionary<GameplayFactKind, AttemptSummary>();
-        var flagAttempts = attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt);
         var breakAttempts = attempts.GetValueOrDefault(GameplayFactKind.BreakAttempt);
         var fixAttempts = attempts.GetValueOrDefault(GameplayFactKind.FixAttempt);
         var practiceRuntimeState = PracticeRuntimeAdmissionState.NotRequired;
         if (practicePhase && scope.PracticeModeEnabled)
         {
-            var template = runtimeTemplates.Get(challengeDefinition);
+            var template = runtimeTemplates.Get(challengeDefinition, challengeRules!);
             if (template is not null)
             {
                 if (template.RuntimeKind is not (RuntimeKind.Container))
@@ -184,7 +184,7 @@ internal static class GameplayFactAdmissionPersistence
                 ?? throw new InvalidOperationException("Competition configuration is required."),
             challengeRules
                 ?? throw new InvalidOperationException("Challenge rules are required."),
-            (flagAttempts?.Count ?? 0) + (breakAttempts?.Count ?? 0),
+            breakAttempts?.Count ?? 0,
             fixAttempts?.Count ?? 0,
             scope.Status,
             scope.StartAt,
@@ -198,7 +198,7 @@ internal static class GameplayFactAdmissionPersistence
             true,
             breakAttempts?.HasCorrect == true,
             fixAttempts?.HasCorrect == true,
-            flagAttempts?.HasCorrect == true,
+            breakAttempts?.HasCorrect == true,
             awdDeadline?.EndsAt ?? officialWindow.EndAt,
             scope.PracticeModeEnabled,
             practiceRuntimeState,

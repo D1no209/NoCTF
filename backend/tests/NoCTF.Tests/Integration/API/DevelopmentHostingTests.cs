@@ -23,6 +23,7 @@ using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Messaging;
 using Testcontainers.PostgreSql;
+using DotNet.Testcontainers.Builders;
 
 namespace NoCTF.Tests.Integration.API;
 
@@ -40,12 +41,16 @@ public sealed class DevelopmentHostingTests
             .WithUsername("postgres")
             .WithPassword("postgres")
             .Build();
-        await postgres.StartAsync(cancellationToken);
+        await using var nats = new ContainerBuilder("docker.m.daocloud.io/library/nats:2.14.7-alpine@sha256:4063edae0717ba5f7501bfde75f97fd9b57f5b93597b92c70b6a6fbbf6a74e06")
+            .WithPortBinding(4222, true).WithCommand("-js")
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222)).Build();
+        await Task.WhenAll(postgres.StartAsync(cancellationToken), nats.StartAsync(cancellationToken));
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
                 builder.UseSetting("ConnectionStrings:PostgreSql", postgres.GetConnectionString());
+                builder.UseSetting("ConnectionStrings:Nats", $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}");
                 builder.UseSetting("SeedAdmin:UserName", "integration-admin");
                 builder.UseSetting("SeedAdmin:Email", "integration-admin@noctf.local");
                 builder.UseSetting("SeedAdmin:Password", "integration-password");

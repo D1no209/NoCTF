@@ -21,6 +21,7 @@ public sealed class GetChallengeTemplateEndpoint(
     {
         Get("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
+        Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankGetTemplate"));
         Summary(summary =>
         {
@@ -33,6 +34,7 @@ public sealed class GetChallengeTemplateEndpoint(
         GetChallengeTemplateRequest request,
         CancellationToken ct)
     {
+        HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await get.ExecuteAsync(
             request.ChallengeId,
             user.UserId,

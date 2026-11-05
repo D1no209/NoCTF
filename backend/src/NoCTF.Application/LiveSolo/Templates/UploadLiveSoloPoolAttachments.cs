@@ -36,7 +36,7 @@ public sealed class UploadLiveSoloPoolAttachments(ILiveSoloQuestionPoolStore poo
             }
             var result = await pool.EditAsync(new(command.CompetitionId, command.CompetitionChallengeId, command.ActorId,
                 command.ExpectedStamp, command.ExpectedMaterialStamp, current.Title, current.Description, current.Direction, current.Definition, command.Now,
-                AddedAttachments: staged), ct);
+                AddedAttachments: staged, CompletionKind: current.CompletionKind), ct);
             committed = result.Failure is null;
             return result;
         }

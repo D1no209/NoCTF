@@ -5,6 +5,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
@@ -29,27 +30,27 @@ internal static class SpectatorFrameReader
         var competitive = input.Teams.Where(x => !x.IsBanned && !x.IsDeleted && x.AffectsCompetitiveResults).Select(x => x.Id).ToArray();
         var facts = db.GameplayFacts.AsNoTracking().Where(x => x.CompetitionId == input.CompetitionId
             && x.CompetitionChallengeId != null && challengeIds.Contains(x.CompetitionChallengeId.Value) && x.OccurredAt <= cutoff
-            && (x.Kind == GameplayFactKind.AwdServiceTransition
+            && (x.Kind == GameplayFactKind.CheckObservation
                 || x.State == GameplayFactState.Completed || x.State == GameplayFactState.PlatformFailed));
-        var eligible = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition
+        var eligible = facts.Where(x => x.Kind == GameplayFactKind.CheckObservation
             || (x.CompetitionChallengeId == overrideId
                 && (overrideOpening == null || x.OccurredAt >= overrideOpening)
                 && (overrideScoringEnd == null || x.OccurredAt < overrideScoringEnd)
-                && (x.Kind == GameplayFactKind.KohControlObservation || overrideSubmissionEnd == null || x.OccurredAt < overrideSubmissionEnd))
+                && (x.Kind == GameplayFactKind.ControlObservation || overrideSubmissionEnd == null || x.OccurredAt < overrideSubmissionEnd))
             || db.CompetitionChallenges.Any(c => c.Id == x.CompetitionChallengeId && c.Id != overrideId
                 && (c.AutoOpenAt == null || x.OccurredAt >= c.AutoOpenAt)
                 && (c.ScoringEndsAt == null || x.OccurredAt < c.ScoringEndsAt)
-                && (x.Kind == GameplayFactKind.KohControlObservation || c.SubmissionDeadlineAt == null || x.OccurredAt < c.SubmissionDeadlineAt)));
+                && (x.Kind == GameplayFactKind.ControlObservation || c.SubmissionDeadlineAt == null || x.OccurredAt < c.SubmissionDeadlineAt)));
         // Select only safe display fields; Flag, failure details, actor identity and addresses never enter the cache frame.
-        var observations = eligible.Where(x => x.Kind == GameplayFactKind.KohControlObservation
-            || x.Kind == GameplayFactKind.AwdServiceTransition)
+        var observations = eligible.Where(x => x.Kind == GameplayFactKind.ControlObservation
+            || x.Kind == GameplayFactKind.CheckObservation)
             .Select(x => new Observation { Id = x.Id, Revision = x.ConcurrencyStamp, ChallengeId = x.CompetitionChallengeId!.Value, TeamId = x.TeamId,
                 At = x.OccurredAt, Kind = x.Kind, State = x.State, Result = x.Result });
         var services = new List<SpectatorService>();
         var points = new List<SpectatorPoint>();
         if (input.Mode == GameMode.Awd)
         {
-            var checkFacts = facts.Where(x => x.Kind == GameplayFactKind.AwdServiceTransition && x.TeamId != null && x.Awd != null);
+            var checkFacts = facts.Where(x => x.Kind == GameplayFactKind.CheckObservation && x.TeamId != null && x.Awd != null);
             var checks = CheckRows(checkFacts);
             var latest = await checks.Where(x => currentRoundId != null && x.RoundId == currentRoundId)
                 .GroupBy(x => new { x.ChallengeId, x.TeamId })
@@ -83,10 +84,10 @@ internal static class SpectatorFrameReader
         }
         else
         {
-            var latest = await observations.Where(x => x.Kind == GameplayFactKind.KohControlObservation)
+            var latest = await observations.Where(x => x.Kind == GameplayFactKind.ControlObservation)
                 .GroupBy(x => x.ChallengeId).Select(g => g.OrderByDescending(x => x.At).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
-            var effective = await observations.Where(x => x.Kind == GameplayFactKind.KohControlObservation
-                && x.State == GameplayFactState.Completed && (x.Result == GameplayFactResult.Uncontrolled
+            var effective = await observations.Where(x => x.Kind == GameplayFactKind.ControlObservation
+                && (x.State != GameplayFactState.Completed || x.Result != GameplayFactResult.Controlled
                     || x.Result == GameplayFactResult.Controlled && x.TeamId != null && competitive.Contains(x.TeamId.Value)))
                 .GroupBy(x => x.ChallengeId).Select(g => g.OrderByDescending(x => x.At).ThenByDescending(x => x.Id).First()).ToArrayAsync(ct);
             var config = (KohCompetitionModeConfiguration)input.CompetitionConfiguration!;
@@ -94,10 +95,10 @@ internal static class SpectatorFrameReader
             {
                 var check = latest.FirstOrDefault(x => x.ChallengeId == challenge.Id);
                 var control = effective.FirstOrDefault(x => x.ChallengeId == challenge.Id);
-                points.Add(new(challenge.Id, control?.Result == GameplayFactResult.Controlled ? control.TeamId : null,
+                points.Add(new(challenge.Id, control is { State: GameplayFactState.Completed, Result: GameplayFactResult.Controlled } ? control.TeamId : null,
                     check?.TeamId, Health(check), check?.At,
-                    challenge.Rules?.PollIntervalSeconds ?? config.PollIntervalSeconds,
-                    challenge.Rules?.ControlPointsPerInterval ?? config.ControlPointsPerInterval));
+                    (challenge.Rules as KohCompetitionChallengeRules)?.PollIntervalSeconds ?? config.PollIntervalSeconds,
+                    (challenge.Rules as KohCompetitionChallengeRules)?.ControlPointsPerInterval ?? config.ControlPointsPerInterval));
             }
         }
         SpectatorChange[] changes;
@@ -105,7 +106,7 @@ internal static class SpectatorFrameReader
         {
             // Same competitive tuple as the scoring projection. EarnsScore only affects
             // attribution of points, not whether a competitive attack took place.
-            var attacks = eligible.Where(x => x.Kind == GameplayFactKind.FlagAttempt
+            var attacks = eligible.Where(x => x.Kind == GameplayFactKind.BreakAttempt
                 && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue)
                 && x.State == GameplayFactState.Completed && x.Awd != null && x.Awd.ReceiptScorable == true
                 && x.Awd.AttackOutcome == AwdAttackOutcome.Accepted && x.Awd.ReceivedRoundId != null
@@ -131,20 +132,20 @@ internal static class SpectatorFrameReader
         }
         else
         {
-            changes = await eligible.Where(x => x.Kind == GameplayFactKind.KohControlObservation && x.OccurredAt >= start)
+            changes = await eligible.Where(x => x.Kind == GameplayFactKind.ControlObservation && x.OccurredAt >= start)
                 .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id).Take(HistoryLimit + 1)
                 .Select(x => new SpectatorChange(x.Id, x.ConcurrencyStamp, x.OccurredAt,
                     x.State != GameplayFactState.Completed || x.Result != GameplayFactResult.Controlled && x.Result != GameplayFactResult.Uncontrolled
                         ? SpectatorChangeKind.DetectionFailed
                         : x.Result == GameplayFactResult.Uncontrolled ? SpectatorChangeKind.Uncontrolled : SpectatorChangeKind.Control,
                     x.CompetitionChallengeId!.Value, x.TeamId, null,
-                    eligible.Where(c => c.Kind == GameplayFactKind.KohControlObservation
-                        && c.CompetitionChallengeId == x.CompetitionChallengeId && c.State == GameplayFactState.Completed
+                    eligible.Where(c => c.Kind == GameplayFactKind.ControlObservation
+                        && c.CompetitionChallengeId == x.CompetitionChallengeId
                         && (c.OccurredAt < x.OccurredAt || c.OccurredAt == x.OccurredAt && c.Id.CompareTo(x.Id) <= 0)
-                        && (c.Result == GameplayFactResult.Uncontrolled || c.Result == GameplayFactResult.Controlled
+                        && (c.State != GameplayFactState.Completed || c.Result != GameplayFactResult.Controlled || c.Result == GameplayFactResult.Controlled
                             && c.TeamId != null && competitive.Contains(c.TeamId.Value)))
                         .OrderByDescending(c => c.OccurredAt).ThenByDescending(c => c.Id)
-                        .Select(c => c.Result == GameplayFactResult.Uncontrolled ? null : c.TeamId).FirstOrDefault()))
+                        .Select(c => c.State != GameplayFactState.Completed || c.Result != GameplayFactResult.Controlled ? null : c.TeamId).FirstOrDefault()))
                 .ToArrayAsync(ct);
         }
         DateTimeOffset? hardeningEnd = null;

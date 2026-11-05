@@ -48,7 +48,7 @@ public sealed partial class AwdRoundCoordinationTests
             await using (var setup = new NoCtfDbContext(options))
             {
                 var template = await setup.Challenges.SingleAsync(ct);
-                ((AwdChallengeDefinition)template.Definition!).Checker!.TargetServiceName = "main";
+                template.Definition!.Check!.TargetServiceName = "main";
                 var runtime = await setup.RuntimeInstances.SingleAsync(ct);
                 runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(runtime.Id);
                 await setup.SaveChangesAsync(ct);

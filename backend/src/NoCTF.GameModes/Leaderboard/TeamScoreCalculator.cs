@@ -1,11 +1,10 @@
 using NoCTF.Application.Challenges.WriteUps;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Theory.Activities;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.GameModes.Leaderboard;
 
-/// <summary>Calculates one spendable score using the same mode, discount and theory rules as the scoreboard.</summary>
+/// <summary>根据排行榜的赛制与题解扣分规则计算可用分数。</summary>
 public sealed class TeamScoreCalculator(ILeaderboardProjectorCatalog projectors)
 {
     public long Calculate(LeaderboardProjectionInput input, Guid teamId)
@@ -33,8 +32,6 @@ public sealed class TeamScoreCalculator(ILeaderboardProjectorCatalog projectors)
         }
         if (input.Mode == GameMode.Awd && input.AwdMinimumTotalScore is { } floor)
             score = Math.Max(score, floor);
-        if (TheoryActivityPolicy.Supports(input.Mode))
-            score = checked(score + (input.TheoryScores?.SingleOrDefault(item => item.TeamId == teamId)?.Points ?? 0));
         return score;
     }
 }

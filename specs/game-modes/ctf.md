@@ -13,8 +13,7 @@ ScoreSettlementMode?                   // null 继承比赛；DynamicRecalculati
 
 `ScoreCurve` 包含 `InitialPoints`、`MinimumPoints`、`DecayTeamCount`、`DecayMode` 和仅在 Custom 模式使用的 `CustomExpression`。数值约束：InitialPoints 为 1..1,000,000，MinimumPoints 为 0..InitialPoints，DecayTeamCount>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。配置以强类型 TPH 聚合与关系子表持久化，不保存 schema-version JSON。Runtime 技术定义属于题库 Challenge，不属于比赛题目规则。
 
-CTF 还可在平台实验开关允许时使用独立的 [PatchVerification](../ctf-patch-verification-experiment.md)
-交互；下文 FlagAttempt 描述适用于 Flag 解题，Patch 模式以 FixAttempt 的当前结果判定完成。
+CTF 调用题目的 Break 能力，Flag 提交产生 BreakAttempt，解题、首解和进度使用该事实的当前有效判定。
 
 ## 标签分数预设
 
@@ -62,11 +61,11 @@ Attachment 策略：
 - All 默认：显示全部 Attachment；全局符合条件 Flag 均可正确。
 - RandomOnePerTeam：只用于多附件；首次下载隐式随机固定一个 Attachment，并复制其全部 Flag 为团队级记录。玩家不能指定 Id，后续不重抽。
 
-## FlagAttempt GameplayFact
+## BreakAttempt GameplayFact
 
 只接受单个 `flag`，不接受 `flags`。题目可配置可空的 `MaxFlagAttempts`；null 表示无限，正整数表示接入上限。API 预检并由 Worker 二次验证。
 
-同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是唯一计分 solve；后续 FlagAttempt 仍按当前有效 Flag 正常判定，匹配为 Correct，不匹配为 Wrong，但不会重复计分或授予血位。尝试计数按当前结果与时间资格计算；平台失败和时间无效事实不消耗，计分截止后的正确结果可为 RightButDue。具体回算行为见[题目时间配置](../challenge-timing-status.md)。重判可改变 solve 与血位。
+同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct BreakAttempt 是唯一计分 solve；后续 BreakAttempt 仍按当前有效 Flag 正常判定，匹配为 Correct，不匹配为 Wrong，但不会重复计分或授予血位。尝试计数按当前结果与时间资格计算；平台失败和时间无效事实不消耗，计分截止后的正确结果可为 RightButDue。具体回算行为见[题目时间配置](../challenge-timing-status.md)。重判可改变 solve 与血位。
 
 ## 动态题值
 

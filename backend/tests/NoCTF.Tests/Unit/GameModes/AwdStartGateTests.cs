@@ -43,15 +43,14 @@ public sealed class AwdStartGateTests
     }
 
     private static ChallengeDefinition CompleteDefinition() =>
-        new AwdChallengeDefinition
+        new ChallengeDefinition
         {
-            FlagInjectionCommand = "printf '%s' '${FLAG}' > /dev/shm/flag",
-            FlagInjectionTimeoutSeconds = 30,
-            FlagInjectionServiceName = "main",
+            Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
+                { InjectionCommand = "printf '%s' \"$FLAG\" > /dev/shm/flag", InjectionTimeoutSeconds = 30, InjectionServiceName = "main" },
+                new NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition { TargetServiceName = "main", Image = "checker:test",
+                    Requirements = [new() { Kind = NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Functionality }] }],
             Runtime = new ContainerChallengeRuntimeTemplate
             {
-                Allocation = PersistedRuntimeAllocation.PerTeam,
-                FlagSource = PersistedRuntimeFlagSource.AwdRotation,
                 Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/awd:v1" }],
                 UrlBindings =
                 [

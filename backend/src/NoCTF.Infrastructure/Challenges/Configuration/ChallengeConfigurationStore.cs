@@ -89,27 +89,47 @@ public sealed class ChallengeConfigurationStore(
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         if (tracked.Mode != rules.Mode || tracked.Rules.GetType() != rules.GetType())
             throw new InvalidOperationException("Challenge rules type does not match its mode.");
+        if (tracked.Mode == GameMode.LiveSolo && await db.LiveSoloRoundQuestions.Where(question => question.CompetitionChallengeId == challengeId)
+                .Join(db.LiveSoloRounds, question => question.RoundId, round => round.Id, (_, round) => round)
+                .AnyAsync(round => round.State == NoCTF.Domain.LiveSolo.LiveSoloRoundState.Preparing
+                    || round.State == NoCTF.Domain.LiveSolo.LiveSoloRoundState.Countdown || round.State == NoCTF.Domain.LiveSolo.LiveSoloRoundState.Running
+                    || round.State == NoCTF.Domain.LiveSolo.LiveSoloRoundState.ConfirmingResult, ct))
+            return new(null, ChallengeConfigurationUpdateFailure.ConfigurationLocked);
         var nextAwdRound = tracked.Mode == GameMode.Awd
             ? (await db.AwdRounds.Where(round => round.CompetitionId == competitionId).MaxAsync(round => (int?)round.Number, ct) ?? 0) + 1
             : (int?)null;
         if (nextAwdRound > 1 && audit?.HasValidReason != true)
             return new(null, ChallengeConfigurationUpdateFailure.RuleChangeReasonRequired);
         rules.CompetitionChallengeId = challengeId;
-        var bloodChanged = !tracked.Rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
-            .SequenceEqual(rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
+        var bloodChanged = tracked.Rules is CtfCompetitionChallengeRules beforeCtf && rules is CtfCompetitionChallengeRules afterCtf
+            && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
+                .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
         var storesChanged = tracked.Rules is AwdCompetitionChallengeRules beforeAwd
             && rules is AwdCompetitionChallengeRules afterAwd
             && !beforeAwd.StoreRules.OrderBy(item => item.StoreId).Select(item => (item.StoreId, item.Weight, item.FlagsPerIssue))
                 .SequenceEqual(afterAwd.StoreRules.OrderBy(item => item.StoreId).Select(item => (item.StoreId, item.Weight, item.FlagsPerIssue)));
         if (rules is AwdCompetitionChallengeRules requestedAwd)
         {
-            var definition = await db.Set<AwdChallengeDefinition>().AsNoTracking().AsSplitQuery()
+            var definition = await db.Set<ChallengeDefinition>().AsNoTracking().AsSplitQuery()
                 .SingleAsync(item => item.ChallengeId == tracked.ChallengeId, ct);
-            var storeIds = definition.FlagStores.Select(item => item.Id).ToArray();
+            var storeIds = definition.Break!.FlagStores.Select(item => item.Id).ToArray();
             if (requestedAwd.StoreRules.Any(item => !storeIds.Contains(item.StoreId)))
                 return new(null, ChallengeConfigurationUpdateFailure.ConfigurationLocked);
         }
         db.Entry(tracked.Rules).CurrentValues.SetValues(rules);
+        if (tracked.Rules is IChallengeRuntimeRules storedRuntime && rules is IChallengeRuntimeRules requestedRuntime)
+            storedRuntime.Runtime = new() { Allocation = requestedRuntime.Runtime.Allocation, FlagSource = requestedRuntime.Runtime.FlagSource,
+                TtlSeconds = requestedRuntime.Runtime.TtlSeconds };
+        if (tracked.Rules is IChallengeFlagTemplateOverride storedFlag && rules is IChallengeFlagTemplateOverride requestedFlag)
+            storedFlag.FlagTemplate = new() { Header = requestedFlag.FlagTemplate.Header, BodyTemplate = requestedFlag.FlagTemplate.BodyTemplate,
+                LeetLiteralText = requestedFlag.FlagTemplate.LeetLiteralText };
+        if (tracked.Rules is CtfCompetitionChallengeRules storedCurve && rules is CtfCompetitionChallengeRules requestedCurve)
+            storedCurve.ScoreCurve = requestedCurve.ScoreCurve;
+        if (tracked.Rules is AwdpCompetitionChallengeRules storedAwdp && rules is AwdpCompetitionChallengeRules requestedAwdp)
+        {
+            storedAwdp.BreakScoreCurve = requestedAwdp.BreakScoreCurve;
+            storedAwdp.FixScoreCurve = requestedAwdp.FixScoreCurve;
+        }
         if (tracked.Rules is AwdCompetitionChallengeRules currentAwd && rules is AwdCompetitionChallengeRules nextAwd)
             currentAwd.AwdOverrides = nextAwd.AwdOverrides with { };
         db.ChangeTracker.DetectChanges();
@@ -119,10 +139,10 @@ public sealed class ChallengeConfigurationStore(
             await transaction.CommitAsync(ct);
             return new(unchanged);
         }
-        if (bloodChanged)
+        if (bloodChanged && tracked.Rules is CtfCompetitionChallengeRules storedCtf && rules is CtfCompetitionChallengeRules nextCtf)
         {
-            db.Set<CompetitionChallengeBloodReward>().RemoveRange(tracked.Rules.BloodRewards);
-            tracked.Rules.BloodRewards = rules.BloodRewards.Select((reward, position) =>
+            db.Set<CompetitionChallengeBloodReward>().RemoveRange(storedCtf.BloodRewards);
+            storedCtf.BloodRewards = nextCtf.BloodRewards.Select((reward, position) =>
                 new CompetitionChallengeBloodReward
                 {
                     CompetitionChallengeId = challengeId,

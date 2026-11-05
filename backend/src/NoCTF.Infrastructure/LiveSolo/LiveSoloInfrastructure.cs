@@ -35,9 +35,6 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ManageLiveSoloMatches>();
         services.AddScoped<ManageLiveSoloConfiguration>();
         services.AddScoped<ILiveSoloPlayerPolicyReader, LiveSoloPlayerPolicyReader>();
-        services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
-        services.AddScoped<CopyLiveSoloTemplate>();
-        services.AddScoped<LiveSoloMaterialCloner>();
         services.AddScoped<ILiveSoloReviewStore, LiveSoloReviewStore>();
         services.AddScoped<ReadLiveSoloReview>();
         services.AddScoped<ILiveSoloQuestionPoolStore, LiveSoloQuestionPoolStore>();
@@ -55,6 +52,11 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ManageLiveSoloWriteUps>();
         services.AddScoped<ILiveSoloRuntimeStore, LiveSoloRuntimeStore>();
         services.AddScoped<ManageLiveSoloRuntimes>();
+        services.AddScoped<ILiveSoloFixTargetStore, LiveSoloFixTargetStore>();
+        services.AddScoped<ManageLiveSoloFixTargets>();
+        services.AddScoped<ILiveSoloFixUploadStore, LiveSoloMatchStore>();
+        services.AddScoped<SubmitLiveSoloFix>();
+        services.AddScoped<NoCTF.Application.GameplayFacts.PatchUploads.IFixUploadAccessPolicy, LiveSoloFixUploadAccessPolicy>();
         services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();
         services.AddScoped<ManageLiveSoloMedia>();
         services.AddScoped<ILiveSoloMediaAlertReader, LiveSoloMediaAlertReader>();

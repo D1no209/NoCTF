@@ -70,7 +70,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
 
         if (scope.Competition.ModeConfiguration is not AwdpCompetitionModeConfiguration competitionConfiguration
             || scope.Challenge.Rules is not AwdpCompetitionChallengeRules challengeRules
-            || scope.Template.Definition is not AwdpChallengeDefinition definition)
+            || scope.Template.Definition is not ChallengeDefinition { Break: not null, Fix: not null, Check: not null } definition)
             return null;
         var configuration = AwdpConfigurationResolver.Resolve(
             competitionConfiguration,
@@ -98,7 +98,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 && runtime.CompetitionChallengeId == competitionChallengeId
                 && runtime.TeamId == scope.TeamId
                 && (runtime.Purpose == RuntimePurpose.Player
-                    || runtime.Purpose == RuntimePurpose.AwdpAttack))
+                    || runtime.Purpose == RuntimePurpose.AttackTarget))
             .OrderByDescending(runtime => runtime.CreatedAt)
             .ThenByDescending(runtime => runtime.Id)
             .Select(runtime => new RuntimeInstanceView(
@@ -133,7 +133,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .Where(runtime => runtime.CompetitionId == competitionId
                 && runtime.CompetitionChallengeId == competitionChallengeId
                 && runtime.TeamId == scope.TeamId
-                && runtime.Purpose == RuntimePurpose.AwdpTarget)
+                && runtime.Purpose == RuntimePurpose.FixTarget)
             .OrderByDescending(runtime => runtime.CreatedAt)
             .ThenByDescending(runtime => runtime.Id)
             .Select(runtime => new
@@ -194,12 +194,14 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
         var firstBreak = facts.FirstOrDefault(fact => fact is
         {
             Kind: GameplayFactKind.BreakAttempt,
+            State: GameplayFactState.Completed,
             Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
             TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
         });
         var firstFix = facts.FirstOrDefault(fact => (!configuration.RequireBreakBeforeFix || firstBreak is not null && firstBreak.OccurredAt <= fact.OccurredAt) && fact is
         {
             Kind: GameplayFactKind.FixAttempt,
+            State: GameplayFactState.Completed,
             Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
             TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
         });
@@ -246,7 +248,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
     private static GameplayFactStatusView ToStatus(GameplayFact fact) =>
         new(
             fact.Id,
-            fact.CompetitionId,
+            fact.CompetitionId!.Value,
             fact.TeamId,
             fact.CompetitionChallengeId!.Value,
             fact.Kind,

@@ -8,6 +8,7 @@ using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Challenges.Capabilities;
 using NoCTF.GameModes.Awd.Checking;
 using NoCTF.GameModes.Awd.Flags;
 using NoCTF.Infrastructure.Persistence;
@@ -40,6 +41,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
     {
         var now = clock.GetUtcNow();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        await AwdMaintenanceEvidence.ReconcileFlagWaitsAsync(db, now, ct);
         var batch = new DispatchBatch(db, now);
         // All samples are persisted together. A crash cannot leave an apparently planned round with missing samples.
         var unplanned = expiry is not null ? [] : await db.AwdRoundRules.AsSplitQuery().Where(rules =>
@@ -49,7 +51,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
                 !db.AwdRoundRules.Any(other => other.RoundId == rules.RoundId
                     && other.CompetitionChallengeId == rules.CompetitionChallengeId && other.Revision < rules.Revision
                     && other.Teams.Any(previousTeam => previousTeam.TeamId == team.TeamId)))
-                && !db.GameplayFacts.Any(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
+                && !db.GameplayFacts.Any(fact => fact.Kind == GameplayFactKind.CheckObservation
                     && fact.Awd != null && fact.Awd.RulesId == rules.Id))
             .OrderBy(rules => rules.EffectiveAt).ThenBy(rules => rules.Id).Take(100).ToListAsync(ct);
         foreach (var rules in unplanned) batch.Rules.Add(rules.Id, rules);
@@ -78,7 +80,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             {
                 var scheduled = timeline.At(TimeSpan.FromTicks(roundStart + sample.ActiveTicks - round.ActiveStartTicks), true, clampClosed: true);
                 var deadline = timeline.At(TimeSpan.FromTicks(roundStart + sample.DeadlineActiveTicks - round.ActiveStartTicks), false, clampClosed: true);
-                var fact = new AwdServiceTransitionGameplayFact
+                var fact = new CheckObservationGameplayFact
                 {
                     Id = AwdCheckPlan.FactId(round.Id, rules.CompetitionChallengeId, team.TeamId, sample.ActiveTicks),
                     CompetitionId = rules.CompetitionId, CompetitionChallengeId = rules.CompetitionChallengeId,
@@ -95,8 +97,10 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
         }
         await db.SaveChangesAsync(ct);
         var pendingQuery = db.GameplayFacts.Include(fact => fact.Awd).ThenInclude(details => details!.Flags)
-            .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition && fact.Awd != null
-                && fact.Awd.Settlement == AwdSettlementState.Provisional
+            .Where(fact => fact.Kind == GameplayFactKind.CheckObservation && fact.Awd != null
+                && (fact.Awd.Settlement == AwdSettlementState.Provisional
+                    || fact.Awd.Settlement == AwdSettlementState.PendingAdjudication
+                        && fact.Awd.BlockingFixFactId != null && fact.Awd.AdjudicatedAt == null && fact.Awd.Reason == AwdCheckReason.TaskNotExecuted)
                 && fact.Awd.Execution != AwdCheckExecution.Completed);
         if (expiry is not null)
         {
@@ -111,16 +115,45 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             pendingQuery = pendingQuery.Where(fact => fact.Id.CompareTo(after) > 0);
         var pending = await pendingQuery.OrderBy(fact => fact.Id).Take(500).AsSplitQuery().ToListAsync(ct);
         await batch.LoadAsync(pending.Select(fact => fact.Awd!.RulesId!.Value),
-            pending.Select(fact => fact.CompetitionId), pending.Select(fact => fact.Awd!.ReceivedRoundId!.Value), ct);
+            pending.Select(fact => fact.CompetitionId!.Value), pending.Select(fact => fact.Awd!.ReceivedRoundId!.Value), ct);
         var applied = added;
         var ready = new List<GameplayFact>();
         var held = new List<GameplayFact>();
+        var blockingIds = pending.Where(fact => fact.Awd!.BlockingFixFactId != null).Select(fact => fact.Awd!.BlockingFixFactId!.Value).Distinct().ToArray();
+        var blockingFixes = await db.GameplayFacts.AsNoTracking().AsSplitQuery().Where(fact => blockingIds.Contains(fact.Id)).ToDictionaryAsync(fact => fact.Id, ct);
         foreach (var fact in pending)
         {
             var details = fact.Awd!;
             var rules = batch.Rules[details.RulesId!.Value];
-            var competition = batch.Competitions[fact.CompetitionId];
+            var competition = batch.Competitions[fact.CompetitionId!.Value];
             var round = batch.Rounds[details.ReceivedRoundId!.Value];
+            if (details.BlockingFixFactId is { } fixId && details.AdjudicatedAt is null)
+            {
+                if (!blockingFixes.TryGetValue(fixId, out var fix) || !AwdMaintenanceEvidence.CoversDeadline(details, fix))
+                    await HoldAsync(fact, AwdCheckReason.InvalidEvidence, now, ct);
+                else if (fix.State == GameplayFactState.PlatformFailed
+                    || fix.CapabilityOutcomes.OfType<FixOutcome>().SingleOrDefault()?.ExecutionState == CapabilityExecutionState.PlatformFailed)
+                    await HoldAsync(fact, AwdCheckReason.InfrastructureFailure, now, ct);
+                else if (fix.State != GameplayFactState.Completed || fix.FixExecution!.MutationBlocked) continue;
+                else
+                {
+                    details.Execution = AwdCheckExecution.Completed; details.Settlement = AwdSettlementState.Final;
+                    details.Health = AwdHealth.Offline; details.Reason = AwdCheckReason.PlayerMaintenance;
+                    details.ObservedAt = details.Deadline; details.ReceivedAt = now; details.EvidenceComplete = false;
+                    fact.State = GameplayFactState.Completed; fact.Result = GameplayFactResult.ServiceDown; fact.FailureCode = null;
+                    fact.UpdatedAt = now; fact.ConcurrencyStamp = Guid.NewGuid();
+                    var outcome = new CheckOutcome { GameplayFactId = fact.Id, RuntimeInstanceId = details.RuntimeId,
+                        ExecutionState = CapabilityExecutionState.NotExecuted, ObservedAt = details.Deadline!.Value };
+                    outcome.Probes.Add(new() { Kind = CheckItemKind.Connection, Result = CheckProbeResult.NotExecuted, Reason = CheckFailureReason.PlayerMaintenance });
+                    outcome.Probes.Add(new() { Position = 1, Kind = CheckItemKind.Functionality, Result = CheckProbeResult.NotExecuted, Reason = CheckFailureReason.PlayerMaintenance });
+                    fact.CapabilityOutcomes.Add(outcome);
+                    await events.RecordAsync(new(fact.CompetitionId!.Value, CompetitionEventKind.ScoringRecorded,
+                        CompetitionEventLevel.Warning, CompetitionEventVisibility.Team, now, TeamId: fact.TeamId,
+                        CompetitionChallengeId: fact.CompetitionChallengeId, RuntimeInstanceId: details.RuntimeId,
+                        GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State, GameplayFactResult: fact.Result), ct);
+                }
+                held.Add(fact); applied = true; continue;
+            }
             if (competition.Status == CompetitionStatus.Paused && details.Execution == AwdCheckExecution.Pending) continue;
             if (details.Execution == AwdCheckExecution.Pending && competition.Status == CompetitionStatus.Running)
             {
@@ -202,7 +235,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             // Re-publish pending attempts on every scan; the Runner fences duplicate execution.
             // Recovery is a new transport delivery, even when a failed claim left the execution attempt unchanged.
             // Reusing identical payloads would let JetStream suppress recovery after the earlier message was acknowledged.
-            dispatches.Add((fact.CompetitionId, new RunAwdChecker(runtime.Id, fact.CompetitionChallengeId!.Value,
+            dispatches.Add((fact.CompetitionId!.Value, new RunAwdChecker(runtime.Id, fact.CompetitionChallengeId!.Value,
                 fact.Id, runtime.RunnerId!, details.Deadline!.Value, details.AttemptId.Value, details.ReceiptDeadline!.Value,
                 Guid.NewGuid())));
         }
@@ -252,7 +285,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
             var details = fact.Awd!;
             var rules = batch.Rules[details.RulesId!.Value];
             var round = batch.Rounds[details.ReceivedRoundId!.Value];
-            var timeline = await batch.TimelineAsync(fact.CompetitionId, ct);
+            var timeline = await batch.TimelineAsync(fact.CompetitionId!.Value, ct);
             var activeTicks = round.ActiveStartTicks + timeline.ElapsedAt(now).Ticks - timeline.ElapsedAt(round.StartsAt).Ticks;
             var generationDue = AwdGenerationPlan.IsDue(rules, round.Number);
             var slot = AwdGenerationPlan.Slot(rules, round.Number, activeTicks);
@@ -343,7 +376,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
         fact.UpdatedAt = now;
         fact.ConcurrencyStamp = Guid.NewGuid();
         await AwdAdjudicationNotification.AddAsync(db, fact, now, ct);
-        await events.RecordAsync(new(fact.CompetitionId, CompetitionEventKind.ScoringRecorded,
+        await events.RecordAsync(new(fact.CompetitionId!.Value, CompetitionEventKind.ScoringRecorded,
             CompetitionEventLevel.Warning, CompetitionEventVisibility.Team, now, TeamId: fact.TeamId,
             CompetitionChallengeId: fact.CompetitionChallengeId, RuntimeInstanceId: details.RuntimeId,
             GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State), ct);

@@ -10,20 +10,20 @@ const { model, disabled, serviceNames, canAddStore, addStore, removeStore, setDe
   <DefinitionSection :title="$t('administration.awd.stores')" :collapsible="false">
     <FieldDescription>{{ $t('administration.awd.storeBudgetHint') }}</FieldDescription>
     <FieldDescription v-if="model.flagInjection">{{ $t('administration.awd.legacyStoreHint') }}</FieldDescription>
-    <Empty v-if="!model.awdFlagStores.length"><EmptyTitle>{{ $t('administration.awd.noStores') }}</EmptyTitle></Empty>
-    <div v-for="(store, index) in model.awdFlagStores" :key="store.id" class="flex flex-col gap-4 py-3">
+    <Empty v-if="!model.flagStores.length"><EmptyTitle>{{ $t('administration.awd.noStores') }}</EmptyTitle></Empty>
+    <div v-for="(store, index) in model.flagStores" :key="store.id" class="flex flex-col gap-4 py-3">
       <Separator v-if="index" />
       <div class="flex items-end gap-3">
         <Field class="flex-1">
           <FieldLabel :for="`awd-store-name-${store.id}`">{{ $t('administration.awd.storeName') }}</FieldLabel>
           <Input :id="`awd-store-name-${store.id}`" v-model="store.name" :maxlength="64" :disabled="disabled" />
         </Field>
-        <Button v-if="!disabled && model.awdFlagStores.length > 1" variant="ghost" @click="removeStore(index)">{{ $t('administration.awd.removeStore') }}</Button>
+        <Button v-if="!disabled" variant="ghost" @click="removeStore(index)">{{ $t('administration.awd.removeStore') }}</Button>
       </div>
       <div class="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel>{{ $t('administration.awd.deliveryMode') }}</FieldLabel>
-          <Select :model-value="store.deliveryMode" :disabled="disabled" @update:model-value="setDeliveryMode(index, $event)">
+          <Select :model-value="store.delivery" :disabled="disabled" @update:model-value="setDeliveryMode(index, $event)">
             <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
               <SelectItem value="RunnerCommand">{{ $t('administration.awd.runnerCommand') }}</SelectItem>
               <SelectItem value="BusinessChecker">{{ $t('administration.awd.businessChecker') }}</SelectItem>
@@ -39,7 +39,7 @@ const { model, disabled, serviceNames, canAddStore, addStore, removeStore, setDe
           </Select>
         </Field>
       </div>
-      <template v-if="store.deliveryMode === 'RunnerCommand'">
+      <template v-if="store.delivery === 'RunnerCommand'">
         <Field>
           <FieldLabel>{{ $t('administration.label.injectCommand') }}</FieldLabel>
           <Textarea :model-value="store.injectionCommand ?? ''" @update:model-value="setCommand(index, $event)" :rows="3" :maxlength="8192" :disabled="disabled" class="font-mono" />

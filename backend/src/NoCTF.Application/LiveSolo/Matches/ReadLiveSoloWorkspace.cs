@@ -3,7 +3,7 @@ using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Application.LiveSolo.Matches;
 
-public enum LiveSoloWorkspaceOperation : short { LockRoster, ConfirmReady, PrepareRound, StartCountdown, RetryPreparation, Pause, Resume, VoidRound, ForfeitMatch, CorrectResult, ManageQuestionPool, SubmitFlag }
+public enum LiveSoloWorkspaceOperation : short { LockRoster, ConfirmReady, PrepareRound, StartCountdown, RetryPreparation, Pause, Resume, VoidRound, ForfeitMatch, CorrectResult, ManageQuestionPool, SubmitFlag, SubmitFix }
 public enum LiveSoloStartCondition : short { CompetitionNotRunning, LeftRosterUnlocked, RightRosterUnlocked, LeftNotReady, RightNotReady, NoPreparedRound, EnvironmentPreparing, EnvironmentFailed, MediaRequired, SelectionChanged, CorrectionPending }
 public sealed record LiveSoloWorkspaceView(LiveSoloMatchView Match, LiveSoloRoundView? Round,
     IReadOnlyList<LiveSoloWorkspaceOperation> AllowedOperations, IReadOnlyList<LiveSoloStartCondition> MissingConditions,

@@ -6,7 +6,7 @@ export function useNavigationCapabilities(listen = true) {
   const result = useAsyncData(
     computed(() => `navigation-capabilities:${user.value?.userId ?? 'anonymous'}`),
     async () => {
-      if (!user.value) return { canAccessTheoryBank: false, hasManagedCompetitions: false }
+      if (!user.value) return { hasManagedCompetitions: false }
       const { data, error } = await getNavigationCapabilitiesEndpoint()
       if (error || !data) throw error ?? new Error('Navigation capabilities response is missing.')
       return data

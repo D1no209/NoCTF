@@ -23,10 +23,7 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null,
     IReadOnlyList<AwdRoundScoreProjection>? AwdRoundScores = null,
     long? AwdMinimumTotalScore = null,
-    IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdTieBreakCriterion>? AwdTieBreakers = null,
-    IReadOnlyList<LeaderboardTheoryScore>? TheoryScores = null);
-
-public sealed record LeaderboardTheoryScore(Guid TeamId, long Points, DateTimeOffset? AchievedAt, bool HasSubmission);
+    IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdTieBreakCriterion>? AwdTieBreakers = null);
 
 public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
     int DeductionPercent, DateTimeOffset UnlockedAt);
@@ -52,7 +49,6 @@ public sealed record LeaderboardChallengeFact(
     int Order = 0,
     bool IsPublished = true,
     ChallengeDefinition? Definition = null,
-    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission,
     string? DirectionIcon = null,
     ChallengeTiming? Timing = null,
     NoCTF.Domain.Competitions.Scoring.CompetitionScorePreset? ScorePreset = null);

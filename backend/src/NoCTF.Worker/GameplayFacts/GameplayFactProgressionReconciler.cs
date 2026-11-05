@@ -22,7 +22,7 @@ public sealed class GameplayFactProgressionReconciler(IDbContextFactory<NoCtfDbC
                 var target = await db.CompetitionEvents.AsNoTracking()
                     .Where(item => item.Id == message.EventId && item.CompetitionId == message.CompetitionId
                         && item.Kind == CompetitionEventKind.GameplayFactAdjudicated
-                        && (item.GameplayFactKind == GameplayFactKind.FlagAttempt || item.GameplayFactKind == GameplayFactKind.FixAttempt)
+                        && item.GameplayFactKind == GameplayFactKind.BreakAttempt
                         && db.Competitions.Any(competition => competition.Id == item.CompetitionId && competition.Mode == GameMode.Ctf)
                         && db.CompetitionProgressions.Any(graph => graph.CompetitionId == item.CompetitionId && graph.Enabled))
                     .Select(item => item.TeamId).SingleOrDefaultAsync(ct);

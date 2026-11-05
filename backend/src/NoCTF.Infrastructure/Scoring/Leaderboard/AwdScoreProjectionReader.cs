@@ -99,7 +99,7 @@ internal static class AwdScoreProjectionReader
             .ToArrayAsync(ct);
         // Include planned samples, including those not dispatched: absence must never become a pass.
         var checkFacts = await db.GameplayFacts.AsNoTracking().IgnoreAutoIncludes().AsSplitQuery()
-            .Where(x => x.CompetitionId == competitionId && x.Kind == GameplayFactKind.AwdServiceTransition
+            .Where(x => x.CompetitionId == competitionId && x.Kind == GameplayFactKind.CheckObservation
                 && x.Awd != null && x.TeamId != null && x.ReferenceId != null
                 && roundIds.Contains(x.ReferenceId.Value) && x.CompetitionChallengeId != null
                 && challengeIds.Contains(x.CompetitionChallengeId.Value))

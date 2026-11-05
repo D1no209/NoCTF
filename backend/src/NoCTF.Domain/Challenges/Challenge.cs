@@ -1,16 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Shared;
 
 namespace NoCTF.Domain.Challenges;
 
-/// <summary>Typed question material for exactly one game mode; catalog scope separates reusable templates from competition-owned LiveSolo content.</summary>
-[PersistentHierarchy]
-[GeneratePersistentLeaves(typeof(GameMode), "Challenge")]
-public abstract class Challenge : IConcurrencyTracked
+public sealed class Challenge : IConcurrencyTracked
 {
-    protected Challenge(GameMode mode) => Mode = mode;
     public Guid Id { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public Guid OwnerId { get; set; }
@@ -28,7 +23,6 @@ public abstract class Challenge : IConcurrencyTracked
                 .Select(userId => new ChallengeManager { ChallengeId = Id, UserId = userId }));
         }
     }
-    public GameMode Mode { get; private set; }
     public ChallengeCatalogScope CatalogScope { get; set; }
     public ChallengeVisibility Visibility { get; set; }
     [MaxLength(160)]

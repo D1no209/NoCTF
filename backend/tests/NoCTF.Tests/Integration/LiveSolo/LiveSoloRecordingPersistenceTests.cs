@@ -21,7 +21,7 @@ namespace NoCTF.Tests.Integration.LiveSolo;
 public sealed class LiveSoloRecordingPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public async Task Generated_recording_decision_migration_upgrades_the_existing_capture_schema(CancellationToken ct)
+    public async Task Generated_baseline_creates_recording_decisions_and_reapplies_idempotently(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -30,7 +30,7 @@ public sealed class LiveSoloRecordingPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString(),
                 setup => setup.MigrationsAssembly(typeof(PostgreSqlPersistence).Assembly.FullName)).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            await db.GetService<IMigrator>().MigrateAsync("20261009121727_LiveSoloCaptureRawCleanup", ct);
+            await db.Database.MigrateAsync(ct);
             await db.Database.MigrateAsync(ct);
             await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
             await Assert.That(await db.LiveSoloRecordingDecisions.CountAsync(ct)).IsEqualTo(0);

@@ -44,7 +44,7 @@ internal sealed class RuntimeCapacityDomainFixture : IAsyncDisposable
     public Guid[] RuntimeIds { get; private set; } = [];
 
     public static async Task<RuntimeCapacityDomainFixture> CreateAsync(
-        int runtimeCount, CancellationToken ct, IInterceptor[]? interceptors = null, bool previousSchema = false)
+        int runtimeCount, CancellationToken ct, IInterceptor[]? interceptors = null, bool migrateDatabase = false)
     {
         var fixture = new RuntimeCapacityDomainFixture();
         try
@@ -60,8 +60,8 @@ internal sealed class RuntimeCapacityDomainFixture : IAsyncDisposable
                     provider.MigrationsAssembly(typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
                 .UseSnakeCaseNamingConvention().AddInterceptors(interceptors ?? []).Options;
             await using var db = new NoCtfDbContext(fixture.Options);
-            if (previousSchema)
-                await db.GetService<IMigrator>().MigrateAsync("20261013124256_MergeAwdAndTheoryModels", ct);
+            if (migrateDatabase)
+                await db.Database.MigrateAsync(ct);
             else
                 await db.Database.EnsureCreatedAsync(ct);
             fixture.RuntimeIds = await SeedAsync(db, runtimeCount, ct);
@@ -162,7 +162,7 @@ internal sealed class RuntimeCapacityDomainFixture : IAsyncDisposable
         foreach (var id in ids)
         {
             var challengeId = Guid.NewGuid();
-            db.Challenges.Add(new AwdpChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId, OwnerId = ownerId, Title = "Capacity fixture", Direction = "Pwn",
                 Definition = TestConfigurations.Definition(GameMode.Awdp), CreatedAt = now, UpdatedAt = now

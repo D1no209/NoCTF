@@ -12,6 +12,9 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
+using NoCTF.Domain.Challenges.Capabilities;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Infrastructure.Challenges.Capabilities;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -24,20 +27,26 @@ public sealed class AwdpFixExecutionFencePersistenceTests
     public async Task Authoritative_target_state_controls_execute_recover_and_superseded(
         CancellationToken cancellationToken)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = await StartPostgresAsync(cancellationToken);
             var options = Options(postgres);
             var fixture = await SeedAsync(options, cancellationToken);
             var request = Request(fixture);
 
-            var execute = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(execute.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Execute);
+            var claims = await Task.WhenAll(AcquireAsync(options, request, cancellationToken), AcquireAsync(options, request, cancellationToken));
+            await Assert.That(claims.Count(claim => claim.Disposition == FixExecutionFenceDisposition.Execute)).IsEqualTo(1);
+            await Assert.That(claims.Count(claim => claim.Disposition == FixExecutionFenceDisposition.Superseded)).IsEqualTo(1);
+            var execute = claims.Single(claim => claim.Disposition == FixExecutionFenceDisposition.Execute);
             await Assert.That(execute.RuntimeInstanceId).IsEqualTo(fixture.RuntimeInstanceId);
             await Assert.That(execute.RunnerId).IsEqualTo(fixture.RunnerId);
-            await Assert.That(execute.ProviderReceipt)
-                .IsTypeOf<NoCTF.Application.Runtime.Provisioning.ContainerRuntimeReceiptData>();
+            var repeated = await AcquireAsync(options, request, cancellationToken);
+            await Assert.That(repeated.Disposition).IsEqualTo(FixExecutionFenceDisposition.Superseded);
+            await using (var read = new NoCtfDbContext(options))
+            {
+                var fact = await read.GameplayFacts.AsSplitQuery().SingleAsync(value => value.Id == fixture.GameplayFactId, cancellationToken);
+                await Assert.That(fact.FixExecution!.Phase).IsEqualTo(FixExecutionPhase.Applying);
+                await Assert.That(fact.FixExecution.RuntimeInstanceId).IsEqualTo(fixture.RuntimeInstanceId);
+            }
 
             await SetRuntimeStateAsync(
                 options,
@@ -46,7 +55,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                 cancellationToken);
             var recover = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(recover.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Recover);
+                .IsEqualTo(FixExecutionFenceDisposition.Recover);
 
             await SetRuntimeStateAsync(
                 options,
@@ -55,8 +64,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                 cancellationToken);
             var stopped = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(stopped.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Superseded);
-        });
+                .IsEqualTo(FixExecutionFenceDisposition.Superseded);
+        }
     }
 
     [Test]
@@ -64,7 +73,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
     public async Task Mismatched_or_expired_operation_is_superseded(
         CancellationToken cancellationToken)
     {
-        await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = await StartPostgresAsync(cancellationToken);
             var options = Options(postgres);
@@ -96,7 +104,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     expired.Disposition
                 })
                 .IsEquivalentTo(Enumerable.Repeat(
-                    AwdpFixExecutionFenceDisposition.Superseded,
+                    FixExecutionFenceDisposition.Superseded,
                     4));
 
             await using var mutation = new NoCtfDbContext(options);
@@ -109,21 +117,21 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 
             var completed = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(completed.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Superseded);
-        });
+                .IsEqualTo(FixExecutionFenceDisposition.Superseded);
+        }
     }
 
-    private static async Task<AwdpFixExecutionFenceResult> AcquireAsync(
+    private static async Task<FixExecutionFenceResult> AcquireAsync(
         DbContextOptions<NoCtfDbContext> options,
-        AwdpFixExecutionFenceRequest request,
+        FixExecutionFenceRequest request,
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        return await new AwdpFixExecutionFence(db, TimeProvider.System)
+        return await new FixExecutionFence(db, TimeProvider.System)
             .AcquireAsync(request, cancellationToken);
     }
 
-    private static AwdpFixExecutionFenceRequest Request(Fixture fixture) =>
+    private static FixExecutionFenceRequest Request(Fixture fixture) =>
         new(
             fixture.GameplayFactId,
             fixture.CompetitionChallengeId,
@@ -185,7 +193,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Id = competitionId,
             Title = "AWDP fence",
             OwnerId = ownerId,
-            ModeConfiguration = TestConfigurations.Competition(GameMode.Awdp),
+            ModeConfiguration = new AwdpCompetitionModeConfiguration(),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
@@ -193,14 +201,13 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
             Title = "Fence target",
             Visibility = ChallengeVisibility.Private,
-            Definition = new GameModeChallengeConfigurationCatalog()
-                .CreateDefaultDefinitionForTest(GameMode.Awdp),
+            Definition = NoCTF.Tests.Unit.Gameplay.ChallengeCapabilityTests.Repairable(),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -210,8 +217,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            Rules = new GameModeChallengeConfigurationCatalog()
-                .CreateDefaultRulesForTest(GameMode.Awdp),
+            Rules = new AwdpCompetitionChallengeRules(),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -261,7 +267,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             OccurredAt = now,
             UpdatedAt = now
         });
-        db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
+        db.RuntimeInstances.Add(new FixTargetRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = competitionId,
@@ -272,7 +278,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = runnerId,
             State = RuntimeState.Running,
-            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             CreatedAt = now,
             RunningAt = now,
             ExpiresAt = now.AddMinutes(15)

@@ -20,6 +20,12 @@ public sealed class DevelopmentRunnerCapacityGate(
     private readonly Dictionary<string, string> claims = [];
     private readonly Lock sync = new();
 
+    public Task<bool> CanMutateAsync(Guid runtimeInstanceId, string candidateRunnerId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (sync) return Task.FromResult(claims.TryGetValue(runtimeInstanceId.ToString("N"), out var owner) && owner == candidateRunnerId);
+    }
+
     public Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
         string runnerPool,
         string runnerId,
@@ -59,7 +65,7 @@ public sealed class DevelopmentRunnerCapacityGate(
     public Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(RuntimeWorkloadIdentity identity, string runnerId,
         CancellationToken cancellationToken) => ReleaseCore(identity.Key, runnerId, cancellationToken);
 
-    public Task<bool> CanCreateWorkloadAsync(RuntimeWorkloadIdentity identity, Guid factId, string runnerId,
+    public Task<bool> CanCreateWorkloadAsync(RuntimeWorkloadIdentity identity, Guid? factId, string runnerId,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

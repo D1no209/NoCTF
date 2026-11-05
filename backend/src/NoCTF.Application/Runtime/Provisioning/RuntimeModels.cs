@@ -89,6 +89,7 @@ public sealed record ChallengeRuntimeTemplate(
 public interface IChallengeRuntimeTemplateCatalog
 {
     ChallengeRuntimeTemplate? Get(NoCTF.Domain.Challenges.ChallengeDefinition? definition);
+    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Challenges.ChallengeDefinition? definition, NoCTF.Domain.Challenges.CompetitionChallengeRules rules);
 }
 
 public sealed record RuntimePlacement(RuntimeProvider Provider, string RunnerPool);
@@ -245,7 +246,9 @@ public interface IOneShotJobRunner
         CancellationToken cancellationToken);
 }
 
-public sealed record ContainerExecResult(int ExitCode, bool TimedOut);
+public sealed record ContainerExecResult(int ExitCode, bool TimedOut, bool ExecutionUncertain = false, string? ExecutionIdentity = null, bool PlatformFailure = false);
+public enum ContainerExecState { Running, Ended, Indeterminate }
+public sealed record ContainerExecObservation(ContainerExecState State, int? ExitCode = null);
 
 public interface IContainerSandboxLifecycle
 {
@@ -257,6 +260,9 @@ public interface IContainerSandboxLifecycle
     Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecAsync(
         ContainerReceipt receipt, IReadOnlyList<string> command, TimeSpan timeout, CancellationToken cancellationToken);
+    Task<ContainerExecResult> ExecRetainingTargetAsync(
+        ContainerReceipt receipt, IReadOnlyList<string> command, TimeSpan timeout, CancellationToken cancellationToken);
+    Task<ContainerExecObservation> ObserveExecAsync(ContainerReceipt receipt, string executionIdentity, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecWithInputAsync(
         ContainerReceipt receipt,
         IReadOnlyList<string> command,
@@ -272,7 +278,7 @@ public sealed record ContainerNetworkPolicyRequest(
     ContainerNetworkPurpose Purpose,
     RuntimeEgressPolicy EgressPolicy,
     IReadOnlyList<int> PublicIngressPorts,
-    int? TargetPort = null,
+    IReadOnlyList<int>? InternalIngressPorts = null,
     IReadOnlyList<int>? ProxyIngressPorts = null);
 
 public abstract record AttachedRuntimeTarget(

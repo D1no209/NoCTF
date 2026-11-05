@@ -50,7 +50,7 @@ public sealed class AdjudicateAwdCheck(IAwdCheckAdjudicationStore store)
     {
         if (!IsValid(command)) return AwdCheckAdjudicationState.InvalidRequest;
         if (fact.CompetitionId != command.CompetitionId || fact.Id != command.GameplayFactId
-            || fact.Kind != GameplayFactKind.AwdServiceTransition || fact.Awd is not { } evidence)
+            || fact.Kind != GameplayFactKind.CheckObservation || fact.Awd is not { } evidence)
             return AwdCheckAdjudicationState.NotFound;
         if (evidence.AttemptId != command.ExpectedAttemptId || evidence.ReceivedAt != command.ExpectedReceivedAt
             || evidence.Settlement != AwdSettlementState.PendingAdjudication)

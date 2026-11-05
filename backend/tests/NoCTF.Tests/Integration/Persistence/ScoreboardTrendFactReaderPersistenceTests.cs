@@ -58,7 +58,7 @@ public sealed class ScoreboardTrendFactReaderPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,

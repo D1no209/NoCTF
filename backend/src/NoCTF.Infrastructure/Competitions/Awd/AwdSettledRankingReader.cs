@@ -22,7 +22,7 @@ internal static class AwdSettledRankingReader
                 x.RegisteredAt, x.TrackKey, true, false, false, true, true)).ToArrayAsync(ct);
         var challenges = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competition.Id)
             .Select(x => new LeaderboardChallengeFact(x.Id, string.Empty, string.Empty, x.DeletedAt != null,
-                null, x.Order, x.IsPublished, null, CtfInteractionKind.FlagSubmission, null,
+                null, x.Order, x.IsPublished, null, null,
                 new ChallengeTiming(x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt))).ToArrayAsync(ct);
         var scores = (await AwdScoreProjectionReader.ReadAsync(db, competition.Id, challenges, teams, now, ct))
             .Where(x => x.RoundNumber < beforeRound).ToArray();

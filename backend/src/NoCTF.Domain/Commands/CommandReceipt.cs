@@ -13,7 +13,7 @@ public enum ReplayOperation : short
     AdminRuntimeMutation,
     TemplateTestRuntimeMutation,
     AwdpDefenseTarget,
-    PatchVerificationTarget
+    TemplateCapabilityTest
 }
 
 [PersistentHierarchy]

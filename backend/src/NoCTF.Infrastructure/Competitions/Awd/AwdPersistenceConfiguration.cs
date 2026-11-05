@@ -97,6 +97,7 @@ internal sealed class AwdFlagIssueConfiguration : IEntityTypeConfiguration<AwdFl
     {
         builder.HasOne<ChallengeFlag>().WithOne(flag => flag.AwdIssue)
             .HasForeignKey<AwdFlagIssue>(issue => issue.FlagId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<GameplayFact>().WithMany().HasForeignKey(issue => issue.BlockingFixFactId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(issue => new
         {
             issue.CompetitionId, issue.CompetitionChallengeId, issue.TeamId,
@@ -129,6 +130,7 @@ internal sealed class AwdFactDetailsConfiguration : IEntityTypeConfiguration<Awd
         builder.HasOne<AwdRound>().WithMany().HasForeignKey(details => details.GenerationRoundId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<AwdRound>().WithMany().HasForeignKey(details => details.ReceivedRoundId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<AwdRoundRules>().WithMany().HasForeignKey(details => details.RulesId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<GameplayFact>().WithMany().HasForeignKey(details => details.BlockingFixFactId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsMany(details => details.Flags, flags =>
         {
             flags.ToTable("awd_check_flag_evidence");
@@ -150,21 +152,6 @@ internal sealed class AwdCaptureIdentityConfiguration : IEntityTypeConfiguration
         builder.HasOne<Team>().WithMany().HasForeignKey(capture => new { capture.AttackingTeamId, capture.CompetitionId })
             .HasPrincipalKey(team => new { team.Id, team.CompetitionId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<GameplayFact>().WithMany().HasForeignKey(capture => capture.GameplayFactId).OnDelete(DeleteBehavior.Cascade);
-    }
-}
-
-internal sealed class AwdDefinitionConfiguration : IEntityTypeConfiguration<AwdChallengeDefinition>
-{
-    public void Configure(EntityTypeBuilder<AwdChallengeDefinition> builder)
-    {
-        builder.OwnsMany(definition => definition.FlagStores, stores =>
-        {
-            stores.ToTable("awd_flag_stores");
-            stores.WithOwner().HasForeignKey(store => store.ChallengeId);
-            stores.HasKey(store => new { store.ChallengeId, store.Id });
-            stores.HasIndex(store => new { store.ChallengeId, store.Name }).IsUnique();
-            stores.HasIndex(store => new { store.ChallengeId, store.Position }).IsUnique();
-        });
     }
 }
 

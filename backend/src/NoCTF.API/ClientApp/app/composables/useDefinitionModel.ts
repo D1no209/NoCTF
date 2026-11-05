@@ -1,5 +1,5 @@
 import { ref, toRaw, watch } from 'vue'
-import type { DefinitionModel, GameModeValue } from '../utils/game-config'
+import type { DefinitionModel } from '../utils/game-config'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../api'
 import { definitionContractToModel, definitionModelToContract } from '../utils/game-config'
 
@@ -8,22 +8,20 @@ import { definitionContractToModel, definitionModelToContract } from '../utils/g
  */
 export function useDefinitionModel(
   modelValue: () => NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
-  mode: () => GameModeValue,
   emit: (definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract) => void,
 ) {
   const model = ref<DefinitionModel | null>(null)
   const parseFailed = ref(false)
   let syncing = false
   let lastEmitted: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null = null
-  let lastEmittedMode: GameModeValue | null = null
 
   watch(
-    [modelValue, mode],
-    ([definition, currentMode]) => {
-      if (toRaw(definition) === lastEmitted && currentMode === lastEmittedMode) return
+    modelValue,
+    (definition) => {
+      if (toRaw(definition) === lastEmitted) return
       syncing = true
       try {
-        model.value = definitionContractToModel(definition, currentMode)
+        model.value = definitionContractToModel(definition)
         parseFailed.value = false
       }
       catch {
@@ -39,8 +37,7 @@ export function useDefinitionModel(
 
   function emitDefinition(): void {
     if (!model.value || syncing) return
-    lastEmittedMode = mode()
-    lastEmitted = definitionModelToContract(lastEmittedMode, model.value)
+    lastEmitted = definitionModelToContract(model.value)
     emit(lastEmitted)
   }
 

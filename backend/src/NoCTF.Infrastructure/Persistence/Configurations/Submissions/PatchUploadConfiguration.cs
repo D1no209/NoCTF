@@ -11,10 +11,7 @@ internal sealed class PatchUploadConfiguration : IEntityTypeConfiguration<PatchU
         builder.ToTable("patch_uploads");
         builder.HasKey(upload => upload.Id);
         builder.HasIndex(upload => upload.FileId).IsUnique();
-        // Older immutable attempts did not carry a target id. New AWDP uploads do,
-        // and this filtered uniqueness constraint makes one target consumable once.
-        builder.HasIndex(upload => upload.RuntimeInstanceId)
-            .IsUnique();
+        builder.HasIndex(upload => upload.RuntimeInstanceId);
         builder.HasIndex(upload => new { upload.TeamId, upload.CompetitionChallengeId });
         builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
             .HasForeignKey(upload => upload.CompetitionId).OnDelete(DeleteBehavior.Restrict);

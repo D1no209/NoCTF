@@ -175,10 +175,10 @@ public sealed class LiveSoloPublicExposurePersistenceTests
         await Assert.That(second.Failure).IsNull();
         // Use a separate instance of the same canonical source; active-instance conflicts are independent from public exposure.
         var templateId = Guid.NewGuid(); var entryId = Guid.NewGuid();
-        f.Db.Challenges.Add(new LiveSoloChallenge { Id = templateId, OwnerId = f.Owner.Id, Title = "Exposure copy", Direction = "Web", Definition = new LiveSoloChallengeDefinition { ChallengeId = templateId }, CreatedAt = f.Now, UpdatedAt = f.Now });
+        f.Db.Challenges.Add(new Challenge { Id = templateId, OwnerId = f.Owner.Id, Title = "Exposure copy", Direction = "Web", Definition = TestConfigurations.Definition(GameMode.LiveSolo), CreatedAt = f.Now, UpdatedAt = f.Now });
         f.Db.CompetitionChallenges.Add(new LiveSoloCompetitionChallenge { Id = entryId, CompetitionId = f.Competition.Id, ChallengeId = templateId,
             DirectionId = f.Entries[0].DirectionId, Order = await f.Db.CompetitionChallenges.MaxAsync(x => x.Order, ct) + 1, UpdatedAt = f.Now, Rules = new LiveSoloCompetitionChallengeRules { CompetitionChallengeId = entryId } });
-        f.Db.LiveSoloChallengeSources.Add(new() { ChallengeId = templateId, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
+        f.Db.ChallengeSources.Add(new() { ChallengeId = templateId, OriginalChallengeId = f.Templates[0].Id, CanonicalChallengeId = f.Templates[0].Id, CopiedAt = f.Now });
         await f.Db.SaveChangesAsync(ct);
         await store.SaveGroupAsync(f.Competition.Id, f.Owner.Id, new(null, "Exposure list", false, null, [new(entryId, 0)], null), f.Now, ct);
         return (second.Match!, left, right);

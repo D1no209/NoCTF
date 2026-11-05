@@ -56,9 +56,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   function updateRemainingAttempts(remaining: number | null): void {
     if (!challenge.value) return
-    challenge.value = challenge.value.interactionKind === 'PatchVerification'
-      ? { ...challenge.value, remainingPatchAttempts: remaining }
-      : { ...challenge.value, remainingFlagAttempts: remaining }
+    challenge.value = { ...challenge.value, remainingFlagAttempts: remaining }
   }
 
   async function loadChallenge(): Promise<void> {

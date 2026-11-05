@@ -3,22 +3,20 @@ import { effectScope, nextTick, reactive } from 'vue'
 
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../app/api'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
-import { defaultDefinition } from '../app/utils/game-config'
-import type { GameModeValue } from '../app/utils/game-config'
+import { defaultDefinition, setChallengeCapability, definitionModelToContract, emptyDefinition } from '../app/utils/game-config'
 
 describe('useDefinitionModel', () => {
   test('loading an external definition does not emit it back or recurse', async () => {
     const scope = effectScope()
-    const form = reactive({ mode: 'Ctf' as const, definition: defaultDefinition('Ctf') })
+    const form = reactive({ definition: defaultDefinition() })
     const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
-      () => form.mode,
       definition => { form.definition = definition; emissions.push(definition) },
     ))!
 
     try {
-      const loaded = defaultDefinition('Ctf')
+      const loaded = defaultDefinition()
       form.definition = loaded
       await nextTick()
 
@@ -32,23 +30,24 @@ describe('useDefinitionModel', () => {
 
   test('a nested editor change emits once without replacing the active model', async () => {
     const scope = effectScope()
-    const form = reactive({ mode: 'Ctf' as const, definition: defaultDefinition('Ctf') })
+    const initial = emptyDefinition()
+    setChallengeCapability(initial, 'Fix', true)
+    const form = reactive({ definition: definitionModelToContract(initial) })
     const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
-      () => form.mode,
       definition => { form.definition = definition; emissions.push(definition) },
     ))!
 
     try {
       const activeModel = editor.model.value
       expect(activeModel).not.toBeNull()
-      activeModel!.patchCommand.push('echo ready')
+      activeModel!.patchCommand.push('{entrypoint}')
       await nextTick()
 
       expect(emissions).toHaveLength(1)
-      expect(form.definition.patchCommand).toEqual(['echo ready'])
-      expect(Object.keys(form.definition)[0]).toBe('mode')
+      expect(form.definition.capabilities?.find(item => item.kind === 'Fix')?.fix?.command).toEqual(['{entrypoint}'])
+      expect('mode' in form.definition).toBeFalse()
       expect(editor.model.value).toBe(activeModel)
     }
     finally {
@@ -58,11 +57,12 @@ describe('useDefinitionModel', () => {
 
   test('external replacement after editing resets the draft without an echo', async () => {
     const scope = effectScope()
-    const form = reactive({ mode: 'Ctf' as GameModeValue, definition: defaultDefinition('Ctf') })
+    const initial = emptyDefinition()
+    setChallengeCapability(initial, 'Fix', true)
+    const form = reactive({ definition: definitionModelToContract(initial) })
     const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
-      () => form.mode,
       definition => { form.definition = definition; emissions.push(definition) },
     ))!
 
@@ -70,13 +70,12 @@ describe('useDefinitionModel', () => {
       editor.model.value!.patchTimeoutSeconds = 42
       expect(emissions).toHaveLength(1)
 
-      form.definition = defaultDefinition('Ctf')
+      form.definition = defaultDefinition()
       await nextTick()
       expect(editor.model.value?.patchTimeoutSeconds).toBeNull()
       expect(emissions).toHaveLength(1)
 
-      form.definition = defaultDefinition('Awdp')
-      form.mode = 'Awdp'
+      form.definition = definitionModelToContract(initial)
       await nextTick()
       expect(editor.model.value?.maximumPatchUploadBytes).toBe(256 * 1024 * 1024)
       expect(emissions).toHaveLength(1)

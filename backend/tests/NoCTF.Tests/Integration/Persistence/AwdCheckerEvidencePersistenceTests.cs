@@ -44,9 +44,9 @@ public sealed partial class AwdRoundCoordinationTests
             await using (var setup = new NoCtfDbContext(options))
             {
                 var template = await setup.Challenges.SingleAsync(ct);
-                ((AwdChallengeDefinition)template.Definition!).FlagStores.Single().DeliveryMode = AwdFlagDeliveryMode.BusinessChecker;
-                ((AwdChallengeDefinition)template.Definition!).Checker!.TargetServiceName = "main";
-                ((AwdChallengeDefinition)template.Definition!).Checker!.TimeoutSeconds = 10;
+                template.Definition!.Break!.FlagStores.Single().DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker;
+                template.Definition.Check!.TargetServiceName = "main";
+                template.Definition.Check.TimeoutSeconds = 10;
                 var runtime = await setup.RuntimeInstances.SingleAsync(ct);
                 runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(runtime.Id);
                 await setup.SaveChangesAsync(ct);
@@ -121,9 +121,11 @@ public sealed partial class AwdRoundCoordinationTests
             {
                 var issue = await verify.AwdFlagIssues.SingleAsync(ct);
                 await Assert.That(issue.Obligation).IsEqualTo(AwdFlagObligation.PlayerRequired);
-                await Assert.That(issue.PublicLocator).IsEqualTo("record-42");
-                await Assert.That(issue.ProtectedReadContext).IsNotEqualTo("private-read-credential");
-                await Assert.That(await verify.GameplayFacts.CountAsync(item => item.Kind == GameplayFactKind.AwdServiceTransition, ct))
+                var flagState = await verify.ChallengeFlags.SingleAsync(flag => flag.Id == issue.FlagId, ct);
+                await Assert.That(flagState.PublicLocator).IsEqualTo("record-42");
+                await Assert.That(Secrets().Unprotect(flagState.ProtectedReadContext!, PlatformSecretPurpose.FlagReadContext,
+                    issue.CompetitionId, issue.FlagId)).IsEqualTo("private-read-credential");
+                await Assert.That(await verify.GameplayFacts.CountAsync(item => item.Kind == GameplayFactKind.CheckObservation, ct))
                     .IsEqualTo(10);
             }
 
@@ -175,7 +177,7 @@ public sealed partial class AwdRoundCoordinationTests
             await Dispatch();
             await using var results = new NoCtfDbContext(options);
             var facts = await results.GameplayFacts.Include(item => item.Awd)
-                .Where(item => item.Kind == GameplayFactKind.AwdServiceTransition).ToArrayAsync(ct);
+                .Where(item => item.Kind == GameplayFactKind.CheckObservation).ToArrayAsync(ct);
             await Assert.That(facts.Count(item => item.Awd!.Settlement == AwdSettlementState.Final)).IsEqualTo(3);
             await Assert.That(facts.Count(item => item.Awd!.Settlement == AwdSettlementState.PendingAdjudication)).IsEqualTo(7);
             await Assert.That(facts.Where(item => item.Awd!.Health == AwdHealth.InternalError).All(item => item.Result is null)).IsTrue();

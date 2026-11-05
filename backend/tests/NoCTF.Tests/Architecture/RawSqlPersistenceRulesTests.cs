@@ -34,7 +34,9 @@ public sealed class RawSqlPersistenceRulesTests
             .ToArray();
         var violations = sources
             .SelectMany(source => ForbiddenTokens
-                .Where(token => source.Content.Contains(token, StringComparison.Ordinal))
+                .Where(token => source.Content.Contains(token, StringComparison.Ordinal)
+                    && !(source.Path.StartsWith("backend/src/NoCTF.Persistence.PostgreSql/", StringComparison.Ordinal)
+                        && token is "PostgresException" or "PostgresErrorCodes"))
                 .Select(token => $"{source.Path}: forbidden {token}"))
             .Concat(sources.SelectMany(source => ProviderSpecificTokens
                 .Where(token => source.Content.Contains(token, StringComparison.Ordinal))

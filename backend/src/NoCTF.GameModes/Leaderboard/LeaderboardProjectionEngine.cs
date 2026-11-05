@@ -20,7 +20,7 @@ public sealed class LeaderboardProjectionEngine(
         var projection = projectors.Get(input.Mode).Project(input);
         var aggregate = ProjectAggregate(input, projection);
         var normalized = NormalizedScoreboardProjection.Project(input, aggregate);
-        return TheoryScoreProjection.Apply(input, projection, WriteUpBenefitProjection.Apply(input, projection, normalized, projectors)) with
+        return WriteUpBenefitProjection.Apply(input, projection, normalized, projectors) with
         {
             BloodAwards = input.Mode == GameMode.Ctf ? BuildBloodAwards(input) : []
         };
@@ -99,9 +99,9 @@ public sealed class LeaderboardProjectionEngine(
             .Where(fact => fact.TeamId is Guid teamId && validTeams.Contains(teamId)
                 && WriteUpBenefitProjection.CanEarnBlood(input, fact)
                 && fact.CompetitionChallengeId is not null
-                && (validChallenges.Count == 0 ? fact.Kind == GameplayFactKind.FlagAttempt
+                && (validChallenges.Count == 0 ? fact.Kind == GameplayFactKind.BreakAttempt
                     : validChallenges.TryGetValue(fact.CompetitionChallengeId.Value, out var challenge)
-                        && CtfCompletionEligibility.Matches(fact.Kind, challenge.InteractionKind))
+                        && CtfCompletionEligibility.Matches(fact.Kind))
                 && fact.Result == GameplayFactResult.Correct)
             .Select(fact => new CtfSolveObservation(
                 fact.TeamId!.Value,

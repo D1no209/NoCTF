@@ -21,10 +21,9 @@ describe('locale feature catalogs', () => {
       'competitions',
       'writeups',
       'leaderboard',
-      'theory',
     ])
     expect(localeDomainsForPath('/notifications')).toEqual(['account', 'notifications'])
-    expect(localeDomainsForPath('/theory/activity')).toEqual(['account', 'theory'])
+    expect(localeDomainsForPath('/questionnaires/activity')).toEqual(['account', 'questionnaires'])
     expect(localeDomainsForPath('/users/user-1')).toEqual(['account', 'competitions'])
     expect(localeDomainsForPath('/competitions/c1/challenge-writeups/c2')).toEqual(['account', 'competitions', 'writeups', 'challenges'])
   })

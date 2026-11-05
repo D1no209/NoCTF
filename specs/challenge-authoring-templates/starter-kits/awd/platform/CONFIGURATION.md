@@ -2,7 +2,8 @@
 
 这是管理界面配置抄录表，不是直接导入 JSON。正式交付补全 `NOCTF-DELIVERY.md`。
 
-- Runtime：Container，PerTeam，AwdRotation。
+- 题库能力：Break、Check；需要提交修补包时增加 Fix。
+- 题库 Runtime：Container；比赛运行规则使用 PerTeam、AwdRotation。
 - 服务 `main`：构建 `runtime/` 的镜像，0.1 核、64 MiB，内部端口 8080。
 - Runtime 访问入口：`main:8080`，Participants，`http://{HOST}:{PORT}/`。Docker 自动随机发布宿主端口。
 - Store `sample`：编辑器生成稳定 ID，BusinessChecker，目标服务 `main`，支持历史保存。

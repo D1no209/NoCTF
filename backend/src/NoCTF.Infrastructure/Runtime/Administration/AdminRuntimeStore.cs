@@ -943,7 +943,7 @@ public sealed class AdminRuntimeStore(
         }
 
         var purpose = scope.Competition.Mode == GameMode.Awdp
-            ? RuntimePurpose.AwdpAttack
+            ? RuntimePurpose.AttackTarget
             : RuntimePurpose.Player;
         using var criticalSection = teamId is Guid lockedTeamId
             ? await runtimeQuota.AcquireLockAsync(
@@ -973,6 +973,10 @@ public sealed class AdminRuntimeStore(
             .ThenByDescending(item => item.Id)
             .FirstOrDefaultAsync(ct);
         RuntimeInstance entity;
+        if (current is not null && action is (RuntimeAction.Reset or RuntimeAction.Stop)
+            && await db.GameplayFacts.AnyAsync(fact => fact.FixExecution != null && fact.FixExecution.RuntimeInstanceId == current.Id
+                && (fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Pending || fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing), ct))
+            return new(null, RuntimeMutationFailure.Conflict);
         if (action is RuntimeAction.Start or RuntimeAction.Reset)
         {
             if (action == RuntimeAction.Start && current is not null && IsActive(current.State))
@@ -1032,7 +1036,7 @@ public sealed class AdminRuntimeStore(
                     RuntimeInstanceId: cleanupTarget.Id,
                     RuntimeState: cleanupTarget.State), ct);
             }
-            var template = templates.Get(scope.Template.Definition);
+            var template = templates.Get(scope.Template.Definition, scope.Instance.Rules!);
             if (template is null)
                 return new(null, RuntimeMutationFailure.ConfigurationInvalid);
             if (scope.Competition.Mode == GameMode.Ctf

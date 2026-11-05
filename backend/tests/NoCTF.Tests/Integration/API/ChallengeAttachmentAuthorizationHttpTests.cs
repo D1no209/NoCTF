@@ -388,7 +388,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             .UseSnakeCaseNamingConvention()
             .Options);
 
-    private static Challenge Challenge(Guid id, Guid ownerId, string title) => new CtfChallenge
+    private static Challenge Challenge(Guid id, Guid ownerId, string title) => new Challenge
     {
         Id = id,
         OwnerId = ownerId,

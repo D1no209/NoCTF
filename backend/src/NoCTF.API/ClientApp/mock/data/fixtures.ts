@@ -1,44 +1,33 @@
 import { date, id, model, now, type Data } from '../schema'
 import { mockRuntimeEndpoint } from '../runtime'
 import { defaultDefinition, competitionConfigFields, buildConfigValues, fieldDefaultValue } from '../../app/utils/game-config'
+import { supportsCompetitionCapabilities } from '../../app/features/admin/challenge-competition-placements'
 
-export function mockDefinition(mode: string) {
-  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh')
-    throw new Error('Unsupported mock game mode')
-  return defaultDefinition(mode)
+export function mockDefinition() {
+  const definition = defaultDefinition()
+  definition.runtime = { kind: 'Container', container: { services: [{ name: 'target', image: 'noctf-demo/target', internalPorts: [8080] }] }, urlBindings: [] }
+  definition.capabilities = [
+    { kind: 'Break', break: { flagStores: [], environmentTargets: [], injection: null, flagTemplate: null } },
+    { kind: 'Fix', fix: { targetServiceName: 'target', entrypoint: 'fix.sh', command: ['sh'], timeoutSeconds: 60, maximumUploadBytes: 268435456 } },
+    { kind: 'Check', check: { checker: { image: 'noctf-demo/checker', command: ['check'], environment: {}, timeoutSeconds: 30, targetServiceName: 'target' }, requirements: ['Connection', 'Functionality', 'Vulnerability'], acceptsFixInput: false, readyTimeoutSeconds: 30 } },
+    { kind: 'Control', control: { serviceName: 'target', protocol: 'HttpTeamIdentifier', containerPort: 8080, urlTemplate: 'http://{host}:{port}/control', timeoutSeconds: 5 } },
+  ]
+  return definition
 }
 
 export function mockModeConfiguration(mode: string) {
-  const flagTemplate = { header: 'flag', bodyTemplate: '[GUID]', leetLiteralText: false }
-  if (mode === 'Ctf') return {
-    mode,
-    flagTemplate,
-    ctf: {
-      scoreSettlementMode: 'DynamicRecalculation',
-      defaultScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
-      bloodRewards: [],
-      wrongSubmissionPenalty: 0,
-    },
-  }
-  if (mode === 'Awd') {
-    const fields = competitionConfigFields('Awd')
-    return buildConfigValues('Awd', fields, Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)])), { rules: false })
-  }
-  if (mode === 'Awdp') return {
-    mode, flagTemplate, roundDurationSeconds: 300,
-    breakScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
-    fixScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
-    flagWrongPenalty: 0, exploitSucceededPenalty: 0, serviceAbnormalPenalty: 0,
-    requireBreakBeforeFix: true, maxBreakSubmissions: 10, maxFixSubmissions: 10,
-    evaluationDispatchMode: 'Automatic',
-  }
-  return { mode, flagTemplate, pollIntervalSeconds: 5, controlPointsPerInterval: 10 }
+  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh' && mode !== 'LiveSolo') throw new Error('Unsupported demo game mode')
+  const fields = competitionConfigFields(mode)
+  return buildConfigValues(mode, fields, Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)])), { rules: false })
 }
 
 export function mockRules(mode: string) {
   if (mode === 'Awd') return { mode, awd: { overrides: {}, storeRules: [] } }
   if (mode === 'Ctf') return { mode, ctf: { scoreSettlementMode: null } }
-  return { mode }
+  if (mode === 'Awdp') return { mode, awdp: {} }
+  if (mode === 'Koh') return { mode, koh: {} }
+  if (mode === 'LiveSolo') return { mode, liveSolo: { completionKind: 'Break' } }
+  throw new Error('Unsupported demo game mode')
 }
 
 // Fictional seed data only. No production database, credentials, or external URLs.
@@ -96,12 +85,12 @@ export function createFixtures() {
     { direction: 'Cloud', title: 'Ephemeral Bucket', slug: 'cloud' },
     { direction: 'Blockchain', title: 'Ledger Drift', slug: 'blockchain' },
   ] as const
-  const templates = competitions.slice(0, 4).flatMap((competition, ci) => challengeCatalog.map(({ title, direction }, i) => model('ChallengeBankChallengeTemplateResponse', {
-    id: id(3, ci * 100 + i + 1), ownerId: id(1), managerIds: [], mode: competition.mode, visibility: 'Shared',
-    title, direction, description: `## ${title}\n\n这是 ${competition.mode} 模式的 ${direction} 方向本地演示题目。\n\n输入 \`flag{mock_success}\` 可体验正确提交；其他内容将产生错误结果。\n\n此环境不会运行真实容器或处理真实 Flag。`,
-    definition: mockDefinition(String(competition.mode)),
+  const templates = challengeCatalog.map(({ title, direction }, i) => model('ChallengeBankChallengeTemplateResponse', {
+    id: id(3, i + 1), ownerId: id(1), managerIds: [], visibility: 'Shared',
+    title, direction, description: `## ${title}\n\n这是 ${direction} 方向的能力组合演示题目。\n\n输入 \`flag{mock_success}\` 可体验正确提交；其他内容将产生错误结果。\n\n此环境不会运行真实容器或处理真实 Flag。`,
+    definition: mockDefinition(), capabilities: ['Break', 'Fix', 'Check', 'Control'],
     activeCompetitionReferenceCount: 1, createdAt: date(-168), updatedAt: date(-3),
-  })))
+  }))
   const attachments = templates.map((template, index) => {
     const item = challengeCatalog[index % challengeCatalog.length]!
     const mockContent = [
@@ -118,7 +107,7 @@ export function createFixtures() {
       createdAt: date(-2), mockContent,
     })
   })
-  const challenges = competitions.flatMap((competition, ci) => templates.filter(template => template.mode === competition.mode).map((template, index) => model('ChallengesChallengeResponse', {
+  const challenges = competitions.flatMap((competition, ci) => templates.filter(template => supportsCompetitionCapabilities(competition.mode, template.capabilities)).map((template, index) => model('ChallengesChallengeResponse', {
     id: id(4, ci * 100 + index + 1), competitionId: competition.id, challengeId: template.id,
     title: template.title, direction: template.direction, description: template.description, order: index,
       tags: index % 3 === 0 ? ["Beginner", "HTTP"] : index % 3 === 1 ? ["Beginner", "SQL"] : [],
@@ -164,7 +153,7 @@ export function createFixtures() {
     return model('GameplayFactsGameplayFactListItemResponse', {
       id: factId, gameplayFactId: factId, competitionId: competition.id, competitionChallengeId: id(4, ci * 100 + i + 1),
       teamId: id(5, ci * 10 + i + 1), actorUserId: i === 0 ? id(1, 3) : id(10, i),
-      kind: competition.mode === 'Awdp' ? 'BreakAttempt' : 'FlagAttempt', state: 'Completed', result: seededCorrect ? 'Correct' : 'Wrong',
+      kind: 'BreakAttempt', state: 'Completed', result: seededCorrect ? 'Correct' : 'Wrong',
       value: seededCorrect ? 'flag{mock_success}' : 'flag{demo_wrong}', occurredAt: date(-2 + i / 4), updatedAt: date(-2 + i / 4),
     })
   }))
@@ -187,7 +176,7 @@ export function createFixtures() {
     platform: { name: 'NoCTF · MOCK', description: '本地演示站 · Fictional data · No production backend', logoUrl: null,
       imageUploadLimits: { maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 },
       humanVerification: { provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false, evaluationRequired: false },
-      experimentalFeatures: { ctfPatchVerificationEnabled: false }, updatedAt: now() },
+      updatedAt: now() },
   }
 }
 

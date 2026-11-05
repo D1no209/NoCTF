@@ -6,6 +6,8 @@ using NoCTF.API.Security;
 using NoCTF.Application.LiveSolo.Templates;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.LiveSolo;
+using System.Text.Json.Serialization;
+using NoCTF.API.Serialization;
 
 namespace NoCTF.API.Endpoints.LiveSolo;
 
@@ -16,11 +18,13 @@ public sealed class CreateLiveSoloPoolQuestionRequest
     public string? Description { get; set; }
     public required string Direction { get; set; }
     public required ChallengeDefinitionContract Definition { get; set; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloCompletionKind>))]
+    public LiveSoloCompletionKind CompletionKind { get; set; }
 }
 public sealed class CreateLiveSoloPoolQuestionValidator : Validator<CreateLiveSoloPoolQuestionRequest>
 {
     public CreateLiveSoloPoolQuestionValidator()
-    { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.Title).NotEmpty().MaximumLength(160); RuleFor(x => x.Direction).NotEmpty().MaximumLength(96); }
+    { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.Title).NotEmpty().MaximumLength(160); RuleFor(x => x.Direction).NotEmpty().MaximumLength(96); RuleFor(x => x.CompletionKind).IsInEnum(); }
 }
 public sealed class CreateLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
     : Endpoint<CreateLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>>
@@ -33,9 +37,9 @@ public sealed class CreateLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPoo
     }
     public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(CreateLiveSoloPoolQuestionRequest req, CancellationToken ct)
     {
-        if (req.Definition.Mode != NoCTF.API.Endpoints.Competitions.GameModeProtocol.LiveSolo)
+        if (!ChallengeDefinitionContractMapper.HasValidShape(req.Definition))
             return TypedResults.UnprocessableEntity(new LiveSoloPoolFailureResponse(LiveSoloPoolFailure.UnsupportedDefinition));
-        var definition = (LiveSoloChallengeDefinition)ChallengeDefinitionContractMapper.ToDomain(Guid.Empty, GameMode.LiveSolo, req.Definition);
-        return LiveSoloPoolProtocol.Mutation(await pool.CreateAsync(new(req.CompetitionId, user.UserId, req.Title, req.Description, req.Direction, definition, clock.GetUtcNow()), ct));
+        var definition = ChallengeDefinitionContractMapper.ToDomain(Guid.Empty, req.Definition);
+        return LiveSoloPoolProtocol.Mutation(await pool.CreateAsync(new(req.CompetitionId, user.UserId, req.Title, req.Description, req.Direction, definition, clock.GetUtcNow(), req.CompletionKind), ct));
     }
 }

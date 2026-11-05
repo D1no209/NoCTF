@@ -246,7 +246,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await using (var verify = new NoCtfDbContext(options))
             {
                 var runtimes = await verify.RuntimeInstances.AsNoTracking()
-                    .Where(runtime => runtime.Purpose == RuntimePurpose.AwdpAttack)
+                    .Where(runtime => runtime.Purpose == RuntimePurpose.AttackTarget)
                     .OrderBy(runtime => runtime.TeamId)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(runtimes.Length).IsEqualTo(2);
@@ -273,7 +273,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
                         10,
                         cancellationToken);
                 var attackRuntimes = adminRuntimes
-                    .Where(runtime => runtime.Purpose == RuntimePurpose.AwdpAttack)
+                    .Where(runtime => runtime.Purpose == RuntimePurpose.AttackTarget)
                     .ToArray();
                 await Assert.That(attackRuntimes.Length).IsEqualTo(2);
                 await Assert.That(attackRuntimes.Select(runtime => runtime.SourceTeamId).ToArray())
@@ -475,7 +475,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
 
             await Assert.That(result.Failure).IsNull();
             await Assert.That(result.Runtime).IsNotNull();
-            await Assert.That(result.Runtime!.Purpose).IsEqualTo(RuntimePurpose.AwdpAttack);
+            await Assert.That(result.Runtime!.Purpose).IsEqualTo(RuntimePurpose.AttackTarget);
             await Assert.That(result.Runtime.TeamId).IsEqualTo(fixture.TeamIds[0]);
 
             var listed = await store.ListAsync(new(
@@ -561,7 +561,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
     {
         await using var db = new NoCtfDbContext(options);
         var runtimeId = Guid.CreateVersion7(fixture.Now.AddSeconds(1));
-        var runtime = new AwdpAttackRuntimeInstance
+        var runtime = new AttackTargetRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = fixture.CompetitionId,
@@ -597,10 +597,10 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 db.Challenges.AsNoTracking(),
                 item => item.ChallengeId,
                 challenge => challenge.Id,
-                (_, challenge) => challenge)
+                (entry, challenge) => new { challenge.Definition, entry.Rules })
             .SingleAsync(cancellationToken);
         var template = new ChallengeRuntimeTemplateCatalog().Get(
-            challengeDefinition.Definition)!;
+            challengeDefinition.Definition, challengeDefinition.Rules!)!;
         var claim = (ProvisionContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
             runtime,
             "runner-1",
@@ -633,10 +633,10 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 db.Challenges.AsNoTracking(),
                 item => item.ChallengeId,
                 challenge => challenge.Id,
-                (_, challenge) => challenge)
+                (entry, challenge) => new { challenge.Definition, entry.Rules })
             .SingleAsync(cancellationToken);
         var template = new ChallengeRuntimeTemplateCatalog().Get(
-            challengeDefinition.Definition)!;
+            challengeDefinition.Definition, challengeDefinition.Rules!)!;
         var claim = (ProvisionContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
             entity,
             "runner-1",
@@ -645,7 +645,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             challengeDefinition.Definition,
             expectedFlag);
 
-        await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.AwdpAttack);
+        await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.AttackTarget);
         await Assert.That(entity.TeamId).IsEqualTo(runtime.TeamId);
         await Assert.That(claim.Definition.Services[0].Environment!["FLAG"]).IsEqualTo(expectedFlag);
         await Assert.That(claim.Definition.UrlBindings!.Single().ContainerPort).IsEqualTo(31337);
@@ -723,7 +723,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,

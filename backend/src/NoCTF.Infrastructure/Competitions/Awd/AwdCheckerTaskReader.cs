@@ -12,7 +12,7 @@ public sealed class AwdCheckerTaskReader(NoCtfDbContext db, PlatformSecretProtec
     public async Task<AwdCheckerTask?> ReadAsync(Guid runtimeId, Guid factId, Guid attemptId, DateTimeOffset at, CancellationToken ct)
     {
         var fact = await db.GameplayFacts.AsNoTracking().Include(item => item.Awd).ThenInclude(details => details!.Flags)
-            .SingleOrDefaultAsync(item => item.Id == factId && item.Kind == GameplayFactKind.AwdServiceTransition, ct);
+            .SingleOrDefaultAsync(item => item.Id == factId && item.Kind == GameplayFactKind.CheckObservation, ct);
         if (fact?.Awd is not { Execution: AwdCheckExecution.Running, AttemptDeadline: { } deadline } details
             || details.RuntimeId != runtimeId || details.AttemptId != attemptId || at >= deadline)
             return null;
@@ -31,9 +31,9 @@ public sealed class AwdCheckerTaskReader(NoCtfDbContext db, PlatformSecretProtec
                 return null;
             var store = rules[issue.RulesId].Stores.Single(item => item.StoreId == issue.StoreId);
             result.Add(new(flag.Id, issue.StoreId, store.Name, store.TargetServiceName, flag.Flag, expected.Historical,
-                expected.RequiresWrite, issue.ProtectedReadContext is { } context
-                    ? secrets.Unprotect(Convert.FromBase64String(context), PlatformSecretPurpose.AwdFlagReadContext, issue.CompetitionId, issue.FlagId)
-                    : null, issue.PublicLocator));
+                expected.RequiresWrite, flag.ProtectedReadContext is { } context
+                    ? secrets.Unprotect(context, PlatformSecretPurpose.FlagReadContext, issue.CompetitionId, issue.FlagId)
+                    : null, flag.PublicLocator));
         }
         return new(factId, attemptId, deadline, result);
     }

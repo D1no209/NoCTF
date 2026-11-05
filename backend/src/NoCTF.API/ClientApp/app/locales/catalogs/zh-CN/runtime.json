@@ -72,7 +72,7 @@
   "runtime.label.accessEntrance": "访问入口",
   "runtime.runtime.label.oneTimeFixVerification": "一次性 Fix 验证 Target",
   "runtime.runtime.label.oneTimeFixVerification.adminRuntime": "一次性 Fix 验证 Target · {team}",
-  "runtime.runtime.description.awdpAttackRuntimeBound": "未绑定队伍的 AWDP 攻击环境",
+  "runtime.runtime.description.awdpAttackRuntimeBound": "未绑定队伍的攻击环境",
   "runtime.runtimeCard.description.environmentStatusUpdateTimed": "环境状态更新超时,请稍后手动刷新。",
   "runtime.urlBinding.description.visibleTeamItself": "仅队伍自己可见",
   "runtime.label.staticFlagTemplatePreset": "静态 Flag(模板预置)",
@@ -175,5 +175,6 @@
   "runtime.defaults.checkerTimeoutSeconds": "60",
   "runtime.label.compose": "Compose",
   "runtime.terminate.reasonLimitSuffix": "/512",
-  "runtime.label.service": "服务"
+  "runtime.label.service": "服务",
+  "runtime.label.runtimeAllocation": "环境分配方式"
 }

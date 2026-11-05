@@ -7,7 +7,7 @@ using NoCTF.Application.Runtime.Provisioning;
 
 namespace NoCTF.Runner.Messages;
 
-public sealed class RuntimeNodeWorkReader(IDbContextFactory<NoCtfDbContext> contexts)
+public sealed class RuntimeNodeWorkReader(IDbContextFactory<NoCtfDbContext> contexts, TimeProvider clock)
     : IRuntimeNodeWorkReader
 {
     public async Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
@@ -23,6 +23,10 @@ public sealed class RuntimeNodeWorkReader(IDbContextFactory<NoCtfDbContext> cont
         if (assignment is null
             || !string.Equals(assignment.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return RuntimeProvisionWorkStatus.AssignmentAbsent;
+        if (assignment.State == RuntimeState.Provisioning && assignment.Purpose == RuntimePurpose.ScopedFixTarget
+            && await db.Set<NoCTF.Domain.LiveSolo.LiveSoloFixTargetOwnership>().AnyAsync(value => value.RuntimeInstanceId == assignment.Id, cancellationToken)
+            && !await NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloFixTargetValidity.CanProvisionAsync(db, assignment, clock.GetUtcNow(), cancellationToken))
+            return RuntimeProvisionWorkStatus.StopRequested;
         if (assignment.State == RuntimeState.Provisioning
             && assignment.CapacityAllocations.Items.Any(item => !item.Identity.IsAuxiliary
                 && item.Identity.RuntimeInstanceId == message.RuntimeInstanceId

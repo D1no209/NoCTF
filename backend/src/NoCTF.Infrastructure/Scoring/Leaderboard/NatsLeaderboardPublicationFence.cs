@@ -34,9 +34,10 @@ public interface ILeaderboardPublicationFence
     Task<IReadOnlyList<Guid>> GetPendingCompetitionsAsync(CancellationToken ct);
 }
 
-public sealed class NatsLeaderboardPublicationFence(INatsConnection connection, IFusionCacheProvider caches)
+public sealed class NatsLeaderboardPublicationFence(INatsConnection connection, IFusionCacheProvider caches, TimeProvider? configuredClock = null)
     : ILeaderboardPublicationFence
 {
+    private readonly TimeProvider clock = configuredClock ?? TimeProvider.System;
     private readonly NatsKeyValueStoreAccess storeAccess = new(ct =>
         connection.CreateKeyValueStoreContext().CreateOrUpdateStoreAsync(
             new NatsKVConfig("NOCTF_SCOREBOARD_PUBLICATIONS_V4") { History = 1 }, ct));
@@ -76,7 +77,7 @@ public sealed class NatsLeaderboardPublicationFence(INatsConnection connection, 
         var payloadKey = PayloadKey(competitionId, ticket.Version, payload);
         try
         {
-            await RegisterCandidateAsync(new(competitionId, ticket.Version, payloadKey, DateTimeOffset.UtcNow), ct);
+            await RegisterCandidateAsync(new(competitionId, ticket.Version, payloadKey, clock.GetUtcNow()), ct);
             await cache.SetAsync(payloadKey, payload, PayloadOptions, token: ct);
             var accepted = await storeAccess.ExecuteAsync<bool>(async store =>
             {
@@ -228,7 +229,7 @@ public sealed class NatsLeaderboardPublicationFence(INatsConnection connection, 
             var candidate = entry.Value is null ? null : JsonSerializer.Deserialize(entry.Value,
                 LeaderboardPublicationJsonContext.Default.LeaderboardPayloadCandidate);
             if (candidate is null) throw new InvalidOperationException("Invalid scoreboard candidate metadata.");
-            if (DateTimeOffset.UtcNow - candidate.RegisteredAt < TimeSpan.FromMinutes(5)) continue;
+            if (clock.GetUtcNow() - candidate.RegisteredAt < TimeSpan.FromMinutes(5)) continue;
             var current = await ReadAsync(store, candidate.CompetitionId, ct);
             if (current?.Value.PublishedPayloadKey == candidate.PayloadKey) continue;
             await cache.RemoveAsync(candidate.PayloadKey, PayloadOptions, ct);

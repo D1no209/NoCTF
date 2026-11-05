@@ -34,13 +34,12 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
                 .ToArray())
             .IsEquivalentTo([
                 "ResourceIdConflict",
-                "ActiveCompetitionModeConflict",
+                "ReferencedCapabilityConflict",
                 "ActiveRuntimeDefinitionConflict",
                 "OwnerIncludedInManagerSet",
                 "UserNotFound",
                 "RoleNotEligible",
-                "ExperimentalFeatureDisabled",
-                "InteractionKindConflict"
+                "PendingExecutionConflict"
             ]);
         await Assert.That(schemas.EnumerateObject().Count(schema =>
             schema.Name.EndsWith(
@@ -71,12 +70,8 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
             request.GetProperty("properties").GetProperty("content")
                 .GetProperty("oneOf").EnumerateArray().First());
         await Assert.That(PropertyNames(content)).IsEquivalentTo([
-            "mode", "visibility", "title", "description", "direction", "definition"
+            "visibility", "title", "description", "direction", "definition"
         ]);
-        await AssertNamedStringEnumAsync(
-            root,
-            content.GetProperty("properties").GetProperty("mode"),
-            ["Ctf", "Awd", "Awdp", "Koh", "LiveSolo"]);
         await AssertNamedStringEnumAsync(
             root,
             content.GetProperty("properties").GetProperty("visibility"),

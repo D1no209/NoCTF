@@ -104,7 +104,7 @@ public class GameplayFactAdmissionPolicyTests
         GameplayFactAdmissionSnapshot snapshot,
         DateTimeOffset receivedAt) => GameplayFactAdmissionPolicy.Check(
         snapshot,
-        NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt,
+        NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt,
         new(true, false, null, null),
         receivedAt);
 }

@@ -49,7 +49,7 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
             return OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.GameplayFactScopeNotFound, "GameplayFact scope was not found.");
 
-        var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
+        var kind = GameplayFactKind.BreakAttempt;
         var rules = modePolicy.GetRules(
             snapshot.Mode, snapshot.CompetitionConfiguration, snapshot.ChallengeRules,
             snapshot.ChallengeDefinition);
@@ -108,7 +108,7 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
             return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.FlagBatchNotSupported, "Only AWD accepts a Flag collection.");
 
-        var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
+        var kind = GameplayFactKind.BreakAttempt;
         var rules = modePolicy.GetRules(
             snapshot.Mode, snapshot.CompetitionConfiguration, snapshot.ChallengeRules,
             snapshot.ChallengeDefinition);

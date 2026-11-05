@@ -46,17 +46,17 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
 
         facts = query.Mode switch
         {
-            GameMode.Ctf => facts.Where(fact => (fact.Kind == GameplayFactKind.FlagAttempt
+            GameMode.Ctf => facts.Where(fact => (fact.Kind == GameplayFactKind.BreakAttempt
                     || fact.Kind == GameplayFactKind.HintUnlock)
                 && fact.OccurredAt >= ctfWindow.StartAt
                 && fact.OccurredAt < ctfWindow.EndAt),
-            GameMode.Awd => facts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
+            GameMode.Awd => facts.Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
                 && fact.Awd != null && fact.Awd.ReceivedRoundId == query.RoundId),
             GameMode.Awdp => facts.Where(fact => (fact.Kind == GameplayFactKind.BreakAttempt
                     || fact.Kind == GameplayFactKind.FixAttempt)
                 && fact.OccurredAt >= query.RoundStartAt
                 && fact.OccurredAt < query.RoundEndAt),
-            GameMode.Koh => facts.Where(fact => fact.Kind == GameplayFactKind.KohControlObservation),
+            GameMode.Koh => facts.Where(fact => fact.Kind == GameplayFactKind.ControlObservation),
             _ => throw new ArgumentOutOfRangeException(nameof(query), query.Mode, "Unsupported game mode.")
         };
 

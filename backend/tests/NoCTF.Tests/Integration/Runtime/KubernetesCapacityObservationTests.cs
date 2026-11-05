@@ -1,18 +1,17 @@
 using k8s;
 using k8s.Models;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
-using NSubstitute;
-using Testcontainers.PostgreSql;
+using NATS.Client.Core;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
@@ -27,7 +26,11 @@ public sealed class KubernetesCapacityObservationTests
             Skip.Test("Requires an isolated Kubernetes cluster with metrics-server and pod-pids-limit=128 attested nodes.");
             return;
         }
-        var clientConfiguration = KubernetesClientConfiguration.BuildDefaultConfig();
+        var context = Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_CONTEXT")
+            ?? throw new InvalidOperationException("An explicit isolated integration context is required.");
+        if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated integration cluster.");
+        var clientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigFile(
+            Environment.GetEnvironmentVariable("KUBECONFIG"), currentContext: context);
         using var client = new Kubernetes(clientConfiguration);
         var ns = "noctf-capacity-" + Guid.NewGuid().ToString("N");
         var roleCreated = false;
@@ -42,9 +45,11 @@ public sealed class KubernetesCapacityObservationTests
             var lifecycle = new KubernetesContainerLifecycle(client, options);
             var id = Guid.NewGuid();
             var policy = new RuntimeResourceBudgetPolicy();
-            var limits = policy.EffectiveLimit(new(64 * 1024 * 1024, 201_000_001, 128), RuntimeProvider.Kubernetes);
+            var image = Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_TEST_IMAGE") ?? "busybox:1.36.1";
+            var limits = policy.EffectiveLimit(new RuntimeServiceDefinition("capacity", image, .202m, 64)
+                .Resources(options.PodPidsLimit), RuntimeProvider.Kubernetes);
             var budget = policy.Calculate(limits, RuntimeProvider.Kubernetes);
-            var receipt = await lifecycle.CreateAsync(new(id, RuntimeProvider.Kubernetes, "busybox:1.36.1", ["sleep", "180"], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), limits, null, OperationTimeout: TimeSpan.FromMinutes(2), Budget: budget), ct);
+            var receipt = await lifecycle.EnsureRunningAsync(new(id, RuntimeProvider.Kubernetes, image, ["sleep", "180"], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), limits, null, OperationTimeout: TimeSpan.FromMinutes(2), Budget: budget), ct);
             try
             {
                 var pod = await client.CoreV1.ReadNamespacedPodAsync(receipt.ResourceId, ns, cancellationToken: ct);
@@ -52,13 +57,12 @@ public sealed class KubernetesCapacityObservationTests
                 await Assert.That(pod.Spec.Containers[0].Resources.Requests["cpu"].ToDecimal()).IsEqualTo(.202m);
                 await Assert.That(pod.Spec.Containers[0].Resources.Limits["cpu"].ToDecimal()).IsEqualTo(.202m);
                 await Assert.That(pod.Spec.Containers[0].Resources.Requests["memory"].ToDecimal()).IsEqualTo(limits.MemoryBytes);
-                await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
-                await postgres.StartAsync(ct);
-                var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-                    { ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString() }).Build();
+                await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
+                await using var nats = new NatsConnection(new NatsOpts { Url = fixture.NatsUrl });
+                var leases = new NatsClusterLeaseManager(nats, TimeProvider.System);
                 var runner = Options.Create(new RunnerOptions { Id = "kube-capacity-test", Provider = RuntimeProvider.Kubernetes });
-                await using var observer = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, client, new InMemoryClusterLeaseManager(),
-                    Substitute.For<IHostApplicationLifetime>(), TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
+                await using var observer = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, client, leases,
+                    fixture.Lifetime, TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
                 RunnerAdmissionSnapshot snapshot = await observer.SampleAsync(ct);
                 for (var attempt = 0; attempt < 10 && snapshot.State != RunnerAdmissionState.Ready; attempt++)
                 {
@@ -66,7 +70,7 @@ public sealed class KubernetesCapacityObservationTests
                     snapshot = await observer.SampleAsync(ct);
                 }
                 await Assert.That(snapshot.State).IsEqualTo(RunnerAdmissionState.Ready);
-                await Assert.That(snapshot.Observation!.CpuMillicores).IsEqualTo(eligible.Items.Sum(node => (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1_000_000_000m)));
+                await Assert.That(snapshot.Observation!.CpuMillicores).IsEqualTo(eligible.Items.Sum(node => (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1000m)));
                 await Assert.That(snapshot.Observation.MemoryTotalBytes).IsEqualTo(eligible.Items.Sum(node => (long)node.Status.Allocatable["memory"].ToDecimal()));
                 await Assert.That(snapshot.Observation.PidsUsed).IsNull();
                 await Assert.That(snapshot.Observation.PidsCapacity).IsNull();
@@ -88,8 +92,8 @@ public sealed class KubernetesCapacityObservationTests
                 using var restricted = new Kubernetes(new KubernetesClientConfiguration
                 { Host = clientConfiguration.Host, SslCaCerts = clientConfiguration.SslCaCerts, AccessToken = token.Status.Token });
                 await Assert.That((await restricted.CoreV1.ListNodeAsync(cancellationToken: ct)).Items.Count).IsGreaterThan(0);
-                await using var denied = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, restricted, new InMemoryClusterLeaseManager(),
-                    Substitute.For<IHostApplicationLifetime>(), TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
+                await using var denied = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, restricted, leases,
+                    fixture.Lifetime, TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
                 var blocked = await denied.SampleAsync(ct);
                 await Assert.That(blocked.State).IsEqualTo(RunnerAdmissionState.Starting);
                 await Assert.That(blocked.Failure).IsEqualTo(RunnerAdmissionFailure.ObservationStale);

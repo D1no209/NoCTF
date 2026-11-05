@@ -124,7 +124,7 @@ public sealed class AwdpParticipantStatePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new AwdpChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = userId,
@@ -179,7 +179,7 @@ public sealed class AwdpParticipantStatePersistenceTests
                 UpdatedAt = now.AddSeconds(-20)
             });
         db.RuntimeInstances.AddRange(
-            new AwdpAttackRuntimeInstance
+            new AttackTargetRuntimeInstance
             {
                 Id = attackRuntimeId,
                 CompetitionId = competitionId,
@@ -199,7 +199,7 @@ public sealed class AwdpParticipantStatePersistenceTests
                 RunningAt = now.AddMinutes(-2),
                 ExpiresAt = now.AddMinutes(10)
             },
-            new AwdpTargetRuntimeInstance
+            new FixTargetRuntimeInstance
             {
                 Id = fixRuntimeId,
                 CompetitionId = competitionId,

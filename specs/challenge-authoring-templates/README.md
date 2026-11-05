@@ -6,6 +6,7 @@
 - [AWDP 出题模板](awdp-challenge-template.md)
 - [可直接打包的 AWD / AWDP Starter Kit](starter-kits/README.md)
 - [AWDP PWN 示例题 index-vault](examples/awdp-pwn-index-vault/README.md)
+- [能力组合、独立 Questionnaire 与统一回调样例](capability-examples.md)
 
 使用方法：
 

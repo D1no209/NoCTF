@@ -34,7 +34,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             .Where(item => item.CompetitionId == competitionId).ToArrayAsync(ct);
         var challenges = challengeRows.Select(row => new StartGateChallenge(
             row.Instance.Id,
-            row.Template.Mode,
+            row.Instance.Mode,
             row.Instance.Rules ?? throw new InvalidOperationException(
                 $"Competition challenge {row.Instance.Id} has no rules."),
             row.Template.Definition ?? throw new InvalidOperationException(

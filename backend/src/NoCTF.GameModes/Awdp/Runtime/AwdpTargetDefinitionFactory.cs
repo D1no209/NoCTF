@@ -3,7 +3,7 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.GameModes.Awdp.Runtime;
 
-using NoCTF.GameModes.PatchVerification.Runtime;
+using NoCTF.Application.Challenges.Capabilities;
 
 public static class AwdpTargetDefinitionFactory
 {
@@ -12,9 +12,9 @@ public static class AwdpTargetDefinitionFactory
         ChallengeRuntimeTemplate template,
         RuntimeProvider provider,
         DateTimeOffset now)
-        => PatchVerificationTargetDefinitionFactory.Create(
+        => FixTargetDefinitionFactory.Create(
             operationId,
             template,
             provider,
-            RuntimePurpose.AwdpTarget);
+            RuntimePurpose.FixTarget);
 }

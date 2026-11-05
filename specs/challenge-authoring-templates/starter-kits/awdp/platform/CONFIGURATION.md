@@ -4,9 +4,9 @@
 
 ## 题库模板
 
-- 游戏模式：`AWDP`
+- 题库能力：`Break`、`Fix`、`Check`；比赛部署模式为 `AWDP`
 - Break Flag：平台按比赛题目、队伍和 Runtime UUID 生成的精确 Flag
-- 分配语义 / FlagSource：`PerTeam` / `PerTeam`
+- 比赛运行规则的分配语义 / FlagSource：`PerTeam` / `PerTeam`
 - Flag 环境变量：`FLAG` 或题目采用的合法变量名
 - Flag 容量：目标服务、漏洞读取路径和作者 EXP 必须完整支持 1～4096 UTF-8 字节
 - Runtime：Container；不使用 Compose 或 OVA
@@ -21,6 +21,7 @@
 - Checker 镜像：`待填写`
 - Checker 目标端口：`8080`
 - Checker 超时：`待填写`
+- Check 要求：`Functionality`、`Vulnerability`；回调只发送客观探针及真实观察时间。
 
 公开端口和 URL 只用于 Player Runtime。一次性 Fix target 绑定申请队伍但无公开入口，
 只通过隔离内部网络连接 Checker。比赛专属 Flag 模板在比赛默认配置或比赛题目规则中配置，题目规则优先。

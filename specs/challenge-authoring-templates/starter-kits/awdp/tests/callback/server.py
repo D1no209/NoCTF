@@ -4,11 +4,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 EXPECTED_TOKEN = os.environ["EXPECTED_TOKEN"]
-ALLOWED_OUTCOMES = {
-    "ExploitSucceeded",
-    "DefenseSucceeded",
-    "ServiceAbnormal",
-}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -27,7 +22,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length))
-        if payload.get("outcome") not in ALLOWED_OUTCOMES or len(payload) != 1:
+        if {probe.get("kind") for probe in payload.get("probes", [])} != {"Functionality", "Vulnerability"} or not payload.get("observedAt"):
             self.respond(422)
             return
         print(json.dumps(payload, separators=(",", ":")), flush=True)

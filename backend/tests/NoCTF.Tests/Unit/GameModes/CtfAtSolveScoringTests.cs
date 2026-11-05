@@ -13,12 +13,12 @@ public sealed class CtfAtSolveScoringTests
         .Select(i => Guid.Parse($"20000000-0000-0000-0000-{i:000000000000}")).ToArray();
     private static readonly DateTimeOffset Started = DateTimeOffset.Parse("2026-10-02T00:00:00Z");
 
-    [Test, Arguments(CtfInteractionKind.FlagSubmission), Arguments(CtfInteractionKind.PatchVerification)]
-    public async Task Later_solves_do_not_reprice_earlier_solves_and_quote_the_next_price(CtfInteractionKind interaction)
+    [Test]
+    public async Task Later_solves_do_not_reprice_earlier_solves_and_quote_the_next_price()
     {
-        var first = Input([Fact(0, 1, interaction)], interaction: interaction);
+        var first = Input([Fact(0, 1)]);
         var before = Project(first);
-        var after = Project(first with { GameplayFacts = [.. first.GameplayFacts, Fact(1, 2, interaction), Fact(2, 3, interaction), Fact(0, 4, interaction)] });
+        var after = Project(first with { GameplayFacts = [.. first.GameplayFacts, Fact(1, 2), Fact(2, 3), Fact(0, 4)] });
         await Assert.That(Score(before, 0)).IsEqualTo(500);
         await Assert.That(Score(after, 0)).IsEqualTo(500);
         await Assert.That(Score(after, 1)).IsEqualTo(400);
@@ -153,7 +153,7 @@ public sealed class CtfAtSolveScoringTests
         rules.ScoreCurve = new() { InitialPoints = 700, MinimumPoints = 70, DecayTeamCount = 10, DecayMode = PersistedScoreDecayMode.Linear };
         await Assert.That(Score(Project(input), 0)).IsEqualTo(mode == CtfScoreSettlementMode.AtSolve ? 770 : 693);
         rules.HasScoreCurve = false;
-        var validationRules = NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(rules, preset);
+        var validationRules = (CtfCompetitionChallengeRules)NoCTF.Domain.Competitions.Scoring.CtfScoreCurveResolver.ForValidation(rules, preset);
         await Assert.That(validationRules.HasScoreCurve).IsTrue();
         await Assert.That(validationRules.ScoreCurve.InitialPoints).IsEqualTo(2000);
         await Assert.That(rules.HasScoreCurve).IsFalse();
@@ -164,13 +164,13 @@ public sealed class CtfAtSolveScoringTests
 
     private static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input) => new CtfLeaderboardProjector().Project(input);
     private static long Score(GameModeLeaderboardProjection projection, int team) => projection.Entries.Single(entry => entry.TeamId == Teams[team]).Score;
-    private static LeaderboardGameplayFact Fact(int team, int seconds, CtfInteractionKind interaction = CtfInteractionKind.FlagSubmission) =>
-        new(Guid.NewGuid(), Teams[team], ChallengeId, CtfCompletionEligibility.CompletionKind(interaction), Started.AddSeconds(seconds),
+    private static LeaderboardGameplayFact Fact(int team, int seconds) =>
+        new(Guid.NewGuid(), Teams[team], ChallengeId, GameplayFactKind.BreakAttempt, Started.AddSeconds(seconds),
             GameplayFactState.Completed, GameplayFactResult.Correct, null);
     private static LeaderboardProjectionInput Input(IReadOnlyList<LeaderboardGameplayFact> facts,
-        CtfScoreSettlementMode mode = CtfScoreSettlementMode.AtSolve, CtfInteractionKind interaction = CtfInteractionKind.FlagSubmission) =>
+        CtfScoreSettlementMode mode = CtfScoreSettlementMode.AtSolve) =>
         new(Guid.NewGuid(), GameMode.Ctf, Teams.Select((team, i) => new LeaderboardTeamFact(team, $"team-{i}", false, false)).ToArray(), facts,
-            [new(ChallengeId, "Web", "challenge", false, InteractionKind: interaction)],
+            [new(ChallengeId, "Web", "challenge", false)],
             new CtfCompetitionModeConfiguration { ScoreSettlementMode = mode,
                 DefaultScoreCurve = new() { InitialPoints = 500, MinimumPoints = 100, DecayTeamCount = 5, DecayMode = PersistedScoreDecayMode.Linear } },
             ProjectedAt: Started.AddHours(1));

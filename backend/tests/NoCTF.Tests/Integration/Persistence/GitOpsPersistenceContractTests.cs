@@ -100,12 +100,11 @@ public sealed class GitOpsPersistenceContractTests
                 new(
                     challengeId,
                     botId,
-                    GameMode.Ctf,
                     ChallengeVisibility.Private,
                     "Stable challenge",
                     "Statement",
                     "Web",
-                    new CtfChallengeDefinition(),
+                    TestConfigurations.Definition(GameMode.Ctf),
                     now),
                 cancellationToken);
             await Assert.That(challenge.State)

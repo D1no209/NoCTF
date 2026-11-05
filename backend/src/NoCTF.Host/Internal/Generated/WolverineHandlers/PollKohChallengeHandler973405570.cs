@@ -3,7 +3,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Notifications;
-using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Koh.Configuration;
 using System;
 using System.Net.Http;
@@ -17,34 +16,31 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
-        private readonly NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog _challengeRuntimeTemplateCatalog;
         private readonly NoCTF.GameModes.Koh.Configuration.IKohProducerConfigurationCatalog _kohProducerConfigurationCatalog;
         private readonly System.Net.Http.IHttpClientFactory _httpClientFactory;
         private readonly System.TimeProvider _timeProvider;
 
-        public PollKohChallengeHandler973405570(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.GameModes.Koh.Configuration.IKohProducerConfigurationCatalog kohProducerConfigurationCatalog, System.Net.Http.IHttpClientFactory httpClientFactory, System.TimeProvider timeProvider)
+        public PollKohChallengeHandler973405570(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Koh.Configuration.IKohProducerConfigurationCatalog kohProducerConfigurationCatalog, System.Net.Http.IHttpClientFactory httpClientFactory, System.TimeProvider timeProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _notificationChangePublisher = notificationChangePublisher;
-            _challengeRuntimeTemplateCatalog = challengeRuntimeTemplateCatalog;
             _kohProducerConfigurationCatalog = kohProducerConfigurationCatalog;
             _httpClientFactory = httpClientFactory;
             _timeProvider = timeProvider;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            var httpKohControlClient = new NoCTF.Infrastructure.Competitions.Koh.HttpKohControlClient(_httpClientFactory);
+            var httpControlObservationClient = new NoCTF.Infrastructure.Challenges.Capabilities.HttpControlObservationClient(_httpClientFactory);
+            var observeControl = new NoCTF.Application.Challenges.Capabilities.ObserveControl(httpControlObservationClient, _timeProvider);
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             // The actual message body
             var pollKohChallenge = (NoCTF.Application.Messaging.PollKohChallenge)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.KohPollingHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.KohPollingHandler");
-            var kohPollingHandler = new NoCTF.Worker.KohPollingHandler(noCtfDbContext, httpKohControlClient, _kohProducerConfigurationCatalog, _challengeRuntimeTemplateCatalog, _timeProvider);
+            var kohPollingHandler = new NoCTF.Worker.KohPollingHandler(noCtfDbContext, observeControl, _kohProducerConfigurationCatalog, _timeProvider);
             
             // The actual message execution
             var outgoing1 = await kohPollingHandler.Handle(pollKohChallenge, cancellation).ConfigureAwait(false);
@@ -52,13 +48,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // Outgoing, cascaded message
             await context.EnqueueCascadingAsync(outgoing1).ConfigureAwait(false);
-
         }
-
     }
 
     // END: PollKohChallengeHandler973405570
     
     
 }
-

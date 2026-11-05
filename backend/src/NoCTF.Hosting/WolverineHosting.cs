@@ -23,11 +23,13 @@ public static class WolverineHosting
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:Nats or Wolverine:Nats:ConnectionString is required.");
 
-        options.Policies.Add(new AwdpFixVerificationExecutionTimeoutPolicy());
+        options.Policies.Add(new CapabilityExecutionTimeoutPolicy());
         options.Policies.Add(new AwdFlagInjectionExecutionTimeoutPolicy());
 
         options.UseNats(nats)
             .AutoProvision()
+            .DeduplicateUsing(envelope => $"{envelope.DeduplicationId ?? envelope.Id.ToString()}:{envelope.Destination?.AbsoluteUri
+                ?? throw new InvalidOperationException("JetStream publication requires a destination.")}")
             .UseJetStream(jetStream =>
             {
                 jetStream.MaxDeliver = configuration.GetValue("Wolverine:Nats:MaxDeliver", 5);
@@ -38,23 +40,20 @@ public static class WolverineHosting
                     "Wolverine:Nats:DuplicateWindowSeconds",
                     120));
             })
-            .DefineWorkQueueStream(
+            .DefineStream(
                 NatsSubjects.ControlStream,
                 stream => stream.WithSubjects(
                     NatsSubjects.Subject(WorkerQueue.Control),
-                    NatsSubjects.ScheduledSubject(WorkerQueue.Control)).EnableScheduledDelivery(),
-                NatsSubjects.Subject(WorkerQueue.Control))
-            .DefineWorkQueueStream(
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Control) + ".>").EnableScheduledDelivery())
+            .DefineStream(
                 NatsSubjects.GameplayStream,
                 stream => stream.WithSubjects(
                     NatsSubjects.Subject(WorkerQueue.Gameplay),
-                    NatsSubjects.ScheduledSubject(WorkerQueue.Gameplay)).EnableScheduledDelivery(),
-                NatsSubjects.Subject(WorkerQueue.Gameplay))
-            .DefineWorkQueueStream(
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Gameplay) + ".>").EnableScheduledDelivery())
+            .DefineStream(
                 NatsSubjects.LiveSoloMediaStream,
                 stream=>stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.LiveSoloMedia),
-                    NatsSubjects.ScheduledSubject(WorkerQueue.LiveSoloMedia)).EnableScheduledDelivery(),
-                NatsSubjects.Subject(WorkerQueue.LiveSoloMedia))
+                    NatsSubjects.ScheduledSubject(WorkerQueue.LiveSoloMedia) + ".>").EnableScheduledDelivery())
             .DefineStream(
                 NatsSubjects.ProjectionStream,
                 stream =>
@@ -62,12 +61,11 @@ public static class WolverineHosting
                     stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Projection));
                     stream.Retention = StreamConfigRetention.Workqueue;
                 })
-            .DefineWorkQueueStream(
+            .DefineStream(
                 NatsSubjects.BackgroundStream,
                 stream => stream.WithSubjects(
                     NatsSubjects.Subject(WorkerQueue.Background),
-                    NatsSubjects.ScheduledSubject(WorkerQueue.Background)).EnableScheduledDelivery(),
-                NatsSubjects.Subject(WorkerQueue.Background))
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Background) + ".>").EnableScheduledDelivery())
             .DefineWorkQueueStream(
                 NatsSubjects.WebhookStream,
                 stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Webhook)),
@@ -85,9 +83,8 @@ public static class WolverineHosting
                 NatsSubjects.RealtimeEvents,
                 NatsSubjects.LeaderboardEvents,
                 NatsSubjects.WebhookEvents)
-            .DefineWorkQueueStream(
+            .DefineStream(
                 NatsSubjects.RunnerStream,
-                stream => stream.WithSubject("noctf.v2.runner.>").EnableScheduledDelivery(),
-                "noctf.v2.runner.>");
+                stream => stream.WithSubject("noctf.v2.runner.>").EnableScheduledDelivery());
     }
 }

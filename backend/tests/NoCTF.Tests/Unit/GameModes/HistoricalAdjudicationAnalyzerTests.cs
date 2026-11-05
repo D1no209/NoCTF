@@ -29,7 +29,7 @@ public sealed class HistoricalAdjudicationAnalyzerTests
     {
         var factId = Guid.NewGuid();
         return new(factId, Guid.NewGuid(), "challenge", Guid.NewGuid(), "team", GameMode.Ctf,
-            GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, null, At, true, 0, false,
+            GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, null, At, true, 0, false,
             events.Select(item => item with { GameplayFactId = item.GameplayFactId ?? factId }).ToArray(), []);
     }
 

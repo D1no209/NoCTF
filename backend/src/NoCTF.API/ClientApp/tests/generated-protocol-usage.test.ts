@@ -77,7 +77,7 @@ describe('generated protocol usage', () => {
     expect(gameConfig).toContain("export const runtimeFlagSourceProtocols = ['Static', 'PerTeam', 'AwdRotation'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol[]")
     // 未知协议值必须显式失败,不允许静默回退成另一个值:旧的静默映射函数已移除。
     expect(gameConfig).not.toContain('function protocolAllocation(')
-    expect(gameConfig).toContain("export const ctfInteractionProtocols = ['FlagSubmission', 'PatchVerification'] as const satisfies readonly NoCtfapiEndpointsChallengesCtfInteractionKindProtocol[]")
+    expect(gameConfig).toContain("export const challengeCapabilityProtocols = ['Break', 'Fix', 'Check', 'Control', 'Questionnaire'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol[]")
     expect(gameConfig).toContain("export const scoreDecayProtocols = [")
     // 静默把未知协议映射到默认值的辅助函数必须保持移除状态。
     expect(gameConfig).not.toContain('function protocolIndex(')

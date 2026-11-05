@@ -87,7 +87,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(persistence).DoesNotContain("PersistMessagesWithPostgresql");
         await Assert.That(persistence).DoesNotContain("UseEntityFrameworkCoreTransactions");
         await Assert.That(persistence)
-            .Contains("new AwdpFixVerificationExecutionTimeoutPolicy()")
+            .Contains("new CapabilityExecutionTimeoutPolicy()")
             .And.DoesNotContain("ExecutionTimeoutInSeconds = 60");
         await Assert.That(persistence).Contains("options.UseNats(nats)");
         foreach (var scheduledQueue in new[]
@@ -109,13 +109,11 @@ public sealed class DeploymentTopologyTests
             .Contains("typeof(SendEmailVerification)")
             .And.Contains("BackgroundEndpointAddress()");
         await Assert.That(routing)
-            .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
+            .Contains("Route<RecoverFixExecution>(options, WorkerQueue.Control)");
         await Assert.That(routing)
             .Contains("Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control)");
         await Assert.That(routing)
-            .Contains("Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay)");
-        await Assert.That(routing)
-            .Contains("Route<StartPatchVerification>(options, WorkerQueue.Gameplay)");
+            .Contains("Route<StartFixExecution>(options, WorkerQueue.Gameplay)");
         await Assert.That(runnerTopology).Contains(".MaximumAckExtension(");
         await Assert.That(runnerTopology).DoesNotContain(".AckWait(");
         foreach (var workerQueue in new[]

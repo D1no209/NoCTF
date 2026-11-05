@@ -74,7 +74,7 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
         var facts = await db.GameplayFacts.AsNoTracking().Where(fact => fact.ActorUserId == userId
                 && (competitionId == null || fact.CompetitionId == competitionId)
                 && fact.OccurredAt >= cutoff
-                && (fact.Kind == GameplayFactKind.FlagAttempt || fact.Kind == GameplayFactKind.BreakAttempt
+                && (fact.Kind == GameplayFactKind.BreakAttempt
                     || fact.Kind == GameplayFactKind.FixAttempt))
             .OrderByDescending(fact => fact.OccurredAt).ThenByDescending(fact => fact.Id).Take(50)
             .Select(fact => new AccountActivity(fact.Id,

@@ -26,7 +26,8 @@ public sealed partial class LiveSoloMatchStore
             var facts = await db.GameplayFacts.Include(x => x.AcquisitionEvidence).Where(x => associations.Select(a => a.GameplayFactId).Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == match.CompetitionId, ct);
             var directory = await db.CompetitionChallenges.AsNoTracking().Where(x => round.Questions.Select(q => q.CompetitionChallengeId).Contains(x.Id))
-                .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template }).ToDictionaryAsync(x => x.Entry.Id, ct);
+                .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template })
+                .AsSplitQuery().ToDictionaryAsync(x => x.Entry.Id, ct);
             var questionIds = round.Questions.Select(x => x.Id).ToArray();
             var runtimes = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes().Where(x => x.ExecutionScopeId != null
                     && questionIds.Contains(x.ExecutionScopeId.Value)).Select(x => new { x.Id, x.ExecutionScopeId, x.RunningAt }).ToArrayAsync(ct);
@@ -37,7 +38,7 @@ public sealed partial class LiveSoloMatchStore
             var resolution = new LiveSoloOrderedResolution(round.LastAdmissionSequence);
             var changedFacts = new List<GameplayFact>();
             var priorByQuestion = new Dictionary<Guid, List<GameplayFact>>();
-            var evaluator = new LiveSoloFlagEvaluator();
+            var evaluator = new NoCTF.GameModes.GameplayFact.BreakCapabilityEvaluator(new LiveSoloFlagEvaluator());
             foreach (var association in associations)
             {
                 var fact = facts[association.GameplayFactId];
@@ -48,7 +49,7 @@ public sealed partial class LiveSoloMatchStore
                 }
                 if (!priorByQuestion.TryGetValue(association.RoundQuestionId, out var prior))
                     priorByQuestion[association.RoundQuestionId] = prior = [];
-                if (fact.State is GameplayFactState.Queued or GameplayFactState.Pending or GameplayFactState.Processing)
+                if (fact.Kind == GameplayFactKind.BreakAttempt && fact.State is GameplayFactState.Queued or GameplayFactState.Pending or GameplayFactState.Processing)
                 {
                     var question = round.Questions.Single(x => x.Id == association.RoundQuestionId);
                     var challenge = directory[question.CompetitionChallengeId];
@@ -66,14 +67,15 @@ public sealed partial class LiveSoloMatchStore
                         ChallengeDefinition: challenge.Template.Definition));
                     fact.Result = decision.Result; fact.FailureCode = decision.FailureCode; fact.VictimTeamId = decision.VictimTeamId;
                     fact.State = decision.Result is null ? GameplayFactState.PlatformFailed : GameplayFactState.Completed; fact.UpdatedAt = now;
+                    if (decision.BreakOutcome is { } evidence) NoCTF.Application.Challenges.Capabilities.BreakOutcomeUpdates.Apply(fact, evidence);
                     changedFacts.Add(fact);
                     if (fact.TeamId is Guid sourceTeam && fact.ActorUserId is Guid actor && CheatIncidentFailures.IsIncident(fact.FailureCode))
                     {
                         if (fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected && fact.VictimTeamId is Guid owner)
-                            await messages.PublishAsync(new ForeignTeamFlagDetected(fact.CompetitionId, fact.Id, sourceTeam, owner, actor,
+                            await messages.PublishAsync(new ForeignTeamFlagDetected(fact.CompetitionId!.Value, fact.Id, sourceTeam, owner, actor,
                                 fact.CompetitionChallengeId!.Value, fact.OccurredAt));
                         else if (fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected)
-                            await messages.PublishAsync(new StaticFlagAcquisitionViolationDetected(fact.CompetitionId, fact.Id, sourceTeam, actor,
+                            await messages.PublishAsync(new StaticFlagAcquisitionViolationDetected(fact.CompetitionId!.Value, fact.Id, sourceTeam, actor,
                                 fact.CompetitionChallengeId!.Value, fact.FailureCode!.Value, fact.OccurredAt));
                     }
                 }

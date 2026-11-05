@@ -76,14 +76,7 @@ public sealed class FlagAttemptStateReaderPersistenceTests
                     competition.UpdatedAt = now;
                     seed.Competitions.Add(competition);
 
-                    Challenge template = mode switch
-                    {
-                        GameMode.Ctf => new CtfChallenge(),
-                        GameMode.Awd => new AwdChallenge(),
-                        GameMode.Awdp => new AwdpChallenge(),
-                        GameMode.Koh => new KohChallenge(),
-                        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
-                    };
+                    var template = new Challenge();
                     template.Id = templateId;
                     template.OwnerId = userId;
                     template.Title = $"{mode} template";
@@ -125,9 +118,7 @@ public sealed class FlagAttemptStateReaderPersistenceTests
                 await seed.SaveChangesAsync(cancellationToken);
                 foreach (var scope in scopes.Where(item => item.Mode != GameMode.Koh))
                 {
-                    var fact = scope.Mode == GameMode.Awdp
-                        ? (GameplayFact)new BreakAttemptGameplayFact()
-                        : new FlagAttemptGameplayFact();
+                    var fact = new BreakAttemptGameplayFact();
                     fact.Id = Guid.CreateVersion7();
                     fact.CompetitionId = scope.CompetitionId;
                     fact.CompetitionChallengeId = scope.ChallengeId;

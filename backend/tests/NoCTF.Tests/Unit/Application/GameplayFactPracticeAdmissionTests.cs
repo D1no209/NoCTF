@@ -19,7 +19,7 @@ public sealed class GameplayFactPracticeAdmissionTests
         var now = DateTimeOffset.Parse("2026-09-11T08:00:00Z");
         var result = GameplayFactAdmissionPolicy.Check(
             Snapshot(now, mode, status, practiceEnabled),
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             new(true, false, 1, null),
             now);
 
@@ -42,7 +42,7 @@ public sealed class GameplayFactPracticeAdmissionTests
 
         var result = GameplayFactAdmissionPolicy.Check(
             snapshot,
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             new(true, false, 1, null),
             end);
 
@@ -64,7 +64,7 @@ public sealed class GameplayFactPracticeAdmissionTests
 
         var result = GameplayFactAdmissionPolicy.Check(
             snapshot,
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             new(true, false, null, null),
             now);
 

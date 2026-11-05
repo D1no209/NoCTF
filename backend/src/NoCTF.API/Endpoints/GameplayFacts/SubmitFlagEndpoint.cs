@@ -18,13 +18,12 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactKindProtocol>))]
 public enum GameplayFactKindProtocol
 {
-    FlagAttempt,
     BreakAttempt,
     FixAttempt,
     HintUnlock,
     ManualAdjustment,
-    AwdServiceTransition,
-    KohControlObservation,
+    CheckObservation,
+    ControlObservation,
     AttachmentDownload,
     WriteUpUnlock
 }
@@ -91,10 +90,6 @@ public enum GameplayFactFailureCodeProtocol
     ForeignTeamFlagDetected,
     InsufficientScore,
     HintUnavailable,
-    PatchStillExploitable,
-    PatchExecutionFailed,
-    PatchServiceAbnormal,
-    PatchVerificationPlatformFailed,
     StaticFlagWithoutContainer,
     StaticFlagWithoutAttachment,
     StaticFlagWithoutContainerAndAttachment,
@@ -104,7 +99,13 @@ public enum GameplayFactFailureCodeProtocol
     FlagNotIssued,
     FlagNotYetActive,
     FlagNotScorable,
-    AwdReceiptUnavailable
+    AwdReceiptUnavailable,
+    FixExecutionFailed,
+    FixExecutionTimedOut,
+    FixExecutionUncertain,
+    FixPlatformFailure,
+    FixStillExploitable,
+    FixServiceAbnormal
 }
 
 public sealed record AcceptedGameplayFactResponse(
@@ -132,7 +133,17 @@ public sealed record GameplayFactStatusResponse(
     DateTimeOffset UpdatedAt,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
     NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
-    AwdAttackStatusResponse? AwdAttack = null);
+    AwdAttackStatusResponse? AwdAttack = null,
+    FixExecutionStatusResponse? FixExecution = null);
+
+public sealed record FixExecutionStatusResponse(
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.Capabilities.FixTargetKind>))]
+    NoCTF.Domain.Challenges.Capabilities.FixTargetKind TargetKind,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase>))]
+    NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase Phase,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase>))]
+    NoCTF.Domain.Challenges.Capabilities.FixExecutionPhase? FailedPhase,
+    bool MutationBlocked);
 
 public sealed record AdminGameplayFactStatusResponse(
     Guid GameplayFactId,
@@ -207,7 +218,7 @@ public static partial class GameplayFactMapper
         AdmissionFailureCode failureCode);
 
     [MapEnum(EnumMappingStrategy.ByName)]
-    [MapperIgnoreSourceValue(GameplayFactKind.TheoryPaperSubmission)]
+    [MapperIgnoreSourceValue(GameplayFactKind.QuestionnaireAttempt)]
     public static partial GameplayFactKindProtocol ToProtocol(GameplayFactKind value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
@@ -221,7 +232,7 @@ public static partial class GameplayFactMapper
     public static partial GameplayFactFailureCodeProtocol ToProtocol(GameplayFactFailureCode value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
-    [MapperIgnoreTargetValue(GameplayFactKind.TheoryPaperSubmission)]
+    [MapperIgnoreTargetValue(GameplayFactKind.QuestionnaireAttempt)]
     public static partial GameplayFactKind ToDomain(GameplayFactKindProtocol value);
 
     [MapEnum(EnumMappingStrategy.ByName)]

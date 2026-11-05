@@ -1,4 +1,5 @@
 import { message as describeMessage } from '../../../../../../utils/i18n'
+import { supportsCompetitionCapabilities } from '../../../../../admin/challenge-competition-placements'
 import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags, replaceScorePresetTag, tagKey } from '~/lib/challenge-tags'
 import { proxyRefs } from 'vue'
@@ -134,7 +135,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   const addError = ref<UiMessage | null>(null)
 
   const modeTemplates = computed(() =>
-    templates.value.filter(t => t.mode === competition.value?.mode && !t.deletedAt),
+    templates.value.filter(t => !t.deletedAt && supportsCompetitionCapabilities(competition.value?.mode, t.capabilities ?? [])),
   )
 
   const addedTemplateIds = computed(() => new Set(
@@ -177,7 +178,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     templatesLoading.value = true
     try {
       const [templateResult, challengeResult] = await Promise.all([
-        adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } }),
+        adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, requiredCapabilities: [], direction: null, keyword: null, offset: 0, limit: 200, desc: false } }),
         adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: true } }),
       ])
       const failure = templateResult.error ?? challengeResult.error

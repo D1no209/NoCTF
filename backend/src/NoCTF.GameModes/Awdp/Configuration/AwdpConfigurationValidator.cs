@@ -1,6 +1,7 @@
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 using NoCTF.Application.Scoring;
+using NoCTF.Application.Challenges.Capabilities;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.GameModes.Flags;
@@ -143,12 +144,12 @@ public static class AwdpConfigurationValidator
         ValidatePatchCommand(patchCommand, errors);
 
         var patchIsValid = patchTimeoutSeconds is null && configuredValuesAreOptional
-            || patchTimeoutSeconds is >= 1 and <= AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds;
+            || patchTimeoutSeconds is >= 1 and <= FixExecutionBudget.MaximumPatchTimeoutSeconds;
         if (!patchIsValid)
         {
             errors.Add(configuredValuesAreOptional
-                ? $"PatchTimeoutSeconds must be between 1 and {AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds} when configured."
-                : $"PatchTimeoutSeconds must be between 1 and {AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds}.");
+                ? $"PatchTimeoutSeconds must be between 1 and {FixExecutionBudget.MaximumPatchTimeoutSeconds} when configured."
+                : $"PatchTimeoutSeconds must be between 1 and {FixExecutionBudget.MaximumPatchTimeoutSeconds}.");
         }
 
         var readyIsValid = readyTimeoutSeconds is null && configuredValuesAreOptional
@@ -164,9 +165,9 @@ public static class AwdpConfigurationValidator
             return;
 
         var effectivePatchTimeout = patchTimeoutSeconds
-            ?? AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds;
+            ?? FixExecutionBudget.DefaultPatchTimeoutSeconds;
         var effectiveReadyTimeout = readyTimeoutSeconds
-            ?? AwdpFixExecutionBudget.DefaultReadyTimeoutSeconds;
+            ?? FixExecutionBudget.DefaultReadyTimeoutSeconds;
         if (checker.TimeoutSeconds > 0
             && effectiveReadyTimeout > checker.TimeoutSeconds)
         {
@@ -175,7 +176,7 @@ public static class AwdpConfigurationValidator
 
         if (patchIsValid
             && checker.TimeoutSeconds >= 1
-            && !AwdpFixExecutionBudget.FitsHandlerTimeout(
+            && !FixExecutionBudget.FitsHandlerTimeout(
                 effectivePatchTimeout,
                 checker.TimeoutSeconds))
         {
@@ -190,22 +191,22 @@ public static class AwdpConfigurationValidator
     {
         if (patchCommand is not { Count: > 0 })
             return;
-        if (patchCommand.Count > AwdpPatchCommandRules.MaximumArguments)
+        if (patchCommand.Count > FixCommandRules.MaximumArguments)
         {
             errors.Add(
-                $"PatchCommand cannot contain more than {AwdpPatchCommandRules.MaximumArguments} arguments.");
+                $"PatchCommand cannot contain more than {FixCommandRules.MaximumArguments} arguments.");
         }
         if (patchCommand.Any(string.IsNullOrWhiteSpace))
             errors.Add("PatchCommand cannot contain blank arguments.");
         if (patchCommand.Any(argument =>
-                argument.Length > AwdpPatchCommandRules.MaximumArgumentLength))
+                argument.Length > FixCommandRules.MaximumArgumentLength))
         {
             errors.Add(
-                $"PatchCommand arguments cannot exceed {AwdpPatchCommandRules.MaximumArgumentLength} characters.");
+                $"PatchCommand arguments cannot exceed {FixCommandRules.MaximumArgumentLength} characters.");
         }
         if (patchCommand.Count(argument => string.Equals(
                 argument,
-                AwdpPatchCommandRules.EntrypointPlaceholder,
+                FixCommandRules.EntrypointPlaceholder,
                 StringComparison.Ordinal)) != 1)
         {
             errors.Add(
@@ -258,15 +259,14 @@ public static class AwdpConfigurationValidator
             && runtime is { FlagSource: not NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam })
             errors.Add("AWDP player Runtime FlagSource must be PerTeam.");
         if (runtime is null) return;
-        if (runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition { Services.Count: 1 } definition)
-        { errors.Add("AWDP requires exactly one Runtime service."); return; }
-        var service = definition.Services[0];
-        if (service.InternalPorts is not { Count: 1 }) errors.Add("AWDP requires exactly one internal target port.");
+        if (runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition { Services.Count: > 0 and <= 64 } definition)
+        { errors.Add("AWDP requires named Container Runtime services."); return; }
+        if (!definition.Services.Any(service => service.InternalPorts is { Count: > 0 })) errors.Add("AWDP requires internal service ports for checking.");
         if (!allowsAttackExposure && runtime.UrlBindings is { Count: > 0 }) errors.Add("Disposable targets cannot expose public entries.");
         if (allowsAttackExposure && runtime.UrlBindings is not { Count: > 0 }) errors.Add("AWDP requires an OwnerOnly attack entry.");
         if (allowsAttackExposure && runtime.UrlBindings?.Any(binding => binding.Exposure != NoCTF.Application.Runtime.Provisioning.RuntimeExposure.OwnerOnly
-            || binding.ServiceName != service.Name || service.InternalPorts is not { Count: 1 } || binding.ContainerPort != service.InternalPorts[0]) == true)
-            errors.Add("AWDP entries must use OwnerOnly exposure and target the single checker port.");
+            || !definition.Services.Any(service => service.Name == binding.ServiceName && service.InternalPorts?.Contains(binding.ContainerPort ?? 0) == true)) == true)
+            errors.Add("AWDP entries must use OwnerOnly exposure and reference declared service ports.");
     }
 
     private static void ValidateChecker(

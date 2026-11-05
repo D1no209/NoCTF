@@ -18,7 +18,7 @@ public sealed class ChallengeTemplateProtocolTests
         new(JsonSerializerDefaults.Web);
 
     [Test]
-    [Arguments("""{"mode":"Ctf","visibility":"Private","definition":{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"patchCommand":[]}}""")]
+    [Arguments("""{"visibility":"Private","definition":{"capabilities":[{"kind":"Break","break":{}}]}}""")]
     public async Task Create_request_accepts_pascal_case_string_enums(string json)
     {
         var request = JsonSerializer.Deserialize<CreateChallengeTemplateRequest>(
@@ -26,12 +26,14 @@ public sealed class ChallengeTemplateProtocolTests
             JsonOptions);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Mode).IsEqualTo(GameModeProtocol.Ctf);
+        await Assert.That(request!.Definition.Capabilities.Single().Kind).IsEqualTo(ChallengeCapabilityProtocol.Break);
         await Assert.That(request.Visibility).IsEqualTo(ChallengeVisibilityProtocol.Private);
+        using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(request, JsonOptions));
+        await Assert.That(serialized.RootElement.TryGetProperty("mode", out _)).IsFalse();
     }
 
     [Test]
-    [Arguments("""{"content":{"mode":"Ctf","visibility":"Private","title":"Template","description":null,"direction":"Web","definition":{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"patchCommand":[]}}}""")]
+    [Arguments("""{"content":{"visibility":"Private","title":"Template","description":null,"direction":"Web","definition":{"capabilities":[{"kind":"Break","break":{}}]}}}""")]
     public async Task Update_request_accepts_pascal_case_string_enums(string json)
     {
         var request = JsonSerializer.Deserialize<PatchChallengeTemplateRequest>(
@@ -39,7 +41,7 @@ public sealed class ChallengeTemplateProtocolTests
             JsonOptions);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Content!.Mode).IsEqualTo(GameModeProtocol.Ctf);
+        await Assert.That(request!.Content!.Definition.Capabilities.Single().Kind).IsEqualTo(ChallengeCapabilityProtocol.Break);
         await Assert.That(request.Content.Visibility).IsEqualTo(ChallengeVisibilityProtocol.Private);
     }
 
@@ -84,20 +86,17 @@ public sealed class ChallengeTemplateProtocolTests
         {
             Content = new()
             {
-                Mode = (GameModeProtocol)(-1),
                 Visibility = (ChallengeVisibilityProtocol)(-1),
                 Title = string.Empty,
                 Description = null,
                 Direction = string.Empty,
-                Definition = CtfDefinition()
+                Definition = BreakDefinition()
             }
         });
         var missingProperties = missing.Errors
             .Select(error => error.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        await Assert.That(missingProperties.Contains(
-            "Content.Mode")).IsTrue();
         await Assert.That(missingProperties.Contains(
             "Content.Visibility")).IsTrue();
         await Assert.That(missingProperties.Contains(
@@ -108,19 +107,18 @@ public sealed class ChallengeTemplateProtocolTests
         {
             Content = new()
             {
-                Mode = GameModeProtocol.Ctf,
                 Visibility = ChallengeVisibilityProtocol.Private,
                 Title = "Template",
                 Description = null,
                 Direction = "Web",
-                Definition = CtfDefinition()
+                Definition = BreakDefinition()
             }
         }).IsValid).IsTrue();
     }
 
     [Test]
     [Arguments(ChallengeTemplateConflictCode.RoleNotEligible)]
-    [Arguments(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict)]
+    [Arguments(ChallengeTemplateConflictCode.ReferencedCapabilityConflict)]
     [Arguments(ChallengeTemplateConflictCode.ActiveRuntimeDefinitionConflict)]
     public async Task Conflict_code_serializes_as_a_named_enum(
         ChallengeTemplateConflictCode code)
@@ -133,20 +131,20 @@ public sealed class ChallengeTemplateProtocolTests
     [Test]
     public async Task Permission_specific_mappers_only_update_their_allowed_fields()
     {
-        var challenge = new CtfChallenge
+        var definition = new ChallengeDefinition { Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition()] };
+        var challenge = new Challenge
         {
             Id = Guid.NewGuid(), OwnerId = Guid.NewGuid(), ManagerIds = [],
             Visibility = ChallengeVisibility.Private,
-            Title = "Old", Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf)
+            Title = "Old", Direction = "Web", Definition = definition
         };
         ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(new()
         {
-            Mode = GameModeProtocol.Awd,
             Visibility = ChallengeVisibilityProtocol.Shared,
             Title = "New",
             Description = null,
             Direction = "Pwn",
-            Definition = AwdDefinition()
+            Definition = BreakDefinition()
         }, challenge);
         var ownerAfterContent = challenge.OwnerId;
         var newOwner = Guid.NewGuid();
@@ -159,22 +157,23 @@ public sealed class ChallengeTemplateProtocolTests
         await Assert.That(challenge.Title).IsEqualTo("New");
         await Assert.That(challenge.OwnerId).IsEqualTo(newOwner);
         await Assert.That(ownerAfterContent).IsNotEqualTo(newOwner);
+        await Assert.That(ReferenceEquals(challenge.Definition, definition)).IsTrue();
     }
 
-    private static ChallengeDefinitionContract CtfDefinition() => new()
+    [Test]
+    [Arguments("""{"capabilities":[]}""", false)]
+    [Arguments("""{"capabilities":[{"kind":"Break","break":{}},{"kind":"Fix","fix":{"targetServiceName":"web"}}]}""", true)]
+    [Arguments("""{"capabilities":[{"kind":"Break","break":{}},{"kind":"Break","break":{}}]}""", false)]
+    [Arguments("""{"capabilities":[{"kind":"Break","fix":{"targetServiceName":"web"}}]}""", false)]
+    [Arguments("""{"capabilities":[{"kind":"Break","break":{},"fix":{"targetServiceName":"web"}}]}""", false)]
+    public async Task Capability_contract_rejects_missing_duplicate_or_mismatched_branches(string json, bool valid)
     {
-        Mode = GameModeProtocol.Ctf,
-        Ctf = new CtfChallengeDefinitionContract
-        {
-            InteractionKind = NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol.FlagSubmission
-        },
-        PatchCommand = []
-    };
+        var contract = JsonSerializer.Deserialize<ChallengeDefinitionContract>(json, JsonOptions);
+        await Assert.That(ChallengeDefinitionContractMapper.HasValidShape(contract)).IsEqualTo(valid);
+    }
 
-    private static ChallengeDefinitionContract AwdDefinition() => new()
+    private static ChallengeDefinitionContract BreakDefinition() => new()
     {
-        Mode = GameModeProtocol.Awd,
-        Awd = new AwdChallengeDefinitionContract { FlagInjection = null },
-        PatchCommand = []
+        Capabilities = [new() { Kind = ChallengeCapabilityProtocol.Break, Break = new() }]
     };
 }

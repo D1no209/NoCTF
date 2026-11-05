@@ -34,7 +34,8 @@ public enum AwdCheckReason : short
     IncompleteEvidence,
     InvalidEvidence,
     RuntimeSuperseded,
-    LateReceipt
+    LateReceipt,
+    PlayerMaintenance
 }
 
 public sealed record AwdProbe(AwdProbeOutcome Outcome, AwdCheckReason Reason = AwdCheckReason.None);

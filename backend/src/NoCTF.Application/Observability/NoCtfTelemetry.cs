@@ -569,8 +569,7 @@ public static class NoCtfTelemetry
         GameplayFactResult? result,
         double elapsedSeconds)
     {
-        var submissionKind = kind is GameplayFactKind.FlagAttempt
-            or GameplayFactKind.BreakAttempt
+        var submissionKind = kind == GameplayFactKind.BreakAttempt
             ? SubmissionKind(kind)
             : null;
         var outcome = state switch
@@ -611,7 +610,6 @@ public static class NoCtfTelemetry
 
     private static string? SubmissionKind(GameplayFactKind kind) => kind switch
     {
-        GameplayFactKind.FlagAttempt => "flag",
         GameplayFactKind.BreakAttempt => "break",
         GameplayFactKind.FixAttempt => "fix",
         _ => null

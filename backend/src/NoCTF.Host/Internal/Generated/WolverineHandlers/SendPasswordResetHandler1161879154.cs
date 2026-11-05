@@ -21,8 +21,6 @@ namespace Internal.Generated.WolverineHandlers
             _passwordResetEmailDelivery = passwordResetEmailDelivery;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             // The actual message body
@@ -34,13 +32,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await accountNotificationMessageHandler.Handle(sendPasswordReset, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: SendPasswordResetHandler1161879154
     
     
 }
-

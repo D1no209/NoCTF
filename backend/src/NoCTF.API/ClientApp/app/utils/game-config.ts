@@ -1,11 +1,15 @@
 import { defaultAwdTieBreaks } from './awd-tie-breaks'
-import { createAwdFlagStore } from './awd-flag-stores'
 import { toRaw } from 'vue'
 import { awdOptionFields } from './awd-config-fields'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
-  NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
-  NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityContract,
+  NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract,
+  NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract,
+  NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract,
+  NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
   NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol,
@@ -91,7 +95,6 @@ export interface RuntimeServiceModel {
   command: string[]
   arguments: string[]
   environment: Record<string, string>
-  flagEnvironmentVariableName: string
   internalPorts: Array<number | null>
 }
 
@@ -109,15 +112,11 @@ export interface OvaDefinitionModel {
 export type RuntimeDefinitionModel = ContainerDefinitionModel | OvaDefinitionModel
 
 export interface RuntimeTemplateModel {
-  allocation: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol
   egressPolicy: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol
   definition: RuntimeDefinitionModel
   limits: RuntimeLimitsModel
-  ttlSeconds: number | null
   operationTimeoutSeconds: number | null
   urlBindings: UrlBindingModel[]
-  flagSource: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol
-  controlCheckUrlBinding: UrlBindingModel | null
 }
 
 export interface RunnerJobModel {
@@ -140,15 +139,17 @@ export interface FlagInjectionModel {
 }
 
 export interface DefinitionModel {
-  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol
+  capabilities: NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol[]
   runtime: RuntimeTemplateModel | null
-  /** AWD:checker(包装 job + targetServiceName)。 */
   checker: { job: RunnerJobModel; targetServiceName: string } | null
-  /** AWDP:checker 直接是 RunnerJobConfiguration。 */
-  checkerJob: RunnerJobModel | null
-  awdFlagStores: NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract[]
+  checkRequirements: NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol[]
+  flagStores: NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract[]
+  flagEnvironmentTargets: NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract[]
+  control: NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract | null
+  questionnaire: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract | null
   flagInjection: FlagInjectionModel | null
   flagTemplate: FlagTemplateModel | null
+  patchTargetServiceName: string
   patchEntrypoint: string
   patchCommand: string[]
   patchTimeoutSeconds: number | null
@@ -158,7 +159,6 @@ export interface DefinitionModel {
 }
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
-export const DEFAULT_CTF_PATCH_UPLOAD_BYTES = 64 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 export const DEFAULT_RUNTIME_MEMORY_BYTES = 256 * 1024 * 1024
 export const DEFAULT_RUNTIME_CPU_MILLICORES = 500
@@ -174,38 +174,28 @@ export function defaultRuntimeLimits(): RuntimeLimitsModel {
   }
 }
 
-export function emptyRuntimeService(name = 'main', withFlagInjection = false): RuntimeServiceModel {
+export function emptyRuntimeService(name = 'main'): RuntimeServiceModel {
   return { name, image: '', cpuCores: 0.5, memoryMiB: 512, command: [], arguments: [], environment: {},
-    flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '', internalPorts: [] }
+    internalPorts: [] }
 }
 
-export function emptyContainerDefinition(withFlagInjection = false): ContainerDefinitionModel {
-  return { kind: 'container', services: [emptyRuntimeService('main', withFlagInjection)] }
+export function emptyContainerDefinition(): ContainerDefinitionModel {
+  return { kind: 'container', services: [emptyRuntimeService()] }
 }
 
 export function emptyUrlBinding(): UrlBindingModel {
   return { urlTemplate: 'http://{host}:{port}', exposure: 'Participants', containerPort: null, serviceName: 'main' }
 }
 
-export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
+export function emptyRuntimeTemplate(): RuntimeTemplateModel {
   const accessBinding = emptyUrlBinding()
-  accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-    ? 'OwnerOnly'
-    : 'Participants'
+  accessBinding.exposure = 'OwnerOnly'
   return {
-    allocation: mode === 'Koh' ? 'Shared' : 'PerTeam',
     egressPolicy: 'Isolated',
-    definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'),
+    definition: emptyContainerDefinition(),
     limits: defaultRuntimeLimits(),
-    ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: [accessBinding],
-    flagSource: mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
-      ? 'PerTeam'
-      : mode === 'Awd'
-        ? 'AwdRotation'
-        : 'Static',
-    controlCheckUrlBinding: null,
   }
 }
 
@@ -217,20 +207,24 @@ export function emptyFlagTemplate(): FlagTemplateModel {
   return { header: 'flag', bodyTemplate: '[GUID]', leetLiteralText: false }
 }
 
-export function emptyDefinition(mode: GameModeValue): DefinitionModel {
+export function emptyDefinition(): DefinitionModel {
   return {
-    interactionKind: 'FlagSubmission',
+    capabilities: ['Break'],
     runtime: null,
     checker: null,
-    checkerJob: null,
-    awdFlagStores: mode === 'Awd' ? [createAwdFlagStore()] : [],
+    checkRequirements: ['Functionality', 'Vulnerability'],
+    flagStores: [],
+    flagEnvironmentTargets: [],
+    control: null,
+    questionnaire: null,
     flagInjection: null,
     flagTemplate: null,
-    patchEntrypoint: '',
+    patchTargetServiceName: 'main',
+    patchEntrypoint: 'fix.sh',
     patchCommand: [],
     patchTimeoutSeconds: null,
     readyTimeoutSeconds: null,
-    maximumPatchUploadBytes: mode === 'Awdp' ? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES : null,
+    maximumPatchUploadBytes: DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES,
     checkerFixInput: false,
   }
 }
@@ -253,21 +247,6 @@ function asNumber(value: unknown): number | null {
 
 function asBool(value: unknown): boolean {
   return value === true
-}
-
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
-}
-
-
-function asStringMap(value: unknown): Record<string, string> {
-  const obj = asObject(value)
-  if (!obj) return {}
-  const result: Record<string, string> = {}
-  for (const [key, v] of Object.entries(obj)) {
-    if (typeof v === 'string') result[key] = v
-  }
-  return result
 }
 
 // ---------- Definition mapping ----------
@@ -306,7 +285,7 @@ export const runtimeAllocationProtocols = ['Shared', 'PerTeam'] as const satisfi
 export const runtimeEgressPolicyProtocols = ['Isolated', 'InternetOnly'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol[]
 export const runtimeFlagSourceProtocols = ['Static', 'PerTeam', 'AwdRotation'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol[]
 export const runtimeExposureProtocols = ['OwnerOnly', 'Participants'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol[]
-export const ctfInteractionProtocols = ['FlagSubmission', 'PatchVerification'] as const satisfies readonly NoCtfapiEndpointsChallengesCtfInteractionKindProtocol[]
+export const challengeCapabilityProtocols = ['Break', 'Fix', 'Check', 'Control', 'Questionnaire'] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol[]
 
 /**
  * 读取生成契约中的协议值。未知值必须显式失败:静默回退成默认值会在下次保存时
@@ -347,7 +326,7 @@ function definitionContractRuntime(
       services: runtime.container.services.map(service => ({
         name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
         command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: { ...(service.environment ?? {}) },
-        flagEnvironmentVariableName: service.flagEnvironmentVariableName ?? '', internalPorts: [...(service.internalPorts ?? [])],
+        internalPorts: [...(service.internalPorts ?? [])],
       })),
     }
   }
@@ -355,7 +334,6 @@ function definitionContractRuntime(
   const limits = asObject(value.limits) ?? {}
   const bindings = Array.isArray(value.urlBindings) ? value.urlBindings : []
   return {
-    allocation: optionalProtocol(value.allocation, runtimeAllocationProtocols, 'PerTeam', 'runtime allocation'),
     egressPolicy: optionalProtocol(value.egressPolicy, runtimeEgressPolicyProtocols, 'Isolated', 'runtime egress policy'),
     definition,
     limits: {
@@ -363,92 +341,72 @@ function definitionContractRuntime(
       cpuMillicores: asNumber(limits.cpuMillicores),
       pidsLimit: asNumber(limits.pidsLimit),
     },
-    ttlSeconds: asNumber(value.ttlSeconds),
     operationTimeoutSeconds: asNumber(value.operationTimeoutSeconds),
-    urlBindings: bindings.filter(item => asObject(item)?.isControlCheck !== true).map(parseUrlBinding),
-    flagSource: optionalProtocol(value.flagSource, runtimeFlagSourceProtocols, 'Static', 'runtime flag source'),
-    controlCheckUrlBinding: bindings.find(item => asObject(item)?.isControlCheck === true)
-      ? parseUrlBinding(bindings.find(item => asObject(item)?.isControlCheck === true))
-      : null,
+    urlBindings: bindings.map(parseUrlBinding),
   }
 }
 
 export function definitionContractToModel(
   contract: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
-  mode: GameModeValue,
 ): DefinitionModel {
-  if (contract.mode !== mode) throw new Error('Challenge definition mode does not match the editor.')
-  const selected = mode === 'Ctf' ? contract.ctf : mode === 'Awd' ? contract.awd : mode === 'Awdp' ? contract.awdp : mode === 'LiveSolo' ? contract.liveSolo : contract.koh
-  if (!selected || [contract.ctf, contract.awd, contract.awdp, contract.koh, contract.liveSolo].filter(Boolean).length !== 1)
-    throw new Error('Invalid challenge definition branch.')
-  const model = emptyDefinition(mode)
-  model.flagTemplate = contract.flagTemplate ? parseFlagTemplate(contract.flagTemplate) : null
-  model.interactionKind = optionalProtocol(contract.ctf?.interactionKind, ctfInteractionProtocols, 'FlagSubmission', 'CTF interaction kind')
+  if (!contract.capabilities?.length || new Set(contract.capabilities.map(item => item.kind)).size !== contract.capabilities.length)
+    throw new Error('Invalid challenge capability set.')
+  const model = emptyDefinition()
+  model.capabilities = contract.capabilities.map(item => requiredProtocol(item.kind, challengeCapabilityProtocols, 'Capability'))
   model.runtime = contract.runtime ? definitionContractRuntime(contract.runtime) : null
-  const checker = asObject(contract.checker)
-  if (checker) {
-    const job = {
-      image: asString(checker.image),
-      command: asStringArray(checker.command),
-      environment: asStringMap(checker.environment),
-      timeoutSeconds: asNumber(checker.timeoutSeconds),
-    }
-    if (mode === 'Awd') {
-      model.checker = {
-        job,
-        targetServiceName: asString(checker.targetServiceName),
+  for (const capability of contract.capabilities) {
+    if ([capability.break, capability.fix, capability.check, capability.control, capability.questionnaire].filter(Boolean).length !== 1)
+      throw new Error('Invalid capability branch.')
+    switch (capability.kind) {
+      case 'Break': {
+        if (!capability.break) throw new Error('Missing Break definition.')
+        model.flagTemplate = capability.break.flagTemplate ? parseFlagTemplate(capability.break.flagTemplate) : null
+        model.flagStores = structuredClone(toRaw(capability.break.flagStores ?? []))
+        model.flagEnvironmentTargets = structuredClone(toRaw(capability.break.environmentTargets ?? []))
+        const injection = capability.break.injection
+        model.flagInjection = injection ? { command: injection.command ?? '', timeoutSeconds: injection.timeoutSeconds ?? 30, serviceName: injection.serviceName ?? '' } : null
+        break
       }
-    }
-    else {
-      model.checkerJob = job
+      case 'Fix': {
+        if (!capability.fix) throw new Error('Missing Fix definition.')
+        model.patchTargetServiceName = capability.fix.targetServiceName
+        model.patchEntrypoint = capability.fix.entrypoint ?? 'fix.sh'
+        model.patchCommand = [...(capability.fix.command ?? [])]
+        model.patchTimeoutSeconds = capability.fix.timeoutSeconds ?? 60
+        model.maximumPatchUploadBytes = capability.fix.maximumUploadBytes ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
+        break
+      }
+      case 'Check': {
+        if (!capability.check?.checker) throw new Error('Missing Check definition.')
+        const checker = capability.check.checker
+        model.checker = { targetServiceName: checker.targetServiceName ?? '', job: {
+          image: checker.image ?? '', command: [...(checker.command ?? [])], environment: { ...checker.environment }, timeoutSeconds: checker.timeoutSeconds ?? 30,
+        } }
+        model.readyTimeoutSeconds = capability.check.readyTimeoutSeconds ?? 30
+        model.checkerFixInput = capability.check.acceptsFixInput ?? false
+        model.checkRequirements = [...capability.check.requirements]
+        break
+      }
+      case 'Control':
+        if (!capability.control) throw new Error('Missing Control definition.')
+        model.control = structuredClone(toRaw(capability.control))
+        break
+      case 'Questionnaire':
+        if (!capability.questionnaire) throw new Error('Missing Questionnaire definition.')
+        model.questionnaire = structuredClone(toRaw(capability.questionnaire))
+        break
     }
   }
-  if (mode === 'Awd') model.awdFlagStores = structuredClone(toRaw(contract.awd?.flagStores ?? []))
-  const injection = asObject(contract.awd?.flagInjection)
-  if (mode === 'Awd' && injection) {
-    model.flagInjection = {
-      command: asString(injection.command),
-      timeoutSeconds: asNumber(injection.timeoutSeconds),
-      serviceName: asString(injection.serviceName),
-    }
-  }
-  model.patchEntrypoint = asString(contract.patchEntrypoint)
-  model.patchCommand = asStringArray(contract.patchCommand)
-  model.patchTimeoutSeconds = asNumber(contract.patchTimeoutSeconds)
-  model.readyTimeoutSeconds = asNumber(contract.readyTimeoutSeconds)
-  model.maximumPatchUploadBytes = asNumber(contract.maximumPatchUploadBytes)
-  model.checkerFixInput = contract.checkerFixInput === true
   return model
 }
 
-export function applyCtfInteraction(
-  model: DefinitionModel,
-  interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol,
-): void {
-  model.interactionKind = interactionKind
-  if (interactionKind === 'PatchVerification') {
-    model.runtime ??= emptyRuntimeTemplate('Ctf')
-    if (model.runtime.definition.kind !== 'container')
-      model.runtime.definition = emptyContainerDefinition(false)
-    model.runtime.flagSource = 'Static'
-    for (const service of model.runtime.definition.services) service.flagEnvironmentVariableName = ''
-    model.checkerJob ??= emptyRunnerJob()
-    model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
-    model.flagTemplate = null
-    return
-  }
-  model.patchEntrypoint = ''
-  model.patchCommand = []
-  model.patchTimeoutSeconds = null
-  model.readyTimeoutSeconds = null
-  model.maximumPatchUploadBytes = null
-  model.checkerJob = null
-  model.checkerFixInput = false
-  if (model.runtime) {
-    model.runtime.flagSource = 'PerTeam'
-    if (model.runtime.definition.kind === 'container')
-      model.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
-  }
+export function setChallengeCapability(model: DefinitionModel, kind: DefinitionModel['capabilities'][number], enabled: boolean): void {
+  if (!enabled) { model.capabilities = model.capabilities.filter(item => item !== kind); return }
+  if (!model.capabilities.includes(kind)) model.capabilities.push(kind)
+  if (kind === 'Fix' || kind === 'Check' || kind === 'Control') model.runtime ??= emptyRuntimeTemplate()
+  if (kind === 'Check') model.checker ??= { job: emptyRunnerJob(), targetServiceName: 'main' }
+  if (kind === 'Control') model.control ??= { protocol: 'HttpTeamIdentifier', urlTemplate: 'http://{host}:{port}/control', serviceName: 'main', containerPort: 80, timeoutSeconds: 10 }
+  if (kind === 'Questionnaire') model.questionnaire ??= { revisionId: crypto.randomUUID(), revisionNumber: 1, questions: [] }
 }
 
 // ---------- Field-driven competition and challenge configuration ----------
@@ -472,7 +430,7 @@ export interface ConfigFieldOption {
 export interface ConfigFieldDef {
   /** JSON 属性名(camelCase)。 */
   key: string
-  scope?: 'awdOptions'
+  scope?: 'awdOptions' | 'runtimeRules'
   group?: import('./awd-config-fields').AwdFieldGroup
   label: string
   type: ConfigFieldType
@@ -590,22 +548,45 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
 }
 
 /** Challenge rule fields are nullable; null means inheriting the competition value. */
+function runtimeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
+  const allocation = mode === 'Koh' ? 'Shared' : 'PerTeam'
+  const flagSource = mode === 'Awd' ? 'AwdRotation' : mode === 'Awdp' ? 'PerTeam' : 'Static'
+  const flagOptions = mode === 'Ctf' || mode === 'LiveSolo' ? ['Static', 'PerTeam'] : [flagSource]
+  return [
+    { key: 'allocation', scope: 'runtimeRules', label: translate('runtime.label.runtimeAllocation'), type: 'select', defaultValue: allocation,
+      options: [{ value: allocation, label: allocation === 'Shared' ? 'common.label.share' : 'runtime.label.teamIndependent' }] },
+    { key: 'flagSource', scope: 'runtimeRules', label: translate('runtime.label.flagSource'), type: 'select', defaultValue: flagSource,
+      options: flagOptions.map(value => ({ value, label: value === 'Static' ? 'runtime.label.staticFlagTemplatePreset'
+        : value === 'PerTeam' ? 'runtime.definitionRuntime.label.independentFlagTeam' : 'runtime.label.alternateRoundAwd' })) },
+    { key: 'ttlSeconds', scope: 'runtimeRules', label: translate('runtime.label.instanceSurvivalTimeSeconds'), type: 'int', min: 1, max: 604800,
+      defaultValue: mode === 'Awd' || mode === 'Koh' ? null : mode === 'Awdp' ? 900 : 3600 },
+  ]
+}
+
 export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
-    case 'LiveSolo': return [] // No challenge points or paid rule overrides in match play.
+    case 'LiveSolo': return [
+      ...runtimeRuleFields(mode),
+      { key: 'completionKind', label: translate('administration.capability.completionKind'), type: 'select', defaultValue: 'Break', options: [
+        { value: 'Break', label: 'administration.capability.break' },
+        { value: 'FixAndCheck', label: 'administration.capability.fixAndCheck' },
+      ] },
+    ]
     case 'Ctf':
       return [
+        ...runtimeRuleFields(mode),
         { key: 'scoreSettlementMode', label: translate('common.label.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('common.label.ctfScoreSettlementHint') },
         { key: 'scoreCurve', label: translate("common.label.scoreCurve"), type: 'pointsCurve' },
         { key: 'bloodRewards', label: translate("common.label.bloodListReward"), type: 'bloodRewards', description: translate("common.label.items") },
         { key: 'maxFlagAttempts', label: translate("common.label.flagMaximumNumberSubmissions"), type: 'int', min: 1 },
-        { key: 'maxPatchAttempts', label: translate("common.label.patchMaximumNumberSubmissions"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'wrongSubmissionPenalty', label: translate("common.error.pointsDeductedSubmissionFailed"), type: 'int', min: 0 },
         { key: 'flagTemplate', label: translate("common.label.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("common.description.futureTeamRuntimeFlags") },
       ]
     case 'Awd':
       return [
+        ...runtimeRuleFields(mode),
         { key: 'attackRewardMode', group: 'scoring', label: translate("common.label.attackScoringMethod"), type: 'select', options: ['FixedPerAttack', 'SplitVictimDefensePool', 'Scarcity', 'TargetRank'].map(value => ({ value, label: `administration.awd.option.${value}` })) },
+        { key: 'allowFixSubmissions', label: translate('administration.capability.allowFixSubmissions'), type: 'bool', defaultValue: false },
         { key: 'attackPoints', max: 1000000, group: 'scoring', label: translate("common.label.scoreAttack"), type: 'int', min: 0 },
         { key: 'victimDefensePoolPoints', max: 1000000, group: 'scoring', label: translate("common.label.victimDefensePool"), type: 'int', min: 0 },
         { key: 'checkerIntervalSeconds', max: 86400, group: 'checker', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1 },
@@ -615,6 +596,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Awdp':
       return [
+        ...runtimeRuleFields(mode),
         { key: 'breakScoreCurve', label: translate("common.label.breakScoreCurve"), type: 'pointsCurve' },
         { key: 'fixScoreCurve', label: translate("common.label.fixScoreCurve"), type: 'pointsCurve' },
         { key: 'requireBreakBeforeFix', label: translate("common.label.requireBreakFix"), type: 'bool' },
@@ -628,6 +610,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Koh':
       return [
+        ...runtimeRuleFields(mode),
         { key: 'pollIntervalSeconds', label: translate("common.label.controlCheckIntervalSeconds"), type: 'int', min: 1 },
         { key: 'controlPointsPerInterval', label: translate("common.label.controlScoreInterval"), type: 'int', min: 0 },
       ]
@@ -714,15 +697,12 @@ function runtimeModelToContract(
   runtime: RuntimeTemplateModel,
 ): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
-    allocation: runtime.allocation,
     limits: runtime.definition.kind === 'ova' ? {
       memoryBytes: runtime.limits.memoryBytes ?? 0,
       cpuMillicores: runtime.limits.cpuMillicores ?? 0,
       pidsLimit: runtime.limits.pidsLimit ?? 0,
     } : null,
-    ttlSeconds: runtime.ttlSeconds,
     operationTimeoutSeconds: runtime.operationTimeoutSeconds,
-    flagSource: runtime.flagSource,
     egressPolicy: runtime.egressPolicy,
     urlBindings: [
       ...runtime.urlBindings.map(binding => ({
@@ -732,19 +712,7 @@ function runtimeModelToContract(
         serviceName: binding.serviceName || null,
         vmId: null,
         guestPort: null,
-        isControlCheck: false,
       })),
-      ...(runtime.controlCheckUrlBinding
-        ? [{
-            urlTemplate: runtime.controlCheckUrlBinding.urlTemplate,
-            exposure: runtime.controlCheckUrlBinding.exposure,
-            containerPort: runtime.controlCheckUrlBinding.containerPort,
-            serviceName: runtime.controlCheckUrlBinding.serviceName || null,
-            vmId: null,
-            guestPort: null,
-            isControlCheck: true,
-          }]
-        : []),
     ],
   }
   if (runtime.definition.kind === 'ova') {
@@ -761,7 +729,6 @@ function runtimeModelToContract(
       services: runtime.definition.services.map(service => ({
         name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
         command: service.command, arguments: service.arguments, environment: service.environment,
-        flagEnvironmentVariableName: service.flagEnvironmentVariableName || null,
         internalPorts: service.internalPorts.filter((port): port is number => port !== null),
       })),
     },
@@ -780,60 +747,27 @@ function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null
 }
 
 export function definitionModelToContract(
-  mode: GameModeValue,
   model: DefinitionModel,
 ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
-  const common = {
-    flagTemplate: model.flagTemplate ? {
-      header: model.flagTemplate.header,
-      bodyTemplate: model.flagTemplate.bodyTemplate,
-      leetLiteralText: model.flagTemplate.leetLiteralText,
-    } : null,
-    runtime: model.runtime ? runtimeModelToContract(model.runtime) : null,
-    checker: mode === 'Awd' && model.checker
-      ? runnerJobContract(model.checker.job, model.checker.targetServiceName || null)
-      : model.checkerJob
-        ? runnerJobContract(model.checkerJob)
-        : null,
-    patchEntrypoint: model.patchEntrypoint || null,
-    patchCommand: model.patchCommand,
-    patchTimeoutSeconds: model.patchTimeoutSeconds,
-    readyTimeoutSeconds: model.readyTimeoutSeconds,
-    maximumPatchUploadBytes: model.maximumPatchUploadBytes,
-    checkerFixInput: model.checkerFixInput,
-  }
-  switch (mode) {
-    case 'Ctf':
-      return {
-        mode,
-        ...common,
-        ctf: { interactionKind: model.interactionKind === 'PatchVerification'
-          ? 'PatchVerification'
-          : 'FlagSubmission' },
-      }
-    case 'Awd':
-      return {
-        mode,
-        ...common,
-        awd: { flagStores: structuredClone(toRaw(model.awdFlagStores)), flagInjection: model.flagInjection
-          ? {
-              command: model.flagInjection.command,
-              timeoutSeconds: model.flagInjection.timeoutSeconds ?? 30,
-              serviceName: model.flagInjection.serviceName || null,
-            }
-          : null },
-      }
-    case 'Awdp':
-      return { mode, ...common, awdp: {} }
-    case 'LiveSolo':
-      return { mode, ...common, liveSolo: {}, checker: null, patchEntrypoint: null, patchCommand: [], patchTimeoutSeconds: null, maximumPatchUploadBytes: null, checkerFixInput: false }
-    case 'Koh':
-      return { mode, ...common, koh: {} }
-  }
+  const capabilities = model.capabilities.map((kind): NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityContract => {
+    switch (kind) {
+      case 'Break': return { kind, break: { flagTemplate: model.flagTemplate,
+        flagStores: structuredClone(toRaw(model.flagStores)), environmentTargets: structuredClone(toRaw(model.flagEnvironmentTargets)), injection: model.flagInjection ? {
+          command: model.flagInjection.command, timeoutSeconds: model.flagInjection.timeoutSeconds ?? 30, serviceName: model.flagInjection.serviceName,
+        } : null } }
+      case 'Fix': return { kind, fix: { targetServiceName: model.patchTargetServiceName, entrypoint: model.patchEntrypoint,
+        command: [...model.patchCommand], timeoutSeconds: model.patchTimeoutSeconds ?? 60, maximumUploadBytes: model.maximumPatchUploadBytes ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES } }
+      case 'Check': return { kind, check: { checker: runnerJobContract(model.checker?.job ?? emptyRunnerJob(), model.checker?.targetServiceName || null),
+        readyTimeoutSeconds: model.readyTimeoutSeconds ?? 30, acceptsFixInput: model.checkerFixInput, requirements: [...model.checkRequirements] } }
+      case 'Control': return { kind, control: model.control ? structuredClone(toRaw(model.control)) : null }
+      case 'Questionnaire': return { kind, questionnaire: model.questionnaire ? structuredClone(toRaw(model.questionnaire)) : null }
+    }
+  })
+  return { runtime: model.runtime ? runtimeModelToContract(model.runtime) : null, capabilities }
 }
 
-export function defaultDefinition(mode: GameModeValue): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
-  return definitionModelToContract(mode, emptyDefinition(mode))
+export function defaultDefinition(): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+  return definitionModelToContract(emptyDefinition())
 }
 
 export function readConfigValues(
@@ -854,6 +788,7 @@ export function readConfigValues(
   for (const field of fields) {
     const source = field.scope === 'awdOptions'
       ? (asObject(branch[options.rules ? 'overrides' : 'options']) ?? {})
+      : field.scope === 'runtimeRules' ? (asObject(branch.runtime) ?? {})
       : !options.rules && field.key === 'flagTemplate' ? configuration : branch
     const key = !options.rules && field.key === 'scoreCurve' ? 'defaultScoreCurve' : field.key
     if (key in source) {
@@ -932,15 +867,16 @@ export function buildConfigValues(
   const branch: JsonObject = {}
   const out: JsonObject = { mode, [mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()]: branch }
   for (const field of fields) {
-    if (options.rules && !options.overridden?.[field.key]) continue
+    if (options.rules && field.scope !== 'runtimeRules' && !options.overridden?.[field.key]) continue
     let target = !options.rules && field.key === 'flagTemplate' ? out : branch
     if (field.scope === 'awdOptions') {
       const key = options.rules ? 'overrides' : 'options'
       target = (branch[key] ??= {}) as JsonObject
     }
+    if (field.scope === 'runtimeRules') target = (branch.runtime ??= {}) as JsonObject
     const value = field.type === 'flagTemplate' && mode === 'Awd' && values[field.key]
       ? { ...(values[field.key] as FlagTemplateModel), bodyTemplate: (values[field.key] as FlagTemplateModel).bodyTemplate.trim() || '[SECURE]' }
-      : values[field.key]
+      : field.scope === 'runtimeRules' && !(field.key in values) ? fieldDefaultValue(field) : values[field.key]
     writeFieldValue(target, field, value)
   }
   if (mode === 'Awd' && !options.rules) { branch.serviceUnhealthyPenalty = 0; branch.tieBreakers = structuredClone(toRaw(values.awdTieBreakers ?? defaultAwdTieBreaks())) }
@@ -973,9 +909,10 @@ export function coresToMillicores(cores: number | null): number | null {
 /** A service cannot be removed while any operation refers to it. */
 export function runtimeServiceIsReferenced(model: DefinitionModel, name: string): boolean {
   return !!model.runtime?.urlBindings.some(binding => binding.serviceName === name)
-    || model.runtime?.controlCheckUrlBinding?.serviceName === name
     || model.checker?.targetServiceName === name || model.flagInjection?.serviceName === name
-    || model.awdFlagStores.some(store => store.targetServiceName === name)
+    || model.flagStores.some(store => store.targetServiceName === name)
+    || model.flagEnvironmentTargets.some(target => target.serviceName === name)
+    || model.patchTargetServiceName === name || model.control?.serviceName === name
 }
 
 /** Rename the service and all references in one editor operation. */
@@ -985,8 +922,10 @@ export function renameRuntimeService(model: DefinitionModel, oldName: string, na
   if (!service) return
   service.name = name
   for (const binding of model.runtime.urlBindings) if (binding.serviceName === oldName) binding.serviceName = name
-  if (model.runtime.controlCheckUrlBinding?.serviceName === oldName) model.runtime.controlCheckUrlBinding.serviceName = name
   if (model.checker?.targetServiceName === oldName) model.checker.targetServiceName = name
   if (model.flagInjection?.serviceName === oldName) model.flagInjection.serviceName = name
-  for (const store of model.awdFlagStores) if (store.targetServiceName === oldName) store.targetServiceName = name
+  for (const store of model.flagStores) if (store.targetServiceName === oldName) store.targetServiceName = name
+  for (const target of model.flagEnvironmentTargets) if (target.serviceName === oldName) target.serviceName = name
+  if (model.patchTargetServiceName === oldName) model.patchTargetServiceName = name
+  if (model.control?.serviceName === oldName) model.control.serviceName = name
 }

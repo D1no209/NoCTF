@@ -10,551 +10,6 @@ export type NoCtfapiEndpointsHealthResponse = {
 
 export type NoCtfapiEndpointsHealthStatus = 'Ok';
 
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionSaved = {
-    questionId?: string;
-    revisionId?: string;
-    version?: number;
-    sourceId?: string;
-};
-
-export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-} & {
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Per-field message descriptors, in the same order as errors.
-     */
-    errorMessages?: {
-        [key: string]: Array<{
-            key?: string;
-            arguments?: {
-                [key: string]: unknown;
-            };
-        }>;
-    };
-};
-
-export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-} & {
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type MicrosoftAspNetCoreMvcProblemDetails = {
-    type?: string | null;
-    title?: string | null;
-    status?: number | null;
-    detail?: string | null;
-    instance?: string | null;
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsCopyTheoryQuestionRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsCreateTheoryQuestionRequest = {
-    content: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
-};
-
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionInput = {
-    title: string;
-    body: string;
-    explanation?: string | null;
-    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
-    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty;
-    options: Array<NoCtfApplicationTheoryQuestionsTheoryOptionInput>;
-    classifications: Array<NoCtfApplicationTheoryQuestionsTheoryClassificationInput>;
-    fileIds: Array<string>;
-};
-
-export type NoCtfDomainTheoryQuestionsTheoryQuestionKind = 0 | 1 | 2;
-
-export type NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty = 0 | 1 | 2;
-
-export type NoCtfApplicationTheoryQuestionsTheoryOptionInput = {
-    content?: string;
-    isCorrect?: boolean;
-    truthValue?: NoCtfDomainTheoryQuestionsTheoryTruthValue | null;
-};
-
-export type NoCtfDomainTheoryQuestionsTheoryTruthValue = 0 | 1;
-
-export type NoCtfApplicationTheoryQuestionsTheoryClassificationInput = {
-    kind?: NoCtfDomainTheoryQuestionsTheoryClassificationKind;
-    name?: string;
-};
-
-export type NoCtfDomainTheoryQuestionsTheoryClassificationKind = 0 | 1;
-
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionContent = {
-    question?: NoCtfApplicationTheoryQuestionsTheoryQuestionSummary;
-    revisionId?: string;
-    content?: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
-    grants?: Array<NoCtfApplicationTheoryQuestionsTheoryQuestionAccessGrant>;
-};
-
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionSummary = {
-    id?: string;
-    ownerId?: string;
-    sourceId?: string;
-    version?: number;
-    title?: string;
-    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
-    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty;
-    state?: NoCtfDomainTheoryQuestionsTheoryQuestionState;
-    updatedAt?: string;
-    canReadAnswers?: boolean;
-    canManage?: boolean;
-    firstExposedAt?: string | null;
-    paperReferences?: number;
-    classifications?: Array<NoCtfApplicationTheoryQuestionsTheoryClassificationInput>;
-};
-
-export type NoCtfDomainTheoryQuestionsTheoryQuestionState = 0 | 1 | 2;
-
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionAccessGrant = {
-    userId?: string;
-    name?: string;
-    permission?: NoCtfDomainTheoryQuestionsTheoryQuestionPermission;
-};
-
-export type NoCtfDomainTheoryQuestionsTheoryQuestionPermission = 0 | 1 | 2;
-
-export type NoCtfapiEndpointsTheoryQuestionsGetTheoryQuestionRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsGetTheoryQuestionImageRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest = {
-    permission?: NoCtfDomainTheoryQuestionsTheoryQuestionPermission | null;
-};
-
-export type NoCtfApplicationTheoryQuestionsTheoryQuestionPage = {
-    items?: Array<NoCtfApplicationTheoryQuestionsTheoryQuestionSummary>;
-    total?: number;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsListTheoryQuestionsRequest = NoCtfapiPaginationSearchRequest & {};
-
-export type NoCtfapiPaginationSearchRequest = NoCtfapiPaginationPaginationRequest & {};
-
-export type NoCtfapiPaginationPaginationRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsSetTheoryQuestionStateRequest = {
-    state?: NoCtfDomainTheoryQuestionsTheoryQuestionState;
-};
-
-export type NoCtfapiEndpointsTheoryQuestionsUpdateTheoryQuestionRequest = {
-    content: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
-};
-
-export type NoCtfApplicationTheoryQuestionsTheoryImageResult = {
-    fileId?: string | null;
-    revisionId?: string | null;
-    failure?: NoCtfApplicationTheoryQuestionsTheoryImageFailure | null;
-};
-
-export type NoCtfApplicationTheoryQuestionsTheoryImageFailure = 0 | 1 | 2 | 3;
-
-export type NoCtfapiEndpointsTheoryQuestionsUploadTheoryImageRequest = {
-    file: Blob | File;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryPaperView = {
-    activity?: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
-    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline;
-    paper?: NoCtfApplicationTheoryPapersTheoryParticipantPaper | null;
-    issuedCount?: number;
-    effectiveScore?: NoCtfApplicationTheoryPapersTheoryEffectiveScore;
-    history?: Array<NoCtfApplicationTheoryPapersTheoryPaperHistory>;
-    serverTime?: string;
-    canIssue?: boolean;
-    canAnswer?: boolean;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivitySummary = {
-    id?: string;
-    competitionId?: string | null;
-    name?: string;
-    kind?: NoCtfDomainTheoryActivitiesTheoryActivityKind;
-    state?: NoCtfDomainTheoryActivitiesTheoryActivityState;
-    opensAt?: string;
-    closesAt?: string;
-    durationSeconds?: number;
-    attemptLimit?: number | null;
-    scoringMode?: NoCtfDomainTheoryActivitiesTheoryScoringMode;
-    maximumPaperPoints?: number;
-    issuanceStopped?: boolean;
-    questionCount?: number;
-};
-
-export type NoCtfDomainTheoryActivitiesTheoryActivityKind = 0 | 1 | 2;
-
-export type NoCtfDomainTheoryActivitiesTheoryActivityState = 0 | 1 | 2 | 3;
-
-export type NoCtfDomainTheoryActivitiesTheoryScoringMode = 0 | 1 | 2;
-
-export type NoCtfApplicationTheoryActivitiesTheoryDeadline = {
-    at?: string;
-    extension?: string;
-    paused?: boolean;
-    capped?: boolean;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryParticipantPaper = {
-    id?: string;
-    answerRevision?: string;
-    attempt?: number;
-    state?: NoCtfDomainTheoryPapersTheoryPaperState;
-    openedAt?: string;
-    submittedAt?: string | null;
-    submissionKind?: NoCtfDomainTheoryPapersTheorySubmissionKind | null;
-    maximumPoints?: number;
-    score?: number | null;
-    questions?: Array<NoCtfApplicationTheoryPapersTheoryParticipantQuestion>;
-};
-
-export type NoCtfDomainTheoryPapersTheoryPaperState = 0 | 1 | 2;
-
-export type NoCtfDomainTheoryPapersTheorySubmissionKind = 0 | 1 | 2;
-
-export type NoCtfApplicationTheoryPapersTheoryParticipantQuestion = {
-    id?: string;
-    answerRevision?: string;
-    order?: number;
-    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
-    body?: string;
-    points?: number;
-    answeredById?: string | null;
-    answeredAt?: string | null;
-    options?: Array<NoCtfApplicationTheoryPapersTheoryParticipantOption>;
-    answeredByName?: string | null;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryParticipantOption = {
-    id?: string;
-    order?: number;
-    content?: string;
-    truthValue?: NoCtfDomainTheoryQuestionsTheoryTruthValue | null;
-    selected?: boolean;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryEffectiveScore = {
-    points?: number;
-    achievedAt?: string | null;
-    hasSubmission?: boolean;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryPaperHistory = {
-    paperId?: string;
-    attempt?: number;
-    state?: NoCtfDomainTheoryPapersTheoryPaperState;
-    score?: number | null;
-    submittedAt?: string | null;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesAnswerTheoryPaperRequest = {
-    expectedRevision: string;
-    requestId: string;
-    optionIds: Array<string>;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesTheoryCorrectionAccepted = {
-    targetRevision?: string;
-    statusUrl?: string;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesApplyTheoryCorrectionRequest = {
-    input: NoCtfApplicationTheoryActivitiesTheoryCorrectionInput;
-    token: string;
-    expiresAt?: string;
-    reason: string;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryCorrectionInput = {
-    revisionId: string;
-    mode?: NoCtfDomainTheoryActivitiesTheoryCorrectionMode;
-    correctOptions: Array<string>;
-};
-
-export type NoCtfDomainTheoryActivitiesTheoryCorrectionMode = 0 | 1;
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivityCheck = {
-    feasible?: boolean;
-    rules?: Array<NoCtfApplicationTheoryActivitiesTheoryRuleCapacity>;
-    shortages?: Array<NoCtfApplicationTheoryPapersTheoryAllocationShortage>;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryRuleCapacity = {
-    order?: number;
-    required?: number;
-    available?: number;
-};
-
-export type NoCtfApplicationTheoryPapersTheoryAllocationShortage = {
-    ruleId?: string;
-    required?: number;
-    allocated?: number;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesCheckTheoryActivityRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesGetCompetitionTheoryRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivityManagement = {
-    activity?: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
-    rules?: Array<NoCtfApplicationTheoryActivitiesTheoryRuleInput>;
-    allowExposedQuestions?: boolean;
-    canManage?: boolean;
-    canJudge?: boolean;
-    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline;
-    corrections?: Array<NoCtfApplicationTheoryActivitiesTheoryCorrectionProgress>;
-    issuedCount?: number;
-    competitionEndAt?: string | null;
-    allowedOperations?: Array<NoCtfApplicationTheoryActivitiesTheoryActivityAction>;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryRuleInput = {
-    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
-    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty | null;
-    count?: number;
-    points?: number;
-    filters?: Array<NoCtfApplicationTheoryActivitiesTheoryClassificationFilter>;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryClassificationFilter = {
-    kind?: NoCtfDomainTheoryQuestionsTheoryClassificationKind;
-    name?: string;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryCorrectionProgress = {
-    revisionId?: string;
-    targetRevision?: string;
-    completed?: boolean;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivityAction = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheoryActivityManagementRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryExamLeaderboard = {
-    items?: Array<NoCtfApplicationTheoryActivitiesTheoryExamRank>;
-    total?: number;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryExamRank = {
-    rank?: number;
-    userId?: string;
-    name?: string;
-    points?: number;
-    achievedAt?: string | null;
-    hasSubmission?: boolean;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheoryExamLeaderboardRequest = NoCtfapiPaginationPaginationRequest & {};
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheoryPaperRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheoryPaperImageRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryReviewPaper = {
-    paper?: NoCtfApplicationTheoryActivitiesTheoryReviewRow;
-    questions?: Array<NoCtfApplicationTheoryActivitiesTheoryReviewQuestion>;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryReviewRow = {
-    paperId?: string;
-    participantId?: string;
-    userId?: string | null;
-    teamId?: string | null;
-    name?: string;
-    attempt?: number;
-    state?: NoCtfDomainTheoryPapersTheoryPaperState;
-    openedAt?: string;
-    submittedAt?: string | null;
-    score?: number | null;
-    questionCount?: number;
-    answeredCount?: number;
-    submissionKind?: NoCtfDomainTheoryPapersTheorySubmissionKind | null;
-    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline | null;
-    effectiveScore?: NoCtfApplicationTheoryPapersTheoryEffectiveScore | null;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryReviewQuestion = {
-    question?: NoCtfApplicationTheoryPapersTheoryParticipantQuestion;
-    revisionId?: string;
-    correctOptions?: Array<string>;
-    explanation?: string | null;
-    result?: NoCtfDomainTheoryPapersTheoryAnswerResult | null;
-};
-
-export type NoCtfDomainTheoryPapersTheoryAnswerResult = 0 | 1 | 2 | 3;
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheoryReviewRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesGetTheorySessionRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesIssueTheoryPaperRequest = {
-    requestId: string;
-    expectedIssuedCount?: number;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivityPage = {
-    items?: Array<NoCtfApplicationTheoryActivitiesTheoryActivitySummary>;
-    total?: number;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesListTheoryActivitiesRequest = NoCtfapiPaginationSearchRequest & {};
-
-export type NoCtfApplicationTheoryActivitiesTheoryAuditPage = {
-    items?: Array<NoCtfApplicationTheoryActivitiesTheoryAuditRow>;
-    total?: number;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryAuditRow = {
-    id?: string;
-    kind?: NoCtfDomainTheoryActivitiesTheoryActivityOperationKind;
-    actorName?: string;
-    occurredAt?: string;
-    reason?: string | null;
-};
-
-export type NoCtfDomainTheoryActivitiesTheoryActivityOperationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
-
-export type NoCtfapiEndpointsTheoryActivitiesListTheoryAuditRequest = NoCtfapiPaginationPaginationRequest & {};
-
-export type NoCtfApplicationTheoryActivitiesTheoryReviewPage = {
-    items?: Array<NoCtfApplicationTheoryActivitiesTheoryReviewRow>;
-    total?: number;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesListTheoryReviewsRequest = NoCtfapiPaginationPaginationRequest & {};
-
-export type NoCtfApplicationTheoryActivitiesTheoryCorrectionPreview = {
-    token?: string;
-    expiresAt?: string;
-    affectedPapers?: number;
-    scores?: Array<NoCtfApplicationTheoryActivitiesTheoryScoreImpact>;
-    participants?: Array<NoCtfApplicationTheoryActivitiesTheoryParticipantScoreImpact>;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryScoreImpact = {
-    paperId?: string;
-    participantId?: string;
-    before?: number;
-    after?: number;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryParticipantScoreImpact = {
-    participantId?: string;
-    name?: string;
-    before?: number;
-    after?: number;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest = {
-    input: NoCtfApplicationTheoryActivitiesTheoryCorrectionInput;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesSaveCompetitionTheoryRequest = {
-    activityId?: string | null;
-    input: NoCtfApplicationTheoryActivitiesTheoryActivityInput;
-};
-
-export type NoCtfApplicationTheoryActivitiesTheoryActivityInput = {
-    name: string;
-    kind?: NoCtfDomainTheoryActivitiesTheoryActivityKind;
-    opensAt?: string;
-    closesAt?: string;
-    durationSeconds?: number;
-    attemptLimit?: number | null;
-    scoringMode?: NoCtfDomainTheoryActivitiesTheoryScoringMode;
-    allowExposedQuestions?: boolean;
-    rules: Array<NoCtfApplicationTheoryActivitiesTheoryRuleInput>;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesSaveTheoryActivityRequest = {
-    activityId?: string | null;
-    competitionId?: string | null;
-    input: NoCtfApplicationTheoryActivitiesTheoryActivityInput;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesTheoryConsultationResponse = {
-    threadRootId?: string;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesStartTheoryConsultationRequest = {
-    body: string;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesSubmitTheoryPaperRequest = {
-    expectedRevision: string;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesTransitionTheoryActivityRequest = {
-    action?: NoCtfApplicationTheoryActivitiesTheoryActivityAction;
-    deadline?: string | null;
-    reason?: string | null;
-};
-
-export type NoCtfapiEndpointsTheoryActivitiesVoidTheoryPaperRequest = {
-    reason: string;
-};
-
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
     code?: NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol;
     message?: string;
@@ -658,6 +113,72 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse =
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol = 'Processing';
+
+export type MicrosoftAspNetCoreMvcProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Per-field message descriptors, in the same order as errors.
+     */
+    errorMessages?: {
+        [key: string]: Array<{
+            key?: string;
+            arguments?: {
+                [key: string]: unknown;
+            };
+        }>;
+    };
+};
+
+export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
 
 export type NoCtfapiEndpointsTeamsGetMyTeamStandingRequest = {
     [key: string]: never;
@@ -960,8 +481,365 @@ export type NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse = {
 
 export type NoCtfapiEndpointsRuntimeListTeamRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
 
+export type NoCtfapiPaginationPaginationRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsRuntimeProbeRuntimeProxyRequest = {
     [key: string]: never;
+};
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView = {
+    activity?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary;
+    deadline?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireDeadline;
+    session?: NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantSession | null;
+    issuedCount?: number;
+    effectiveScore?: NoCtfApplicationQuestionnairesSessionsQuestionnaireEffectiveScore;
+    history?: Array<NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionHistory>;
+    serverTime?: string;
+    canIssue?: boolean;
+    canAnswer?: boolean;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary = {
+    id?: string;
+    name?: string;
+    kind?: NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityKind;
+    state?: NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityState;
+    opensAt?: string;
+    closesAt?: string;
+    durationSeconds?: number;
+    attemptLimit?: number | null;
+    scoringMode?: NoCtfDomainQuestionnairesActivitiesQuestionnaireScoringMode;
+    maximumSessionPoints?: number;
+    issuanceStopped?: boolean;
+    questionCount?: number;
+};
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityKind = 0 | 1;
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityState = 0 | 1 | 2 | 3;
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireScoringMode = 0 | 1 | 2;
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireDeadline = {
+    at?: string;
+    extension?: string;
+    paused?: boolean;
+    capped?: boolean;
+};
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantSession = {
+    id?: string;
+    answerRevision?: string;
+    attempt?: number;
+    state?: NoCtfDomainQuestionnairesSessionsQuestionnaireSessionState;
+    openedAt?: string;
+    submittedAt?: string | null;
+    submissionKind?: NoCtfDomainQuestionnairesSessionsQuestionnaireSubmissionKind | null;
+    maximumPoints?: number;
+    score?: number | null;
+    questions?: Array<NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantQuestion>;
+};
+
+export type NoCtfDomainQuestionnairesSessionsQuestionnaireSessionState = 0 | 1 | 2;
+
+export type NoCtfDomainQuestionnairesSessionsQuestionnaireSubmissionKind = 0 | 1 | 2;
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantQuestion = {
+    id?: string;
+    answerRevision?: string;
+    order?: number;
+    kind?: NoCtfDomainChallengesCapabilitiesQuestionnaireQuestionKind;
+    body?: string;
+    points?: number;
+    answeredById?: string | null;
+    answeredAt?: string | null;
+    options?: Array<NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantOption>;
+    answeredByName?: string | null;
+};
+
+export type NoCtfDomainChallengesCapabilitiesQuestionnaireQuestionKind = 0 | 1 | 2;
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantOption = {
+    id?: string;
+    order?: number;
+    content?: string;
+    truthValue?: boolean | null;
+    selected?: boolean;
+};
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireEffectiveScore = {
+    points?: number;
+    achievedAt?: string | null;
+    hasSubmission?: boolean;
+};
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionHistory = {
+    sessionId?: string;
+    attempt?: number;
+    state?: NoCtfDomainQuestionnairesSessionsQuestionnaireSessionState;
+    score?: number | null;
+    submittedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsAnswerQuestionnaireSessionRequest = {
+    expectedRevision: string;
+    requestId: string;
+    optionIds: Array<string>;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsGetQuestionnaireActivitySessionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsGetQuestionnaireSessionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsGetQuestionnaireSessionImageRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsIssueQuestionnaireSessionRequest = {
+    requestId: string;
+    expectedIssuedCount?: number;
+};
+
+export type NoCtfapiEndpointsQuestionnairesSessionsSubmitQuestionnaireSessionRequest = {
+    expectedRevision: string;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireCorrectionAccepted = {
+    targetRevision?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesApplyQuestionnaireCorrectionRequest = {
+    input: NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionInput;
+    token: string;
+    expiresAt?: string;
+    reason: string;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionInput = {
+    revisionId: string;
+    mode?: NoCtfDomainQuestionnairesActivitiesQuestionnaireCorrectionMode;
+    correctOptions: Array<string>;
+};
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireCorrectionMode = 0 | 1;
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityCheck = {
+    feasible?: boolean;
+    rules?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireRuleCapacity>;
+    shortages?: Array<NoCtfApplicationQuestionnairesSessionsQuestionnaireAllocationShortage>;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireRuleCapacity = {
+    order?: number;
+    required?: number;
+    available?: number;
+};
+
+export type NoCtfApplicationQuestionnairesSessionsQuestionnaireAllocationShortage = {
+    ruleId?: string;
+    required?: number;
+    allocated?: number;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesCheckQuestionnaireActivityRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityManagement = {
+    activity?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary;
+    rules?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireRuleInput>;
+    allowExposedQuestions?: boolean;
+    canManage?: boolean;
+    canJudge?: boolean;
+    deadline?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireDeadline;
+    selectionKind?: NoCtfDomainQuestionnairesActivitiesQuestionnaireSelectionKind;
+    fixedQuestionnaires?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireFixedSelectionInput>;
+    corrections?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionProgress>;
+    issuedCount?: number;
+    allowedOperations?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityAction>;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireRuleInput = {
+    kind?: NoCtfDomainChallengesCapabilitiesQuestionnaireQuestionKind;
+    difficulty?: NoCtfDomainChallengesCapabilitiesQuestionnaireDifficulty | null;
+    count?: number;
+    points?: number;
+    filters?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireClassificationFilter>;
+};
+
+export type NoCtfDomainChallengesCapabilitiesQuestionnaireDifficulty = 0 | 1 | 2;
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireClassificationFilter = {
+    kind?: NoCtfDomainChallengesCapabilitiesQuestionnaireClassificationKind;
+    name?: string;
+};
+
+export type NoCtfDomainChallengesCapabilitiesQuestionnaireClassificationKind = 0 | 1;
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireSelectionKind = 0 | 1;
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireFixedSelectionInput = {
+    challengeId?: string;
+    pointsPerQuestion?: number;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionProgress = {
+    revisionId?: string;
+    targetRevision?: string;
+    completed?: boolean;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityAction = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesGetQuestionnaireActivityManagementRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireExamLeaderboard = {
+    items?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireExamRank>;
+    total?: number;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireExamRank = {
+    rank?: number;
+    userId?: string;
+    name?: string;
+    points?: number;
+    achievedAt?: string | null;
+    hasSubmission?: boolean;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesGetQuestionnaireExamLeaderboardRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireReviewResponse = {
+    session?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireReviewRow;
+    questions?: Array<NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireReviewedQuestionResponse>;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireReviewRow = {
+    sessionId?: string;
+    participantId?: string;
+    userId?: string;
+    name?: string;
+    attempt?: number;
+    state?: NoCtfDomainQuestionnairesSessionsQuestionnaireSessionState;
+    openedAt?: string;
+    submittedAt?: string | null;
+    score?: number | null;
+    questionCount?: number;
+    answeredCount?: number;
+    submissionKind?: NoCtfDomainQuestionnairesSessionsQuestionnaireSubmissionKind | null;
+    deadline?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireDeadline | null;
+    effectiveScore?: NoCtfApplicationQuestionnairesSessionsQuestionnaireEffectiveScore | null;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireReviewedQuestionResponse = {
+    question?: NoCtfApplicationQuestionnairesSessionsQuestionnaireParticipantQuestion;
+    revisionId?: string;
+    correctOptions?: Array<string>;
+    explanation?: string | null;
+    result?: NoCtfDomainChallengesCapabilitiesQuestionnaireAnswerResult | null;
+};
+
+export type NoCtfDomainChallengesCapabilitiesQuestionnaireAnswerResult = 'Correct' | 'Wrong' | 'Unanswered' | 'FullCredit';
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesGetQuestionnaireReviewRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityPage = {
+    items?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesListQuestionnaireActivitiesRequest = NoCtfapiPaginationSearchRequest & {};
+
+export type NoCtfapiPaginationSearchRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireAuditPage = {
+    items?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireAuditRow>;
+    total?: number;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireAuditRow = {
+    id?: string;
+    kind?: NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityOperationKind;
+    actorName?: string;
+    occurredAt?: string;
+    reason?: string | null;
+};
+
+export type NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityOperationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesListQuestionnaireAuditRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireReviewPage = {
+    items?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireReviewRow>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesListQuestionnaireReviewsRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionPreview = {
+    token?: string;
+    expiresAt?: string;
+    affectedSessions?: number;
+    scores?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireScoreImpact>;
+    participants?: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireParticipantScoreImpact>;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireScoreImpact = {
+    sessionId?: string;
+    participantId?: string;
+    before?: number;
+    after?: number;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireParticipantScoreImpact = {
+    participantId?: string;
+    name?: string;
+    before?: number;
+    after?: number;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesPreviewQuestionnaireCorrectionRequest = {
+    input: NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionInput;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesSaveQuestionnaireActivityRequest = {
+    activityId?: string | null;
+    input: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityInput;
+};
+
+export type NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityInput = {
+    name: string;
+    kind?: NoCtfDomainQuestionnairesActivitiesQuestionnaireActivityKind;
+    opensAt?: string;
+    closesAt?: string;
+    durationSeconds?: number;
+    attemptLimit?: number | null;
+    scoringMode?: NoCtfDomainQuestionnairesActivitiesQuestionnaireScoringMode;
+    allowExposedQuestions?: boolean;
+    rules: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireRuleInput>;
+    selectionKind?: NoCtfDomainQuestionnairesActivitiesQuestionnaireSelectionKind;
+    fixedQuestionnaires: Array<NoCtfApplicationQuestionnairesActivitiesQuestionnaireFixedSelectionInput>;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesTransitionQuestionnaireActivityRequest = {
+    action?: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityAction;
+    deadline?: string | null;
+    reason?: string | null;
+};
+
+export type NoCtfapiEndpointsQuestionnairesActivitiesVoidQuestionnaireSessionRequest = {
+    reason: string;
 };
 
 export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
@@ -970,7 +848,6 @@ export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
     logoUrl?: string | null;
     imageUploadLimits?: NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse;
     humanVerification?: NoCtfapiEndpointsPlatformPublicHumanVerificationResponse;
-    experimentalFeatures?: NoCtfapiEndpointsPlatformPublicExperimentalFeaturesResponse;
 };
 
 export type NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse = {
@@ -987,10 +864,6 @@ export type NoCtfapiEndpointsPlatformPublicHumanVerificationResponse = {
 };
 
 export type NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol = 'None' | 'Cap' | 'Turnstile';
-
-export type NoCtfapiEndpointsPlatformPublicExperimentalFeaturesResponse = {
-    ctfPatchVerificationEnabled?: boolean;
-};
 
 export type NoCtfapiEndpointsNotificationsNotificationListResponse = NoCtfapiPaginationArrayResultOfNotificationResponse & {};
 
@@ -1094,7 +967,7 @@ export type NoCtfDomainGameplayGameplayFactState = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainGameplayGameplayFactResult = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
-export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45;
+export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47;
 
 export type NoCtfApplicationNotificationsRuntimeStateChangedNotificationContent = Omit<NoCtfApplicationNotificationsNotificationContent, 'type'> & {
     code?: string | null;
@@ -1374,7 +1247,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse = {
     };
 };
 
-export type NoCtfApplicationLiveSoloRoundsLiveSoloFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'InvalidConfiguration' | 'Conflict' | 'RosterLocked' | 'NotReady' | 'MediaUnavailable' | 'IsolationUnavailable' | 'RoundNotRunning' | 'RoundPaused' | 'QuestionNotOpen' | 'DeadlinePassed' | 'AlreadyEnded' | 'NoSuitableQuestionGroup' | 'DependencyUnavailable' | 'IdempotencyConflict' | 'CompetitionNotStarted' | 'ResourceCapacityExceeded' | 'UnsupportedEnvironment' | 'IsolationNotConfigured' | 'IsolationVerificationFailed' | 'QuestionGroupNotFound' | 'SelectionChanged' | 'ActiveQuestionConflict' | 'QuestionGroupAlreadyDrawn';
+export type NoCtfApplicationLiveSoloRoundsLiveSoloFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'InvalidConfiguration' | 'Conflict' | 'RosterLocked' | 'NotReady' | 'MediaUnavailable' | 'IsolationUnavailable' | 'RoundNotRunning' | 'RoundPaused' | 'QuestionNotOpen' | 'DeadlinePassed' | 'AlreadyEnded' | 'NoSuitableQuestionGroup' | 'DependencyUnavailable' | 'IdempotencyConflict' | 'CompetitionNotStarted' | 'ResourceCapacityExceeded' | 'UnsupportedEnvironment' | 'IsolationNotConfigured' | 'IsolationVerificationFailed' | 'QuestionGroupNotFound' | 'SelectionChanged' | 'ActiveQuestionConflict' | 'QuestionGroupAlreadyDrawn' | 'SubmissionActionUnsupported';
 
 export type NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchRequest = {
     expectedMatchStamp: string;
@@ -1491,43 +1364,20 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse = {
     attachments?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
     flags?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse>;
     canEditContent?: boolean;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMaterialOwnership = 'FollowingQuestionBank' | 'CompetitionOwned';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract = {
-    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol;
-    flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
     runtime?: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract | null;
-    checker?: NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract | null;
-    patchEntrypoint?: string | null;
-    patchCommand?: Array<string>;
-    patchTimeoutSeconds?: number | null;
-    readyTimeoutSeconds?: number | null;
-    maximumPatchUploadBytes?: number | null;
-    checkerFixInput?: boolean;
-    ctf?: NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract | null;
-    awd?: NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract | null;
-    awdp?: NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract | null;
-    koh?: NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract | null;
-    liveSolo?: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract | null;
-};
-
-export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh' | 'LiveSolo';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract = {
-    header?: string;
-    bodyTemplate?: string;
-    leetLiteralText?: boolean;
+    capabilities: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityContract>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract = {
     kind: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol;
-    allocation?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol;
     limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract | null;
-    ttlSeconds?: number | null;
     operationTimeoutSeconds?: number | null;
-    flagSource?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol;
     egressPolicy?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol;
     urlBindings?: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract>;
     container?: NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract | null;
@@ -1536,15 +1386,11 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol = 'Container' | 'Ova';
 
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol = 'Shared' | 'PerTeam';
-
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract = {
     memoryBytes?: number;
     cpuMillicores?: number;
     pidsLimit?: number;
 };
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol = 'Static' | 'PerTeam' | 'AwdRotation';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol = 'Isolated' | 'InternetOnly';
 
@@ -1555,7 +1401,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContrac
     serviceName?: string | null;
     vmId?: string | null;
     guestPort?: number | null;
-    isControlCheck?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol = 'OwnerOnly' | 'Participants';
@@ -1574,13 +1419,74 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract =
     environment?: {
         [key: string]: string;
     };
-    flagEnvironmentVariableName?: string | null;
     internalPorts?: Array<number>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract = {
     sourceUrl: string;
     sha256: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityContract = {
+    kind: NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol;
+    break?: NoCtfapiEndpointsAdministrationChallengeBankBreakCapabilityContract | null;
+    fix?: NoCtfapiEndpointsAdministrationChallengeBankFixCapabilityContract | null;
+    check?: NoCtfapiEndpointsAdministrationChallengeBankCheckCapabilityContract | null;
+    control?: NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract | null;
+    questionnaire?: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol = 'Break' | 'Fix' | 'Check' | 'Control' | 'Questionnaire';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankBreakCapabilityContract = {
+    flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
+    injection?: NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract | null;
+    flagStores?: Array<NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract>;
+    environmentTargets?: Array<NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract = {
+    header?: string;
+    bodyTemplate?: string;
+    leetLiteralText?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract = {
+    command?: string;
+    timeoutSeconds?: number;
+    serviceName?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract = {
+    id?: string;
+    name?: string;
+    delivery?: NoCtfapiEndpointsAdministrationChallengeBankFlagDeliveryProtocol;
+    targetServiceName?: string | null;
+    injectionCommand?: string | null;
+    injectionTimeoutSeconds?: number;
+    preservesHistoricalFlags?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFlagDeliveryProtocol = 'RunnerCommand' | 'BusinessChecker';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract = {
+    serviceName?: string;
+    variableName?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFixCapabilityContract = {
+    targetServiceName: string;
+    entrypoint?: string;
+    command?: Array<string>;
+    timeoutSeconds?: number;
+    maximumUploadBytes?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankCheckCapabilityContract = {
+    checker: NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract;
+    readyTimeoutSeconds?: number;
+    acceptsFixInput?: boolean;
+    requirements: Array<NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
@@ -1593,46 +1499,56 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
     targetServiceName?: string | null;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract = {
-    interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
-};
+export type NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol = 'Connection' | 'Functionality' | 'Vulnerability' | 'FlagWrite' | 'CurrentFlagRead' | 'HistoricalFlagRead';
 
-export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract = {
-    flagStores?: Array<NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract>;
-    flagInjection: NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdFlagStoreContract = {
-    id?: string;
-    name?: string;
-    deliveryMode?: NoCtfapiEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol;
-    targetServiceName?: string | null;
-    injectionCommand?: string | null;
-    injectionTimeoutSeconds?: number;
-    preservesHistoricalFlags?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol = 'RunnerCommand' | 'BusinessChecker';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract = {
-    command?: string;
-    timeoutSeconds?: number;
+export type NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract = {
+    protocol?: NoCtfapiEndpointsAdministrationChallengeBankControlProtocolKind;
+    urlTemplate?: string;
     serviceName?: string | null;
+    containerPort?: number | null;
+    vmId?: string | null;
+    guestPort?: number | null;
+    timeoutSeconds?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract = {
-    [key: string]: never;
+export type NoCtfapiEndpointsAdministrationChallengeBankControlProtocolKind = 'HttpTeamIdentifier';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract = {
+    revisionId?: string;
+    revisionNumber?: number;
+    questions?: Array<NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireQuestionContract>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract = {
-    [key: string]: never;
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireQuestionContract = {
+    id?: string;
+    sourceId?: string;
+    kind?: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireQuestionProtocol;
+    difficulty?: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireDifficultyProtocol;
+    title?: string;
+    body?: string;
+    explanation?: string | null;
+    options?: Array<NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireOptionContract>;
+    classifications?: Array<NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireClassificationContract>;
+    fileIds?: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract = {
-    [key: string]: never;
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireQuestionProtocol = 'SingleChoice' | 'MultipleChoice' | 'TrueFalse';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireDifficultyProtocol = 'Basic' | 'Intermediate' | 'Advanced';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireOptionContract = {
+    id?: string;
+    content?: string;
+    isCorrect?: boolean;
+    truthValue?: boolean | null;
 };
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireClassificationContract = {
+    kind?: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireClassificationProtocol;
+    name?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireClassificationProtocol = 'Knowledge' | 'Tag';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse = {
     id?: string;
@@ -1666,6 +1582,8 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindPr
 
 export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
 
+export type NoCtfDomainLiveSoloLiveSoloCompletionKind = 'Break' | 'FixAndCheck';
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse = {
     code?: NoCtfApplicationLiveSoloTemplatesLiveSoloPoolFailure;
     messageKey?: string;
@@ -1679,6 +1597,7 @@ export type NoCtfapiEndpointsLiveSoloCreateLiveSoloPoolQuestionRequest = {
     description?: string | null;
     direction: string;
     definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
 };
 
 export type NoCtfapiEndpointsLiveSoloDeleteLiveSoloDirectionPresetRequest = {
@@ -1696,6 +1615,7 @@ export type NoCtfapiEndpointsLiveSoloDeleteLiveSoloMatchRequest = {
 export type NoCtfapiEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest = {
     sourceTemplateId: string;
     expectedSourceStamp: string;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
 };
 
 export type NoCtfapiEndpointsLiveSoloDownloadLiveSoloAttachmentRequest = {
@@ -1723,6 +1643,7 @@ export type NoCtfapiEndpointsLiveSoloEditLiveSoloPoolQuestionRequest = {
     flags?: Array<NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest> | null;
     removedAttachmentIds?: Array<string> | null;
     definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
@@ -1892,6 +1813,20 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloDirectionPoolRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloFixTargetResponse = {
+    runtimeInstanceId?: string | null;
+    state?: NoCtfDomainRuntimeRuntimeState2 | null;
+    gameplayFactId?: string | null;
+    statusUrl?: string;
+    admissionSequence?: number | null;
+};
+
+export type NoCtfDomainRuntimeRuntimeState2 = 'Queued' | 'Provisioning' | 'Running' | 'Stopping' | 'Stopped' | 'Failed';
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloFixTargetRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloMatchRequest = {
     [key: string]: never;
 };
@@ -2051,7 +1986,22 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionResponse = {
     tags?: Array<string>;
     openedAt?: string;
     runtimeInstanceId?: string | null;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
+    availableActions?: Array<NoCtfapiEndpointsLiveSoloLiveSoloAvailableActionResponse>;
 };
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloAvailableActionResponse = {
+    kind?: NoCtfApplicationChallengesActionsChallengeActionKind;
+    enabled?: boolean;
+    availability?: NoCtfApplicationChallengesActionsChallengeActionAvailability;
+    failure?: NoCtfApplicationLiveSoloRoundsLiveSoloFailure | null;
+    runtimeInstanceId?: string | null;
+    gameplayFactId?: string | null;
+};
+
+export type NoCtfApplicationChallengesActionsChallengeActionKind = 'SubmitFlag' | 'PrepareFixTarget' | 'SubmitFix' | 'ViewCheck' | 'ViewControl';
+
+export type NoCtfApplicationChallengesActionsChallengeActionAvailability = 'Available' | 'AdmissionRejected' | 'TargetNotRunning' | 'TargetBusy' | 'RecoveryRequired' | 'TargetRequired';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloHintResponse = {
     id?: string;
@@ -2091,7 +2041,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloWorkspaceResponse = {
     resources?: Array<NoCtfapiEndpointsLiveSoloLiveSoloPreparationResponse>;
 };
 
-export type NoCtfapiEndpointsLiveSoloLiveSoloWorkspaceOperationProtocol = 'LockRoster' | 'ConfirmReady' | 'PrepareRound' | 'StartCountdown' | 'RetryPreparation' | 'Pause' | 'Resume' | 'VoidRound' | 'ForfeitMatch' | 'CorrectResult' | 'ManageQuestionPool' | 'SubmitFlag';
+export type NoCtfapiEndpointsLiveSoloLiveSoloWorkspaceOperationProtocol = 'LockRoster' | 'ConfirmReady' | 'PrepareRound' | 'StartCountdown' | 'RetryPreparation' | 'Pause' | 'Resume' | 'VoidRound' | 'ForfeitMatch' | 'CorrectResult' | 'ManageQuestionPool' | 'SubmitFlag' | 'SubmitFix';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloStartConditionProtocol = 'CompetitionNotRunning' | 'LeftRosterUnlocked' | 'RightRosterUnlocked' | 'LeftNotReady' | 'RightNotReady' | 'NoPreparedRound' | 'EnvironmentPreparing' | 'EnvironmentFailed' | 'MediaRequired' | 'SelectionChanged' | 'CorrectionPending';
 
@@ -2524,6 +2474,10 @@ export type NoCtfapiEndpointsLiveSoloRecoverLiveSoloProgramRequest = {
     reason: string;
 };
 
+export type NoCtfapiEndpointsLiveSoloRequestLiveSoloFixTargetRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloRequestLiveSoloRescueRequest = {
     userId: string;
     reason?: string | null;
@@ -2620,6 +2574,18 @@ export type NoCtfapiEndpointsLiveSoloStartLiveSoloCountdownRequest = {
     expectedStamp: string;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloFixAcceptedResponse = {
+    patchUploadId?: string;
+    gameplayFactId?: string;
+    admissionSequence?: number;
+    acceptedAt?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloSubmitLiveSoloFixRequest = {
+    file: Blob | File;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloFlagAcceptedResponse = {
     gameplayFactId?: string;
     admissionSequence?: number;
@@ -2672,41 +2638,30 @@ export type NoCtfapiEndpointsInternalInternalResultResponse = {
 
 export type NoCtfapiEndpointsInternalInternalResultDispositionProtocol = 'Applied' | 'Duplicate' | 'Superseded' | 'Conflict';
 
-export type NoCtfapiEndpointsInternalRecordAwdCheckResultRequest = {
-    connection: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
-    functionality: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
-    flags: Array<NoCtfapiEndpointsInternalAwdCheckFlagRequest>;
+export type NoCtfapiEndpointsInternalRecordCheckResultRequest = {
+    probes: Array<NoCtfapiEndpointsInternalCheckProbeEvidenceRequest>;
+    flagContexts: Array<NoCtfapiEndpointsInternalCheckFlagContextRequest>;
     observedAt: string;
 };
 
-export type NoCtfapiEndpointsInternalAwdCheckProbeRequest = {
-    outcome?: NoCtfDomainCompetitionsAwdAwdProbeOutcome;
-    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+export type NoCtfapiEndpointsInternalCheckProbeEvidenceRequest = {
+    kind: NoCtfDomainChallengesCapabilitiesCheckItemKind;
+    flagId?: string | null;
+    result: NoCtfDomainChallengesCapabilitiesCheckProbeResult;
+    reason?: NoCtfDomainChallengesCapabilitiesCheckFailureReason;
 };
 
-export type NoCtfDomainCompetitionsAwdAwdProbeOutcome = 'Unknown' | 'Passed' | 'TargetFailure' | 'PlatformFailure' | 'NotRequired';
+export type NoCtfDomainChallengesCapabilitiesCheckItemKind = 'Connection' | 'Functionality' | 'Vulnerability' | 'FlagWrite' | 'CurrentFlagRead' | 'HistoricalFlagRead';
 
-export type NoCtfDomainCompetitionsAwdAwdCheckReason = 'None' | 'ConnectionRefused' | 'ConnectTimeout' | 'RequestTimeout' | 'FunctionalCheckFailed' | 'FlagStoreFailed' | 'CurrentFlagMissing' | 'HistoricalFlagMissing' | 'CheckerCrashed' | 'CheckerTimedOut' | 'TaskNotExecuted' | 'CallbackMissing' | 'InfrastructureFailure' | 'IncompleteEvidence' | 'InvalidEvidence' | 'RuntimeSuperseded' | 'LateReceipt';
+export type NoCtfDomainChallengesCapabilitiesCheckProbeResult = 'Passed' | 'TargetFailure' | 'PlatformFailure' | 'Unknown' | 'NotRequired' | 'NotExecuted';
 
-export type NoCtfapiEndpointsInternalAwdCheckFlagRequest = {
+export type NoCtfDomainChallengesCapabilitiesCheckFailureReason = 'None' | 'ConnectionRefused' | 'ConnectTimeout' | 'RequestTimeout' | 'FunctionalCheckFailed' | 'VulnerabilityPresent' | 'FlagWriteFailed' | 'FlagReadFailed' | 'CheckerCrashed' | 'CheckerTimedOut' | 'CallbackMissing' | 'IncompleteEvidence' | 'InvalidEvidence' | 'TargetSuperseded' | 'PlayerMaintenance' | 'InfrastructureFailure';
+
+export type NoCtfapiEndpointsInternalCheckFlagContextRequest = {
     flagId?: string;
-    write?: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
-    read?: NoCtfapiEndpointsInternalAwdCheckProbeRequest;
     privateReadContext?: string | null;
     publicLocator?: string | null;
 };
-
-export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
-    outcome?: NoCtfapiEndpointsInternalAwdpFixResultOutcome;
-};
-
-export type NoCtfapiEndpointsInternalAwdpFixResultOutcome = 'ExploitSucceeded' | 'DefenseSucceeded' | 'ServiceAbnormal';
-
-export type NoCtfapiEndpointsInternalRecordPatchVerificationResultRequest = {
-    outcome?: NoCtfapiEndpointsInternalPatchVerificationResultOutcome;
-};
-
-export type NoCtfapiEndpointsInternalPatchVerificationResultOutcome = 'StillExploitable' | 'Verified' | 'ServiceAbnormal';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
     currentRound?: number | null;
@@ -2733,15 +2688,16 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {
     updatedAt?: string;
     timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
     awdAttack?: NoCtfapiEndpointsGameplayFactsAwdAttackStatusResponse | null;
+    fixExecution?: NoCtfapiEndpointsGameplayFactsFixExecutionStatusResponse | null;
 };
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'FlagAttempt' | 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'AwdServiceTransition' | 'KohControlObservation' | 'AttachmentDownload' | 'WriteUpUnlock';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'CheckObservation' | 'ControlObservation' | 'AttachmentDownload' | 'WriteUpUnlock';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' | 'Queued' | 'Processing' | 'Completed' | 'PlatformFailed';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled' | 'RightButDue';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment' | 'FlagInvalid' | 'FlagUnknown' | 'FlagRevoked' | 'FlagNotIssued' | 'FlagNotYetActive' | 'FlagNotScorable' | 'AwdReceiptUnavailable';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment' | 'FlagInvalid' | 'FlagUnknown' | 'FlagRevoked' | 'FlagNotIssued' | 'FlagNotYetActive' | 'FlagNotScorable' | 'AwdReceiptUnavailable' | 'FixExecutionFailed' | 'FixExecutionTimedOut' | 'FixExecutionUncertain' | 'FixPlatformFailure' | 'FixStillExploitable' | 'FixServiceAbnormal';
 
 export type NoCtfDomainChallengesGameplayFactTimeEligibility = 'Valid' | 'NotOpened' | 'SubmissionClosed';
 
@@ -2759,6 +2715,17 @@ export type NoCtfapiEndpointsGameplayFactsAwdAttackStatusResponse = {
 export type NoCtfDomainCompetitionsAwdAwdAttackOutcome = 'Accepted' | 'Invalid' | 'Expired' | 'Duplicate' | 'OwnFlag' | 'UnknownFlag' | 'NotScorable' | 'SystemError';
 
 export type NoCtfDomainCompetitionsAwdAwdSettlementState = 'Provisional' | 'Final' | 'PendingAdjudication' | 'Exempted';
+
+export type NoCtfapiEndpointsGameplayFactsFixExecutionStatusResponse = {
+    targetKind?: NoCtfDomainChallengesCapabilitiesFixTargetKind;
+    phase?: NoCtfDomainChallengesCapabilitiesFixExecutionPhase;
+    failedPhase?: NoCtfDomainChallengesCapabilitiesFixExecutionPhase | null;
+    mutationBlocked?: boolean;
+};
+
+export type NoCtfDomainChallengesCapabilitiesFixTargetKind = 'Isolated' | 'Persistent';
+
+export type NoCtfDomainChallengesCapabilitiesFixExecutionPhase = 'Queued' | 'Applying' | 'Checking' | 'Finalizing' | 'Finished';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -2785,26 +2752,6 @@ export type NoCtfapiEndpointsGameplayFactsGetGameplayFactValueResponse = {
     gameplayFactId?: string;
     kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol;
     value?: string;
-};
-
-export type NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse = {
-    patchVerificationAvailable?: boolean;
-    maximumAttempts?: number;
-    acceptedAttempts?: number;
-    remainingAttempts?: number;
-    verificationState?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
-    verificationResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
-    verificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
-    runtimeInstanceId?: string | null;
-    runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
-    unavailableCode?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol | null;
-    timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
-};
-
-export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol = 'PatchVerificationNotAvailable' | 'ExperimentalFeatureDisabled' | 'ActiveTargetExists' | 'PatchAlreadyVerified' | 'PatchAttemptsExhausted' | 'RuntimeQuotaExceeded' | 'InvalidRuntimeConfiguration' | 'TargetConcurrency';
-
-export type NoCtfapiEndpointsGameplayFactsGetPatchVerificationRequest = {
-    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
@@ -2879,25 +2826,6 @@ export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse = {
 
 export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'DefenseAlreadySucceeded' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
 
-export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetResponse = {
-    runtimeInstanceId?: string;
-    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
-    statusUrl?: string;
-};
-
-export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureResponse = {
-    code?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol;
-    detail?: string;
-    messageKey?: string;
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetRequest = {
-    [key: string]: never;
-};
-
 export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactAcceptedResponse = {
     gameplayFactId?: string | null;
     state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
@@ -2949,21 +2877,6 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchRequest = {
     file: Blob | File;
 };
 
-export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse = {
-    code?: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode;
-    detail?: string;
-    messageKey?: string;
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode = 'ArchiveStreamNotSeekable' | 'ArchiveTooLarge' | 'ArchiveInvalid' | 'TargetNotReady' | 'PatchAlreadyVerified' | 'AttemptsExhausted' | 'TargetConsumed' | 'UploadConflict';
-
-export type NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest = {
-    file: Blob | File;
-};
-
 export type NoCtfapiEndpointsCompetitionsSpectatorScreenResponse = {
     version?: string;
     dataAsOf?: string;
@@ -2984,6 +2897,8 @@ export type NoCtfapiEndpointsCompetitionsSpectatorScreenResponse = {
     historyTruncated?: boolean;
     nextCursor?: string | null;
 };
+
+export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh' | 'LiveSolo';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
@@ -3123,7 +3038,6 @@ export type NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol = 'Direct' | 
 export type NoCtfApplicationCompetitionsManagementCompetitionFeatures = {
     progressionEnabled?: boolean;
     progressionMapVisible?: boolean;
-    hasPublishedTheory?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
@@ -3144,7 +3058,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     rounds?: Array<NoCtfapiEndpointsCompetitionsScoreboardRoundResponse>;
     challenges?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeResponse>;
     teams?: Array<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse>;
-    theoryEnabled?: boolean;
     tracks?: Array<NoCtfapiEndpointsCompetitionsScoreboardTrackResponse>;
     tracksEnabled?: boolean;
     visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
@@ -3184,8 +3097,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     achievements?: Array<NoCtfapiEndpointsCompetitionsScoreboardAchievementResponse> | null;
     challengeTotals?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeTotalResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
-    theoryScore?: number;
-    hasTheorySubmission?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol = 'Eligible' | 'Banned' | 'Disqualified';
@@ -3803,18 +3714,9 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     solvedByMyTeam?: boolean;
     usesDynamicFlag?: boolean;
     hints?: Array<NoCtfapiEndpointsChallengesParticipantChallengeHintResponse> | null;
-    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
-    patchVerificationAvailable?: boolean;
-    maximumPatchAttempts?: number | null;
-    acceptedPatchAttempts?: number | null;
-    remainingPatchAttempts?: number | null;
-    patchVerificationState?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
-    patchVerificationResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
-    patchVerificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
-    patchVerificationRuntimeInstanceId?: string | null;
-    patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     directionId?: string | null;
     directionIcon?: string | null;
+    availableActions?: Array<NoCtfapiEndpointsChallengesAvailableChallengeActionResponse>;
     timing?: NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null;
     tags?: Array<string>;
 };
@@ -3827,6 +3729,19 @@ export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
     isUnlocked?: boolean;
     canUnlock?: boolean;
 };
+
+export type NoCtfapiEndpointsChallengesAvailableChallengeActionResponse = {
+    kind?: NoCtfApplicationChallengesActionsChallengeActionKind;
+    enabled?: boolean;
+    availability?: NoCtfApplicationChallengesActionsChallengeActionAvailability;
+    admissionFailure?: NoCtfApplicationGameplayFactsIntakeGameplayFactAdmissionFailureCode | null;
+    runtimeInstanceId?: string | null;
+    remainingAttempts?: number | null;
+    gameplayFactId?: string | null;
+    admissionMessageKey?: string | null;
+};
+
+export type NoCtfApplicationGameplayFactsIntakeGameplayFactAdmissionFailureCode = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound' | 'ChallengeNotOpened' | 'ChallengeSubmissionClosed' | 'AwdHardeningActive' | 'AwdRoundGap' | 'AwdRoundUnavailable' | 'ManualAdjustmentReasonInvalid';
 
 export type NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse = {
     autoOpenAt?: string | null;
@@ -3886,7 +3801,6 @@ export type NoCtfapiEndpointsChallengesChallengeSummaryResponse = {
     order?: number;
     isPublished?: boolean;
     deletedAt?: string | null;
-    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
     locked?: boolean;
     prerequisitesSatisfied?: number;
     prerequisitesTotal?: number;
@@ -4209,7 +4123,6 @@ export type NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse = {
 };
 
 export type NoCtfapiEndpointsAuthenticationNavigationCapabilitiesResponse = {
-    canAccessTheoryBank?: boolean;
     hasManagedCompetitions?: boolean;
 };
 
@@ -4783,7 +4696,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     capacity?: Array<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse> | null;
 };
 
-export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack' | 'TemplateTest' | 'PatchVerificationTarget';
+export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'FixTarget' | 'Practice' | 'AttackTarget' | 'TemplateTest' | 'ScopedFixTarget';
 
 export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;
@@ -4798,7 +4711,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse
     budget?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse;
 };
 
-export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3;
+export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse = {
     memoryBytes?: number;
@@ -5046,7 +4959,6 @@ export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationRes
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
-    experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse;
     liveSoloVideo?: NoCtfApplicationLiveSoloMediaLiveSoloVideoPolicy | null;
     liveSoloVideoRules?: NoCtfapiEndpointsAdministrationPlatformLiveSoloVideoConfigurationRulesResponse;
 };
@@ -5094,10 +5006,6 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol = 'None' | 'SslOnConnect' | 'StartTls';
-
-export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse = {
-    ctfPatchVerificationEnabled?: boolean;
-};
 
 export type NoCtfApplicationLiveSoloMediaLiveSoloVideoPolicy = {
     maximumWidth?: number;
@@ -5289,7 +5197,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest | null;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest | null;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest | null;
-    experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest | null;
     liveSoloVideo?: NoCtfapiEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest | null;
 };
 
@@ -5324,10 +5231,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatc
     smtpFromAddress: string;
     smtpFromName: string;
     smtpTimeoutSeconds: number;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest = {
-    ctfPatchVerificationEnabled: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest = {
@@ -5409,12 +5312,19 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckEvidenceResponse
     requiredFlags?: number;
     readableFlags?: number;
     flags?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse>;
+    blockingFixFactId?: string | null;
+    maintenanceWaitStartedAt?: string | null;
+    maintenanceWaitEndedAt?: string | null;
 };
+
+export type NoCtfDomainCompetitionsAwdAwdCheckReason = 'None' | 'ConnectionRefused' | 'ConnectTimeout' | 'RequestTimeout' | 'FunctionalCheckFailed' | 'FlagStoreFailed' | 'CurrentFlagMissing' | 'HistoricalFlagMissing' | 'CheckerCrashed' | 'CheckerTimedOut' | 'TaskNotExecuted' | 'CallbackMissing' | 'InfrastructureFailure' | 'IncompleteEvidence' | 'InvalidEvidence' | 'RuntimeSuperseded' | 'LateReceipt' | 'PlayerMaintenance';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckProbeResponse = {
     outcome?: NoCtfDomainCompetitionsAwdAwdProbeOutcome;
     reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
 };
+
+export type NoCtfDomainCompetitionsAwdAwdProbeOutcome = 'Unknown' | 'Passed' | 'TargetFailure' | 'PlatformFailure' | 'NotRequired';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckFlagEvidenceResponse = {
     flagId?: string;
@@ -5816,7 +5726,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp' | 'LiveSoloMatch' | 'LiveSoloQuestionGroup' | 'LiveSoloQuestionMaterial' | 'ActiveLiveSoloMediaResource' | 'TheoryActivity';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp' | 'LiveSoloMatch' | 'LiveSoloQuestionGroup' | 'LiveSoloQuestionMaterial' | 'ActiveLiveSoloMediaResource';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;
@@ -6291,6 +6201,11 @@ export type NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDe
 
 export type NoCtfapiEndpointsAdministrationCompetitionsRetryCompetitionWebhookDeliveryConflict = {
     failure?: NoCtfApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfApplicationCompetitionsWebhooksCompetitionWebhookRetryFailure = 0 | 1 | 2;
@@ -6387,7 +6302,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse = 
     };
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid' | 'ExperimentalFeatureDisabled';
+export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid';
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse = {
     gameplayFactId?: string;
@@ -6484,6 +6399,7 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsUpdateCheatIncidentStat
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse = {
     code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode;
+    missingCapabilities?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol> | null;
     detail: string;
     messageKey?: string;
     messageArguments?: {
@@ -6491,7 +6407,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflic
     };
 };
 
-export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch' | 'ExperimentalFeatureDisabled';
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'CompetitionModeMismatch' | 'RequiredCapabilitiesMissing';
 
 export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
@@ -6549,16 +6465,28 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesCo
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCtfCompetitionChallengeRulesContract = {
+    runtime?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract | null;
     scoreSettlementMode?: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol | null;
     scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
     bloodRewards?: Array<NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract> | null;
     maxFlagAttempts?: number | null;
-    maxPatchAttempts?: number | null;
     wrongSubmissionPenalty?: number | null;
     flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract = {
+    allocation?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol;
+    flagSource?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol;
+    ttlSeconds?: number | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol = 'Shared' | 'PerTeam';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol = 'Static' | 'PerTeam' | 'AwdRotation';
+
 export type NoCtfapiEndpointsAdministrationChallengesAwdCompetitionChallengeRulesContract = {
+    runtime?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract | null;
+    allowFixSubmissions?: boolean;
     overrides?: NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract | null;
     storeRules?: Array<NoCtfapiEndpointsAdministrationChallengesAwdStoreRuleContract>;
     attackRewardMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol | null;
@@ -6577,6 +6505,7 @@ export type NoCtfapiEndpointsAdministrationChallengesAwdStoreRuleContract = {
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesAwdpCompetitionChallengeRulesContract = {
+    runtime?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract | null;
     breakScoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
     fixScoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
     maxBreakSubmissions?: number | null;
@@ -6590,12 +6519,14 @@ export type NoCtfapiEndpointsAdministrationChallengesAwdpCompetitionChallengeRul
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract = {
+    runtime?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract | null;
     pollIntervalSeconds?: number | null;
     controlPointsPerInterval?: number | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesLiveSoloCompetitionChallengeRulesContract = {
-    [key: string]: never;
+    runtime?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRuntimeRulesContract | null;
+    completionKind?: NoCtfDomainLiveSoloLiveSoloCompletionKind;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesEffectiveCtfScoringResponse = {
@@ -6691,17 +6622,16 @@ export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse = {
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateCopyResponse = {
     challengeId?: string;
     canonicalChallengeId?: string;
     title?: string;
     attachmentCount?: number;
     flagCount?: number;
-    allocationChanged?: boolean;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse = {
-    code?: NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure;
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateCopyFailureResponse = {
+    code?: NoCtfApplicationChallengesBankChallengeTemplateCopyFailure;
     detail?: string;
     messageKey?: string;
     messageArguments?: {
@@ -6709,13 +6639,12 @@ export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFail
     };
 };
 
-export type NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure = 'NotFound' | 'Forbidden' | 'UnsupportedSource' | 'AttachmentsForbidden' | 'FlagsForbidden' | 'Conflict' | 'AttachmentsRequired' | 'InvalidTags' | 'SourceChanged';
+export type NoCtfApplicationChallengesBankChallengeTemplateCopyFailure = 'NotFound' | 'Forbidden' | 'UnsupportedSource' | 'AttachmentsForbidden' | 'FlagsForbidden' | 'Conflict' | 'AttachmentsRequired';
 
-export type NoCtfapiEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest = {
+export type NoCtfapiEndpointsAdministrationChallengeBankCopyChallengeTemplateRequest = {
     sourceChallengeId: string;
     copyAttachments?: boolean;
     copyFlags?: boolean;
-    expectedSourceStamp: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankTemplateChallengeFlagResponse = {
@@ -6744,7 +6673,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     id?: string;
     ownerId?: string;
     managerIds?: Array<string>;
-    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    capabilities?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol>;
     visibility?: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title?: string;
     description?: string | null;
@@ -6754,7 +6683,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     activeCompetitionReferenceCount?: number;
     createdAt?: string;
     updatedAt?: string;
-    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
     concurrencyStamp?: string;
 };
 
@@ -6770,11 +6698,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflic
     };
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible' | 'ExperimentalFeatureDisabled' | 'InteractionKindConflict';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ReferencedCapabilityConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible' | 'PendingExecutionConflict';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
-    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     visibility?: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title: string;
     description?: string | null;
@@ -6793,6 +6720,42 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTestRunti
 
 export type NoCtfapiEndpointsAdministrationChallengeBankExtendChallengeTestRuntimeRequest = {
     expiresAt: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityTestResponse = {
+    executionId?: string;
+    runtimeInstanceId?: string;
+    kind?: NoCtfDomainChallengesTestingTemplateCapabilityTestKind;
+    state?: NoCtfDomainChallengesTestingTemplateCapabilityTestState;
+    acceptedAt?: string;
+    deadline?: string;
+    completedAt?: string | null;
+    failure?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure | null;
+    failureStage?: NoCtfDomainChallengesTestingTemplateCapabilityTestState | null;
+    fixResult?: NoCtfDomainChallengesCapabilitiesFixResult | null;
+    fixExitCode?: number | null;
+    fixExecutionUncertain?: boolean;
+    checkCompleted?: boolean;
+    probes?: Array<NoCtfapiEndpointsAdministrationChallengeBankTemplateCheckProbeResponse>;
+};
+
+export type NoCtfDomainChallengesTestingTemplateCapabilityTestKind = 'Fix' | 'Check' | 'FixAndCheck';
+
+export type NoCtfDomainChallengesTestingTemplateCapabilityTestState = 'Queued' | 'Applying' | 'Checking' | 'Finalizing' | 'Completed' | 'PlatformFailed' | 'Canceled';
+
+export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure = 'InvalidInput' | 'RuntimeUnavailable' | 'TargetSuperseded' | 'ExecutionInterrupted' | 'DeadlineExceeded' | 'InvalidEvidence' | 'MissingEvidence' | 'InvalidCallback' | 'ResourceCleanupFailed' | 'InputPreparationFailed' | 'TargetExecutionFailed' | 'ResourceUnavailable';
+
+export type NoCtfDomainChallengesCapabilitiesFixResult = 'Applied' | 'Failed' | 'TimedOut';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTemplateCheckProbeResponse = {
+    kind?: NoCtfDomainChallengesCapabilitiesCheckItemKind;
+    flagId?: string | null;
+    result?: NoCtfDomainChallengesCapabilitiesCheckProbeResult;
+    reason?: NoCtfDomainChallengesCapabilitiesCheckFailureReason;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeCapabilityTestRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeFlagRequest = {
@@ -6821,6 +6784,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResp
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol = 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled';
 
+export type NoCtfapiEndpointsAdministrationChallengeBankGetQuestionnaireImageRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeAttachmentsRequest = {
     [key: string]: never;
 };
@@ -6845,14 +6812,13 @@ export type NoCtfapiPaginationArrayResultOfChallengeTemplateSummaryResponse = {
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse = {
     id?: string;
-    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    capabilities?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol>;
     visibility?: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title?: string;
     direction?: string;
     deletedAt?: string | null;
     activeCompetitionReferenceCount?: number;
     updatedAt?: string;
-    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
     concurrencyStamp?: string;
 };
 
@@ -6864,7 +6830,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankPatchChallengeTemplateRe
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest = {
-    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     visibility: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title: string;
     description: string | null;
@@ -6879,6 +6844,90 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplatePermiss
 
 export type NoCtfapiEndpointsAdministrationChallengeBankPermanentlyDeleteChallengeAttachmentRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeBreakTestResponse = {
+    executionId?: string;
+    match?: NoCtfDomainChallengesCapabilitiesBreakMatchResult;
+    matchedFlagIds?: Array<string>;
+    observedAt?: string;
+};
+
+export type NoCtfDomainChallengesCapabilitiesBreakMatchResult = 'NotMatched' | 'Matched' | 'Ambiguous';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem = {
+    code?: NoCtfApplicationChallengesTestingTemplateCapabilityTestFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
+
+export type NoCtfApplicationChallengesTestingTemplateCapabilityTestFailure = 'NotFound' | 'CapabilityMissing' | 'InvalidConfiguration' | 'InvalidInput' | 'RuntimeNotReady' | 'RuntimeScopeMismatch' | 'Conflict' | 'RequestConflict' | 'ArchiveInvalid' | 'ArchiveTooLarge';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeBreakRequest = {
+    runtimeInstanceId?: string | null;
+    flag: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse = {
+    executionId?: string;
+    runtimeInstanceId?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeCheckRequest = {
+    requestId: string;
+    runtimeInstanceId: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeControlTestResponse = {
+    executionId?: string;
+    result?: NoCtfDomainChallengesCapabilitiesControlResult;
+    controllerIdentifier?: string | null;
+    executionState?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionState;
+    executionFailure?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure | null;
+    observedAt?: string;
+};
+
+export type NoCtfDomainChallengesCapabilitiesControlResult = 'Controlled' | 'Uncontrolled' | 'Indeterminate';
+
+export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionState = 'Completed' | 'PlatformFailed' | 'NotExecuted';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeControlRequest = {
+    runtimeInstanceId: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeFixAndCheckRequest = {
+    requestId: string;
+    file: Blob | File;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeFixRequest = {
+    requestId: string;
+    file: Blob | File;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeQuestionnaireTestResponse = {
+    executionId?: string;
+    revisionId?: string;
+    questions?: Array<NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireTestQuestionResponse>;
+    observedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireTestQuestionResponse = {
+    questionId?: string;
+    result?: NoCtfDomainChallengesCapabilitiesQuestionnaireAnswerResult;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeQuestionnaireRequest = {
+    answers: Array<NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireTestAnswerRequest>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireTestAnswerRequest = {
+    questionId?: string;
+    selectedOptionIds?: Array<string>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse = {
@@ -6897,6 +6946,15 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUploadChallengeAttachmen
     downloadFileName?: string | null;
     attachmentIds?: Array<string> | null;
     files: Array<Blob | File>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireImageResponse = {
+    fileId?: string;
+    revisionId?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankUploadQuestionnaireImageRequest = {
+    file: Blob | File;
 };
 
 export type NoCtfapiEndpointsAdministrationArchivesExportCompetitionArchiveRequest = {
@@ -6927,1152 +6985,6 @@ export type HealthEndpointResponses = {
 };
 
 export type HealthEndpointResponse = HealthEndpointResponses[keyof HealthEndpointResponses];
-
-export type TheoryQuestionsCopyData = {
-    body?: never;
-    path: {
-        questionId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}/copy';
-};
-
-export type TheoryQuestionsCopyErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsCopyError = TheoryQuestionsCopyErrors[keyof TheoryQuestionsCopyErrors];
-
-export type TheoryQuestionsCopyResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
-};
-
-export type TheoryQuestionsCopyResponse = TheoryQuestionsCopyResponses[keyof TheoryQuestionsCopyResponses];
-
-export type TheoryQuestionsListData = {
-    body?: never;
-    path?: never;
-    query: {
-        kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind | null;
-        state?: NoCtfDomainTheoryQuestionsTheoryQuestionState | null;
-        difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty | null;
-        knowledge?: string | null;
-        tag?: string | null;
-        keyword?: string | null;
-        offset: number;
-        limit: number;
-        desc: boolean;
-    };
-    url: '/api/v1/theory/questions';
-};
-
-export type TheoryQuestionsListErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type TheoryQuestionsListError = TheoryQuestionsListErrors[keyof TheoryQuestionsListErrors];
-
-export type TheoryQuestionsListResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryQuestionPage;
-};
-
-export type TheoryQuestionsListResponse = TheoryQuestionsListResponses[keyof TheoryQuestionsListResponses];
-
-export type TheoryQuestionsCreateData = {
-    body: NoCtfapiEndpointsTheoryQuestionsCreateTheoryQuestionRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/theory/questions';
-};
-
-export type TheoryQuestionsCreateErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsCreateError = TheoryQuestionsCreateErrors[keyof TheoryQuestionsCreateErrors];
-
-export type TheoryQuestionsCreateResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
-};
-
-export type TheoryQuestionsCreateResponse = TheoryQuestionsCreateResponses[keyof TheoryQuestionsCreateResponses];
-
-export type TheoryQuestionsGetData = {
-    body?: never;
-    path: {
-        questionId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}';
-};
-
-export type TheoryQuestionsGetErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsGetError = TheoryQuestionsGetErrors[keyof TheoryQuestionsGetErrors];
-
-export type TheoryQuestionsGetResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryQuestionContent;
-};
-
-export type TheoryQuestionsGetResponse = TheoryQuestionsGetResponses[keyof TheoryQuestionsGetResponses];
-
-export type TheoryQuestionsUpdateData = {
-    body: NoCtfapiEndpointsTheoryQuestionsUpdateTheoryQuestionRequest;
-    path: {
-        questionId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}';
-};
-
-export type TheoryQuestionsUpdateErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsUpdateError = TheoryQuestionsUpdateErrors[keyof TheoryQuestionsUpdateErrors];
-
-export type TheoryQuestionsUpdateResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
-};
-
-export type TheoryQuestionsUpdateResponse = TheoryQuestionsUpdateResponses[keyof TheoryQuestionsUpdateResponses];
-
-export type GetTheoryQuestionImageData = {
-    body?: never;
-    path: {
-        questionId: string;
-        fileId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}/images/{fileId}';
-};
-
-export type GetTheoryQuestionImageErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryQuestionImageResponses = {
-    /**
-     * Success
-     */
-    200: Blob | File;
-};
-
-export type GetTheoryQuestionImageResponse = GetTheoryQuestionImageResponses[keyof GetTheoryQuestionImageResponses];
-
-export type TheoryQuestionsGrantData = {
-    body: NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest;
-    path: {
-        questionId: string;
-        userId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}/grants/{userId}';
-};
-
-export type TheoryQuestionsGrantErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsGrantError = TheoryQuestionsGrantErrors[keyof TheoryQuestionsGrantErrors];
-
-export type TheoryQuestionsGrantResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type TheoryQuestionsGrantResponse = TheoryQuestionsGrantResponses[keyof TheoryQuestionsGrantResponses];
-
-export type TheoryQuestionsSetStateData = {
-    body: NoCtfapiEndpointsTheoryQuestionsSetTheoryQuestionStateRequest;
-    path: {
-        questionId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}/state';
-};
-
-export type TheoryQuestionsSetStateErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TheoryQuestionsSetStateError = TheoryQuestionsSetStateErrors[keyof TheoryQuestionsSetStateErrors];
-
-export type TheoryQuestionsSetStateResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type TheoryQuestionsSetStateResponse = TheoryQuestionsSetStateResponses[keyof TheoryQuestionsSetStateResponses];
-
-export type UploadTheoryImageData = {
-    body: NoCtfapiEndpointsTheoryQuestionsUploadTheoryImageRequest;
-    path: {
-        questionId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/questions/{questionId}/images';
-};
-
-export type UploadTheoryImageErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type UploadTheoryImageError = UploadTheoryImageErrors[keyof UploadTheoryImageErrors];
-
-export type UploadTheoryImageResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryQuestionsTheoryImageResult;
-};
-
-export type UploadTheoryImageResponse = UploadTheoryImageResponses[keyof UploadTheoryImageResponses];
-
-export type AnswerTheoryPaperData = {
-    body: NoCtfapiEndpointsTheoryActivitiesAnswerTheoryPaperRequest;
-    path: {
-        activityId: string;
-        paperId: string;
-        itemId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}';
-};
-
-export type AnswerTheoryPaperErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AnswerTheoryPaperError = AnswerTheoryPaperErrors[keyof AnswerTheoryPaperErrors];
-
-export type AnswerTheoryPaperResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryPapersTheoryPaperView;
-};
-
-export type AnswerTheoryPaperResponse = AnswerTheoryPaperResponses[keyof AnswerTheoryPaperResponses];
-
-export type ApplyTheoryCorrectionData = {
-    body: NoCtfapiEndpointsTheoryActivitiesApplyTheoryCorrectionRequest;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/corrections';
-};
-
-export type ApplyTheoryCorrectionErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type ApplyTheoryCorrectionError = ApplyTheoryCorrectionErrors[keyof ApplyTheoryCorrectionErrors];
-
-export type ApplyTheoryCorrectionResponses = {
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsTheoryActivitiesTheoryCorrectionAccepted;
-};
-
-export type ApplyTheoryCorrectionResponse = ApplyTheoryCorrectionResponses[keyof ApplyTheoryCorrectionResponses];
-
-export type CheckTheoryActivityData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/check';
-};
-
-export type CheckTheoryActivityErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type CheckTheoryActivityResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivityCheck;
-};
-
-export type CheckTheoryActivityResponse = CheckTheoryActivityResponses[keyof CheckTheoryActivityResponses];
-
-export type GetCompetitionTheoryData = {
-    body?: never;
-    path: {
-        competitionId: string;
-    };
-    query: {
-        staff: boolean;
-    };
-    url: '/api/v1/competitions/{competitionId}/theory';
-};
-
-export type GetCompetitionTheoryErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type GetCompetitionTheoryResponses = {
-    /**
-     * Success
-     */
-    200: Array<NoCtfApplicationTheoryActivitiesTheoryActivitySummary>;
-};
-
-export type GetCompetitionTheoryResponse = GetCompetitionTheoryResponses[keyof GetCompetitionTheoryResponses];
-
-export type SaveCompetitionTheoryData = {
-    body: NoCtfapiEndpointsTheoryActivitiesSaveCompetitionTheoryRequest;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/theory';
-};
-
-export type SaveCompetitionTheoryErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type SaveCompetitionTheoryError = SaveCompetitionTheoryErrors[keyof SaveCompetitionTheoryErrors];
-
-export type SaveCompetitionTheoryResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
-};
-
-export type SaveCompetitionTheoryResponse = SaveCompetitionTheoryResponses[keyof SaveCompetitionTheoryResponses];
-
-export type GetTheoryActivityManagementData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/management';
-};
-
-export type GetTheoryActivityManagementErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryActivityManagementResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivityManagement;
-};
-
-export type GetTheoryActivityManagementResponse = GetTheoryActivityManagementResponses[keyof GetTheoryActivityManagementResponses];
-
-export type GetTheoryExamLeaderboardData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query: {
-        offset: number;
-        limit: number;
-        desc: boolean;
-    };
-    url: '/api/v1/theory/activities/{activityId}/leaderboard';
-};
-
-export type GetTheoryExamLeaderboardErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryExamLeaderboardError = GetTheoryExamLeaderboardErrors[keyof GetTheoryExamLeaderboardErrors];
-
-export type GetTheoryExamLeaderboardResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryExamLeaderboard;
-};
-
-export type GetTheoryExamLeaderboardResponse = GetTheoryExamLeaderboardResponses[keyof GetTheoryExamLeaderboardResponses];
-
-export type GetTheoryPaperData = {
-    body?: never;
-    path: {
-        activityId: string;
-        paperId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}';
-};
-
-export type GetTheoryPaperErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryPaperResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryPapersTheoryPaperView;
-};
-
-export type GetTheoryPaperResponse = GetTheoryPaperResponses[keyof GetTheoryPaperResponses];
-
-export type GetTheoryPaperImageData = {
-    body?: never;
-    path: {
-        activityId: string;
-        paperId: string;
-        fileId: string;
-    };
-    query: {
-        staff: boolean;
-    };
-    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}';
-};
-
-export type GetTheoryPaperImageErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryPaperImageResponses = {
-    /**
-     * Success
-     */
-    200: Blob | File;
-};
-
-export type GetTheoryPaperImageResponse = GetTheoryPaperImageResponses[keyof GetTheoryPaperImageResponses];
-
-export type GetTheoryReviewData = {
-    body?: never;
-    path: {
-        activityId: string;
-        paperId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}';
-};
-
-export type GetTheoryReviewErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheoryReviewResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryReviewPaper;
-};
-
-export type GetTheoryReviewResponse = GetTheoryReviewResponses[keyof GetTheoryReviewResponses];
-
-export type GetTheorySessionData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/session';
-};
-
-export type GetTheorySessionErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetTheorySessionResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryPapersTheoryPaperView;
-};
-
-export type GetTheorySessionResponse = GetTheorySessionResponses[keyof GetTheorySessionResponses];
-
-export type IssueTheoryPaperData = {
-    body: NoCtfapiEndpointsTheoryActivitiesIssueTheoryPaperRequest;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/papers';
-};
-
-export type IssueTheoryPaperErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type IssueTheoryPaperError = IssueTheoryPaperErrors[keyof IssueTheoryPaperErrors];
-
-export type IssueTheoryPaperResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryPapersTheoryPaperView;
-};
-
-export type IssueTheoryPaperResponse = IssueTheoryPaperResponses[keyof IssueTheoryPaperResponses];
-
-export type ListTheoryActivitiesData = {
-    body?: never;
-    path?: never;
-    query: {
-        staff: boolean;
-        competitionId?: string | null;
-        keyword?: string | null;
-        offset: number;
-        limit: number;
-        desc: boolean;
-    };
-    url: '/api/v1/theory/activities';
-};
-
-export type ListTheoryActivitiesErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type ListTheoryActivitiesError = ListTheoryActivitiesErrors[keyof ListTheoryActivitiesErrors];
-
-export type ListTheoryActivitiesResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivityPage;
-};
-
-export type ListTheoryActivitiesResponse = ListTheoryActivitiesResponses[keyof ListTheoryActivitiesResponses];
-
-export type SaveTheoryActivityData = {
-    body: NoCtfapiEndpointsTheoryActivitiesSaveTheoryActivityRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/theory/activities';
-};
-
-export type SaveTheoryActivityErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type SaveTheoryActivityError = SaveTheoryActivityErrors[keyof SaveTheoryActivityErrors];
-
-export type SaveTheoryActivityResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
-};
-
-export type SaveTheoryActivityResponse = SaveTheoryActivityResponses[keyof SaveTheoryActivityResponses];
-
-export type ListTheoryAuditData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query: {
-        offset: number;
-        limit: number;
-        desc: boolean;
-    };
-    url: '/api/v1/theory/activities/{activityId}/audit';
-};
-
-export type ListTheoryAuditErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type ListTheoryAuditError = ListTheoryAuditErrors[keyof ListTheoryAuditErrors];
-
-export type ListTheoryAuditResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryAuditPage;
-};
-
-export type ListTheoryAuditResponse = ListTheoryAuditResponses[keyof ListTheoryAuditResponses];
-
-export type ListTheoryReviewsData = {
-    body?: never;
-    path: {
-        activityId: string;
-    };
-    query: {
-        offset: number;
-        limit: number;
-        desc: boolean;
-    };
-    url: '/api/v1/theory/activities/{activityId}/reviews';
-};
-
-export type ListTheoryReviewsErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type ListTheoryReviewsError = ListTheoryReviewsErrors[keyof ListTheoryReviewsErrors];
-
-export type ListTheoryReviewsResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryReviewPage;
-};
-
-export type ListTheoryReviewsResponse = ListTheoryReviewsResponses[keyof ListTheoryReviewsResponses];
-
-export type PreviewTheoryCorrectionData = {
-    body: NoCtfapiEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/corrections/preview';
-};
-
-export type PreviewTheoryCorrectionErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type PreviewTheoryCorrectionError = PreviewTheoryCorrectionErrors[keyof PreviewTheoryCorrectionErrors];
-
-export type PreviewTheoryCorrectionResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryCorrectionPreview;
-};
-
-export type PreviewTheoryCorrectionResponse = PreviewTheoryCorrectionResponses[keyof PreviewTheoryCorrectionResponses];
-
-export type StartTheoryConsultationData = {
-    body: NoCtfapiEndpointsTheoryActivitiesStartTheoryConsultationRequest;
-    path: {
-        activityId: string;
-        paperId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations';
-};
-
-export type StartTheoryConsultationErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type StartTheoryConsultationError = StartTheoryConsultationErrors[keyof StartTheoryConsultationErrors];
-
-export type StartTheoryConsultationResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsTheoryActivitiesTheoryConsultationResponse;
-};
-
-export type StartTheoryConsultationResponse = StartTheoryConsultationResponses[keyof StartTheoryConsultationResponses];
-
-export type SubmitTheoryPaperData = {
-    body: NoCtfapiEndpointsTheoryActivitiesSubmitTheoryPaperRequest;
-    path: {
-        activityId: string;
-        paperId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/submit';
-};
-
-export type SubmitTheoryPaperErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type SubmitTheoryPaperError = SubmitTheoryPaperErrors[keyof SubmitTheoryPaperErrors];
-
-export type SubmitTheoryPaperResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryPapersTheoryPaperView;
-};
-
-export type SubmitTheoryPaperResponse = SubmitTheoryPaperResponses[keyof SubmitTheoryPaperResponses];
-
-export type TransitionTheoryActivityData = {
-    body: NoCtfapiEndpointsTheoryActivitiesTransitionTheoryActivityRequest;
-    path: {
-        activityId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/operations';
-};
-
-export type TransitionTheoryActivityErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type TransitionTheoryActivityError = TransitionTheoryActivityErrors[keyof TransitionTheoryActivityErrors];
-
-export type TransitionTheoryActivityResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
-};
-
-export type TransitionTheoryActivityResponse = TransitionTheoryActivityResponses[keyof TransitionTheoryActivityResponses];
-
-export type VoidTheoryPaperData = {
-    body: NoCtfapiEndpointsTheoryActivitiesVoidTheoryPaperRequest;
-    path: {
-        activityId: string;
-        paperId: string;
-    };
-    query?: never;
-    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}/void';
-};
-
-export type VoidTheoryPaperErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type VoidTheoryPaperError = VoidTheoryPaperErrors[keyof VoidTheoryPaperErrors];
-
-export type VoidTheoryPaperResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type VoidTheoryPaperResponse = VoidTheoryPaperResponses[keyof VoidTheoryPaperResponses];
 
 export type TeamAvatarClearData = {
     body?: never;
@@ -9156,6 +8068,728 @@ export type ProbeRuntimeProxyResponses = {
 };
 
 export type ProbeRuntimeProxyResponse = ProbeRuntimeProxyResponses[keyof ProbeRuntimeProxyResponses];
+
+export type AnswerQuestionnaireSessionData = {
+    body: NoCtfapiEndpointsQuestionnairesSessionsAnswerQuestionnaireSessionRequest;
+    path: {
+        activityId: string;
+        sessionId: string;
+        itemId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/answers/{itemId}';
+};
+
+export type AnswerQuestionnaireSessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AnswerQuestionnaireSessionError = AnswerQuestionnaireSessionErrors[keyof AnswerQuestionnaireSessionErrors];
+
+export type AnswerQuestionnaireSessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView;
+};
+
+export type AnswerQuestionnaireSessionResponse = AnswerQuestionnaireSessionResponses[keyof AnswerQuestionnaireSessionResponses];
+
+export type GetQuestionnaireActivitySessionData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/session';
+};
+
+export type GetQuestionnaireActivitySessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireActivitySessionError = GetQuestionnaireActivitySessionErrors[keyof GetQuestionnaireActivitySessionErrors];
+
+export type GetQuestionnaireActivitySessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView;
+};
+
+export type GetQuestionnaireActivitySessionResponse = GetQuestionnaireActivitySessionResponses[keyof GetQuestionnaireActivitySessionResponses];
+
+export type GetQuestionnaireSessionData = {
+    body?: never;
+    path: {
+        activityId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}';
+};
+
+export type GetQuestionnaireSessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireSessionError = GetQuestionnaireSessionErrors[keyof GetQuestionnaireSessionErrors];
+
+export type GetQuestionnaireSessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView;
+};
+
+export type GetQuestionnaireSessionResponse = GetQuestionnaireSessionResponses[keyof GetQuestionnaireSessionResponses];
+
+export type GetQuestionnaireSessionImageData = {
+    body?: never;
+    path: {
+        activityId: string;
+        sessionId: string;
+        fileId: string;
+    };
+    query: {
+        staff: boolean;
+    };
+    url: '/api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/images/{fileId}';
+};
+
+export type GetQuestionnaireSessionImageErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireSessionImageError = GetQuestionnaireSessionImageErrors[keyof GetQuestionnaireSessionImageErrors];
+
+export type GetQuestionnaireSessionImageResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type GetQuestionnaireSessionImageResponse = GetQuestionnaireSessionImageResponses[keyof GetQuestionnaireSessionImageResponses];
+
+export type IssueQuestionnaireSessionData = {
+    body: NoCtfapiEndpointsQuestionnairesSessionsIssueQuestionnaireSessionRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/sessions';
+};
+
+export type IssueQuestionnaireSessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type IssueQuestionnaireSessionError = IssueQuestionnaireSessionErrors[keyof IssueQuestionnaireSessionErrors];
+
+export type IssueQuestionnaireSessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView;
+};
+
+export type IssueQuestionnaireSessionResponse = IssueQuestionnaireSessionResponses[keyof IssueQuestionnaireSessionResponses];
+
+export type SubmitQuestionnaireSessionData = {
+    body: NoCtfapiEndpointsQuestionnairesSessionsSubmitQuestionnaireSessionRequest;
+    path: {
+        activityId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/submit';
+};
+
+export type SubmitQuestionnaireSessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SubmitQuestionnaireSessionError = SubmitQuestionnaireSessionErrors[keyof SubmitQuestionnaireSessionErrors];
+
+export type SubmitQuestionnaireSessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesSessionsQuestionnaireSessionView;
+};
+
+export type SubmitQuestionnaireSessionResponse = SubmitQuestionnaireSessionResponses[keyof SubmitQuestionnaireSessionResponses];
+
+export type ApplyQuestionnaireCorrectionData = {
+    body: NoCtfapiEndpointsQuestionnairesActivitiesApplyQuestionnaireCorrectionRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/corrections';
+};
+
+export type ApplyQuestionnaireCorrectionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ApplyQuestionnaireCorrectionError = ApplyQuestionnaireCorrectionErrors[keyof ApplyQuestionnaireCorrectionErrors];
+
+export type ApplyQuestionnaireCorrectionResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireCorrectionAccepted;
+};
+
+export type ApplyQuestionnaireCorrectionResponse = ApplyQuestionnaireCorrectionResponses[keyof ApplyQuestionnaireCorrectionResponses];
+
+export type CheckQuestionnaireActivityData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/check';
+};
+
+export type CheckQuestionnaireActivityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type CheckQuestionnaireActivityError = CheckQuestionnaireActivityErrors[keyof CheckQuestionnaireActivityErrors];
+
+export type CheckQuestionnaireActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityCheck;
+};
+
+export type CheckQuestionnaireActivityResponse = CheckQuestionnaireActivityResponses[keyof CheckQuestionnaireActivityResponses];
+
+export type GetQuestionnaireActivityManagementData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/management';
+};
+
+export type GetQuestionnaireActivityManagementErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireActivityManagementError = GetQuestionnaireActivityManagementErrors[keyof GetQuestionnaireActivityManagementErrors];
+
+export type GetQuestionnaireActivityManagementResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityManagement;
+};
+
+export type GetQuestionnaireActivityManagementResponse = GetQuestionnaireActivityManagementResponses[keyof GetQuestionnaireActivityManagementResponses];
+
+export type GetQuestionnaireExamLeaderboardData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/questionnaires/activities/{activityId}/leaderboard';
+};
+
+export type GetQuestionnaireExamLeaderboardErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireExamLeaderboardError = GetQuestionnaireExamLeaderboardErrors[keyof GetQuestionnaireExamLeaderboardErrors];
+
+export type GetQuestionnaireExamLeaderboardResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireExamLeaderboard;
+};
+
+export type GetQuestionnaireExamLeaderboardResponse = GetQuestionnaireExamLeaderboardResponses[keyof GetQuestionnaireExamLeaderboardResponses];
+
+export type GetQuestionnaireReviewData = {
+    body?: never;
+    path: {
+        activityId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/reviews/{sessionId}';
+};
+
+export type GetQuestionnaireReviewErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetQuestionnaireReviewError = GetQuestionnaireReviewErrors[keyof GetQuestionnaireReviewErrors];
+
+export type GetQuestionnaireReviewResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsQuestionnairesActivitiesQuestionnaireReviewResponse;
+};
+
+export type GetQuestionnaireReviewResponse = GetQuestionnaireReviewResponses[keyof GetQuestionnaireReviewResponses];
+
+export type ListQuestionnaireActivitiesData = {
+    body?: never;
+    path?: never;
+    query: {
+        staff: boolean;
+        keyword?: string | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/questionnaires/activities';
+};
+
+export type ListQuestionnaireActivitiesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ListQuestionnaireActivitiesError = ListQuestionnaireActivitiesErrors[keyof ListQuestionnaireActivitiesErrors];
+
+export type ListQuestionnaireActivitiesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivityPage;
+};
+
+export type ListQuestionnaireActivitiesResponse = ListQuestionnaireActivitiesResponses[keyof ListQuestionnaireActivitiesResponses];
+
+export type SaveQuestionnaireActivityData = {
+    body: NoCtfapiEndpointsQuestionnairesActivitiesSaveQuestionnaireActivityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/questionnaires/activities';
+};
+
+export type SaveQuestionnaireActivityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SaveQuestionnaireActivityError = SaveQuestionnaireActivityErrors[keyof SaveQuestionnaireActivityErrors];
+
+export type SaveQuestionnaireActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary;
+};
+
+export type SaveQuestionnaireActivityResponse = SaveQuestionnaireActivityResponses[keyof SaveQuestionnaireActivityResponses];
+
+export type ListQuestionnaireAuditData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/questionnaires/activities/{activityId}/audit';
+};
+
+export type ListQuestionnaireAuditErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListQuestionnaireAuditError = ListQuestionnaireAuditErrors[keyof ListQuestionnaireAuditErrors];
+
+export type ListQuestionnaireAuditResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireAuditPage;
+};
+
+export type ListQuestionnaireAuditResponse = ListQuestionnaireAuditResponses[keyof ListQuestionnaireAuditResponses];
+
+export type ListQuestionnaireReviewsData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/questionnaires/activities/{activityId}/reviews';
+};
+
+export type ListQuestionnaireReviewsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListQuestionnaireReviewsError = ListQuestionnaireReviewsErrors[keyof ListQuestionnaireReviewsErrors];
+
+export type ListQuestionnaireReviewsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireReviewPage;
+};
+
+export type ListQuestionnaireReviewsResponse = ListQuestionnaireReviewsResponses[keyof ListQuestionnaireReviewsResponses];
+
+export type PreviewQuestionnaireCorrectionData = {
+    body: NoCtfapiEndpointsQuestionnairesActivitiesPreviewQuestionnaireCorrectionRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/corrections/preview';
+};
+
+export type PreviewQuestionnaireCorrectionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PreviewQuestionnaireCorrectionError = PreviewQuestionnaireCorrectionErrors[keyof PreviewQuestionnaireCorrectionErrors];
+
+export type PreviewQuestionnaireCorrectionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireCorrectionPreview;
+};
+
+export type PreviewQuestionnaireCorrectionResponse = PreviewQuestionnaireCorrectionResponses[keyof PreviewQuestionnaireCorrectionResponses];
+
+export type TransitionQuestionnaireActivityData = {
+    body: NoCtfapiEndpointsQuestionnairesActivitiesTransitionQuestionnaireActivityRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/operations';
+};
+
+export type TransitionQuestionnaireActivityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TransitionQuestionnaireActivityError = TransitionQuestionnaireActivityErrors[keyof TransitionQuestionnaireActivityErrors];
+
+export type TransitionQuestionnaireActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQuestionnairesActivitiesQuestionnaireActivitySummary;
+};
+
+export type TransitionQuestionnaireActivityResponse = TransitionQuestionnaireActivityResponses[keyof TransitionQuestionnaireActivityResponses];
+
+export type VoidQuestionnaireSessionData = {
+    body: NoCtfapiEndpointsQuestionnairesActivitiesVoidQuestionnaireSessionRequest;
+    path: {
+        activityId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/v1/questionnaires/activities/{activityId}/reviews/{sessionId}/void';
+};
+
+export type VoidQuestionnaireSessionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type VoidQuestionnaireSessionError = VoidQuestionnaireSessionErrors[keyof VoidQuestionnaireSessionErrors];
+
+export type VoidQuestionnaireSessionResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type VoidQuestionnaireSessionResponse = VoidQuestionnaireSessionResponses[keyof VoidQuestionnaireSessionResponses];
 
 export type PlatformLogoGetData = {
     body?: never;
@@ -10303,6 +9937,101 @@ export type SaveLiveSoloConfigurationResponses = {
 };
 
 export type SaveLiveSoloConfigurationResponse = SaveLiveSoloConfigurationResponses[keyof SaveLiveSoloConfigurationResponses];
+
+export type GetLiveSoloFixTargetData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-target';
+};
+
+export type GetLiveSoloFixTargetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloFixTargetError = GetLiveSoloFixTargetErrors[keyof GetLiveSoloFixTargetErrors];
+
+export type GetLiveSoloFixTargetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloFixTargetResponse;
+};
+
+export type GetLiveSoloFixTargetResponse = GetLiveSoloFixTargetResponses[keyof GetLiveSoloFixTargetResponses];
+
+export type RequestLiveSoloFixTargetData = {
+    body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-target';
+};
+
+export type RequestLiveSoloFixTargetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type RequestLiveSoloFixTargetError = RequestLiveSoloFixTargetErrors[keyof RequestLiveSoloFixTargetErrors];
+
+export type RequestLiveSoloFixTargetResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsLiveSoloLiveSoloFixTargetResponse;
+};
+
+export type RequestLiveSoloFixTargetResponse = RequestLiveSoloFixTargetResponses[keyof RequestLiveSoloFixTargetResponses];
 
 export type GetLiveSoloMediaData = {
     body?: never;
@@ -12213,6 +11942,59 @@ export type StartLiveSoloCountdownResponses = {
 
 export type StartLiveSoloCountdownResponse = StartLiveSoloCountdownResponses[keyof StartLiveSoloCountdownResponses];
 
+export type SubmitLiveSoloFixData = {
+    body: NoCtfapiEndpointsLiveSoloSubmitLiveSoloFixRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-targets/{runtimeInstanceId}/fixes';
+};
+
+export type SubmitLiveSoloFixErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type SubmitLiveSoloFixError = SubmitLiveSoloFixErrors[keyof SubmitLiveSoloFixErrors];
+
+export type SubmitLiveSoloFixResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsLiveSoloLiveSoloFixAcceptedResponse;
+};
+
+export type SubmitLiveSoloFixResponse = SubmitLiveSoloFixResponses[keyof SubmitLiveSoloFixResponses];
+
 export type SubmitLiveSoloFlagData = {
     body: NoCtfapiEndpointsLiveSoloSubmitLiveSoloFlagRequest;
     headers?: {
@@ -12359,7 +12141,7 @@ export type DownloadFixArchiveEndpointData = {
         gameplayFactId: string;
     };
     query?: never;
-    url: '/api/internal/v1/awdp/fix-archives/{gameplayFactId}';
+    url: '/api/internal/v1/fixes/{gameplayFactId}/archive';
 };
 
 export type DownloadFixArchiveEndpointErrors = {
@@ -12408,14 +12190,14 @@ export type ReadAwdCheckTaskEndpointResponses = {
 
 export type ReadAwdCheckTaskEndpointResponse = ReadAwdCheckTaskEndpointResponses[keyof ReadAwdCheckTaskEndpointResponses];
 
-export type RecordAwdCheckResultEndpointData = {
-    body: NoCtfapiEndpointsInternalRecordAwdCheckResultRequest;
+export type RecordCheckResultEndpointData = {
+    body: NoCtfapiEndpointsInternalRecordCheckResultRequest;
     path?: never;
     query?: never;
-    url: '/api/internal/v1/awd/check-results';
+    url: '/api/internal/v1/capabilities/check-results';
 };
 
-export type RecordAwdCheckResultEndpointErrors = {
+export type RecordCheckResultEndpointErrors = {
     /**
      * Bad Request
      */
@@ -12435,9 +12217,9 @@ export type RecordAwdCheckResultEndpointErrors = {
     409: NoCtfapiEndpointsInternalInternalResultResponse;
 };
 
-export type RecordAwdCheckResultEndpointError = RecordAwdCheckResultEndpointErrors[keyof RecordAwdCheckResultEndpointErrors];
+export type RecordCheckResultEndpointError = RecordCheckResultEndpointErrors[keyof RecordCheckResultEndpointErrors];
 
-export type RecordAwdCheckResultEndpointResponses = {
+export type RecordCheckResultEndpointResponses = {
     /**
      * Success
      */
@@ -12448,91 +12230,7 @@ export type RecordAwdCheckResultEndpointResponses = {
     202: NoCtfapiEndpointsInternalInternalResultResponse;
 };
 
-export type RecordAwdCheckResultEndpointResponse = RecordAwdCheckResultEndpointResponses[keyof RecordAwdCheckResultEndpointResponses];
-
-export type RecordAwdpCheckResultEndpointData = {
-    body: NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest;
-    path?: never;
-    query?: never;
-    url: '/api/internal/v1/awdp/fix-results';
-};
-
-export type RecordAwdpCheckResultEndpointErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsInternalInternalResultResponse;
-};
-
-export type RecordAwdpCheckResultEndpointError = RecordAwdpCheckResultEndpointErrors[keyof RecordAwdpCheckResultEndpointErrors];
-
-export type RecordAwdpCheckResultEndpointResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsInternalInternalResultResponse;
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsInternalInternalResultResponse;
-};
-
-export type RecordAwdpCheckResultEndpointResponse = RecordAwdpCheckResultEndpointResponses[keyof RecordAwdpCheckResultEndpointResponses];
-
-export type RecordPatchVerificationResultEndpointData = {
-    body: NoCtfapiEndpointsInternalRecordPatchVerificationResultRequest;
-    path?: never;
-    query?: never;
-    url: '/api/internal/v1/patch-verification/results';
-};
-
-export type RecordPatchVerificationResultEndpointErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsInternalInternalResultResponse;
-};
-
-export type RecordPatchVerificationResultEndpointError = RecordPatchVerificationResultEndpointErrors[keyof RecordPatchVerificationResultEndpointErrors];
-
-export type RecordPatchVerificationResultEndpointResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsInternalInternalResultResponse;
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsInternalInternalResultResponse;
-};
-
-export type RecordPatchVerificationResultEndpointResponse = RecordPatchVerificationResultEndpointResponses[keyof RecordPatchVerificationResultEndpointResponses];
+export type RecordCheckResultEndpointResponse = RecordCheckResultEndpointResponses[keyof RecordCheckResultEndpointResponses];
 
 export type GetAwdpParticipantStateEndpointData = {
     body?: never;
@@ -12601,40 +12299,6 @@ export type GetGameplayFactValueEndpointResponses = {
 };
 
 export type GetGameplayFactValueEndpointResponse = GetGameplayFactValueEndpointResponses[keyof GetGameplayFactValueEndpointResponses];
-
-export type GetPatchVerificationEndpointData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification';
-};
-
-export type GetPatchVerificationEndpointErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type GetPatchVerificationEndpointResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse;
-};
-
-export type GetPatchVerificationEndpointResponse = GetPatchVerificationEndpointResponses[keyof GetPatchVerificationEndpointResponses];
 
 export type GetGameplayFactStatusEndpointData = {
     body?: never;
@@ -12809,53 +12473,6 @@ export type RequestAwdpDefenseTargetEndpointResponses = {
 
 export type RequestAwdpDefenseTargetEndpointResponse = RequestAwdpDefenseTargetEndpointResponses[keyof RequestAwdpDefenseTargetEndpointResponses];
 
-export type RequestPatchVerificationTargetEndpointData = {
-    body?: never;
-    headers?: {
-        /**
-         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
-         */
-        'X-NoCTF-Human-Verification'?: string;
-    };
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets';
-};
-
-export type RequestPatchVerificationTargetEndpointErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Human verification is required or was rejected.
-     */
-    403: MicrosoftAspNetCoreMvcProblemDetails;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureResponse;
-    /**
-     * The selected human verification provider is unavailable.
-     */
-    503: MicrosoftAspNetCoreMvcProblemDetails;
-};
-
-export type RequestPatchVerificationTargetEndpointError = RequestPatchVerificationTargetEndpointErrors[keyof RequestPatchVerificationTargetEndpointErrors];
-
-export type RequestPatchVerificationTargetEndpointResponses = {
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetResponse;
-};
-
-export type RequestPatchVerificationTargetEndpointResponse = RequestPatchVerificationTargetEndpointResponses[keyof RequestPatchVerificationTargetEndpointResponses];
-
 export type SubmitFlagEndpointData = {
     body: NoCtfapiEndpointsGameplayFactsSubmitFlagRequest;
     headers?: {
@@ -12921,7 +12538,7 @@ export type UploadPatchEndpointData = {
         runtimeInstanceId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix';
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes';
 };
 
 export type UploadPatchEndpointErrors = {
@@ -12960,60 +12577,6 @@ export type UploadPatchEndpointResponses = {
 };
 
 export type UploadPatchEndpointResponse = UploadPatchEndpointResponses[keyof UploadPatchEndpointResponses];
-
-export type UploadPatchVerificationEndpointData = {
-    body: NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest;
-    headers?: {
-        /**
-         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
-         */
-        'X-NoCTF-Human-Verification'?: string;
-    };
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-        runtimeInstanceId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch';
-};
-
-export type UploadPatchVerificationEndpointErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Human verification is required or was rejected.
-     */
-    403: MicrosoftAspNetCoreMvcProblemDetails;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse;
-    413: MicrosoftAspNetCoreMvcProblemDetails;
-    422: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse;
-    /**
-     * The selected human verification provider is unavailable.
-     */
-    503: MicrosoftAspNetCoreMvcProblemDetails;
-};
-
-export type UploadPatchVerificationEndpointError = UploadPatchVerificationEndpointErrors[keyof UploadPatchVerificationEndpointErrors];
-
-export type UploadPatchVerificationEndpointResponses = {
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsGameplayFactsUploadPatchResponse;
-};
-
-export type UploadPatchVerificationEndpointResponse = UploadPatchVerificationEndpointResponses[keyof UploadPatchVerificationEndpointResponses];
 
 export type GetAwdSpectatorEndpointData = {
     body?: never;
@@ -21237,14 +20800,14 @@ export type AdminRestoreCompetitionChallengeHintResponses = {
 
 export type AdminRestoreCompetitionChallengeHintResponse = AdminRestoreCompetitionChallengeHintResponses[keyof AdminRestoreCompetitionChallengeHintResponses];
 
-export type CopyLiveSoloTemplateData = {
-    body: NoCtfapiEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest;
+export type AdminChallengeBankCopyTemplateData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankCopyChallengeTemplateRequest;
     path?: never;
     query?: never;
-    url: '/api/v1/admin/challenges/live-solo/copies';
+    url: '/api/v1/admin/challenges/copies';
 };
 
-export type CopyLiveSoloTemplateErrors = {
+export type AdminChallengeBankCopyTemplateErrors = {
     /**
      * Bad Request
      */
@@ -21261,20 +20824,20 @@ export type CopyLiveSoloTemplateErrors = {
      * Not Found
      */
     404: unknown;
-    409: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse;
-    422: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateCopyFailureResponse;
+    422: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateCopyFailureResponse;
 };
 
-export type CopyLiveSoloTemplateError = CopyLiveSoloTemplateErrors[keyof CopyLiveSoloTemplateErrors];
+export type AdminChallengeBankCopyTemplateError = AdminChallengeBankCopyTemplateErrors[keyof AdminChallengeBankCopyTemplateErrors];
 
-export type CopyLiveSoloTemplateResponses = {
+export type AdminChallengeBankCopyTemplateResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse;
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateCopyResponse;
 };
 
-export type CopyLiveSoloTemplateResponse = CopyLiveSoloTemplateResponses[keyof CopyLiveSoloTemplateResponses];
+export type AdminChallengeBankCopyTemplateResponse = AdminChallengeBankCopyTemplateResponses[keyof AdminChallengeBankCopyTemplateResponses];
 
 export type AdminChallengeBankListFlagsData = {
     body?: never;
@@ -21357,7 +20920,7 @@ export type AdminChallengeBankListTemplatesData = {
     query: {
         includeDeleted: boolean;
         onlyMine: boolean;
-        mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null;
+        requiredCapabilities: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol>;
         direction?: string | null;
         keyword?: string | null;
         offset: number;
@@ -21800,6 +21363,46 @@ export type AdminChallengeBankExtendTestRuntimeResponses = {
 
 export type AdminChallengeBankExtendTestRuntimeResponse = AdminChallengeBankExtendTestRuntimeResponses[keyof AdminChallengeBankExtendTestRuntimeResponses];
 
+export type AdminChallengeBankGetCapabilityTestData = {
+    body?: never;
+    path: {
+        challengeId: string;
+        executionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/capability-tests/{executionId}';
+};
+
+export type AdminChallengeBankGetCapabilityTestErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminChallengeBankGetCapabilityTestError = AdminChallengeBankGetCapabilityTestErrors[keyof AdminChallengeBankGetCapabilityTestErrors];
+
+export type AdminChallengeBankGetCapabilityTestResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityTestResponse;
+};
+
+export type AdminChallengeBankGetCapabilityTestResponse = AdminChallengeBankGetCapabilityTestResponses[keyof AdminChallengeBankGetCapabilityTestResponses];
+
 export type AdminChallengeBankGetTestRuntimeData = {
     body?: never;
     path: {
@@ -21832,6 +21435,31 @@ export type AdminChallengeBankGetTestRuntimeResponses = {
 };
 
 export type AdminChallengeBankGetTestRuntimeResponse = AdminChallengeBankGetTestRuntimeResponses[keyof AdminChallengeBankGetTestRuntimeResponses];
+
+export type AdminChallengeBankGetQuestionnaireImageData = {
+    body?: never;
+    path: {
+        challengeId: string;
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/questionnaire/images/{fileId}';
+};
+
+export type AdminChallengeBankGetQuestionnaireImageErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
 
 export type AdminChallengeBankListAttachmentsData = {
     body?: never;
@@ -22054,6 +21682,286 @@ export type AdminChallengeBankRestoreTemplateResponses = {
 };
 
 export type AdminChallengeBankRestoreTemplateResponse = AdminChallengeBankRestoreTemplateResponses[keyof AdminChallengeBankRestoreTemplateResponses];
+
+export type AdminChallengeBankTestBreakData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeBreakRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/break-tests';
+};
+
+export type AdminChallengeBankTestBreakErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestBreakError = AdminChallengeBankTestBreakErrors[keyof AdminChallengeBankTestBreakErrors];
+
+export type AdminChallengeBankTestBreakResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeBreakTestResponse;
+};
+
+export type AdminChallengeBankTestBreakResponse = AdminChallengeBankTestBreakResponses[keyof AdminChallengeBankTestBreakResponses];
+
+export type AdminChallengeBankTestCheckData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeCheckRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/check-tests';
+};
+
+export type AdminChallengeBankTestCheckErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestCheckError = AdminChallengeBankTestCheckErrors[keyof AdminChallengeBankTestCheckErrors];
+
+export type AdminChallengeBankTestCheckResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse;
+};
+
+export type AdminChallengeBankTestCheckResponse = AdminChallengeBankTestCheckResponses[keyof AdminChallengeBankTestCheckResponses];
+
+export type AdminChallengeBankTestControlData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeControlRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/control-tests';
+};
+
+export type AdminChallengeBankTestControlErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestControlError = AdminChallengeBankTestControlErrors[keyof AdminChallengeBankTestControlErrors];
+
+export type AdminChallengeBankTestControlResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeControlTestResponse;
+};
+
+export type AdminChallengeBankTestControlResponse = AdminChallengeBankTestControlResponses[keyof AdminChallengeBankTestControlResponses];
+
+export type AdminChallengeBankTestFixAndCheckData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeFixAndCheckRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/fix-and-check-tests';
+};
+
+export type AdminChallengeBankTestFixAndCheckErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestFixAndCheckError = AdminChallengeBankTestFixAndCheckErrors[keyof AdminChallengeBankTestFixAndCheckErrors];
+
+export type AdminChallengeBankTestFixAndCheckResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse;
+};
+
+export type AdminChallengeBankTestFixAndCheckResponse = AdminChallengeBankTestFixAndCheckResponses[keyof AdminChallengeBankTestFixAndCheckResponses];
+
+export type AdminChallengeBankTestFixData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeFixRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/fix-tests';
+};
+
+export type AdminChallengeBankTestFixErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestFixError = AdminChallengeBankTestFixErrors[keyof AdminChallengeBankTestFixErrors];
+
+export type AdminChallengeBankTestFixResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse;
+};
+
+export type AdminChallengeBankTestFixResponse = AdminChallengeBankTestFixResponses[keyof AdminChallengeBankTestFixResponses];
+
+export type AdminChallengeBankTestQuestionnaireData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankTestChallengeQuestionnaireRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/questionnaire-tests';
+};
+
+export type AdminChallengeBankTestQuestionnaireErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestProblem;
+};
+
+export type AdminChallengeBankTestQuestionnaireError = AdminChallengeBankTestQuestionnaireErrors[keyof AdminChallengeBankTestQuestionnaireErrors];
+
+export type AdminChallengeBankTestQuestionnaireResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeQuestionnaireTestResponse;
+};
+
+export type AdminChallengeBankTestQuestionnaireResponse = AdminChallengeBankTestQuestionnaireResponses[keyof AdminChallengeBankTestQuestionnaireResponses];
+
+export type AdminChallengeBankUploadQuestionnaireImageData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankUploadQuestionnaireImageRequest;
+    path: {
+        challengeId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/questionnaire/questions/{questionId}/images';
+};
+
+export type AdminChallengeBankUploadQuestionnaireImageErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminChallengeBankUploadQuestionnaireImageError = AdminChallengeBankUploadQuestionnaireImageErrors[keyof AdminChallengeBankUploadQuestionnaireImageErrors];
+
+export type AdminChallengeBankUploadQuestionnaireImageResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireImageResponse;
+};
+
+export type AdminChallengeBankUploadQuestionnaireImageResponse = AdminChallengeBankUploadQuestionnaireImageResponses[keyof AdminChallengeBankUploadQuestionnaireImageResponses];
 
 export type AdminExportCompetitionArchiveData = {
     body: NoCtfapiEndpointsAdministrationArchivesExportCompetitionArchiveRequest;

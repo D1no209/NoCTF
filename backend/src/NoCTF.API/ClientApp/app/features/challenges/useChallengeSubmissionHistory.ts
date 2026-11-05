@@ -157,7 +157,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
   }
 
   function canReadSubmittedValue(submission: Submission): boolean {
-    return submission.kind === 'FlagAttempt' || submission.kind === 'BreakAttempt'
+    return submission.kind === 'BreakAttempt'
   }
 
   function closeValueDialog(): void {

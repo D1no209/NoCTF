@@ -54,7 +54,9 @@ public static class WorkerRole
         services.AddTransient<KohPollingHandler>();
         services.AddTransient<KohObservationHandler>();
         services.AddTransient<CompetitionLifecycleMessageHandler>();
-        services.AddTransient<AwdpMessageHandler>();
+        services.AddTransient<FixExecutionMessageHandler>();
+        services.AddTransient<Challenges.Capabilities.TemplateCapabilityTestMessageHandler>();
+        services.AddTransient<Challenges.Capabilities.FixExecutionRecoveryHandler>();
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
         services.AddTransient<PendingGameplayFactDispatchHandler>();
@@ -119,8 +121,10 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(KohObservationHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
         options.Discovery.IncludeType(typeof(Challenges.Timing.ChallengeTimingMessageHandler));
-        options.Discovery.IncludeType(typeof(Theory.TheoryActivityMessageHandler));
-        options.Discovery.IncludeType(typeof(AwdpMessageHandler));
+        options.Discovery.IncludeType(typeof(Questionnaires.QuestionnaireActivityMessageHandler));
+        options.Discovery.IncludeType(typeof(FixExecutionMessageHandler));
+        options.Discovery.IncludeType(typeof(Challenges.Capabilities.TemplateCapabilityTestMessageHandler));
+        options.Discovery.IncludeType(typeof(Challenges.Capabilities.FixExecutionRecoveryHandler));
         options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
         options.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
         options.Discovery.IncludeType(typeof(PendingGameplayFactDispatchHandler));

@@ -22,7 +22,8 @@ public sealed class KubernetesContainerRuntime(IKubernetes client, KubernetesCon
         var privatePorts = ports.Concat(request.ControlCheckUrlBinding is { ContainerPort: int controlPort } ? [controlPort] : []).Distinct().ToArray();
         var policy = await containers.CreateIsolatedNetworkAsync(new(new(request.OperationId), request.Purpose,
             request.EgressPolicy, request.AccessMode == RuntimeAccessMode.WsrxOnly ? [] : ports,
-            request.Purpose == ContainerNetworkPurpose.AwdpVerification ? request.Services.Single().InternalPorts!.Single() : null,
+            request.Purpose == ContainerNetworkPurpose.AwdpVerification
+                ? request.Services.SelectMany(service => service.InternalPorts ?? []).Distinct().ToArray() : null,
             request.AccessMode == RuntimeAccessMode.Direct && request.ControlCheckUrlBinding is null ? [] : privatePorts), cancellationToken);
         if (request.Services.Count == 1) return new(policy);
         var labels = new Dictionary<string, string>

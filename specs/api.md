@@ -227,7 +227,7 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/value
 GET  /api/v1/competitions/{competitionId}/gameplay-facts
@@ -619,20 +619,15 @@ ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 ## Internal v1
 
 ```text
-POST /api/internal/v1/awd/check-results
-POST /api/internal/v1/awdp/fix-results
-GET  /api/internal/v1/awdp/fix-archives/{gameplayFactId}
-POST /api/internal/v1/patch-verification/results
-GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch
+POST /api/internal/v1/capabilities/check-results
+GET /api/internal/v1/fixes/{gameplayFactId}/archive
 ```
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/GameplayFact Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
 
 - AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId 和独立 Checker GameplayFactId；请求只提交 typed checker status。相同 callback identity 的重投幂等命中同一事实，不覆盖其他 Checker 执行。
 - AWDP callback permission=`awdp:fix-result:write`，绑定 GameplayFactId、RuntimeInstanceId 和一次性 Fix attempt identity；结果使用强类型枚举和版本化事件 Payload，相同 callback identity 重投幂等。
-- Archive permission=`awdp:fix-archive:read`，只绑定一个 GameplayFactId/PatchUpload；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
+- Archive permission=`fix:archive:read`，只绑定一个 GameplayFactId/PatchUpload；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
 
 callback 成功返回 200。完全相同的 callback identity 重放返回相同 200；同一幂等身份携带不同规范化 body 返回稳定业务冲突。Token/claim 不符返回
 401/403；资源对该 Token 不存在返回 404。过时结果可写结构化日志，但不建审计业务表。
@@ -808,7 +803,7 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions
 GET /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/question-groups
-POST /api/v1/admin/challenges/live-solo/copies
+POST /api/v1/admin/challenges/copies
 GET /api/v1/competitions/{competitionId}/live-solo/question-pool
 POST /api/v1/competitions/{competitionId}/live-solo/question-pool
 POST /api/v1/competitions/{competitionId}/live-solo/question-pool/deploy
@@ -846,44 +841,34 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 
 对局 Runtime 的 GET／POST 使用完整 Match／Round／Question 路径，仅可访问本队已开放环境。POST 的强类型 `Action` 为 Start、Reset、Stop；Reset／Stop 必须提供 `ExpectedRuntimeInstanceId`，并携带 UUID `Idempotency-Key`。202 返回当前作用域的 `StatusUrl`，多人重置与同请求重放保持原子语义。变更在事务内重查账号、名单、队伍、当前 Round 与有效时间；旧代或其他队伍 UUID 不能停止新环境。受控环境由 Round 生命周期回收，题库 TTL 不提前终止它，因此不提供独立延长动作。未验证的隔离资格不能返回代理访问入口。
 
-## 独立理论题库
+## Questionnaire 与独立活动
 
-理论题库使用独立资源和授权，不依赖比赛题库模板。下列接口均要求 Bearer 身份；创建及复制要求组织者或平台管理员，内容读取和更新要求编辑权限。仅使用权限允许列表元数据读取，不能读取答案或再授权。更新内容创建不可变版本，复制保留规范题源但使用独立选项标识。
+Questionnaire 是 Challenge 的可选能力，包含整份问卷与多个小题，内容在题库管理接口编辑。每次内容更新创建不可变版本；活动发布时固定候选版本，发卷时固定具体分配和顺序。活动只用于独立考试和练习，参与者为用户。下列接口均要求 Bearer 身份，管理和阅卷分别核验资源权限。
 
 ```text
-GET /api/v1/competitions/{competitionId}/theory
-GET /api/v1/theory/activities
-GET /api/v1/theory/activities/{activityId}/audit
-GET /api/v1/theory/activities/{activityId}/leaderboard
-GET /api/v1/theory/activities/{activityId}/management
-GET /api/v1/theory/activities/{activityId}/papers/{paperId}
-GET /api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}
-GET /api/v1/theory/activities/{activityId}/reviews
-GET /api/v1/theory/activities/{activityId}/reviews/{paperId}
-GET /api/v1/theory/activities/{activityId}/session
-GET /api/v1/theory/questions
-GET /api/v1/theory/questions/{questionId}
-GET /api/v1/theory/questions/{questionId}/images/{fileId}
-POST /api/v1/theory/activities
-POST /api/v1/theory/activities/{activityId}/check
-POST /api/v1/theory/activities/{activityId}/corrections
-POST /api/v1/theory/activities/{activityId}/corrections/preview
-POST /api/v1/theory/activities/{activityId}/operations
-POST /api/v1/theory/activities/{activityId}/papers
-POST /api/v1/theory/activities/{activityId}/papers/{paperId}/submit
-POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations
-POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/void
-POST /api/v1/theory/questions
-POST /api/v1/theory/questions/{questionId}/copy
-POST /api/v1/theory/questions/{questionId}/images
-PUT /api/v1/competitions/{competitionId}/theory
-PUT /api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}
-PUT /api/v1/theory/questions/{questionId}
-PUT /api/v1/theory/questions/{questionId}/grants/{userId}
-PUT /api/v1/theory/questions/{questionId}/state
+GET /api/v1/admin/challenges/{challengeId}/questionnaire/images/{fileId}
+POST /api/v1/admin/challenges/{challengeId}/questionnaire/questions/{questionId}/images
+GET /api/v1/questionnaires/activities
+GET /api/v1/questionnaires/activities/{activityId}/audit
+GET /api/v1/questionnaires/activities/{activityId}/leaderboard
+GET /api/v1/questionnaires/activities/{activityId}/management
+GET /api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}
+GET /api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/images/{fileId}
+GET /api/v1/questionnaires/activities/{activityId}/reviews
+GET /api/v1/questionnaires/activities/{activityId}/reviews/{sessionId}
+GET /api/v1/questionnaires/activities/{activityId}/session
+POST /api/v1/questionnaires/activities
+POST /api/v1/questionnaires/activities/{activityId}/check
+POST /api/v1/questionnaires/activities/{activityId}/corrections
+POST /api/v1/questionnaires/activities/{activityId}/corrections/preview
+POST /api/v1/questionnaires/activities/{activityId}/operations
+POST /api/v1/questionnaires/activities/{activityId}/sessions
+POST /api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/submit
+POST /api/v1/questionnaires/activities/{activityId}/reviews/{sessionId}/void
+PUT /api/v1/questionnaires/activities/{activityId}/sessions/{sessionId}/answers/{itemId}
 ```
 
-授权 PUT 的 `permission=null` 撤销该协作者授权。活动发布冻结题库版本与计分规则。GET 不发卷；开卷、保存和交卷分别显式写入。参与者交卷仅返回总分；管理纠错需要影响预览、原因及当前策略标识。比赛支持 CTF、AWD、AWDP，首次发布前默认关闭。所有理论响应禁止缓存，图片逐次检查题库／当前试卷权限。
+活动配置使用 `selectionKind=Draw` 的分类抽题规则，或 `selectionKind=Fixed` 的 Challenge 问卷清单。GET 不发卷；开卷、保存和交卷分别显式写入。重复交卷返回同一结果及首次交卷时间。每个 QuestionnaireAssignment 关联一个当前 QuestionnaireAttempt，成绩按逐题结果聚合。管理纠错需要影响预览与原因。响应禁止缓存，图片逐次检查题库或当前试卷权限。
 
 ## 题目时间影响预览
 
@@ -921,6 +906,22 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 ## LiveSolo 当前工作区与题库扩展
 
 ```text
+DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/permanent
+GET /api/v1/admin/competitions/{competitionId}/deliveries
+GET /api/v1/competitions/{competitionId}/live-solo/direction-presets
+POST /api/v1/competitions/{competitionId}/live-solo/direction-presets
+POST /api/v1/competitions/{competitionId}/live-solo/direction-presets/batch
+DELETE /api/v1/competitions/{competitionId}/live-solo/direction-presets/{presetId}
+DELETE /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool
+PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/direction-pool/draw
+PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-visibility
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/rescue-requests
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rescue-requests/{requestId}/decision
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-target
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-target
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/fix-targets/{runtimeInstanceId}/fixes
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}
@@ -928,7 +929,7 @@ GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/ques
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/workspace
 GET /api/v1/competitions/{competitionId}/live-solo/question-pool
 PATCH /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}
-POST /api/v1/admin/challenges/live-solo/copies
+POST /api/v1/admin/challenges/copies
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}/browser-download
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection
@@ -938,9 +939,27 @@ POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionCh
 POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank
 ```
 
+## 题库能力测试
+
+```http
+POST /api/v1/admin/challenges/{challengeId}/break-tests
+POST /api/v1/admin/challenges/{challengeId}/fix-tests
+POST /api/v1/admin/challenges/{challengeId}/check-tests
+POST /api/v1/admin/challenges/{challengeId}/control-tests
+POST /api/v1/admin/challenges/{challengeId}/questionnaire-tests
+POST /api/v1/admin/challenges/{challengeId}/fix-and-check-tests
+GET /api/v1/admin/challenges/{challengeId}/capability-tests/{executionId}
+```
+
+测试只使用已保存的题目配置，并检查题库目录和管理权限。Break、Control、Questionnaire 同步返回客观结果。Fix、Check、FixAndCheck 返回 202、executionId、runtimeInstanceId 和 statusUrl；状态查询返回当前阶段、失败阶段及允许公开的证据。客户端不能指定 Flag 候选集合、目标地址、Runner、提供方或检查要求。
+
+Fix 与 FixAndCheck 每次使用独立干净环境，资源停止与容量释放确认后结束。Check 使用指定的当前交互测试环境；独立验证不替换交互环境。上传使用 multipart file 与 requestId，同一请求重放返回相同受理结果，内容冲突返回 RequestConflict。模板测试不写入 GameplayFact，不计分，也不产生比赛通知。
+
+Checker 回调统一使用上面的 capabilities/check-results 路径。签名绑定执行作用范围、执行标识、Runtime UUID、检查要求和期限；回调由服务端分派到正式 Fix、AWD 观察或模板测试。
+
 ## Competition workspace reads
 
-比赛详情的 `features` 仅包含比赛级 `progressionEnabled`、`progressionMapVisible` 和 `hasPublishedTheory`；最后一项排除草稿与作废理论活动。列表不逐项读取这些配置。入口还须结合当前身份及队伍资格判断，隐藏选手地图时不显示闯关入口。
+比赛详情的 `features` 包含比赛级 `progressionEnabled` 和 `progressionMapVisible`。列表不逐项读取这些配置。入口还须结合当前身份及队伍资格判断，隐藏选手地图时不显示闯关入口。
 
 `GET /api/v1/competitions/{competitionId}/teams/me/standing` 是当前用户本队的私有只读概况，返回排名、总分、题解权益及投影版本与时间，不返回其他队伍或得分明细。沿用排行榜的封榜、黑榜、发布题目及赛道过滤；未知值为 null，不伪造零分。投影准备中返回 202、Retry-After 及指向该资源的 statusUrl；未具备有效本队资格返回 404。响应禁止共享缓存。
 

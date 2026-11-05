@@ -19,6 +19,8 @@ checker_container="$network-checker"
 callback_container="$network-callback"
 target_image="noctf-awdp-v2-target:local"
 checker_image="noctf-awdp-v2-checker:local"
+python_image=${NOCTF_PYTHON_IMAGE:-python:3.13-alpine}
+alpine_image=${NOCTF_ALPINE_IMAGE:-alpine:3.22}
 
 cleanup() {
   docker rm -f "$target_container" "$checker_container" "$callback_container" >/dev/null 2>&1 || true
@@ -29,8 +31,8 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$state/results"
 
-docker build -t "$target_image" "$(host_path "$root/private/target")"
-docker build -t "$checker_image" "$(host_path "$root/private/checker")"
+docker build --build-arg "PYTHON_IMAGE=$python_image" -t "$target_image" "$(host_path "$root/private/target")"
+docker build --build-arg "ALPINE_IMAGE=$alpine_image" -t "$checker_image" "$(host_path "$root/private/checker")"
 sh "$root/scripts/build-fix-packages.sh"
 docker network create "$network" >/dev/null
 docker network create --internal "$callback_network" >/dev/null
@@ -59,7 +61,7 @@ run_case() {
     -e "EXPECTED_TOKEN=$token" \
     -v "$(host_path "$state/results"):/results" \
     -v "$(host_path "$root/tests/callback.py"):/callback.py:ro" \
-    python:3.13-alpine python3 /callback.py >/dev/null
+    "$python_image" python3 /callback.py >/dev/null
   docker run -d --name "$target_container" --network "$network" \
     --cap-drop ALL --security-opt no-new-privileges:true "$target_image" >/dev/null
   docker cp "$(host_path "$case_root/noctf")" "$target_container":/
@@ -74,6 +76,7 @@ run_case() {
     --cap-drop ALL --security-opt no-new-privileges:true \
     -e TARGET_HOST="$target_container" \
     -e TARGET_READY_TIMEOUT_SECONDS=10 \
+    -e 'NOCTF_CHECK_REQUIREMENTS=["Functionality","Vulnerability"]' \
     -e NOCTF_CALLBACK_URL="http://$callback_container:8081/result" \
     -e "NOCTF_CALLBACK_TOKEN=$token" \
     "$checker_image" >/dev/null

@@ -34,10 +34,9 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer _leaderboardSnapshotDeserializer;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo _publishedLeaderboardMemo;
         private readonly System.TimeProvider _timeProvider;
-        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider1;
-        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider2;
+        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public DispatchCompetitionWebhooksHandler1023350261(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookDeliveryStore> loggerOfCompetitionWebhookDeliveryStore, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookSender competitionWebhookSender, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookTestStatusStore competitionWebhookTestStatusStore, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache competitionReadModelCache, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo publishedLeaderboardMemo, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider __fusionCacheProvider1, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider __fusionCacheProvider2)
+        public DispatchCompetitionWebhooksHandler1023350261(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookDeliveryStore> loggerOfCompetitionWebhookDeliveryStore, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookSender competitionWebhookSender, NoCTF.Application.Competitions.Webhooks.ICompetitionWebhookTestStatusStore competitionWebhookTestStatusStore, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache competitionReadModelCache, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardSnapshotDeserializer leaderboardSnapshotDeserializer, NoCTF.Infrastructure.Scoring.Leaderboard.PublishedLeaderboardMemo publishedLeaderboardMemo, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfCompetitionWebhookDeliveryStore = loggerOfCompetitionWebhookDeliveryStore;
@@ -55,24 +54,19 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardSnapshotDeserializer = leaderboardSnapshotDeserializer;
             _publishedLeaderboardMemo = publishedLeaderboardMemo;
             _timeProvider = timeProvider;
-            _fusionCacheProvider1 = __fusionCacheProvider1;
-            _fusionCacheProvider2 = __fusionCacheProvider2;
+            _fusionCacheProvider = fusionCacheProvider;
         }
-
-
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            var fileReferenceLock = new NoCTF.Infrastructure.Storage.FileReferenceLock();
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var liveSoloMaterialMutationGate = new NoCTF.Infrastructure.LiveSolo.Templates.LiveSoloMaterialMutationGate(noCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var platformConfigurationStore = new NoCTF.Infrastructure.Administration.PlatformConfigurationStore(noCtfDbContext, _fusionCacheProvider1, wolverinePostCommitMessagePublisher, fileReferenceLock);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             var competitionTrackStore = new NoCTF.Infrastructure.Competitions.Tracks.CompetitionTrackStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _competitionReadModelCache);
-            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, platformConfigurationStore, liveSoloMaterialMutationGate);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider2, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher, _publishedLeaderboardMemo);
+            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, liveSoloMaterialMutationGate);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _timeProvider, _leaderboardSnapshotDeserializer, wolverinePostCommitMessagePublisher, _publishedLeaderboardMemo);
             var getCompetitionTracks = new NoCTF.Application.Competitions.Tracks.GetCompetitionTracks(competitionTrackStore);
             var getChallenge = new NoCTF.Application.Challenges.Management.GetChallenge(challengeManagementStore);
             var competitionWebhookDeliveryStore = new NoCTF.Infrastructure.Competitions.Webhooks.CompetitionWebhookDeliveryStore(noCtfDbContext, _platformSecretProtector, getChallenge, getCompetitionTracks, fusionLeaderboardCache, _timeProvider, _loggerOfCompetitionWebhookDeliveryStore);
@@ -85,13 +79,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await competitionWebhookMessageHandler.Handle(dispatchCompetitionWebhooks, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: DispatchCompetitionWebhooksHandler1023350261
     
     
 }
-

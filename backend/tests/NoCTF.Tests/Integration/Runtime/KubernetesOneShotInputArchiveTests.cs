@@ -31,7 +31,8 @@ public sealed class KubernetesOneShotInputArchiveTests
         var context = Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_CONTEXT")
             ?? throw new InvalidOperationException("An explicit integration context is required.");
         if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated integration cluster.");
-        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(currentContext: context));
+        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(
+            Environment.GetEnvironmentVariable("KUBECONFIG"), currentContext: context));
         var namespaceName = $"noctf-input-it-{Guid.NewGuid():N}";
         await client.CoreV1.CreateNamespaceAsync(new V1Namespace
         {

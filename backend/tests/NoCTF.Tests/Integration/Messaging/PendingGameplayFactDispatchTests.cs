@@ -18,6 +18,15 @@ using NATS.Net;
 using NoCTF.Hosting;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using NoCTF.Application.Competitions.Awd.Fixes;
+using NoCTF.Infrastructure.Competitions.Awd.Fixes;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Runtime.Placement;
+using NoCTF.Infrastructure.Caching;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -81,7 +90,7 @@ public sealed class PendingGameplayFactDispatchTests
                     FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
                     CreatedAt = now, UpdatedAt = now
                 });
-                setup.Challenges.Add(new AwdChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = templateId, OwnerId = userId, Title = "Recovery challenge",
                     Definition = TestConfigurations.Definition(GameMode.Awd),
@@ -101,7 +110,7 @@ public sealed class PendingGameplayFactDispatchTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 });
-                FlagAttemptGameplayFact Flag(Guid id, GameplayFactState state, DateTimeOffset updatedAt) => new()
+                BreakAttemptGameplayFact Flag(Guid id, GameplayFactState state, DateTimeOffset updatedAt) => new()
                 {
                     Id = id, CompetitionId = competitionId, CompetitionChallengeId = challengeId,
                     TeamId = teamId, ActorUserId = userId, Value = "flag{recovery}",
@@ -112,7 +121,7 @@ public sealed class PendingGameplayFactDispatchTests
                     Flag(queuedId, GameplayFactState.Queued, now.AddMinutes(-2)),
                     Flag(processingId, GameplayFactState.Processing, now.AddMinutes(-2)),
                     Flag(recentId, GameplayFactState.Queued, now));
-                setup.GameplayFacts.Add(new AwdServiceTransitionGameplayFact
+                setup.GameplayFacts.Add(new CheckObservationGameplayFact
                 {
                     Id = externalId, CompetitionId = competitionId,
                     CompetitionChallengeId = challengeId, TeamId = teamId,
@@ -125,8 +134,14 @@ public sealed class PendingGameplayFactDispatchTests
             await using var db = new NoCtfDbContext(options);
             var publisher = new RecordingPublisher();
             var cursors = new GameplayFactRecoveryCursorStore(connection);
+            await using var caches = new ServiceCollection().AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
+            using var coordinator = new RunnerCapacityLedgerCoordinator();
+            var capacity = new PersistedRunnerCapacityGate(db, new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System),
+                caches.GetRequiredService<IFusionCacheProvider>(), publisher, coordinator);
+            var persistent = new RecoverPersistentFixes(new AwdPersistentFixStore(db, publisher, new CompetitionEventStore(db, publisher)),
+                capacity, new ConfiguredRuntimePlacementPolicy(Options.Create(new RuntimePlacementOptions())), TimeProvider.System);
             var handler = new PendingGameplayFactDispatchHandler(db, publisher, TimeProvider.System,
-                connection, cursors, NullLogger<PendingGameplayFactDispatchHandler>.Instance);
+                connection, cursors, persistent, NullLogger<PendingGameplayFactDispatchHandler>.Instance);
             await handler
                 .Handle(new DispatchPendingGameplayFacts(now), cancellationToken);
             var dispatched = publisher.Messages.OfType<EvaluateGameplayFact>()
@@ -136,7 +151,6 @@ public sealed class PendingGameplayFactDispatchTests
                 .All(message => message.ExpectedConcurrencyStamp != Guid.Empty
                     && message.Purpose == GameplayFactDispatchPurpose.Recovery
                     && message.RecoveryWindow > 0)).IsTrue();
-            await Assert.That(publisher.FlushCount).IsEqualTo(1);
             var saved = await cursors.ReadAsync(cancellationToken);
             await Assert.That(saved.Cursor).IsNotNull();
             publisher.Messages.Clear();
@@ -144,7 +158,7 @@ public sealed class PendingGameplayFactDispatchTests
             await Assert.That(publisher.Messages.OfType<EvaluateGameplayFact>().Select(item => item.GameplayFactId))
                 .IsEquivalentTo([queuedId, processingId]);
             var laterIds = Enumerable.Range(0, 65).Select(_ => Guid.NewGuid()).ToArray();
-            db.GameplayFacts.AddRange(laterIds.Select(id => new FlagAttemptGameplayFact {
+            db.GameplayFacts.AddRange(laterIds.Select(id => new BreakAttemptGameplayFact {
                 Id = id, CompetitionId = competitionId, CompetitionChallengeId = challengeId,
                 TeamId = teamId, ActorUserId = userId, Value = "flag{recovery}",
                 ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{recovery}")),

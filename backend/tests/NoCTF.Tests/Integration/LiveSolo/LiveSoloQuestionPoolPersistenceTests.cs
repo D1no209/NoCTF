@@ -26,7 +26,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
     {
         var messages = Substitute.For<IPostCommitMessagePublisher>();
         return new(db, new CompetitionModerationAuthorizer(db), new ChallengeManagementStore(db, messages, new ChallengeRuntimeTemplateCatalog()),
-            new GameModeChallengeConfigurationCatalog(), new LiveSoloMaterialCloner(db, new FileReferenceLock()), messages);
+            new GameModeChallengeConfigurationCatalog(), new ChallengeMaterialCloner(db, new FileReferenceLock()), messages);
     }
 
     [Test, Timeout(300_000)]
@@ -35,7 +35,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
-            var result = await Pool(f.Db).CreateAsync(new(f.Competition.Id, f.Owner.Id, "Local question", "local body", "Web", new(), f.Now), ct);
+            var result = await Pool(f.Db).CreateAsync(new(f.Competition.Id, f.Owner.Id, "Local question", "local body", "Web", TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct);
             await Assert.That(result.Failure).IsNull();
             await Assert.That(result.Question!.Ownership).IsEqualTo(LiveSoloMaterialOwnership.CompetitionOwned);
             var bank = new ChallengeBankStore(f.Db);
@@ -75,10 +75,10 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             source.Description = "updated bank body"; await f.Db.SaveChangesAsync(ct);
             var current = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.Single(x => x.Id == original.Question.Id);
             var unchanged = await pool.EditAsync(new(f.Competition.Id, current.Id, f.Owner.Id, current.ConcurrencyStamp, current.MaterialStamp,
-                current.Title, current.Description, current.Direction, new(), f.Now), ct);
+                current.Title, current.Description, current.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct);
             await Assert.That(unchanged.Question!.Ownership).IsEqualTo(LiveSoloMaterialOwnership.FollowingQuestionBank);
             var edited = await pool.EditAsync(new(f.Competition.Id, current.Id, f.Owner.Id, current.ConcurrencyStamp, current.MaterialStamp,
-                current.Title, "edited locally", current.Direction, new(), f.Now), ct);
+                current.Title, "edited locally", current.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct);
             await Assert.That(edited.Failure).IsNull();
             await Assert.That(edited.Question!.Id).IsEqualTo(current.Id);
             await Assert.That(edited.Question.Ownership).IsEqualTo(LiveSoloMaterialOwnership.CompetitionOwned);
@@ -111,10 +111,10 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             await f.PrepareAsync(ct);
             var current = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.Single(x => x.Id == f.Entries[0].Id);
             await Assert.That((await pool.EditAsync(new(f.Competition.Id, current.Id, f.Owner.Id, current.ConcurrencyStamp, current.MaterialStamp,
-                current.Title, "not allowed", current.Direction, new(), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.ActiveRound);
+                current.Title, "not allowed", current.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.ActiveRound);
             var target = deployed.Question!;
             var edited = await pool.EditAsync(new(other.Id, target.Id, f.Owner.Id, target.ConcurrencyStamp, target.MaterialStamp,
-                target.Title, "safe local edit", target.Direction, new(), f.Now), ct);
+                target.Title, "safe local edit", target.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct);
             await Assert.That(edited.Failure).IsNull();
             await Assert.That(edited.Question!.Description).IsEqualTo("safe local edit");
             await Assert.That(source.Description).IsEqualTo("secret body 0");
@@ -122,18 +122,20 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Stale_or_unavailable_source_and_non_solo_material_are_rejected_without_creating_instances(CancellationToken ct)
+    public async Task Missing_completion_capabilities_and_unavailable_sources_are_rejected_without_creating_instances(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
-            var source = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "CTF source", Direction = "Web", Definition = new CtfChallengeDefinition(), CreatedAt = f.Now, UpdatedAt = f.Now };
+            var definition = NoCTF.Tests.Unit.Gameplay.ChallengeCapabilityTests.Repairable();
+            definition.Capabilities.RemoveAll(capability => capability.Kind == NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind.Break);
+            var source = new Challenge { Id = Guid.NewGuid(), OwnerId = f.Owner.Id, Title = "Repair source", Direction = "Web", Definition = definition, CreatedAt = f.Now, UpdatedAt = f.Now };
             f.Db.Add(source); await f.Db.SaveChangesAsync(ct);
             await Assert.That((await Pool(f.Db).DeployAsync(new(f.Competition.Id, f.Owner.Id, source.Id, source.ConcurrencyStamp, f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.UnsupportedDefinition);
-            var local = await Pool(f.Db).CreateAsync(new(f.Competition.Id, f.Owner.Id, "Local", "local", "Web", new(), f.Now), ct);
+            var local = await Pool(f.Db).CreateAsync(new(f.Competition.Id, f.Owner.Id, "Local", "local", "Web", TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct);
             await Assert.That((await Pool(f.Db).DeployAsync(new(f.Competition.Id, f.Owner.Id, local.Question!.ChallengeId, local.Question.MaterialStamp, f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.NotFound);
             await Assert.That((await Pool(f.Db).EditAsync(new(f.Competition.Id, f.Entries[0].Id, f.Owner.Id, Guid.NewGuid(), f.Templates[0].ConcurrencyStamp,
-                "invalid", "invalid", "Web", new(), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.Conflict);
+                "invalid", "invalid", "Web", TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.Conflict);
         });
     }
 
@@ -147,7 +149,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(f.Options).AddInterceptors(failing).Options);
             failing.Armed = true;
             await Assert.That(async () => await Pool(db).EditAsync(new(f.Competition.Id, f.Entries[0].Id, f.Owner.Id,
-                f.Entries[0].ConcurrencyStamp, f.Templates[0].ConcurrencyStamp, "new title", "new content", "Web", new(), f.Now), ct)).Throws<InvalidOperationException>();
+                f.Entries[0].ConcurrencyStamp, f.Templates[0].ConcurrencyStamp, "new title", "new content", "Web", TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct)).Throws<InvalidOperationException>();
             await Assert.That(await f.Db.Set<LiveSoloQuestionMaterial>().CountAsync(ct)).IsEqualTo(0);
             await Assert.That(await f.Db.Challenges.CountAsync(ct)).IsEqualTo(2);
             await Assert.That(await f.Db.ChallengeFlags.CountAsync(ct)).IsEqualTo(2);
@@ -164,13 +166,13 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             var pool = Pool(f.Db);
             var original = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.First(x => x.Id == f.Entries[0].Id);
             var edited = await pool.EditAsync(new(f.Competition.Id, original.Id, f.Owner.Id, original.ConcurrencyStamp, original.MaterialStamp,
-                original.Title, original.Description, original.Direction, new(), f.Now, [new("flag{local}", ChallengeFlagMatchKind.Exact)]), ct);
+                original.Title, original.Description, original.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now, [new("flag{local}", ChallengeFlagMatchKind.Exact)]), ct);
             await Assert.That(edited.Failure).IsNull();
             await Assert.That(edited.Question!.Ownership).IsEqualTo(LiveSoloMaterialOwnership.CompetitionOwned);
             await Assert.That(edited.Question.Flags.Single().Flag).IsEqualTo("flag{local}");
             await Assert.That((await f.Db.ChallengeFlags.SingleAsync(x => x.ChallengeId == original.ChallengeId, ct)).Flag).IsEqualTo("flag{first}");
             var stale = await pool.EditAsync(new(f.Competition.Id, original.Id, f.Owner.Id, original.ConcurrencyStamp, original.MaterialStamp,
-                original.Title, original.Description, original.Direction, new(), f.Now, []), ct);
+                original.Title, original.Description, original.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now, []), ct);
             await Assert.That(stale.Failure).IsEqualTo(LiveSoloPoolFailure.Conflict);
         });
     }
@@ -187,7 +189,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             var pool = Pool(f.Db);
             var original = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.First(x => x.Id == f.Entries[0].Id);
             var command = new EditLiveSoloPoolQuestion(f.Competition.Id, original.Id, f.Owner.Id, original.ConcurrencyStamp, original.MaterialStamp,
-                original.Title, original.Description, original.Direction, new(), f.Now, RemovedAttachmentIds: [Guid.NewGuid()]);
+                original.Title, original.Description, original.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now, RemovedAttachmentIds: [Guid.NewGuid()]);
             await Assert.That((await pool.EditAsync(command, ct)).Failure).IsEqualTo(LiveSoloPoolFailure.InvalidContent);
             var edited = await pool.EditAsync(command with { RemovedAttachmentIds = [attachment.Id] }, ct);
             await Assert.That(edited.Failure).IsNull();
@@ -205,11 +207,11 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
             var question = (await Pool(f.Db).ListAsync(f.Competition.Id, f.Owner.Id, ct))!.First(x => x.Id == f.Entries[0].Id);
             var command = new EditLiveSoloPoolQuestion(f.Competition.Id, question.Id, f.Owner.Id, question.ConcurrencyStamp, question.MaterialStamp,
-                question.Title, "first edit", question.Direction, new(), f.Now);
+                question.Title, "first edit", question.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now);
             async Task<LiveSoloPoolResult> Edit(string content)
             {
                 await using var db = new NoCtfDbContext(f.Options);
-                return await Pool(db).EditAsync(command with { Description = content, Definition = new() }, ct);
+                return await Pool(db).EditAsync(command with { Description = content, Definition = TestConfigurations.Definition(GameMode.LiveSolo) }, ct);
             }
             var results = await Task.WhenAll(Edit("first"), Edit("second"));
             await Assert.That(results.Count(x => x.Failure is null)).IsEqualTo(1);
@@ -229,7 +231,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             f.Db.Add(file); await f.Db.SaveChangesAsync(ct);
             var pool = Pool(f.Db); var question = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.First(x => x.Id == f.Entries[0].Id);
             var result = await pool.EditAsync(new(f.Competition.Id, question.Id, f.Owner.Id, question.ConcurrencyStamp, question.MaterialStamp,
-                question.Title, question.Description, question.Direction, new(), f.Now, AddedAttachments: [new(file.Id)]), ct);
+                question.Title, question.Description, question.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now, AddedAttachments: [new(file.Id)]), ct);
             await Assert.That(result.Failure).IsNull();
             await Assert.That(result.Question!.Attachments.Single().FileName).IsEqualTo("new.txt");
             await Assert.That(result.Question.Ownership).IsEqualTo(LiveSoloMaterialOwnership.CompetitionOwned);
@@ -252,7 +254,7 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
             var listed = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.Single(x => x.Id == deployed.Question.Id);
             await Assert.That(listed.Flags.Count).IsEqualTo(0);
             await Assert.That((await pool.EditAsync(new(f.Competition.Id, listed.Id, f.Owner.Id, listed.ConcurrencyStamp, listed.MaterialStamp,
-                listed.Title, "protected copy", listed.Direction, new(), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.ProtectedMaterialsForbidden);
+                listed.Title, "protected copy", listed.Direction, TestConfigurations.Definition(GameMode.LiveSolo), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.ProtectedMaterialsForbidden);
         });
     }
 

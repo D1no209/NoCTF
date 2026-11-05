@@ -22,7 +22,9 @@
     <PackageReference Include="NATS.Client.Core" />
     <PackageReference Include="NATS.Client.KeyValueStore" />
     <PackageReference Include="NATS.Net" />
-    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="MetadataExtractor" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.Nats" />

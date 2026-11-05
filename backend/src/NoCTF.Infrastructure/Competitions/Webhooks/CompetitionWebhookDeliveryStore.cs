@@ -989,17 +989,7 @@ public sealed class CompetitionWebhookDeliveryStore(
             RemainingFlagAttempts = (int?)null,
             SolvedByMyTeam = false,
             view.UsesDynamicFlag,
-            Hints = hints,
-            view.InteractionKind,
-            PatchVerificationAvailable = false,
-            MaximumPatchAttempts = (int?)null,
-            AcceptedPatchAttempts = (int?)null,
-            RemainingPatchAttempts = (int?)null,
-            PatchVerificationState = (string?)null,
-            PatchVerificationResult = (string?)null,
-            PatchVerificationFailureCode = (string?)null,
-            PatchVerificationRuntimeInstanceId = (Guid?)null,
-            PatchVerificationRuntimeState = (string?)null
+            Hints = hints
         }, JsonOptions);
     }
 

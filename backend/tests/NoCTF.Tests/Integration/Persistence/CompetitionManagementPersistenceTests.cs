@@ -219,7 +219,7 @@ public sealed class CompetitionManagementPersistenceTests
             var challengeId = Guid.CreateVersion7();
             var competitionChallengeId = Guid.CreateVersion7();
             var runtimeId = Guid.CreateVersion7();
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,

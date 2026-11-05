@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,10 +16,20 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         length = int(self.headers.get("Content-Length", "0"))
-        outcome = json.loads(self.rfile.read(length))["outcome"]
+        report = json.loads(self.rfile.read(length))
+        probes = {probe["kind"]: probe for probe in report["probes"]}
+        if set(probes) != {"Functionality", "Vulnerability"} or not report["observedAt"]:
+            self.send_response(400)
+            self.end_headers()
+            return
+        outcome = (
+            "ServiceAbnormal" if probes["Functionality"]["result"] != "Passed"
+            else "ExploitSucceeded" if probes["Vulnerability"]["result"] != "Passed"
+            else "DefenseSucceeded"
+        )
         with LOCK:
             with CALLBACKS.open("a", encoding="utf-8") as output:
-                output.write(json.dumps({"outcome": outcome}) + "\n")
+                output.write(json.dumps(report) + "\n")
             OUTPUT.write_text(outcome, encoding="utf-8")
         self.send_response(200)
         self.end_headers()

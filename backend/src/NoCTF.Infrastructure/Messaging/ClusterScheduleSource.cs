@@ -68,7 +68,7 @@ public sealed class ClusterScheduleSource(
             ? new Dictionary<Guid, DateTimeOffset>()
             : await db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
-                    && fact.Kind == GameplayFactKind.KohControlObservation)
+                    && fact.Kind == GameplayFactKind.ControlObservation)
                 .GroupBy(fact => fact.CompetitionChallengeId!.Value)
                 .Select(group => new { CompetitionChallengeId = group.Key, ObservedAt = group.Max(fact => fact.OccurredAt) })
                 .ToDictionaryAsync(item => item.CompetitionChallengeId, item => item.ObservedAt, cancellationToken);

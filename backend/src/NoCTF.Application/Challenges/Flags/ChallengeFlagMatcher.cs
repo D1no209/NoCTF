@@ -8,13 +8,16 @@ public static class ChallengeFlagMatcher
     private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
 
     public static bool IsMatch(string submittedFlag, ChallengeFlag candidate) =>
-        candidate.MatchKind switch
+        IsMatch(submittedFlag, candidate.MatchKind, candidate.Flag, candidate.FlagSha256);
+
+    public static bool IsMatch(string submittedFlag, ChallengeFlagMatchKind kind, string candidate, byte[] digest) =>
+        kind switch
         {
             ChallengeFlagMatchKind.Exact =>
-                DefaultExactMatch(submittedFlag, candidate),
+                DefaultExactMatch(submittedFlag, candidate, digest),
             ChallengeFlagMatchKind.RegularExpression =>
-                IsRegularExpressionMatch(submittedFlag, candidate.Flag),
-            _ => false
+                IsRegularExpressionMatch(submittedFlag, candidate),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
 
     public static bool IsValidRegularExpression(string pattern)
@@ -30,14 +33,14 @@ public static class ChallengeFlagMatcher
         }
     }
 
-    private static bool DefaultExactMatch(string submittedFlag, ChallengeFlag candidate)
+    private static bool DefaultExactMatch(string submittedFlag, string candidate, byte[] digest)
     {
         var submittedHash = ManageChallengeFlags.Hash(submittedFlag);
-        return candidate.FlagSha256 is { Length: 32 }
+        return digest is { Length: 32 }
             && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
                 submittedHash,
-                candidate.FlagSha256)
-            && string.Equals(submittedFlag, candidate.Flag, StringComparison.Ordinal);
+                digest)
+            && string.Equals(submittedFlag, candidate, StringComparison.Ordinal);
     }
 
     private static bool IsRegularExpressionMatch(string submittedFlag, string pattern)

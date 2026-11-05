@@ -23,15 +23,6 @@ public sealed class LiveSoloQuestionGroupItem
     public int? OpenOffsetSeconds { get; set; }
 }
 
-/// <summary>Opaque provenance survives deletion of the original template without coupling copied definitions.</summary>
-public sealed class LiveSoloChallengeSource
-{
-    [Key] public Guid ChallengeId { get; set; }
-    public Guid OriginalChallengeId { get; set; }
-    public Guid CanonicalChallengeId { get; set; }
-    public DateTimeOffset CopiedAt { get; set; }
-}
-
 public sealed class LiveSoloQuestionExposure
 {
     public Guid CompetitionId { get; set; }

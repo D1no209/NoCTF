@@ -268,7 +268,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         Guid.NewGuid(),
         "Team",
         GameMode.Ctf,
-        GameplayFactKind.FlagAttempt,
+        GameplayFactKind.BreakAttempt,
         GameplayFactResult.Correct,
         null,
         occurredAt,

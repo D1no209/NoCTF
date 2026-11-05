@@ -32,8 +32,6 @@ namespace Internal.Generated.WolverineHandlers
             _timeProvider2 = __timeProvider2;
         }
 
-
-
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var requestSourceAddress = new NoCTF.API.Security.RequestSourceAddress(_httpContextAccessor);
@@ -48,13 +46,10 @@ namespace Internal.Generated.WolverineHandlers
             
             // The actual message execution
             await expireAccountSourceAddressesHandler.Handle(expireAccountSourceAddresses, cancellation).ConfigureAwait(false);
-
         }
-
     }
 
     // END: ExpireAccountSourceAddressesHandler997555701
     
     
 }
-

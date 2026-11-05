@@ -6,7 +6,6 @@ using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.PatchUploads;
-using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.Domain.Commands;
 using NoCTF.Infrastructure.Persistence;
 
@@ -116,7 +115,7 @@ public sealed class TransactionalRequestReplay(
             (GameplayFactAcceptanceState)receipt.ResultState,
             receipt.PrimaryResultId,
             receipt.ResultOccurredAt),
-        ReplayOperation.PatchUpload => new AcceptedAwdpFix(
+        ReplayOperation.PatchUpload => new AcceptedFixSubmission(
             receipt.PrimaryResultId
                 ?? throw MissingResult(receipt, nameof(receipt.PrimaryResultId)),
             receipt.SecondaryResultId
@@ -130,10 +129,6 @@ public sealed class TransactionalRequestReplay(
                     ?? throw MissingResult(receipt, nameof(receipt.PrimaryResultId))),
         ReplayOperation.AwdpDefenseTarget => new AwdpDefenseTargetRequestResult(
             (AwdpDefenseTargetRequestState)receipt.ResultState,
-            receipt.PrimaryResultId,
-            receipt.RuntimeState),
-        ReplayOperation.PatchVerificationTarget => new PatchVerificationTargetRequestResult(
-            (PatchVerificationTargetRequestState)receipt.ResultState,
             receipt.PrimaryResultId,
             receipt.RuntimeState),
         _ => throw new ArgumentOutOfRangeException(
@@ -162,7 +157,7 @@ public sealed class TransactionalRequestReplay(
                 receipt.PrimaryResultId = result.GameplayFactId;
                 receipt.ResultOccurredAt = result.OccurredAt;
                 return;
-            case (ReplayOperation.PatchUpload, AcceptedAwdpFix result):
+            case (ReplayOperation.PatchUpload, AcceptedFixSubmission result):
                 receipt.PrimaryResultId = result.PatchUploadId;
                 receipt.SecondaryResultId = result.GameplayFactId;
                 receipt.GameplayFactState = result.State;
@@ -173,11 +168,6 @@ public sealed class TransactionalRequestReplay(
                 receipt.PrimaryResultId = result.RuntimeInstanceId;
                 return;
             case (ReplayOperation.AwdpDefenseTarget, AwdpDefenseTargetRequestResult result):
-                receipt.ResultState = (short)result.State;
-                receipt.PrimaryResultId = result.RuntimeInstanceId;
-                receipt.RuntimeState = result.RuntimeState;
-                return;
-            case (ReplayOperation.PatchVerificationTarget, PatchVerificationTargetRequestResult result):
                 receipt.ResultState = (short)result.State;
                 receipt.PrimaryResultId = result.RuntimeInstanceId;
                 receipt.RuntimeState = result.RuntimeState;

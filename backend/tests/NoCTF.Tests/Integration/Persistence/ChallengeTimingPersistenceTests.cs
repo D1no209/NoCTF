@@ -94,10 +94,10 @@ public sealed class ChallengeTimingPersistenceTests
         f.Db.Add(team); var templateId = f.Challenge.ChallengeId;
         f.Db.Add(new TemplateChallengeFlag { Id = Guid.NewGuid(), ChallengeId = templateId, Flag = "flag{budget}",
             FlagSha256 = NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash("flag{budget}"), CreatedAt = f.Now.AddHours(-1) });
-        f.Db.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
+        f.Db.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
             TeamId = team.Id, Value = "wrong", State = GameplayFactState.Completed, Result = GameplayFactResult.Wrong,
             OccurredAt = f.Now.AddMinutes(-10), UpdatedAt = f.Now.AddMinutes(-10) });
-        var id = Guid.NewGuid(); f.Db.Add(new FlagAttemptGameplayFact { Id = id, CompetitionId = f.Competition.Id,
+        var id = Guid.NewGuid(); f.Db.Add(new BreakAttemptGameplayFact { Id = id, CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, TeamId = team.Id, ActorUserId = f.Competition.OwnerId,
             Value = "flag{budget}", ValueSha256 = NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash("flag{budget}"),
             State = GameplayFactState.Queued, OccurredAt = f.Now.AddMinutes(-1), UpdatedAt = f.Now.AddMinutes(-1) });
@@ -116,7 +116,7 @@ public sealed class ChallengeTimingPersistenceTests
     public Task A_concurrent_policy_save_cannot_be_overwritten_by_an_inflight_old_batch(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct); var at = f.Now.AddMinutes(-10);
-        var id = Guid.NewGuid(); f.Db.Add(new FlagAttemptGameplayFact { Id = id, CompetitionId = f.Competition.Id,
+        var id = Guid.NewGuid(); f.Db.Add(new BreakAttemptGameplayFact { Id = id, CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, Value = "synthetic", Result = GameplayFactResult.Correct,
             State = GameplayFactState.Completed, OccurredAt = at, UpdatedAt = at }); await f.Db.SaveChangesAsync(ct);
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at), f.Now), ct);
@@ -159,56 +159,13 @@ public sealed class ChallengeTimingPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.Valid)] [Arguments(GameMode.Awdp, true, GameplayFactTimeEligibility.Valid)]
-    [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.NotOpened)] [Arguments(GameMode.Awdp, false, GameplayFactTimeEligibility.SubmissionClosed)]
-    [Arguments(GameMode.Ctf, false, GameplayFactTimeEligibility.Valid)] [Arguments(GameMode.Ctf, true, GameplayFactTimeEligibility.Valid)]
-    public Task A_late_checker_callback_uses_received_time_and_latest_configuration(GameMode mode, bool receivedBeforeCutoff, GameplayFactTimeEligibility eligibility, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
-    {
-        await using var f = await Fixture.CreateAsync(ct, mode); var at = f.Now.AddMinutes(-10);
-        if (mode == GameMode.Ctf)
-        {
-            var template = await f.Db.Challenges.SingleAsync(item => item.Id == f.Challenge.ChallengeId, ct);
-            ((CtfChallengeDefinition)template.Definition!).InteractionKind = CtfInteractionKind.PatchVerification;
-        }
-        var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Callback team", CaptainId = f.Competition.OwnerId,
-            MemberIds = [f.Competition.OwnerId], InvitationToken = new string('g', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
-        f.Db.Add(team); var factId = Guid.NewGuid(); var runtimeId = Guid.NewGuid();
-        RuntimeInstance runtime = mode == GameMode.Awdp ? new AwdpTargetRuntimeInstance() : new PatchVerificationTargetRuntimeInstance();
-        runtime.Id = runtimeId; runtime.CompetitionId = f.Competition.Id; runtime.CompetitionChallengeId = f.Challenge.Id;
-        runtime.TeamId = team.Id; runtime.RuntimeKind = RuntimeKind.Container; runtime.RuntimeProvider = RuntimeProvider.Docker;
-        runtime.RunnerId = "synthetic-runner"; runtime.State = RuntimeState.Running;
-        runtime.GameplayFactId = factId; runtime.CreatedAt = at; runtime.RunningAt = at; runtime.ExpiresAt = f.Now.AddHours(1);
-        f.Db.Add(runtime);
-        f.Db.Add(new FixAttemptGameplayFact { Id = factId, CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
-            TeamId = team.Id, ActorUserId = f.Competition.OwnerId, ReferenceKind = GameplayFactReferenceKind.PatchUpload, ReferenceId = Guid.NewGuid(),
-            Value = "synthetic", State = GameplayFactState.Processing, OccurredAt = at, UpdatedAt = at }); await f.Db.SaveChangesAsync(ct);
-        var latestTiming = eligibility == GameplayFactTimeEligibility.NotOpened ? new ChallengeTiming(at.AddSeconds(1))
-            : eligibility == GameplayFactTimeEligibility.SubmissionClosed ? new ChallengeTiming(null, null, at)
-            : new ChallengeTiming(null, receivedBeforeCutoff ? at.AddSeconds(1) : at);
-        await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, latestTiming, f.Now), ct);
-        var checker = new InternalResultStore(f.Db, Substitute.For<IPostCommitMessagePublisher>());
-        var callback = new AwdpFixResult(factId, runtimeId, AwdpFixOutcome.DefenseSucceeded, f.Now);
-        Task<InternalResultDisposition> Record() => mode == GameMode.Awdp
-            ? checker.RecordAwdpAsync(callback, ct) : checker.RecordPatchVerificationAsync(callback, ct);
-        await Assert.That(await Record()).IsEqualTo(InternalResultDisposition.Applied);
-        var fact = await f.Db.GameplayFacts.SingleAsync(x => x.Id == factId, ct);
-        await Assert.That(fact.Result).IsEqualTo(receivedBeforeCutoff ? GameplayFactResult.Correct : GameplayFactResult.RightButDue);
-        await Assert.That(fact.TimeEligibility).IsEqualTo(eligibility);
-        await Assert.That(GameplayFactCompletion.IsSuccessful(fact.Result, fact.TimeEligibility)).IsEqualTo(eligibility == GameplayFactTimeEligibility.Valid);
-        await Assert.That(fact.OccurredAt).IsEqualTo(at);
-        await Assert.That(fact.AppliedTimingRevision).IsEqualTo(f.Challenge.TimingRevision);
-        await Assert.That(await Record()).IsEqualTo(InternalResultDisposition.Duplicate);
-        await Assert.That(await f.Db.GameplayFacts.CountAsync(ct)).IsEqualTo(1);
-    });
-
-    [Test, Timeout(300_000)]
     public Task A_queued_blood_notification_rechecks_latest_timing_before_delivery(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct); f.Challenge.IsPublished = true;
         var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Notification team", CaptainId = f.Competition.OwnerId,
             MemberIds = [f.Competition.OwnerId], InvitationToken = new string('f', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
         f.Db.Add(team); var at = f.Now.AddMinutes(-10);
-        f.Db.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
+        f.Db.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
             TeamId = team.Id, OccurredAt = at, UpdatedAt = at, Value = "synthetic", State = GameplayFactState.Completed, Result = GameplayFactResult.Correct });
         await f.Db.SaveChangesAsync(ct);
         using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
@@ -235,7 +192,7 @@ public sealed class ChallengeTimingPersistenceTests
         var others = new List<Guid>();
         for (var index = 1; index <= 2; index++)
         {
-            var template = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = f.Competition.OwnerId, Title = "Other " + index,
+            var template = new Challenge { Id = Guid.NewGuid(), OwnerId = f.Competition.OwnerId, Title = "Other " + index,
                 NormalizedTitle = "OTHER " + index, Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = f.Now, UpdatedAt = f.Now };
             f.Db.Add(template); await f.Db.SaveChangesAsync(ct);
             var created = await f.Management.CreateAsync(new(null, f.Competition.Id, template.Id, index, f.Now), TestConfigurations.Rules(GameMode.Ctf), ct);
@@ -245,7 +202,7 @@ public sealed class ChallengeTimingPersistenceTests
             MemberIds = [f.Competition.OwnerId], InvitationToken = new string('e', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
         f.Db.Add(team);
         foreach (var question in new[] { f.Challenge.Id, others[0] })
-            f.Db.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = question,
+            f.Db.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = question,
                 TeamId = team.Id, Value = "synthetic", Result = GameplayFactResult.Correct, State = GameplayFactState.Completed,
                 OccurredAt = f.Now.AddMinutes(-10), UpdatedAt = f.Now });
         var a = new ChallengeProgressionNode { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id };
@@ -269,7 +226,7 @@ public sealed class ChallengeTimingPersistenceTests
     public Task Interrupted_batches_and_late_jobs_converge_to_the_latest_saved_revision(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct); var at = f.Now.AddMinutes(-10);
-        f.Db.AddRange(Enumerable.Range(0, 205).Select(_ => new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+        f.Db.AddRange(Enumerable.Range(0, 205).Select(_ => new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, Value = "synthetic", State = GameplayFactState.Completed,
             Result = GameplayFactResult.Correct, OccurredAt = at, UpdatedAt = at })); await f.Db.SaveChangesAsync(ct);
         await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at.AddSeconds(-1)), f.Now), ct);
@@ -299,7 +256,7 @@ public sealed class ChallengeTimingPersistenceTests
         var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Timing team", CaptainId = f.Competition.OwnerId,
             MemberIds = [f.Competition.OwnerId], InvitationToken = new string('b', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
         f.Db.Add(team); var at = f.Now.AddMinutes(-10);
-        GameplayFact correct = mode == GameMode.Awdp ? new BreakAttemptGameplayFact() : mode == GameMode.Koh ? new KohControlObservationGameplayFact() : new FlagAttemptGameplayFact();
+        GameplayFact correct = mode == GameMode.Koh ? new ControlObservationGameplayFact() : new BreakAttemptGameplayFact();
         correct.Id = Guid.NewGuid(); correct.CompetitionId = f.Competition.Id; correct.CompetitionChallengeId = f.Challenge.Id;
         correct.TeamId = team.Id; correct.OccurredAt = at; correct.UpdatedAt = at; correct.State = GameplayFactState.Completed;
         correct.Result = mode == GameMode.Koh ? GameplayFactResult.Controlled : GameplayFactResult.Correct; correct.Value = "synthetic";
@@ -333,7 +290,7 @@ public sealed class ChallengeTimingPersistenceTests
                     State = AwdFlagIssueState.Issued, IssuedAt = round.StartsAt, ExpiryRound = 2, HistoricalExpiryRound = 2,
                     Digest = Convert.ToHexString(digest) } });
             correct.VictimTeamId = victimId; correct.ReferenceKind = GameplayFactReferenceKind.AwdRound; correct.ReferenceId = round.Id;
-            ((FlagAttemptGameplayFact)correct).Awd = new() { GameplayFactId = correct.Id, FlagId = flagId,
+            correct.Awd = new() { GameplayFactId = correct.Id, FlagId = flagId,
                 RulesId = rules.Id, GenerationRoundId = round.Id, ReceivedRoundId = round.Id, ReceivedRoundNumber = 1,
                 ReceiptScorable = true, AttackOutcome = AwdAttackOutcome.Accepted };
             f.Db.AwdCaptureIdentities.Add(new() { CompetitionId = f.Competition.Id, FlagId = flagId,
@@ -411,7 +368,7 @@ public sealed class ChallengeTimingPersistenceTests
         await Assert.That(preserve.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await f.Db.Entry(f.Challenge).ReloadAsync(ct);
         await Assert.That(f.Challenge.SubmissionDeadlineAt).IsEqualTo(f.Now.AddMinutes(30));
-        f.Db.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
+        f.Db.Add(new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
             Value = "synthetic", Result = GameplayFactResult.Correct, State = GameplayFactState.Completed, OccurredAt = f.Now.AddMinutes(-2), UpdatedAt = f.Now });
         await f.Db.SaveChangesAsync(ct);
         using var unconfirmed = await client.PatchAsJsonAsync(uri, new { timing = new { scoringEndsAt = (DateTimeOffset?)null } }, ct);
@@ -465,7 +422,7 @@ public sealed class ChallengeTimingPersistenceTests
         var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Preview team", CaptainId = f.Competition.OwnerId,
             MemberIds = [f.Competition.OwnerId], InvitationToken = new string('a', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
         f.Db.Add(team);
-        var fact = new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
+        var fact = new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id,
             TeamId = team.Id, ActorUserId = f.Competition.OwnerId, OccurredAt = f.Now.AddMinutes(-10), UpdatedAt = f.Now,
             Result = GameplayFactResult.Correct, State = GameplayFactState.Completed, Value = "synthetic" };
         f.Db.Add(fact); await f.Db.SaveChangesAsync(ct);
@@ -530,10 +487,10 @@ public sealed class ChallengeTimingPersistenceTests
     {
         await using var f = await Fixture.CreateAsync(ct);
         var at = f.Now.AddMinutes(-10);
-        var correct = new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+        var correct = new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, OccurredAt = at, UpdatedAt = at,
             State = GameplayFactState.Completed, Result = GameplayFactResult.Correct, Value = "synthetic" };
-        var wrong = new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+        var wrong = new BreakAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
             CompetitionChallengeId = f.Challenge.Id, OccurredAt = at, UpdatedAt = at,
             State = GameplayFactState.Completed, Result = GameplayFactResult.Wrong, Value = "wrong" };
         f.Db.AddRange(correct, wrong); await f.Db.SaveChangesAsync(ct);
@@ -596,7 +553,7 @@ public sealed class ChallengeTimingPersistenceTests
             competition.Status = CompetitionStatus.Running; competition.StartAt = now.AddHours(-1); competition.EndAt = now.AddHours(1);
             competition.ModeConfiguration = TestConfigurations.Competition(mode); competition.FlagDerivationSecret = new byte[32]; competition.CreatedAt = now; competition.UpdatedAt = now;
             db.Add(competition);
-            var template = ChallengeGeneratedCatalog.Create(mode); template.Id = Guid.NewGuid(); template.OwnerId = owner;
+            var template = new Challenge(); template.Id = Guid.NewGuid(); template.OwnerId = owner;
             template.Title = "Timing template"; template.Direction = "Web"; template.Definition = TestConfigurations.Definition(mode); template.CreatedAt = now; template.UpdatedAt = now;
             db.Add(template); await db.SaveChangesAsync(ct);
             var management = new ChallengeManagementStore(db, Substitute.For<IPostCommitMessagePublisher>(), Substitute.For<IChallengeRuntimeTemplateCatalog>());

@@ -114,13 +114,14 @@ printf '%s' "${FLAG}" > "/dev/shm/flags/${STORE_ID}/${FLAG_ID}"
 
 ```json
 {
-  "connection": { "outcome": "Passed", "reason": "None" },
-  "functionality": { "outcome": "Passed", "reason": "None" },
-  "flags": [
+  "probes": [
+    { "kind": "Connection", "result": "Passed", "reason": "None" },
+    { "kind": "Functionality", "result": "Passed", "reason": "None" },
+    { "kind": "CurrentFlagRead", "flagId": "aaaaaaaa-0000-0000-0000-000000000001", "result": "Passed", "reason": "None" }
+  ],
+  "flagContexts": [
     {
       "flagId": "aaaaaaaa-0000-0000-0000-000000000001",
-      "write": { "outcome": "NotRequired", "reason": "None" },
-      "read": { "outcome": "Passed", "reason": "None" },
       "privateReadContext": null,
       "publicLocator": "/records/opaque-record-id"
     }
@@ -129,7 +130,7 @@ printf '%s' "${FLAG}" > "/dev/shm/flags/${STORE_ID}/${FLAG_ID}"
 }
 ```
 
-实际回执必须恰好覆盖清单全部 FlagId，无重复；无需写入才可报 `NotRequired`。结果枚举为 `Unknown`、`Passed`、`TargetFailure`、`PlatformFailure`、`NotRequired`；原因使用 OpenAPI 枚举，例如 `ConnectionRefused`、`FunctionalCheckFailed`、`FlagStoreFailed`、`CurrentFlagMissing`、`HistoricalFlagMissing`、`InfrastructureFailure`。
+实际回执必须恰好覆盖服务端要求的全部探针和 FlagId，无重复；未要求写入时省略 FlagWrite。历史 Flag 使用 HistoricalFlagRead，当前 Flag 使用 CurrentFlagRead。结果使用 `Unknown`、`Passed`、`TargetFailure`、`PlatformFailure`；目标功能失败导致依赖探针未执行时使用 `NotExecuted` 并保留明确原因。原因使用 OpenAPI 枚举，例如 `ConnectionRefused`、`FunctionalCheckFailed`、`FlagWriteFailed`、`FlagReadFailed`、`InfrastructureFailure`。统一回调路径为 `/api/internal/v1/capabilities/check-results`。
 
 Checker 不上报最终健康、历史责任或计分资格。服务端根据固定清单分类。TCP 建连失败与已连接后的业务失败分开；网络基础设施异常不能一律扣为选手离线。剩余预算不足时保留清单项并报未知，不能省略或默认通过。一次有效回执固定当前尝试证据，重复回调不能用“最后一次获胜”改写结论。
 
@@ -289,58 +290,19 @@ tar -czf fix.tar.gz -- fix.sh
 | `NOCTF_CALLBACK_URL` | 本次 Fix 结果回调地址 |
 | `NOCTF_CALLBACK_TOKEN` | 绑定 GameplayFact、Runtime UUID 和 Checker execution identity 的 JWT |
 
-最小 Checker：
+最小 Checker 见 [check.py](challenge-authoring-templates/starter-kits/awdp/checker/check.py)。回调发送 Functionality、Vulnerability 探针、真实 observedAt 和可选 FlagContexts。签名与服务端执行记录确定作用范围；Checker 只提供客观证据。
 
-```sh
-#!/bin/sh
-set -u
+模式判定映射：
 
-target="http://${TARGET_HOST}:8080"
-remaining="${TARGET_READY_TIMEOUT_SECONDS}"
-exp_succeeded=0
-service_healthy=0
-
-while [ "${remaining}" -gt 0 ]; do
-  wget -qO- -T 2 "${target}/health" >/dev/null 2>&1 && break
-  remaining=$((remaining - 1))
-  sleep 1
-done
-
-if timeout 10 /checker/exploit.sh "${target}"; then
-  exp_succeeded=1
-fi
-
-health="$(wget -qO- -T 3 "${target}/health" 2>/dev/null || true)"
-if [ "${health}" = "ok" ]; then
-  service_healthy=1
-fi
-
-if [ "${service_healthy}" -ne 1 ]; then
-  outcome='ServiceAbnormal'
-elif [ "${exp_succeeded}" -eq 1 ]; then
-  outcome='ExploitSucceeded'
-else
-  outcome='DefenseSucceeded'
-fi
-
-wget -qO /dev/null -T 5 \
-  --header "Authorization: Bearer ${NOCTF_CALLBACK_TOKEN}" \
-  --header 'Content-Type: application/json' \
-  --post-data "{\"outcome\":\"${outcome}\"}" \
-  "${NOCTF_CALLBACK_URL}"
-```
-
-结果映射：
-
-| 回调结果 | GameplayFact | 含义 |
+| 客观证据 | GameplayFact | 含义 |
 | --- | --- | --- |
-| `DefenseSucceeded` | Correct | EXP 未能利用且服务满足规则 |
-| `ExploitSucceeded` | Wrong / AwdpExploitSucceeded | EXP 仍可利用 |
-| `ServiceAbnormal` | Rejected / AwdpServiceAbnormal | 正常服务交互失败、超时或崩溃 |
+| 功能、漏洞探针均 Passed | Correct | EXP 未能利用且服务满足规则 |
+| 漏洞探针 TargetFailure / VulnerabilityPresent | Wrong / AwdpExploitSucceeded | EXP 仍可利用 |
+| 连接或功能探针 TargetFailure | Rejected / AwdpServiceAbnormal | 正常服务交互失败、超时或崩溃 |
 
 Checker 必须把 EXP 作为子进程运行并捕获失败/崩溃，然后继续做正常服务交互；服务异常优先级高于 EXP 结果。只检测“某个文件存在”通常不足以证明真实题目已修复；正式题应实际请求漏洞路径、正常业务路径和禁止绕过路径。
 
-Checker 成功回调后以 0 退出。Runner 级验证超时会判为 `ServiceAbnormal`；Checker 主进程异常退出且没有可信业务结果、存储或 Provider 故障属于平台失败，不应冒充选手错误并消耗其正常计分机会。
+Checker 成功回调后以 0 退出。Fix 脚本超时保留目标执行结果；Checker 主进程异常退出且没有可信业务结果、证据缺失、存储或 Provider 故障属于平台失败。正式成绩与 LiveSolo 胜负等待工作完成及独立目标回收确认。
 
 ### 4.7 Break Flag
 

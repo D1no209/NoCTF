@@ -21,7 +21,7 @@ public sealed partial class LiveSoloMatchStore
         var config = await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().SingleAsync(x => x.CompetitionId == match.CompetitionId, ct);
         var entries = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().Where(x => x.CompetitionId == match.CompetitionId).ToArrayAsync(ct);
         var templates = await db.Challenges.IgnoreQueryFilters().AsNoTracking().Where(x => entries.Select(e => e.ChallengeId).Contains(x.Id)).AsSplitQuery().ToDictionaryAsync(x => x.Id, ct);
-        var sources = await db.LiveSoloChallengeSources.AsNoTracking().Where(x => templates.Keys.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
+        var sources = await db.ChallengeSources.AsNoTracking().Where(x => templates.Keys.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
         Guid Canonical(Guid template) => sources.GetValueOrDefault(template, template);
         var teamIds = match.Slots.Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).ToArray(); var userIds = match.Roster.Select(x => x.UserId).ToArray();
         var history = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.OpenedAt != null)
@@ -55,7 +55,7 @@ public sealed partial class LiveSoloMatchStore
                 var canonical = Canonical(template.Id);
                 return new LiveSoloSelectionMaterial(entry.Id, canonical, entry.ConcurrencyStamp, template.ConcurrencyStamp, true,
                     entry.DeletedAt != null || template.DeletedAt != null,
-                    template.Definition is LiveSoloChallengeDefinition definition && LiveSoloConfigurationValidator.ValidateDefinition(definition).Count == 0,
+                    template.Definition is { } definition && LiveSoloConfigurationValidator.ValidateDefinition(definition).Count == 0,
                     match.DirectionPool.Count == 0 && active.Contains(entry.Id), seenTeams.Contains(canonical), seenMembers.Contains(canonical), exposed.Contains(canonical));
             }).ToArray();
             return LiveSoloQuestionSelection.Evaluate(group.Id, group.Name, group.Reserve, group.Position, group.ConcurrencyStamp, materials,

@@ -69,49 +69,36 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             case AwdpCompetitionModeConfiguration awdp:
                 foreach (var challenge in challenges)
                 {
-                    if (challenge.Rules is not AwdpCompetitionChallengeRules rules
-                        || challenge.Definition is not AwdpChallengeDefinition definition)
+                    if (challenge.Rules is not AwdpCompetitionChallengeRules rules)
                     {
                         errors.Add("AWDP challenge configuration types do not match the competition mode.");
                         continue;
                     }
                     errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.ValidateForStart(
                         Awdp.Configuration.AwdpConfigurationResolver.Resolve(
-                            awdp, rules, definition)));
+                            awdp, rules, challenge.Definition)));
                 }
                 break;
             case CtfCompetitionModeConfiguration:
                 foreach (var challenge in challenges)
                 {
-                    if (challenge.Rules is not CtfCompetitionChallengeRules rules
-                        || challenge.Definition is not CtfChallengeDefinition definition)
+                    if (challenge.Rules is not CtfCompetitionChallengeRules || challenge.Definition.Break is null)
                     {
                         errors.Add("CTF challenge configuration types do not match the competition mode.");
                         continue;
-                    }
-                    if (definition.InteractionKind == CtfInteractionKind.PatchVerification)
-                    {
-                        if (rules.MaxFlagAttempts is not null)
-                            errors.Add("PatchVerification rules cannot configure MaxFlagAttempts.");
-                        if (rules.HasFlagTemplate)
-                            errors.Add("PatchVerification rules cannot configure FlagTemplate.");
-                    }
-                    else if (rules.MaxPatchAttempts is not null)
-                    {
-                        errors.Add("FlagSubmission rules cannot configure MaxPatchAttempts.");
                     }
                 }
                 break;
             case KohCompetitionModeConfiguration:
                 foreach (var challenge in challenges)
                 {
-                    if (challenge.Definition is not KohChallengeDefinition definition)
+                    if (challenge.Definition.Control is null)
                     {
                         errors.Add("KoH challenge definition type does not match the competition mode.");
                         continue;
                     }
                     errors.AddRange(Koh.Configuration.KohConfigurationValidator.ValidateForStart(
-                        TypedGameModeConfiguration.Koh(definition)));
+                        TypedGameModeConfiguration.Koh(challenge.Definition)));
                 }
                 break;
         }

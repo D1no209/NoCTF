@@ -73,8 +73,16 @@ public sealed class PersistedRunnerCapacityGate(
         return allocation is not null && await IsReadyOwnerAsync(allocation, ct);
     }
 
+    public async Task<bool> CanMutateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken ct)
+    {
+        var runtime = await db.RuntimeInstances.AsNoTracking().Include(item => item.CapacityAllocationEntries).AsSplitQuery()
+            .SingleOrDefaultAsync(item => item.Id == runtimeInstanceId && item.State == RuntimeState.Running && item.RunnerId == runnerId, ct);
+        var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary && item.RunnerId == runnerId);
+        return allocation is not null && await IsReadyOwnerAsync(allocation, ct);
+    }
+
     public async Task<bool> CanCreateWorkloadAsync(
-        RuntimeWorkloadIdentity identity, Guid factId, string runnerId,
+        RuntimeWorkloadIdentity identity, Guid? factId, string runnerId,
         CancellationToken ct)
     {
         var runtime = await db.RuntimeInstances.AsNoTracking()
@@ -85,6 +93,10 @@ public sealed class PersistedRunnerCapacityGate(
         var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(item =>
             item.Identity == identity && item.GameplayFactId == factId
             && item.RunnerId == runnerId);
+        if (identity.Kind == RuntimeWorkloadKind.TemplateChecker)
+            return factId is null && allocation is not null
+                && runtime is { Purpose: RuntimePurpose.TemplateTest, CapabilityTest: { State: NoCTF.Domain.Challenges.Testing.TemplateCapabilityTestState.Checking } test }
+                && test.ExecutionId == identity.OperationId && await IsReadyOwnerAsync(allocation, ct);
         return allocation is not null
             && await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
                 && fact.State == GameplayFactState.Processing
@@ -245,13 +257,19 @@ public sealed class PersistedRunnerCapacityGate(
             || current.RunnerId is { } owner && requestedRunnerId is not null && owner != requestedRunnerId)
             return new(RunnerCapacityAvailability.Unavailable,
                 Failure: RunnerAdmissionFailure.NoEligibleRunner);
-        if (identity.IsAuxiliary && (request.GameplayFactId is not Guid factId
+        var templateChecker = identity.IsAuxiliary && request.GameplayFactId is null
+            && current.Purpose == RuntimePurpose.TemplateTest && identity.Kind == RuntimeWorkloadKind.TemplateChecker
+            && await db.RuntimeInstances.AnyAsync(runtime => runtime.Id == current.Id
+                && runtime.State == RuntimeState.Running && runtime.CapabilityTest != null
+                && runtime.CapabilityTest.ExecutionId == identity.OperationId
+                && runtime.CapabilityTest.State == NoCTF.Domain.Challenges.Testing.TemplateCapabilityTestState.Checking, ct);
+        if (identity.IsAuxiliary && !templateChecker && (request.GameplayFactId is not Guid factId
             || !await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
                 && fact.State == GameplayFactState.Processing
                 && fact.CompetitionChallengeId == current.CompetitionChallengeId
                 && fact.TeamId == current.TeamId
                 && (identity.Kind == RuntimeWorkloadKind.AwdChecker
-                    && fact.Kind == GameplayFactKind.AwdServiceTransition
+                    && fact.Kind == GameplayFactKind.CheckObservation
                     && fact.Awd != null && fact.Awd.AttemptId == identity.OperationId
                     && fact.Awd.RuntimeId == current.Id
                     && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
@@ -293,7 +311,8 @@ public sealed class PersistedRunnerCapacityGate(
                 item.State, item.RunningAt, Allocation = allocation
             })
             .Where(item => item.Allocation.ResourceDomain == domain
-                && (item.Allocation.WorkloadKind != RuntimeWorkloadKind.AwdChecker
+                && (item.Allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker
+                    || item.Allocation.WorkloadKind != RuntimeWorkloadKind.AwdChecker
                     && item.Allocation.WorkloadKind != RuntimeWorkloadKind.PatchChecker
                     && (item.State != RuntimeState.Running || item.RunningAt == null || observedAt < item.RunningAt)
                     || (item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
@@ -305,6 +324,7 @@ public sealed class PersistedRunnerCapacityGate(
                 item.Allocation.LimitMemoryBytes, item.Allocation.LimitCpuMillicores, item.Allocation.LimitPidsLimit,
                 item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
                     || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker
+                    || item.Allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker
                     || item.State == RuntimeState.Queued || item.State == RuntimeState.Provisioning
                     || item.State == RuntimeState.Running))
             .ToArrayAsync(ct);
@@ -370,7 +390,7 @@ public sealed class PersistedRunnerCapacityGate(
         RuntimeWorkloadKind Kind, long MemoryBytes, long CpuMillicores, long PidsLimit,
         bool CountsTowardStartup)
     {
-        public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker;
+        public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker;
     }
 
     private static RunnerAdmissionFailure? CheckCapacity(
@@ -529,7 +549,7 @@ public sealed class PersistedRunnerCapacityGate(
     public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => PrimaryIdentity(runtime.Purpose, runtime.Id);
 
     private static RuntimeWorkloadIdentity PrimaryIdentity(RuntimePurpose purpose, Guid runtimeId) => new(
-        purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
+        purpose is RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget
             ? RuntimeWorkloadKind.VerificationTarget
             : RuntimeWorkloadKind.Runtime,
         runtimeId, runtimeId);

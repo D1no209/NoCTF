@@ -49,7 +49,6 @@ public sealed record ChallengeView(
     public IReadOnlyList<string> Tags { get; init; } = [];
     public string? DirectionIcon { get; init; }
     public bool UsesDynamicFlag { get; init; }
-    public CtfInteractionKind InteractionKind { get; init; }
 }
 
 public sealed record CompetitionChallengeSummaryView(
@@ -62,7 +61,6 @@ public sealed record CompetitionChallengeSummaryView(
     int Order,
     bool IsPublished,
     DateTimeOffset? DeletedAt,
-    CtfInteractionKind InteractionKind,
     Guid? DirectionId = null,
     string? DirectionIcon = null)
 {
@@ -81,20 +79,23 @@ public enum ChallengeMutationFailure
     InvalidScorePresetCurve,
     CompetitionNotFound,
     TemplateNotFound,
-    TemplateModeMismatch,
+    CompetitionModeMismatch,
+    RequiredCapabilitiesMissing,
     ChallengeNotFound,
     ResourceIdConflict,
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
     LifecycleStateConflict,
-    ExperimentalFeatureDisabled,
     InvalidTiming,
     TimingUnsupported, PublicationUnsupported, MaterialEditRequired
 }
 
 public sealed record ChallengeMutationResult(
     ChallengeView? Challenge,
-    ChallengeMutationFailure? Failure = null);
+    ChallengeMutationFailure? Failure = null)
+{
+    public IReadOnlyList<NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityKind> MissingCapabilities { get; init; } = [];
+}
 
 public sealed record ChallengeCompetitionContext(GameMode Mode, CompetitionStatus Status);
 

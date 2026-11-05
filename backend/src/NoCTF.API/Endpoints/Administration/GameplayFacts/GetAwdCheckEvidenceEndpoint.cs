@@ -23,6 +23,9 @@ public sealed record AwdCheckEvidenceResponse(Guid GameplayFactId,
     bool FinalScheduledCheck, bool ManifestComplete, bool EvidenceComplete,
     int RequiredFlags, int ReadableFlags, IReadOnlyList<AwdCheckFlagEvidenceResponse> Flags)
 {
+    public Guid? BlockingFixFactId { get; init; }
+    public DateTimeOffset? MaintenanceWaitStartedAt { get; init; }
+    public DateTimeOffset? MaintenanceWaitEndedAt { get; init; }
     public static AwdCheckEvidenceResponse From(AwdCheckEvidenceView view)
     {
         var e = view.Evidence;
@@ -34,7 +37,8 @@ public sealed record AwdCheckEvidenceResponse(Guid GameplayFactId,
             e.ManifestComplete, e.EvidenceComplete, e.RequiredFlags, e.ReadableFlags,
             e.Flags.Select(flag => new AwdCheckFlagEvidenceResponse(flag.FlagId, flag.Historical,
                 flag.RequiresWrite, flag.Obligation, new(flag.Write, flag.WriteReason),
-                new(flag.Read, flag.ReadReason))).ToArray());
+                new(flag.Read, flag.ReadReason))).ToArray())
+        { BlockingFixFactId = e.BlockingFixFactId, MaintenanceWaitStartedAt = e.MaintenanceWaitStartedAt, MaintenanceWaitEndedAt = e.MaintenanceWaitEndedAt };
     }
 }
 

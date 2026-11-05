@@ -32,13 +32,12 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
                 && submission.CompetitionId == competitionId
                 && (isStaff
                     || submission.TeamId == teamId
-                    && (submission.Kind == GameplayFactKind.FlagAttempt
-                        || submission.Kind == GameplayFactKind.BreakAttempt
+                    && (submission.Kind == GameplayFactKind.BreakAttempt
                         || submission.Kind == GameplayFactKind.FixAttempt
                         || submission.Kind == GameplayFactKind.HintUnlock)))
             .Select(fact => new GameplayFactStatusView(
                 fact.Id,
-                fact.CompetitionId,
+                fact.CompetitionId!.Value,
                 fact.TeamId,
                 fact.CompetitionChallengeId!.Value,
                 fact.Kind,
@@ -47,12 +46,14 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
                 GameplayFactResultDisclosure.PlayerFailureCode(fact.FailureCode),
                 fact.OccurredAt,
                 fact.UpdatedAt, fact.TimeEligibility,
-                fact.Kind != GameplayFactKind.FlagAttempt || fact.Awd == null ? null : new AwdAttackStatusView(
+                fact.Kind != GameplayFactKind.BreakAttempt || fact.Awd == null ? null : new AwdAttackStatusView(
                     fact.Awd.FlagId, fact.Awd.GenerationRoundId,
                     db.AwdFlagIssues.Where(issue => issue.FlagId == fact.Awd.FlagId).Select(issue => (int?)issue.RoundNumber).SingleOrDefault(),
                     fact.Awd.ReceivedRoundId, fact.Awd.ReceivedRoundNumber,
                     db.AwdFlagIssues.Where(issue => issue.FlagId == fact.Awd.FlagId).Select(issue => (Guid?)issue.StoreId).SingleOrDefault(),
-                    fact.Awd.AttackOutcome, fact.Awd.Settlement)))
+                    fact.Awd.AttackOutcome, fact.Awd.Settlement),
+                fact.FixExecution == null ? null : new FixExecutionStatusView(fact.FixExecution.TargetKind,
+                    fact.FixExecution.Phase, fact.FixExecution.FailedPhase, fact.FixExecution.MutationBlocked)))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

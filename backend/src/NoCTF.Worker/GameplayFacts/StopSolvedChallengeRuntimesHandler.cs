@@ -35,6 +35,7 @@ public sealed class StopSolvedChallengeRuntimesHandler(
             })
             .SingleOrDefaultAsync(ct);
         if (fact?.CompetitionChallengeId is not Guid challengeId
+            || fact.CompetitionId is not Guid competitionId
             || fact.TeamId is not Guid teamId
             || !GameplayFactCompletion.IsSuccessful(fact.Result, fact.TimeEligibility))
             return;
@@ -45,8 +46,8 @@ public sealed class StopSolvedChallengeRuntimesHandler(
             .SingleAsync(ct);
         var purpose = (mode, fact.Kind) switch
         {
-            (GameMode.Ctf, GameplayFactKind.FlagAttempt) => RuntimePurpose.Player,
-            (GameMode.Awdp, GameplayFactKind.BreakAttempt) => RuntimePurpose.AwdpAttack,
+            (GameMode.Ctf, GameplayFactKind.BreakAttempt) => RuntimePurpose.Player,
+            (GameMode.Awdp, GameplayFactKind.BreakAttempt) => RuntimePurpose.AttackTarget,
             _ => (RuntimePurpose?)null
         };
         if (purpose is null) return;
@@ -79,7 +80,7 @@ public sealed class StopSolvedChallengeRuntimesHandler(
                 runtime.State = RuntimeState.Stopping;
                 await messages.PublishAsync(new StopRuntime(runtime.Id));
             }
-            await events.RecordAsync(new(fact.CompetitionId, CompetitionEventKind.RuntimeStateChanged,
+            await events.RecordAsync(new(competitionId, CompetitionEventKind.RuntimeStateChanged,
                 CompetitionEventLevel.Information, CompetitionEventVisibility.Team, now,
                 TeamId: teamId, CompetitionChallengeId: challengeId, RuntimeInstanceId: runtime.Id,
                 GameplayFactId: message.GameplayFactId, RuntimeState: runtime.State), ct);

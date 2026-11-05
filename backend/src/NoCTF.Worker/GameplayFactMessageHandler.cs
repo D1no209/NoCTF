@@ -32,12 +32,13 @@ public sealed class GameplayFactMessageHandler(
                 candidate.Result, candidate.FailureCode, candidate.ConcurrencyStamp,
                 candidate.OccurredAt, candidate.UpdatedAt })
             .SingleOrDefaultAsync(cancellationToken);
-        if (fact?.ActorUserId is not Guid userId || fact.State != message.State || fact.CompetitionChallengeId is null
+        if (fact?.ActorUserId is not Guid userId || fact.CompetitionId is not Guid competitionId
+            || fact.State != message.State || fact.CompetitionChallengeId is null
             || message.ConcurrencyStamp != Guid.Empty && fact.ConcurrencyStamp != message.ConcurrencyStamp)
             return;
         var view = new GameplayFactStatusView(
             fact.Id,
-            fact.CompetitionId,
+            competitionId,
             fact.TeamId,
             fact.CompetitionChallengeId.Value,
             fact.Kind,

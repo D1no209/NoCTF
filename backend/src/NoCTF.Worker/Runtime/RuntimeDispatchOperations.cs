@@ -26,8 +26,8 @@ using System.Security.Cryptography;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
-using NoCTF.GameModes.PatchVerification.Configuration;
-using NoCTF.GameModes.PatchVerification.Runtime;
+using NoCTF.GameModes.Challenges.Capabilities;
+using NoCTF.Application.Challenges.Capabilities;
 using NoCTF.GameModes.Registration;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
@@ -152,19 +152,28 @@ internal static partial class BackendMessageOperations
             return;
         }
 
+        if (target.Mode == GameMode.LiveSolo && IsFixTarget(instance.Purpose)
+            && !await NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloFixTargetValidity.CanProvisionAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken))
+        {
+            instance.State = RuntimeState.Stopping;
+            await db.SaveChangesAsync(cancellationToken);
+            await outbox.PublishAsync(new StopRuntime(instance.Id));
+            return;
+        }
+
         var definitionStarted = Stopwatch.GetTimestamp();
         ChallengeRuntimeTemplate? template;
         try
         {
-            var patchVerificationConfiguration = IsPatchVerificationTarget(instance.Purpose)
-                ? PatchVerificationConfigurationResolver.Resolve(
-                    target.Mode,
+            var fixSubmissionConfiguration = IsFixTarget(instance.Purpose)
+                ? FixSubmissionConfigurationResolver.Resolve(
+                    target.Mode ?? throw new InvalidOperationException("Fix targets require a competition execution scope."),
                     target.CompetitionConfiguration!,
                     target.Rules!,
                     target.Definition!)
                 : null;
-            template = patchVerificationConfiguration?.Runtime
-                ?? templates.Get(target.Definition);
+            template = fixSubmissionConfiguration?.Runtime
+                ?? (target.Rules is { } runtimeRules ? templates.Get(target.Definition, runtimeRules) : templates.Get(target.Definition));
         }
         catch (Exception exception) when (exception is InvalidOperationException
             or GameModeConfigurationException
@@ -194,7 +203,7 @@ internal static partial class BackendMessageOperations
                 .SingleOrDefaultAsync(cancellationToken);
         }
         else if (target.Mode is GameMode.Ctf or GameMode.Awdp or GameMode.LiveSolo
-            && !IsPatchVerificationTarget(instance.Purpose)
+            && !IsFixTarget(instance.Purpose)
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
             if (instance.TeamId is Guid teamId
@@ -220,7 +229,7 @@ internal static partial class BackendMessageOperations
         }
         if ((instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment
                 || target.Mode is GameMode.Ctf or GameMode.Awdp or GameMode.LiveSolo
-                    && !IsPatchVerificationTarget(instance.Purpose)
+                    && !IsFixTarget(instance.Purpose)
                     && template.FlagSource == RuntimeFlagSource.PerTeam)
             && perTeamFlag is null)
         {
@@ -293,9 +302,9 @@ internal static partial class BackendMessageOperations
         IRuntimeProvisionMessage provision;
         try
         {
-            if (IsPatchVerificationTarget(instance.Purpose))
+            if (IsFixTarget(instance.Purpose))
             {
-                var definition = PatchVerificationTargetDefinitionFactory.Create(
+                var definition = FixTargetDefinitionFactory.Create(
                     instance.Id,
                     template,
                     instance.RuntimeProvider,
@@ -391,7 +400,7 @@ internal static partial class BackendMessageOperations
                 : new(
                     instance,
                     challenge.Id,
-                    challenge.Mode,
+                    null,
                     challenge.Definition,
                     null,
                     null);
@@ -471,12 +480,12 @@ internal static partial class BackendMessageOperations
     private sealed record RuntimeDispatchTarget(
         RuntimeInstance Instance,
         Guid ChallengeId,
-        GameMode Mode,
+        GameMode? Mode,
         ChallengeDefinition? Definition,
         CompetitionModeConfiguration? CompetitionConfiguration,
         CompetitionChallengeRules? Rules);
 
-    private static bool IsPatchVerificationTarget(RuntimePurpose purpose) =>
-        purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget;
+    private static bool IsFixTarget(RuntimePurpose purpose) =>
+        purpose is RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget;
 
 }

@@ -10,7 +10,7 @@ const administrationDomains: readonly LocaleDomain[] = [
   'runtime',
   'writeups',
   'live-solo',
-  'theory',
+  'questionnaires',
 ]
 
 /** Maps routes to feature catalogs without coupling individual views to loading. */
@@ -21,7 +21,7 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
   // The account panel belongs to the global application shell and can open on
   // every route, so its catalog must be ready before the shell renders.
   const domains = new Set<LocaleDomain>(['account'])
-  if (path.includes('/theory')) domains.add('theory')
+  if (path.includes('/questionnaires')) domains.add('questionnaires')
   if (path === '/') domains.add('live-solo')
   if (path.startsWith('/competitions')) {
     domains.add('competitions')
@@ -38,7 +38,6 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
     domains.add('runtime')
   if (path.includes('/leaderboard')) {
     domains.add('leaderboard')
-    domains.add('theory')
     domains.add('writeups')
   }
   if (path.includes('/notifications') || path.includes('/questions') || path === '/notifications')

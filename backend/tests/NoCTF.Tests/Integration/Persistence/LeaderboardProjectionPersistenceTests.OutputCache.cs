@@ -1,4 +1,5 @@
 using System.Net;
+using NoCTF.Domain.Challenges;
 using System.IO.Compression;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -83,8 +84,8 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         var now = DateTimeOffset.UtcNow;
         var owner = CreateUser(now);
         var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
-        fixture.CompetitionChallenge.Rules!.HasScoreCurve = true;
-        fixture.CompetitionChallenge.Rules.ScoreCurve = new()
+        ((CtfCompetitionChallengeRules)fixture.CompetitionChallenge.Rules!).HasScoreCurve = true;
+        ((CtfCompetitionChallengeRules)fixture.CompetitionChallenge.Rules!).ScoreCurve = new()
             { InitialPoints = 100, MinimumPoints = 100, DecayTeamCount = 10, DecayMode = PersistedScoreDecayMode.Fixed };
         fixture.Facts[0].Result = GameplayFactResult.Correct;
         db.Users.Add(owner); db.Competitions.Add(fixture.Competition); db.Challenges.Add(fixture.Challenge);
@@ -123,6 +124,7 @@ public sealed partial class LeaderboardProjectionPersistenceTests
         builder.Services.AddSingleton<IBackendMessagePublisher>(new WolverineBackendMessagePublisher(bus));
         builder.Services.AddScoped<ILeaderboardCache>(services => Cache(services.GetRequiredService<NoCtfDbContext>()));
         builder.Services.AddScoped<ILeaderboardSnapshotFactory>(services => (ILeaderboardSnapshotFactory)services.GetRequiredService<ILeaderboardCache>());
+        builder.Services.AddScoped<ReadScoreboardAudience>();
         builder.Services.AddNoCtfStaticAssetDelivery();
         builder.Services.AddNoCtfLeaderboardOutputCaching();
         builder.Services.AddFastEndpoints(discovery =>

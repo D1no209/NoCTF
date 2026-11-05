@@ -31,7 +31,7 @@ public sealed class RuntimeFlagReader(NoCtfDbContext db) : IRuntimeFlagReader
                 && flag.CompetitionChallengeId == null && flag.TeamId == null
                 && flag.SpecificationKind == SpecificationKind.RuntimeInstance && flag.SpecificationId == runtime.Id);
         }
-        else if (runtime.Purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
+        else if (runtime.Purpose is RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget
             || runtime.CompetitionChallengeId is null)
             return new([], 0);
         else
@@ -39,7 +39,7 @@ public sealed class RuntimeFlagReader(NoCtfDbContext db) : IRuntimeFlagReader
             var scope = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
                 .Where(item => item.Id == runtime.CompetitionChallengeId && item.CompetitionId == runtime.CompetitionId)
                 .Join(db.Challenges.IgnoreQueryFilters(), item => item.ChallengeId, template => template.Id,
-                    (item, template) => new { item.ChallengeId, template.Mode }).SingleOrDefaultAsync(ct);
+                    (item, template) => new { item.ChallengeId, item.Mode }).SingleOrDefaultAsync(ct);
             if (scope is null || scope.Mode == GameMode.Koh) return new([], 0);
             var start = runtime.RunningAt ?? runtime.CreatedAt;
             var end = runtime.StoppedAt ?? query.Now;

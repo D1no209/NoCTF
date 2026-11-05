@@ -3,17 +3,16 @@ import { message as describeMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
-import { requestAwdpDefenseTargetEndpoint, requestPatchVerificationTargetEndpoint, uploadPatchEndpoint, uploadPatchVerificationEndpoint } from '../../api'
-import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse, NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode, NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol } from '../../api'
+import { requestAwdpDefenseTargetEndpoint, uploadPatchEndpoint } from '../../api'
+import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol } from '../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 /** Owns state, effects and commands for FixSubmit. */
 export function useFixSubmit(props: Readonly<{
   competitionId: string
   competitionChallengeId: string
-  defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse
+  defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse
   timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
-  ctfPatchVerification?: boolean
 }>,
 emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []): void }) {
   const { request: requestHumanVerification } = useHumanVerification()
@@ -40,35 +39,8 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     DefenseTargetConsumed: "common.fixSubmit.description.oneShotDefenseVerification.environmentAlreadyFix",
   }
 
-  const patchRequestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol, string> = {
-    PatchVerificationNotAvailable: 'common.fixSubmit.description.competitionTeamChallengeCurrently',
-    ExperimentalFeatureDisabled: 'common.label.patchVerificationDisabled',
-    ActiveTargetExists: 'common.fixSubmit.description.oneShotDefenseVerification',
-    PatchAlreadyVerified: 'common.fixSubmit.description.fixAlreadySucceededFurther',
-    PatchAttemptsExhausted: 'common.fixSubmit.description.challengeSFixAttempts',
-    RuntimeQuotaExceeded: 'common.label.teamRuntimeQuotaReached',
-    InvalidRuntimeConfiguration: 'common.fixSubmit.description.oneShotDefenseVerification.useFixSubmit',
-    TargetConcurrency: 'common.fixSubmit.description.defenseVerificationStateChanged',
-  }
-
-  const patchUploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode, string> = {
-    ArchiveStreamNotSeekable: 'common.fixSubmit.validation.fixArchiveFormat',
-    ArchiveTooLarge: 'common.label.patchArchiveTooLarge',
-    ArchiveInvalid: 'common.fixSubmit.error.fixArchiveUploadInvalid',
-    TargetNotReady: 'common.fixSubmit.description.oneShotDefenseVerification.verificationEnvironmentExpired',
-    PatchAlreadyVerified: 'common.fixSubmit.description.fixAlreadySucceededFurther',
-    AttemptsExhausted: 'common.fixSubmit.description.challengeSFixAttempts',
-    TargetConsumed: 'common.fixSubmit.description.oneShotDefenseVerification.environmentAlreadyFix',
-    UploadConflict: 'common.fixSubmit.description.defenseVerificationStateChanged',
-  }
-
-  const verificationState = computed(() => props.ctfPatchVerification
-    ? (props.defense as NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse | undefined)?.verificationState
-    : (props.defense as NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | undefined)?.state)
-
-  const hasGameplayFact = computed(() => props.ctfPatchVerification
-    ? verificationState.value != null
-    : Boolean((props.defense as NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | undefined)?.gameplayFactId))
+  const verificationState = computed(() => props.defense?.state)
+  const hasGameplayFact = computed(() => Boolean(props.defense?.gameplayFactId))
 
   const runtimeActive = computed(() => {
     const state = props.defense?.runtimeState
@@ -106,10 +78,7 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     props.defense?.runtimeState === 'Stopped' && hasGameplayFact.value,
   )
 
-  const canRequest = computed(() => !submissionsClosed.value && !runtimeActive.value
-    && (!props.ctfPatchVerification
-      || ((props.defense as NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse | undefined)?.verificationResult !== 'Correct'
-        && ((props.defense as NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse | undefined)?.remainingAttempts ?? 1) > 0)))
+  const canRequest = computed(() => !submissionsClosed.value && !runtimeActive.value)
 
   function protocolCode<T extends string>(error: unknown): T | null {
     if (!error || typeof error !== 'object' || !('code' in error)) return null
@@ -135,15 +104,10 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
         signal: AbortSignal.timeout(30_000),
         path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
       }
-      const { data, error } = props.ctfPatchVerification
-        ? await requestPatchVerificationTargetEndpoint(options)
-        : await requestAwdpDefenseTargetEndpoint(options)
+      const { data, error } = await requestAwdpDefenseTargetEndpoint(options)
       if (error || !data?.runtimeInstanceId) {
-        const code = protocolCode<NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol
-          | NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol>(error)
-        const label = props.ctfPatchVerification
-          ? patchRequestFailureLabels[code as NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol]
-          : requestFailureLabels[code as NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol]
+        const code = protocolCode<NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol>(error)
+        const label = code ? requestFailureLabels[code] : null
         toast.error(label ? translate(label) : parseApiError(error, describeMessage("challenges.fixSubmit.error.defenseVerificationEnvironmentFailed")).displayMessage)
         return
       }
@@ -175,15 +139,10 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
         },
         body: { file: file.value },
       }
-      const { data, error } = props.ctfPatchVerification
-        ? await uploadPatchVerificationEndpoint(options)
-        : await uploadPatchEndpoint(options)
+      const { data, error } = await uploadPatchEndpoint(options)
       if (error || !data?.gameplayFactId) {
-        const code = protocolCode<NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol
-          | NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode>(error)
-        const label = props.ctfPatchVerification
-          ? patchUploadFailureLabels[code as NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode]
-          : uploadFailureLabels[code as NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol]
+        const code = protocolCode<NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol>(error)
+        const label = code ? uploadFailureLabels[code] : null
         toast.error(label ? translate(label) : parseApiError(error, describeMessage("challenges.error.fixUploadFailed")).displayMessage)
         return
       }

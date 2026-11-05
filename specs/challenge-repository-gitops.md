@@ -30,8 +30,8 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 - 不引入仓库专用密钥体系或仓库专用身份；
 - GitHub Repository Secret 中只保存管理员为 Bot 用户签发的普通 Access JWT；
 - Bot 和自然人都是 `User`，使用相同的角色、比赛权限、题库权限和授权路径；
-- Challenge 与且只与一种 `GameMode` 绑定；
-- Challenge 管理 provider-neutral Runtime、Checker 和动态 Flag 注入定义；
+- Challenge 多选 Break、Fix、Check、Control、Questionnaire 能力，不保存 `GameMode`；
+- Challenge 管理 Runtime 构造与各项能力配置；分配、Flag 生命周期和能力编排由比赛规则决定；
 - CompetitionChallenge 管理本场比赛的可选展示名称、分值、顺序、发布状态、Hint 和模式规则；展示名称为空时使用 Challenge 模板标题；
 - Competition 和 Challenge 都不关心平台部署使用 Docker 还是 Kubernetes；
 - Manifest 中禁止出现 `provider`、`runnerPool`、Docker host port、Kubernetes namespace、Ingress 等部署字段；
@@ -45,7 +45,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 
 NoCTF 题目模型分为两个层次：
 
-- `Challenge` 是全局题库模板，绑定一种 GameMode，拥有标题、题面、方向、可见性、模板附件、模板静态 Flag、Runtime、Checker 和动态 Flag 注入定义；
+- `Challenge` 是全局题库模板，拥有标题、题面、方向、可见性、附件、可选 Runtime 和多项能力定义；同一模板可被不同兼容模式引用；
 - `CompetitionChallenge` 是某场比赛对 Challenge 的一次引用，拥有可选比赛内展示名称、比赛内排序、发布状态、Rules 和 Hint；比赛内展示名称不会修改 Challenge 模板标题，分值完全由模式规则决定。
 
 仓库协议与领域模型直接对应：
@@ -68,7 +68,7 @@ competition.yml.challenges[]     -> CompetitionChallenge
 - Challenge ID 全仓库唯一；
 - CompetitionChallenge ID 唯一；
 - 同一个 Challenge ID 在 `competition.yml` 中最多引用一次；
-- Challenge Mode 与 Competition Mode 完全相同；
+- 模板能力与所选比赛规则兼容，规则分支与 Competition Mode 一致；
 - 路径中的 direction 与 `challenge.yml.direction` 规范化后相符。
 
 ## 仓库结构
@@ -259,7 +259,7 @@ Issue Form 至少收集：
 - 题目标题；
 - Direction；
 - slug；
-- GameMode；
+- 可多选的题目能力；
 - Runtime 类型：None 或 Container（一个或多个命名服务）；
 - 初始 Order；
 - 题目负责人；
@@ -280,7 +280,7 @@ slug 只允许小写 ASCII 字母、数字和单个连字符，不能以连字�
 - 分支不存在；
 - 目录不存在；
 - slug 在该 direction 下没有重复；
-- GameMode 是 CTF、AWD、AWDP、KoH 之一；
+- 能力来自 Break、Fix、Check、Control、Questionnaire，配置完整且没有重复；
 - Order 与模式专属计分规则合法；
 - Issue 创建者是允许创建题目的仓库成员。
 
@@ -350,7 +350,11 @@ apiVersion: gitops.noctf.dev/v1
 kind: ChallengeTemplate
 
 id: 8c219fcc-b5cb-48d1-ab45-52333b984f87
-mode: Ctf
+definition:
+  runtime: null
+  capabilities:
+    - kind: Break
+      break: {}
 
 title: SQL Notes
 direction: Web
@@ -403,12 +407,13 @@ challenges:
         publishedAt: null
 
     rules:
-      schemaVersion: 2
+      mode: Ctf
+      ctf: {}
 ```
 
 `competition.yml` 是 CompetitionChallenge 的完整期望集合。它不能覆盖：
 
-- Challenge Mode；
+- Challenge 能力集合及技术定义；
 - Runtime；
 - Checker；
 - Flag 生成；
@@ -418,247 +423,210 @@ challenges:
 - provider；
 - runner pool。
 
-仓库脚本把 `challenge.yml` 中 Mode 对应的运行字段转换为 canonical `Challenge.DefinitionJson`，把 `competition.yml.rules` 转换为 canonical `CompetitionChallenge.RulesJson`。
+仓库脚本将 `challenge.yml.definition` 映射到生成 SDK 的强类型能力契约，将 `competition.yml.rules` 映射到对应比赛模式规则。请求直接发送结构化定义和规则，不持久化配置 JSON 或 schemaVersion。部署前检查所需能力、Runtime、目标服务和 Flag 签发方式。
 
-## 四种 Mode 的 Challenge Definition
+## Challenge 能力与运行定义
 
-Manifest 必须按 `mode` 使用判别联合。不能创建一个包含所有可选字段的通用大对象。
+Manifest 的 `definition.capabilities` 是可多选的强类型集合，每项 Kind 只允许相应的配置分支。Runtime 在同一题目的能力之间共享。比赛模式保存在 `competition.yml`，按所需能力选择模板；同一份 Break、Fix、Check 模板可部署到 CTF 和 AWDP。
 
-### CTF
+### Break 与 Container
 
-CTF Challenge 可以是纯静态题，也可以有 PerTeam Container/Compose Runtime。
-
-静态题：
+静态题声明 Break，并配置模板 Flag 或附件绑定 Flag：
 
 ```yaml
-mode: Ctf
-
+definition:
+  runtime: null
+  capabilities:
+    - kind: Break
+      break: {}
 flags:
   - id: 15aa869b-c796-40e1-9d5e-80809277913f
     value: flag{plain_text_flag}
 ```
 
-动态 Container：
+动态环境示例中的 build 引用由仓库脚本解析为最终镜像字符串，再发送 API：
 
 ```yaml
-mode: Ctf
 build:
   images:
-  - key: runtime
-    context: runtime
-    dockerfile: runtime/Dockerfile
-    target: runtime
-    platforms:
-    - linux/amd64
-runtime:
-  allocation: PerTeam
-  flagSource: PerTeam
-  definition:
+    - key: runtime
+      context: runtime
+      dockerfile: runtime/Dockerfile
+      platforms: [linux/amd64]
+definition:
+  runtime:
     kind: Container
-    image:
-      build: runtime
-    command: []
-    environment: {}
-    flagEnvironmentVariableName: FLAG
-  limits:
-    memoryBytes: 268435456
-    nanoCpus: 500000000
-    pidsLimit: 128
-  endpoints:
-  - name: web
-    protocol: Http
-    containerPort: 8080
-    exposure: OwnerOnly
+    container:
+      services:
+        - name: web
+          image: {build: runtime}
+          cpuCores: 0.5
+          memoryMiB: 256
+          command: []
+          arguments: []
+          environment: {}
+          internalPorts: [8080]
+    urlBindings:
+      - serviceName: web
+        urlTemplate: "http://{HOST}:{PORT}"
+        containerPort: 8080
+        exposure: OwnerOnly
+  capabilities:
+    - kind: Break
+      break:
+        environmentTargets:
+          - serviceName: web
+            variableName: FLAG
 ```
 
-CTF 不允许 Checker。仓库脚本根据逻辑 endpoint 生成 NoCTF 当前 Runtime Definition 所需的动态公开端口配置，题目作者不填写 host port。
-
-CTF 的计分曲线、血奖、最大尝试次数、错误提交惩罚等只放在 `competition.yml.rules`。
-
-### AWD
-
-AWD Challenge Definition 管理：
-
-- PerTeam Container 或 Compose Runtime；
-- Flag injection；
-- Checker one-shot Job。
-
-Container 示例：
-
-```yaml
-mode: Awd
-build:
-  images:
-  - key: runtime
-    context: runtime
-    dockerfile: runtime/Dockerfile
-    platforms:
-    - linux/amd64
-  - key: checker
-    context: checker
-    dockerfile: checker/Dockerfile
-    platforms:
-    - linux/amd64
-runtime:
-  allocation: PerTeam
-  flagSource: AwdRotation
-  definition:
-    kind: Container
-    image:
-      build: runtime
-  limits:
-    memoryBytes: 536870912
-    nanoCpus: 1000000000
-    pidsLimit: 256
-flagInjection:
-  command: /app/set-flag '${FLAG}'
-  timeoutSeconds: 30
-checker:
-  job:
-    image:
-      build: checker
-    command: []
-    environment: {}
-    timeoutSeconds: 30
-```
-
-AWD Container Checker 不配置目标 URL、目标 host 或目标 port。Runner 把 Checker 加入目标 Runtime 的内部网络并注入内部目标 host；Checker 自己知道服务协议和端口。
-
-Compose 只额外配置内部目标 service：
-
-```yaml
-checker:
-  targetServiceName: web
-  job:
-    image:
-      build: checker
-    timeoutSeconds: 30
-```
-
-Checker 通过平台指定的 Internal API 回报状态，不能用进程退出码表达 Up/Down：
-
-- 正常回报 Up 或 Down：使用最后一次有效回报；
-- 正常退出但未回报：`Unknown`；
-- 非零异常退出：`CheckerAbnormalExit`；
-- 超时：`CheckerTimedOut`；
-- 后写的同一执行序列结果覆盖先写结果。
-
-Checker interval、攻击计分、防守计分、轮次和 AWD 轮换 Flag 模板等放在 `competition.yml.rules`。
+CTF 只调用 Break。其每队分配、Flag 签发、时长、计分曲线、血奖、次数和错误惩罚由比赛规则决定。作者填写内部端口及逻辑访问入口，Docker host port 由平台随机分配。
 
 ```yaml
 rules:
-  schemaVersion: 4
-  flagTemplate:
-    header: flag
-    bodyTemplate: "[TEAMHASH:32]"
-    leetLiteralText: false
+  mode: Ctf
+  ctf:
+    runtime:
+      allocation: PerTeam
+      flagSource: PerTeam
+      ttlSeconds: 3600
 ```
 
-### AWDP
+### Break 与 Check
 
-AWDP Challenge Definition 管理：
-
-- 队伍攻击实例使用的 PerTeam Container Runtime；
-- 一次性 Fix target 复用同一 target 定义，但不公开 Player endpoint；
-- Patch 入口和执行限制；
-- Checker one-shot Job。
+AWD 要求 Break、Check，可按比赛规则启用 Fix。Runtime 使用 1–64 个命名服务；Check 明确指定服务，不推断单服务目标。Flag 存储和投放技术配置属于 Break：
 
 ```yaml
-mode: Awdp
+definition:
+  runtime:
+    kind: Container
+    container:
+      services:
+        - name: web
+          image: {build: runtime}
+          cpuCores: 1
+          memoryMiB: 512
+          internalPorts: [8080]
+  capabilities:
+    - kind: Break
+      break:
+        flagStores:
+          - id: a09bd178-c16c-4621-aadb-d7fcd7f4f336
+            name: main
+            delivery: RunnerCommand
+            targetServiceName: web
+            injectionCommand: /app/set-flag '${FLAG}'
+            injectionTimeoutSeconds: 30
+            preservesHistoricalFlags: false
+    - kind: Check
+      check:
+        checker:
+          image: {build: checker}
+          targetServiceName: web
+          command: []
+          environment: {}
+          timeoutSeconds: 30
+        readyTimeoutSeconds: 30
+        requirements: [Connection, Functionality, FlagWrite, CurrentFlagRead]
+        acceptsFixInput: false
+```
+
+build.images 分别声明 runtime 和 checker 的构建上下文。Runner 注入内部服务访问及回调配置，作者实现服务协议、探针和投放脚本。Check 返回服务、功能、漏洞或 Flag 读写证据，服务端确定本次要求。缺失证据或无有效回调属于平台失败；相同结果重复投递保持幂等，冲突结果拒绝覆盖。
+
+AWD 的轮次、健康结算、历史 Flag 义务、维护窗口、攻击及防守计分由比赛编排解释。启用 `allowFixSubmissions` 时，Fix 应用到本队持久 Runtime，部分修改及失败状态保留；比赛不会额外产生 Fix 得分。
+
+### Break、Fix 与 Check
+
+AWDP 使用 Break 和独立验证环境中的 Fix→Check。LiveSolo 可为每道题选择同一修补完成方式。模板可同时提供这些能力：
+
+```yaml
 build:
   images:
-  - key: target
-    context: runtime
-    dockerfile: runtime/Dockerfile
-    platforms:
-    - linux/amd64
-  - key: checker
-    context: checker
-    dockerfile: checker/Dockerfile
-    platforms:
-    - linux/amd64
-runtime:
-  allocation: PerTeam
-  flagSource: PerTeam
-  definition:
+    - key: target
+      context: runtime
+      dockerfile: runtime/Dockerfile
+      platforms: [linux/amd64]
+    - key: checker
+      context: checker
+      dockerfile: checker/Dockerfile
+      platforms: [linux/amd64]
+definition:
+  runtime:
     kind: Container
-    image:
-      build: target
-    flagEnvironmentVariableName: FLAG
-    internalPorts:
-    - 8080
-  limits:
-    memoryBytes: 536870912
-    nanoCpus: 1000000000
-    pidsLimit: 256
-  endpoints:
-  - name: web
-    protocol: Http
-    containerPort: 8080
-    exposure: OwnerOnly
-patch:
-  entrypoint: fix.sh
-  command: []
-  timeoutSeconds: 60
-  readyTimeoutSeconds: 30
-checker:
-  image:
-    build: checker
-  command: []
-  environment: {}
-  timeoutSeconds: 30
+    container:
+      services:
+        - name: web
+          image: {build: target}
+          cpuCores: 1
+          memoryMiB: 512
+          internalPorts: [8080]
+    urlBindings:
+      - serviceName: web
+        urlTemplate: "http://{HOST}:{PORT}"
+        containerPort: 8080
+        exposure: OwnerOnly
+  capabilities:
+    - kind: Break
+      break:
+        environmentTargets: [{serviceName: web, variableName: FLAG}]
+    - kind: Fix
+      fix:
+        targetServiceName: web
+        entrypoint: fix.sh
+        command: []
+        timeoutSeconds: 60
+        maximumUploadBytes: 268435456
+    - kind: Check
+      check:
+        checker:
+          image: {build: checker}
+          targetServiceName: web
+          command: []
+          environment: {}
+          timeoutSeconds: 30
+        readyTimeoutSeconds: 30
+        requirements: [Connection, Functionality, Vulnerability]
+        acceptsFixInput: false
 ```
 
-AWDP 只允许 Container Runtime。Player / AwdpAttack Runtime 可以声明 OwnerOnly endpoint 供本队攻击使用；一次性 Fix target 忽略公开 endpoint，只通过内部网络给 Checker 访问。定义中必须声明且只声明一个 `internalPort`。Checker 不配置目标 URL/host/port；Runner 根据一次性 target 的唯一 internal port 建立内部访问。
+修补要求 Container Runtime。独立验证目标复用构造定义并使用干净环境，不开放攻击入口。Fix 与 Check 可指定不同的命名服务；内部端口可为多个，Checker 通过明确的服务访问信息执行。修补包不会获得 Checker 凭据。只有 Check 明确允许时，修补包才作为不可信检查输入提供。
 
-Break/Fix 分值、尝试次数、惩罚、轮次结算方式、调度方式和 AWDP Break Flag 模板放在 `competition.yml.rules`。
+AWDP 的前置 Break、独立次数、计分和扣分由比赛规则决定，默认 Break 和 Fix 各十次、要求先 Break。验证成功必须同时满足修补完成及必要检查通过。LiveSolo 的正式受理发生在完整上传校验以后，后续按 AdmissionSequence 裁定。
+
+### Control
+
+Control 声明读取协议和目标入口。KoH 的共享分配、轮询与收益属于比赛规则：
 
 ```yaml
-rules:
-  schemaVersion: 4
-  flagTemplate:
-    header: flag
-    bodyTemplate: "[GUID]"
-    leetLiteralText: false
-```
-
-### KoH
-
-KoH Challenge 使用 Shared Runtime：
-
-```yaml
-mode: Koh
-build:
-  images:
-  - key: hill
-    context: runtime
-    dockerfile: runtime/Dockerfile
-    platforms:
-    - linux/amd64
-runtime:
-  allocation: Shared
-  definition:
+definition:
+  runtime:
     kind: Container
-    image:
-      build: hill
-  limits:
-    memoryBytes: 536870912
-    nanoCpus: 1000000000
-    pidsLimit: 256
-  endpoints:
-  - name: public
-    protocol: Http
-    containerPort: 8080
-    exposure: Participants
-  controlCheck:
-    protocol: Http
-    containerPort: 8080
-    path: /flag
+    container:
+      services:
+        - name: hill
+          image: {build: hill}
+          cpuCores: 1
+          memoryMiB: 512
+          internalPorts: [8080]
+    urlBindings:
+      - serviceName: hill
+        urlTemplate: "http://{HOST}:{PORT}"
+        containerPort: 8080
+        exposure: Participants
+  capabilities:
+    - kind: Control
+      control:
+        protocol: HttpTeamIdentifier
+        serviceName: hill
+        containerPort: 8080
+        urlTemplate: "http://{HOST}:{PORT}/flag"
+        timeoutSeconds: 5
 ```
 
-KoH 没有独立 Checker Job。NoCTF Worker 通过 Shared Runtime 的 Control Check binding 轮询。Control Flag 由平台生成，不进入仓库。
+Control 返回控制者、明确无人控制或无法确定；KoH 将控制标识映射到本比赛有效队伍。无法确定时不延续推测收益。动态控制标识由平台签发，不写入仓库。
 
-轮询间隔和每次控制得分放在 `competition.yml.rules`。
+### Questionnaire
+
+Questionnaire 在同一个 Challenge 中保存整份多题问卷，包含小题、选项、解析、分类和不可变 FileId。内容通过题库 API 管理。独立考试和练习引用真实 Challenge 及内容版本，发布时固定候选版本，发卷时固定实际分配和顺序。Questionnaire 不进入比赛题目清单。活动与试卷契约见 [Questionnaire](questionnaire.md)。
 
 ## Docker 构建模型
 
@@ -688,9 +656,9 @@ build:
 - 未由仓库构建的外部镜像必须使用 digest；
 - Runtime、命名服务 和 Checker 共用相同 build key 解析机制。
 
-### Compose 源文件
+### 命名服务构建引用
 
-仓库中的 Compose 是源模板，可以不写最终 `image`，但禁止直接把 `build:` 交给 NoCTF：
+每个 Container Runtime 包含 1–64 个命名服务。仓库脚本在请求 API 前将各服务及 Checker 的 build 引用解析为最终镜像字符串：
 
 ```yaml
 build:
@@ -702,29 +670,39 @@ build:
       context: runtime/proxy
       dockerfile: runtime/proxy/Dockerfile
 
-runtime:
-  allocation: PerTeam
-  definition:
-    kind: Compose
-    file: runtime/compose.yml
-    serviceImages:
-      web:
-        build: web
-      proxy:
-        build: proxy
-      redis:
-        external: redis@sha256:...
+definition:
+  runtime:
+    kind: Container
+    container:
+      services:
+        - name: web
+          image: {build: web}
+          cpuCores: 0.5
+          memoryMiB: 256
+          internalPorts: [8080]
+        - name: proxy
+          image: {build: proxy}
+          cpuCores: 0.25
+          memoryMiB: 128
+          internalPorts: [80]
+    urlBindings:
+      - serviceName: proxy
+        containerPort: 80
+        urlTemplate: "http://{HOST}:{PORT}"
+        exposure: OwnerOnly
+  capabilities:
+    - kind: Break
+      break: {}
 ```
 
 Action：
 
-1. 读取 `runtime/compose.yml`；
-2. 校验 `serviceImages` 与 命名服务s 一一匹配；
-3. 将 build key 替换为本次构建得到的 digest；
-4. 将 external digest 注入对应 service；
-5. 删除任何仓库构建字段；
-6. 生成 NoCTF `ComposeRuntimeDefinition.ComposeYaml`；
-7. 再执行 NoCTF 当前 Compose policy 等价校验。
+1. 读取完整的命名服务列表、访问入口及能力配置；
+2. 校验服务名称唯一，Fix、Check、Control 和 Break 注入引用真实服务；
+3. 校验每个 build key 在 build.images 中存在；
+4. 将构建引用替换为选定 Registry 的最终 digest，并保留明确的外部镜像引用；
+5. 删除仓库构建元数据，生成强类型 Challenge Definition 请求；
+6. 校验资源、端口、入口和能力组合，并执行题目自测。
 
 最终发送给 NoCTF 的每个 命名服务 都有明确、不可变的 `image: registry/...@sha256:...`。
 
@@ -770,7 +748,7 @@ git diff --name-status -z
 - `challenge.yml` 修改：构建该 Challenge 的全部 images；
 - Dockerfile 修改：构建对应 image；
 - image context 内文件修改：构建对应 image；
-- Compose 文件修改：重新物化 Definition；只有 context 同时变化时才重建镜像；
+- 命名服务或能力配置修改：重新生成 Definition；构建上下文变化时才重建对应镜像；
 - Checker context 修改：只重建 Checker image；
 - statement、solution 和普通附件修改：不重建镜像；
 - `competition.yml` 修改：只应用 CompetitionChallenge；
@@ -795,7 +773,7 @@ git diff --name-status -z
 }
 ```
 
-Matrix 以 image 为粒度，因此一个 Compose Challenge 的多个 service 和 Checker 可以并行构建。
+Matrix 以 image 为粒度，同一题目的多个命名服务和 Checker 可以并行构建。
 
 ## Registry 配置
 
@@ -904,9 +882,9 @@ image-map-web-sql-notes-runtime
 
 ### 未变化镜像的解析
 
-最终 Challenge Definition 必须完整，但一次提交可能只重建一个 image。例如只修改 AWD Checker 时，不应该同时重建 Runtime；只修改 Compose 配置时，也可能没有任何新镜像。
+最终 Challenge Definition 必须完整，但一次提交可能只重建一个 image。例如只修改 Checker 的构建上下文时，只重建对应镜像；修改命名服务及能力配置时，也可能没有新镜像。
 
-仓库脚本按以下优先级解析每个 `image.build` 或 Compose `serviceImages.build`：
+仓库脚本按以下优先级解析服务及 Checker 中的每个 `image.build`：
 
 1. 本次 workflow 的 image-map 中有该 build key：使用本次新 digest；
 2. 该 Challenge 已存在且对应 Definition 字段仍由同一个 build key 表示：从 NoCTF 当前 Challenge Definition 复用现有 digest；
@@ -915,9 +893,8 @@ image-map-web-sql-notes-runtime
 
 对应关系由当前 Manifest 结构决定：
 
-- Container `runtime.definition.image.build` 对应当前 Container image；
-- Checker `image.build` 对应当前 Checker image；
-- Compose `serviceImages.<service>.build` 对应当前 ComposeYaml 中该 service 的 image。
+- `definition.runtime.container.services[].image.build` 按服务名称对应当前服务镜像；
+- `definition.capabilities[].check.checker.image.build` 对应 Check 能力的 Checker 镜像。
 
 PR 不访问 NoCTF。PR 校验使用明确的本地占位 digest 物化完整 Definition，仅验证结构；main apply 才读取平台当前 Definition 并解析真实未变化 digest。
 
@@ -1024,19 +1001,19 @@ PR 必须检查：
 - 所有实体 UUID；
 - Challenge、CompetitionChallenge、Attachment、Flag、Hint ID 唯一性；
 - direction/slug 与目录；
-- Competition Mode 与 Challenge Mode；
-- Mode 判别联合；
+- 比赛规则要求的能力与题库能力兼容性；
+- 能力 Kind 与唯一配置分支、比赛模式与规则分支；
 - Challenge Definition 与 CompetitionChallenge Rules 边界；
 - 题面和附件路径；
 - Attachment ID 与内容不可变规则；
 - 静态 Flag 及 specification 引用；
 - build key、context、Dockerfile 和 target；
 - 外部镜像必须使用 digest；
-- Container/Compose Runtime 约束；
+- Container 命名服务和可选 OVA Runtime 约束；
 - 命名服务 image 物化结果；
 - AWD Checker 不声明目标 URL/port；
-- AWDP 唯一 internal port；
-- KoH Shared Runtime 和 Control Check；
+- Fix 与 Check 的目标服务、有效内部端口及证据要求；
+- KoH 的共享分配规则和 Control 入口；
 - Docker build；
 - 题目 `tests/`；
 - `competition.yml` 的 Order、模式专属计分规则、发布状态和 Hint。
@@ -1371,7 +1348,7 @@ Pause 停止相应调度；Resume 后继续，不补跑暂停期间错过的 Che
 - `.github/**`；
 - `competition.yml`；
 - Challenge ID 或 CompetitionChallenge ID；
-- GameMode；
+- 比赛模式或题目能力集合；
 - build/Registry 解析逻辑；
 - published；
 - Rules。
@@ -1429,7 +1406,7 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 
 ## 比赛仓库模板需要提供
 
-首版仓库模板至少包含：
+仓库模板包含：
 
 - Issue Form；
 - Scaffold Action；
@@ -1440,7 +1417,7 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 - CTF 静态题示例；
 - CTF Container 示例；
 - AWD Container 示例；
-- AWD Compose 示例；
+- 多服务 Runtime 示例；
 - AWDP 示例；
 - KoH 示例；
 - GHCR 配置说明；
@@ -1465,9 +1442,9 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 
 - 纯静态题无需 Docker 也能通过；
 - 修改一个 Runtime context 只构建对应镜像；
-- Compose 与 Checker 多镜像形成独立 matrix；
+- 命名服务与 Checker 的镜像形成独立 matrix；
 - PR 不读取 NoCTF 或 Registry Secret；
-- Mode、Definition/Rules 和内部网络边界得到校验。
+- 能力配置、比赛规则兼容性和内部网络边界得到校验。
 
 ### main
 
@@ -1497,12 +1474,12 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 1. 完成 Bot User、管理员创建和指定时长 Token 签发；
 2. 让普通 Create API 支持 Manifest 提供的稳定 UUID；
 3. 补齐普通 API 的删除状态和 Attachment hash；
-4. 建立比赛仓库模板和四种 Mode 的 Manifest schema；
+4. 建立比赛仓库模板、能力 Manifest 和模式规则 schema；
 5. 实现 Issue Form 与 Scaffold Action；
 6. 实现仓库本地 validate/discover/plan/build；
 7. 实现动态 matrix Docker build；
 8. 实现 GHCR 和可选自定义 Registry 推送；
-9. 实现 image-map 收集与 Compose digest 物化；
+9. 实现 image-map 收集与命名服务及 Checker 的 digest 解析；
 10. 实现普通 API apply、重新读取重试和删除顺序；
 11. 补齐 PR/Main GitHub Actions 测试；
 12. 用四种 Mode 的示例比赛完成端到端验收。

@@ -15,7 +15,7 @@ public class NoRawFlagLoggingTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
-            GameplayFactKind.FlagAttempt,
+            GameplayFactKind.BreakAttempt,
             rawFlag,
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(rawFlag)),

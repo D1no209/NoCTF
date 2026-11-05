@@ -6,16 +6,16 @@ public sealed record AwdFlagInjectionSettings(string Command, int TimeoutSeconds
 
 public interface IAwdFlagInjectionConfigurationCatalog
 {
-    AwdFlagInjectionSettings? Get(AwdChallengeDefinition definition);
+    AwdFlagInjectionSettings? Get(ChallengeDefinition definition);
 }
 
 public sealed class AwdFlagInjectionConfigurationCatalog : IAwdFlagInjectionConfigurationCatalog
 {
-    public AwdFlagInjectionSettings? Get(AwdChallengeDefinition definition) =>
-        definition.FlagInjectionCommand is null
+    public AwdFlagInjectionSettings? Get(ChallengeDefinition definition) =>
+        definition.Break?.InjectionCommand is null
             ? null
             : new(
-                definition.FlagInjectionCommand,
-                definition.FlagInjectionTimeoutSeconds ?? 30,
-                definition.FlagInjectionServiceName);
+                definition.Break.InjectionCommand,
+                definition.Break.InjectionTimeoutSeconds,
+                definition.Break.InjectionServiceName);
 }

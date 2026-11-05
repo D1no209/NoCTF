@@ -8,6 +8,8 @@ using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Domain.LiveSolo;
 using NoCTF.GameModes.LiveSolo.Configuration;
+using NoCTF.Application.Challenges.Capabilities;
+using NoCTF.Domain.Challenges.Capabilities;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -28,27 +30,6 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         };
         rules.CompetitionChallengeId = competitionChallengeId;
         return rules;
-    }
-
-    public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid challengeId)
-    {
-        ChallengeDefinition definition = mode switch
-        {
-            GameMode.Ctf => new CtfChallengeDefinition
-            {
-                InteractionKind = CtfInteractionKind.FlagSubmission
-            },
-            GameMode.Awd => new AwdChallengeDefinition(),
-            GameMode.Awdp => new AwdpChallengeDefinition
-            {
-                MaximumPatchUploadBytes = PatchUploadRules.DefaultMaximumArchiveBytes
-            },
-            GameMode.Koh => new KohChallengeDefinition(),
-            GameMode.LiveSolo => new LiveSoloChallengeDefinition(),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
-        };
-        definition.ChallengeId = challengeId;
-        return definition;
     }
 
     public IReadOnlyList<string> Validate(
@@ -77,29 +58,16 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             _ => ["Challenge rules type does not match the competition mode."]
         };
 
-    public IReadOnlyList<string> ValidateDefinition(
-        GameMode mode,
-        ChallengeDefinition definition)
+    public IReadOnlyList<string> ValidateDefinition(ChallengeDefinition definition)
     {
-        if (definition.Mode != mode)
-            return ["Challenge definition type does not match the game mode."];
-        var runtime = TypedGameModeConfiguration.Runtime(definition.Runtime);
-        var errors = ChallengeRuntimeTemplateValidator.Validate(
+        var errors = ChallengeCapabilityValidation.Validate(definition).Select(error => $"{error.Capability}: {error.Code}.").ToList();
+        if (errors.Count > 0) return errors;
+        var runtime = TypedGameModeConfiguration.Runtime(definition);
+        errors.AddRange(ChallengeRuntimeTemplateValidator.Validate(
             runtime,
-            allowControlCheckUrlBinding: mode == GameMode.Koh).ToList();
-        errors.AddRange(definition switch
-        {
-            CtfChallengeDefinition ctf => CtfConfigurationValidator.Validate(
-                TypedGameModeConfiguration.Ctf(ctf)),
-            AwdChallengeDefinition awd => AwdConfigurationValidator.Validate(
-                TypedGameModeConfiguration.Awd(awd)),
-            AwdpChallengeDefinition awdp => AwdpConfigurationValidator.Validate(
-                TypedGameModeConfiguration.Awdp(awdp)),
-            KohChallengeDefinition koh => KohConfigurationValidator.Validate(
-                TypedGameModeConfiguration.Koh(koh)),
-            LiveSoloChallengeDefinition liveSolo => LiveSoloConfigurationValidator.ValidateDefinition(liveSolo),
-            _ => ["Unsupported challenge definition type."]
-        });
+            allowControlCheckUrlBinding: definition.Control is not null));
+        if (definition.Check is not null)
+            errors.AddRange(RunnerJobConfigurationValidator.Validate(TypedGameModeConfiguration.Checker(definition), "Check"));
         return errors;
     }
 
@@ -107,11 +75,11 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         GameMode mode,
         ChallengeDefinition definition)
     {
-        var errors = ValidateDefinition(mode, definition).ToList();
+        var errors = ValidateDefinition(definition).ToList();
         if (errors.Count > 0) return errors;
-        if (definition is KohChallengeDefinition koh)
+        if (mode == GameMode.Koh)
             errors.AddRange(KohConfigurationValidator.ValidateForStart(
-                TypedGameModeConfiguration.Koh(koh)));
+                TypedGameModeConfiguration.Koh(definition)));
         return errors;
     }
 
@@ -127,38 +95,67 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             ? CtfConfigurationValidator.Validate(TypedGameModeConfiguration.Ctf(ctf, scorePreset),
                 TypedGameModeConfiguration.Ctf(competition), eligibleTeamCount)
             : Validate(mode, rules, competitionConfiguration, eligibleTeamCount)).ToList();
-        errors.AddRange(ValidateDefinition(mode, definition));
+        errors.AddRange(ValidateDefinition(definition));
+        var required = RequiredCapabilities(rules);
+        foreach (var capability in required)
+            if (!definition.Capabilities.Any(item => item.Kind == capability))
+                errors.Add($"Required capability {capability} is missing.");
+        if (mode != rules.Mode || mode != competitionConfiguration.Mode)
+            errors.Add("Competition and challenge rules must use the same mode.");
+        if (rules is IChallengeRuntimeRules runtimeRules)
+        {
+            var policy = runtimeRules.Runtime;
+            if (!Enum.IsDefined(policy.Allocation) || !Enum.IsDefined(policy.FlagSource) || policy.TtlSeconds is <= 0 or > 604800)
+                errors.Add("Runtime allocation, Flag issuance or lifetime is invalid.");
+            if (policy.Allocation != (mode == GameMode.Koh ? PersistedRuntimeAllocation.Shared : PersistedRuntimeAllocation.PerTeam))
+                errors.Add("Runtime allocation is incompatible with this competition mode.");
+            var validFlagSource = mode switch
+            {
+                GameMode.Ctf or GameMode.LiveSolo => policy.FlagSource is PersistedRuntimeFlagSource.Static or PersistedRuntimeFlagSource.PerTeam,
+                GameMode.Awd => policy.FlagSource == PersistedRuntimeFlagSource.AwdRotation,
+                GameMode.Awdp => policy.FlagSource == PersistedRuntimeFlagSource.PerTeam,
+                GameMode.Koh => policy.FlagSource == PersistedRuntimeFlagSource.Static,
+                _ => false
+            };
+            if (!validFlagSource) errors.Add("Flag issuance is incompatible with this competition mode.");
+        }
         if (errors.Count > 0) return errors;
+        var effectiveRuntime = TypedGameModeConfiguration.Runtime(definition, rules);
+        errors.AddRange(ChallengeRuntimeTemplateValidator.Validate(effectiveRuntime, mode == GameMode.Koh));
         if (mode == GameMode.Awdp
             && rules is AwdpCompetitionChallengeRules awdpRules
-            && definition is AwdpChallengeDefinition awdpDefinition
             && competitionConfiguration is AwdpCompetitionModeConfiguration awdpCompetition)
         {
             errors.AddRange(AwdpConfigurationValidator.Validate(
                 AwdpConfigurationResolver.Resolve(
                     awdpCompetition,
                     awdpRules,
-                    awdpDefinition),
+                    definition),
                 eligibleTeamCount));
         }
-        if (mode == GameMode.Ctf
-            && rules is CtfCompetitionChallengeRules ctfRules
-            && definition is CtfChallengeDefinition ctfDefinition)
-        {
-            if (ctfDefinition.InteractionKind == CtfInteractionKind.PatchVerification)
-            {
-                if (ctfRules.MaxFlagAttempts is not null)
-                    errors.Add("PatchVerification rules cannot configure MaxFlagAttempts.");
-                if (ctfRules.HasFlagTemplate)
-                    errors.Add("PatchVerification rules cannot configure FlagTemplate.");
-            }
-            else if (ctfRules.MaxPatchAttempts is not null)
-            {
-                errors.Add("FlagSubmission rules cannot configure MaxPatchAttempts.");
-            }
-        }
+        if (mode == GameMode.Ctf) errors.AddRange(CtfConfigurationValidator.Validate(TypedGameModeConfiguration.Ctf(definition) with { Runtime = effectiveRuntime }));
+        if (mode == GameMode.Awd) errors.AddRange(AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(definition) with { Runtime = effectiveRuntime }));
+        if (mode == GameMode.Koh) errors.AddRange(KohConfigurationValidator.Validate(TypedGameModeConfiguration.Koh(definition) with { Runtime = effectiveRuntime }));
+        if (mode == GameMode.LiveSolo) errors.AddRange(LiveSoloConfigurationValidator.ValidateDefinition(definition));
+        if (required.Contains(ChallengeCapabilityKind.Fix) && definition.Check is { } checker
+            && mode is GameMode.Awdp or GameMode.LiveSolo
+            && (!checker.Requirements.Any(item => item.Kind == CheckItemKind.Functionality)
+                || !checker.Requirements.Any(item => item.Kind == CheckItemKind.Vulnerability)))
+            errors.Add("Fix completion requires functionality and vulnerability checks.");
         return errors;
     }
+
+    public static IReadOnlyList<ChallengeCapabilityKind> RequiredCapabilities(CompetitionChallengeRules rules) => rules switch
+    {
+        CtfCompetitionChallengeRules => [ChallengeCapabilityKind.Break],
+        AwdCompetitionChallengeRules { AllowFixSubmissions: true } => [ChallengeCapabilityKind.Break, ChallengeCapabilityKind.Check, ChallengeCapabilityKind.Fix],
+        AwdCompetitionChallengeRules => [ChallengeCapabilityKind.Break, ChallengeCapabilityKind.Check],
+        AwdpCompetitionChallengeRules => [ChallengeCapabilityKind.Break, ChallengeCapabilityKind.Fix, ChallengeCapabilityKind.Check],
+        KohCompetitionChallengeRules => [ChallengeCapabilityKind.Control],
+        LiveSoloCompetitionChallengeRules { CompletionKind: LiveSoloCompletionKind.Break } => [ChallengeCapabilityKind.Break],
+        LiveSoloCompetitionChallengeRules { CompletionKind: LiveSoloCompletionKind.FixAndCheck } => [ChallengeCapabilityKind.Fix, ChallengeCapabilityKind.Check],
+        _ => throw new ArgumentOutOfRangeException(nameof(rules))
+    };
 
     private static IReadOnlyList<string> ValidateAwdpRules(
         AwdpCompetitionChallengeRules rules,

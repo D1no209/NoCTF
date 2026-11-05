@@ -100,7 +100,7 @@ public sealed class UserAccountDeletionPersistenceTests
                     CreatedAt = now.AddHours(-3),
                     UpdatedAt = now
                 });
-                db.Challenges.Add(new CtfChallenge
+                db.Challenges.Add(new Challenge
                 {
                     Id = challengeId,
                     OwnerId = referencedUserId,

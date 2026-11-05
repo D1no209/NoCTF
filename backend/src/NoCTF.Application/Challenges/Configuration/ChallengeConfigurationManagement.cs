@@ -23,7 +23,6 @@ public sealed record ChallengeConfigurationView(
 public interface IChallengeConfigurationCatalog
 {
     CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid competitionChallengeId);
-    ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid challengeId);
 
     IReadOnlyList<string> Validate(
         GameMode mode,
@@ -38,14 +37,12 @@ public interface IChallengeConfigurationCatalog
         int eligibleTeamCount) =>
         Validate(mode, rules, competitionConfiguration, eligibleTeamCount);
 
-    IReadOnlyList<string> ValidateDefinition(
-        GameMode mode,
-        ChallengeDefinition definition);
+    IReadOnlyList<string> ValidateDefinition(ChallengeDefinition definition);
 
     IReadOnlyList<string> ValidateDefinitionForStart(
         GameMode mode,
         ChallengeDefinition definition) =>
-        ValidateDefinition(mode, definition);
+        ValidateDefinition(definition);
 
     IReadOnlyList<string> ValidateRulesForDefinition(
         GameMode mode,

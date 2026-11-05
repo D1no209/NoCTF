@@ -39,11 +39,11 @@ public enum RuntimeStateProtocol
 public enum RuntimePurposeProtocol
 {
     Player,
-    AwdpTarget,
+    FixTarget,
     Practice,
-    AwdpAttack,
+    AttackTarget,
     TemplateTest,
-    PatchVerificationTarget
+    ScopedFixTarget
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeFailureCodeProtocol>))]

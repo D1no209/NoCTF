@@ -13,19 +13,12 @@ using NoCTF.Application.Challenges.Hints;
 using NoCTF.API.Endpoints.Runtime;
 using NoCTF.Domain.Challenges;
 using NoCTF.Application.Challenges.Bank;
-using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Serialization;
 using System.Text.Json.Serialization;
+using NoCTF.Application.Challenges.Actions;
 
 namespace NoCTF.API.Endpoints.Challenges;
-
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<CtfInteractionKindProtocol>))]
-public enum CtfInteractionKindProtocol
-{
-    FlagSubmission,
-    PatchVerification
-}
 
 public sealed record CompetitionChallengeTimingResponse(DateTimeOffset? AutoOpenAt, DateTimeOffset? ScoringEndsAt,
     DateTimeOffset? SubmissionDeadlineAt,
@@ -63,21 +56,22 @@ public sealed record ChallengeResponse(
     bool SolvedByMyTeam = false,
     bool UsesDynamicFlag = false,
     IReadOnlyList<ParticipantChallengeHintResponse>? Hints = null,
-    CtfInteractionKindProtocol InteractionKind = CtfInteractionKindProtocol.FlagSubmission,
-    bool PatchVerificationAvailable = false,
-    int? MaximumPatchAttempts = null,
-    int? AcceptedPatchAttempts = null,
-    int? RemainingPatchAttempts = null,
-    GameplayFactStateProtocol? PatchVerificationState = null,
-    GameplayFactResultProtocol? PatchVerificationResult = null,
-    GameplayFactFailureCodeProtocol? PatchVerificationFailureCode = null,
-    Guid? PatchVerificationRuntimeInstanceId = null,
-    RuntimeStateProtocol? PatchVerificationRuntimeState = null,
     Guid? DirectionId = null,
     string? DirectionIcon = null)
 {
+    public IReadOnlyList<AvailableChallengeActionResponse> AvailableActions { get; init; } = [];
     public CompetitionChallengeTimingResponse? Timing { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
+}
+
+public sealed record AvailableChallengeActionResponse(
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeActionKind>))] ChallengeActionKind Kind,
+    bool Enabled,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeActionAvailability>))] ChallengeActionAvailability Availability,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactAdmissionFailureCode>))] GameplayFactAdmissionFailureCode? AdmissionFailure,
+    Guid? RuntimeInstanceId, int? RemainingAttempts, Guid? GameplayFactId)
+{
+    public string? AdmissionMessageKey => AdmissionFailure is { } failure ? ApiMessages.For(failure).Key : null;
 }
 
 public sealed record ParticipantChallengeHintResponse(
@@ -103,7 +97,6 @@ public sealed record ChallengeSummaryResponse(
     int Order,
     bool IsPublished,
     DateTimeOffset? DeletedAt,
-    CtfInteractionKindProtocol InteractionKind,
     bool Locked = false,
     int PrerequisitesSatisfied = 0,
     int PrerequisitesTotal = 0,
@@ -123,7 +116,6 @@ internal static class ChallengeMapper
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
         FlagAttemptState? attemptState = null,
         IReadOnlyList<ParticipantChallengeHintView>? hints = null,
-        PatchVerificationParticipantState? patchVerification = null,
         HttpRequest? request = null) =>
         new(
             view.Id,
@@ -152,38 +144,12 @@ internal static class ChallengeMapper
             attemptState?.Maximum,
             attemptState?.Accepted,
             attemptState?.Remaining,
-            attemptState?.Solved == true
-                || patchVerification?.VerificationResult == NoCTF.Domain.Gameplay.GameplayFactResult.Correct,
+            attemptState?.Solved == true,
             view.UsesDynamicFlag,
             hints?.Select(hint => new ParticipantChallengeHintResponse(
                 hint.Id, hint.Cost, hint.PublishedAt, hint.Content, hint.IsUnlocked, hint.CanUnlock)).ToArray(),
-            ToProtocol(view.InteractionKind),
-            patchVerification?.Available ?? false,
-            patchVerification?.MaximumAttempts,
-            patchVerification?.AcceptedAttempts,
-            patchVerification?.RemainingAttempts,
-            patchVerification?.VerificationState is { } patchState
-                ? GameplayFactMapper.ToProtocol(patchState)
-                : null,
-            patchVerification?.VerificationResult is { } patchResult
-                ? GameplayFactMapper.ToProtocol(patchResult)
-                : null,
-            patchVerification?.VerificationFailureCode is { } patchFailure
-                ? GameplayFactMapper.ToProtocol(patchFailure)
-                : null,
-            patchVerification?.RuntimeInstanceId,
-            patchVerification?.RuntimeState is { } patchRuntimeState
-                ? RuntimeProtocolMapper.ToProtocol(patchRuntimeState)
-                : null,
             view.DirectionId,
             view.DirectionIcon) { Tags = view.Tags, Timing = CompetitionChallengeTimingResponse.From(view.Timing, view.OpeningState, view.TimingRecalculationPending) };
-
-    public static CtfInteractionKindProtocol ToProtocol(CtfInteractionKind kind) => kind switch
-    {
-        CtfInteractionKind.FlagSubmission => CtfInteractionKindProtocol.FlagSubmission,
-        CtfInteractionKind.PatchVerification => CtfInteractionKindProtocol.PatchVerification,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
-    };
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<CompetitionChallengeSummaryView> views,
@@ -200,7 +166,7 @@ internal static class ChallengeMapper
                 view.Order,
                 view.IsPublished,
                 view.DeletedAt,
-                ToProtocol(view.InteractionKind), DirectionId: view.DirectionId, DirectionIcon: view.DirectionIcon) { Tags = view.Tags, Timing = CompetitionChallengeTimingResponse.From(view.Timing) }).ToArray(),
+                DirectionId: view.DirectionId, DirectionIcon: view.DirectionIcon) { Tags = view.Tags, Timing = CompetitionChallengeTimingResponse.From(view.Timing) }).ToArray(),
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope));
 }
@@ -218,10 +184,9 @@ public sealed class GetChallengeEndpoint(
     IProgressionChallengeAccess progressionAccess,
     GetFlagAttemptState getAttemptState,
     ReadParticipantChallengeHints getHints,
+    GetAvailableChallengeActions actions,
     IUserContext user,
-    TimeProvider timeProvider,
-    IExperimentalFeatureReader? experimentalFeatures = null,
-    GetPatchVerificationState? getPatchVerificationState = null) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
+    TimeProvider timeProvider) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -262,12 +227,6 @@ public sealed class GetChallengeEndpoint(
 
         if (item is null)
             return TypedResults.NotFound();
-        if (item.InteractionKind == CtfInteractionKind.PatchVerification
-            && visibility.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused)
-            && !(await IsPatchVerificationEnabledAsync(ct)))
-        {
-            return TypedResults.NotFound();
-        }
         var access = visibility.GameMode == GameMode.Koh
             ? await kohAccess.FindAsync(
                 item.CompetitionId,
@@ -276,7 +235,6 @@ public sealed class GetChallengeEndpoint(
                 ct)
             : null;
         var attemptState = decision.TeamId is not Guid teamId
-                || item.InteractionKind == CtfInteractionKind.PatchVerification
             ? null
             : await getAttemptState.ExecuteAsync(
                 item.CompetitionId,
@@ -284,16 +242,6 @@ public sealed class GetChallengeEndpoint(
                 teamId,
                 visibility.GameMode,
                 visibility.CompetitionStatus,
-                ct);
-        var patchVerification = user.UserId == Guid.Empty
-                || item.InteractionKind != CtfInteractionKind.PatchVerification
-            ? null
-            : getPatchVerificationState is null
-                ? null
-                : await getPatchVerificationState.ExecuteAsync(
-                item.CompetitionId,
-                item.Id,
-                user.UserId,
                 ct);
         var response = ChallengeMapper.ToResponse(
             item,
@@ -304,16 +252,15 @@ public sealed class GetChallengeEndpoint(
             await getHints.ExecuteAsync(
                 item.CompetitionId, item.Id, visibility.CompetitionStatus,
                 decision.TeamId, timeProvider.GetUtcNow(), ct),
-            patchVerification,
             HttpContext.Request);
         var timingNow = timeProvider.GetUtcNow();
-        response = response with { Timing = response.Timing is null ? null : response.Timing with {
+        response = response with { AvailableActions = (await actions.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timingNow, ct))
+                .Select(action => new AvailableChallengeActionResponse(action.Kind, action.Enabled, action.Availability,
+                    action.AdmissionFailure, action.RuntimeInstanceId, action.RemainingAttempts, action.GameplayFactId)).ToArray(),
+            Timing = response.Timing is null ? null : response.Timing with {
             ServerTime = timingNow, Phase = item.Timing.Phase(timingNow,
                 visibility.GameMode == GameMode.Ctf && visibility.CompetitionStatus == CompetitionStatus.Finished) } };
         return TypedResults.Ok(response);
     }
 
-    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
-        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
-        ?? Task.FromResult(false);
 }

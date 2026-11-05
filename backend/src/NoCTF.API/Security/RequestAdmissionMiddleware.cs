@@ -16,7 +16,9 @@ public enum ProtectedEntry
     RuntimeCommand,
     ManualAdjustment,
     FlagSubmission,
-    RuntimeRelease
+    RuntimeRelease,
+    CapabilityTest,
+    TemplatePatchUpload
 }
 public sealed record ProtectedEntryMetadata(ProtectedEntry Entry);
 
@@ -24,7 +26,7 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IRequestAdmission admission,
         IRequestSourceAddress source, IOptions<RequestAdmissionOptions> options,
-        NoCTF.Application.GameplayFacts.PatchUploads.IPatchUploadStore patchScope,
+        NoCTF.Application.GameplayFacts.PatchUploads.IFixUploadTargetAccess patchScope,
         NoCTF.Application.Messaging.PostCommitDispatchStatus dispatchStatus)
     {
         var entry = context.GetEndpoint()?.Metadata.GetMetadata<ProtectedEntryMetadata>()?.Entry;
@@ -64,18 +66,18 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             rates.Add(new($"entry-user:{policy ?? entry.ToString()}:{userId}",
                 policy == "submission"
                     ? options.Value.SubmissionPerUserPerMinute
-                    : entry is ProtectedEntry.RuntimeCommand or ProtectedEntry.RuntimeRelease
+                    : entry is ProtectedEntry.RuntimeCommand or ProtectedEntry.RuntimeRelease or ProtectedEntry.CapabilityTest
                         ? options.Value.RuntimeCommandPerUserPerMinute
                         : 30,
                 60));
         }
-        if (entry == ProtectedEntry.PatchUpload)
+        if (entry is ProtectedEntry.PatchUpload or ProtectedEntry.TemplatePatchUpload)
         {
             slots.Add(new("patch-global", options.Value.PatchConcurrency));
             slots.Add(new($"patch-user:{userId}", options.Value.PatchPerUserConcurrency));
-            var targetKey = Guid.TryParse(context.Request.RouteValues["runtimeInstanceId"]?.ToString(), out var canonicalTargetId)
+            var targetKey = Guid.TryParse(context.Request.RouteValues[entry == ProtectedEntry.TemplatePatchUpload ? "challengeId" : "runtimeInstanceId"]?.ToString(), out var canonicalTargetId)
                 ? canonicalTargetId.ToString("N") : "invalid";
-            slots.Add(new($"patch-target:{targetKey}", 1));
+            slots.Add(new(entry == ProtectedEntry.TemplatePatchUpload ? $"patch-template:{targetKey}" : $"patch-target:{targetKey}", 1));
         }
         if (entry is ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
             slots.Add(new("sso-protocol-global", options.Value.SsoProtocolConcurrency));
@@ -102,9 +104,10 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             {
             if (!Guid.TryParse(userId, out var actorId)
                 || !Guid.TryParse(context.Request.RouteValues["competitionId"]?.ToString(), out var competitionId)
-                || !Guid.TryParse(context.Request.RouteValues["competitionChallengeId"]?.ToString(), out var challengeId)
                 || !Guid.TryParse(context.Request.RouteValues["runtimeInstanceId"]?.ToString(), out var targetId)
-                || !await patchScope.CanAccessTargetAsync(competitionId, challengeId, targetId, actorId, originalToken))
+                || !await patchScope.CanAccessAsync(new(competitionId, targetId, actorId,
+                    Guid.TryParse(context.Request.RouteValues["competitionChallengeId"]?.ToString(), out var challengeId) ? challengeId : null,
+                    Guid.TryParse(context.Request.RouteValues["questionId"]?.ToString(), out var executionScopeId) ? executionScopeId : null), originalToken))
             {
                 await ApiProblems.Problem(statusCode: 403, title: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareTitlePatch),
                     detail: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareDetailRequestAdmissionMiddleware)).ExecuteAsync(context);
@@ -112,7 +115,7 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             }
             }
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lease.Token);
-            deadline.CancelAfter(entry == ProtectedEntry.PatchUpload ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(45));
+            deadline.CancelAfter(entry is ProtectedEntry.PatchUpload or ProtectedEntry.TemplatePatchUpload ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(45));
             context.RequestAborted = deadline.Token;
             try { await next(context); }
             catch (OperationCanceledException) when (!originalToken.IsCancellationRequested && !context.Response.HasStarted)

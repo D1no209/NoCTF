@@ -27,7 +27,6 @@ internal sealed class PlatformSettingsConfiguration
             HumanVerificationEnabled = true,
             HumanVerificationRuntimeEnabled = true,
             HumanVerificationEvaluationEnabled = true,
-            CtfPatchVerificationEnabled = false,
             HumanVerificationProvider = null,
             HumanVerificationCapServerUrl = string.Empty,
             HumanVerificationCapSiteKey = string.Empty,
@@ -59,9 +58,6 @@ internal sealed class PlatformSettingsConfiguration
             .ValueGeneratedNever();
         builder.Property(settings => settings.HumanVerificationEvaluationEnabled)
             .HasDefaultValue(true)
-            .ValueGeneratedNever();
-        builder.Property(settings => settings.CtfPatchVerificationEnabled)
-            .HasDefaultValue(false)
             .ValueGeneratedNever();
         builder.Property(settings => settings.HumanVerificationProvider)
             .HasConversion<short>();

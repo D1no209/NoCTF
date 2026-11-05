@@ -1,4 +1,5 @@
-FROM python:3.13-alpine
+ARG PYTHON_IMAGE=python:3.13-alpine
+FROM ${PYTHON_IMAGE}
 
 RUN addgroup -S -g 10001 challenge && adduser -S -u 10001 -G challenge challenge
 WORKDIR /opt/challenge

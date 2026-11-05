@@ -9,7 +9,6 @@ using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.GameplayFacts.PatchUploads;
-using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Notifications;
@@ -226,8 +225,8 @@ internal static class Program
         var mode = row.Required<GameMode>("Mode");
         if (!Enum.IsDefined(mode))
             throw new InvalidOperationException($"Production challenge {row.Id} has an unknown mode.");
-        var challenge = Populate(ChallengeGeneratedCatalog.Create(mode), row,
-            nameof(Challenge.Mode),
+        var challenge = Populate(new Challenge(), row,
+            "Mode",
             nameof(Challenge.ManagerIds),
             nameof(Challenge.Managers),
             nameof(Challenge.Definition),
@@ -278,14 +277,14 @@ internal static class Program
 
     private static GameplayFact MapGameplayFact(ArchiveRow row)
     {
-        var kind = row.Required<GameplayFactKind>("Kind");
+        var kind = LegacyConverters.GameplayKind(row.Element.GetProperty("Kind"));
         var fact = GameplayFactGeneratedCatalog.Create(kind);
         return Populate(fact, row, nameof(GameplayFact.Kind));
     }
 
     private static RuntimeInstance MapRuntimeInstance(ArchiveRow row)
     {
-        var purpose = row.Required<RuntimePurpose>("Purpose");
+        var purpose = LegacyConverters.RuntimeUse(row.Element.GetProperty("Purpose"));
         var runtime = Populate(RuntimeInstanceGeneratedCatalog.Create(purpose), row,
             nameof(RuntimeInstance.Purpose),
             nameof(RuntimeInstance.ActiveSlot),
@@ -411,8 +410,7 @@ internal static class Program
                 || result.TryGetProperty("state", out _))
                 operation = runtime.Purpose switch
                 {
-                    RuntimePurpose.AwdpTarget => ReplayOperation.AwdpDefenseTarget,
-                    RuntimePurpose.PatchVerificationTarget => ReplayOperation.PatchVerificationTarget,
+                    RuntimePurpose.FixTarget => ReplayOperation.AwdpDefenseTarget,
                     _ => throw new InvalidOperationException(
                         $"Runtime receipt {row.Id} has an unsupported result purpose.")
                 };
@@ -471,11 +469,6 @@ internal static class Program
                 break;
             case ReplayOperation.AwdpDefenseTarget:
                 receipt.ResultState = (short)EnumValue<AwdpDefenseTargetRequestState>(result, "state");
-                receipt.PrimaryResultId = OptionalGuid(result, "runtimeInstanceId");
-                receipt.RuntimeState = OptionalEnum<RuntimeState>(result, "runtimeState");
-                break;
-            case ReplayOperation.PatchVerificationTarget:
-                receipt.ResultState = (short)EnumValue<PatchVerificationTargetRequestState>(result, "state");
                 receipt.PrimaryResultId = OptionalGuid(result, "runtimeInstanceId");
                 receipt.RuntimeState = OptionalEnum<RuntimeState>(result, "runtimeState");
                 break;
@@ -599,7 +592,7 @@ internal static class Program
                 && targetProperty.PropertyType.GetGenericTypeDefinition() == typeof(List<>))
                 continue;
             targetProperty.SetValue(target,
-                sourceProperty.Value.Deserialize(targetProperty.PropertyType, JsonOptions));
+                ImportedScalar(sourceProperty.Value, targetProperty.PropertyType));
         }
     }
 
@@ -619,9 +612,18 @@ internal static class Program
                 || !row.Element.TryGetProperty(property.Name, out var value)
                 || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 continue;
-            property.SetValue(target, value.Deserialize(property.PropertyType, JsonOptions));
+            property.SetValue(target, ImportedScalar(value, property.PropertyType));
         }
         return target;
+    }
+
+    private static object? ImportedScalar(JsonElement value, Type type)
+    {
+        if (value.ValueKind == JsonValueKind.Null) return null;
+        var scalarType = Nullable.GetUnderlyingType(type) ?? type;
+        if (scalarType == typeof(GameplayFactKind)) return LegacyConverters.GameplayKind(value);
+        if (scalarType == typeof(RuntimePurpose)) return LegacyConverters.RuntimeUse(value);
+        return value.Deserialize(type, JsonOptions);
     }
 
     private static async Task AddAsync<T>(NoCtfDbContext db, IEnumerable<T> entities)
@@ -910,7 +912,7 @@ internal static class Program
                 || !IsScalar(property.PropertyType)
                 || !row.Element.TryGetProperty(property.Name, out var oldValue))
                 continue;
-            var expected = oldValue.Deserialize(property.PropertyType, JsonOptions);
+            var expected = ImportedScalar(oldValue, property.PropertyType);
             var actual = property.GetValue(item);
             var equal = expected is byte[] oldBytes && actual is byte[] newBytes
                 ? oldBytes.SequenceEqual(newBytes)

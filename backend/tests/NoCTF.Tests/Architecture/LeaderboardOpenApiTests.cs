@@ -11,7 +11,7 @@ public sealed class LeaderboardOpenApiTests
     private const string ChallengeListPath =
         "/api/v1/competitions/{competitionId}/challenges";
     private const string ScoreboardSlotDetailPath =
-        "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}";
+        "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/challenges/{competitionChallengeId}";
     private const string ScoreboardAdjustmentDetailPath =
         "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments";
 
@@ -34,24 +34,27 @@ public sealed class LeaderboardOpenApiTests
 
         await Assert.That(PropertyNames(response)).IsEquivalentTo([
             "competitionId",
+            "mode",
             "version",
-            "schemaRevision",
+            "challengeCatalogRevision",
             "generatedAt",
             "currentRoundId",
-            "actors",
+            "rounds",
+            "challenges",
             "teams",
             "tracks",
             "tracksEnabled",
-            "theoryEnabled",
-            "currentChallengeScores",
             "visibility",
             "dataScope",
-            "dataAsOf"
+            "dataAsOf",
+            "roundWindowStart",
+            "roundWindowEnd",
+            "latestRound"
         ]);
         await Assert.That(ResolveSchema(root, responseProperties.GetProperty("version"))
                 .GetProperty("type").GetString())
             .IsEqualTo("string");
-        await Assert.That(ResolveSchema(root, responseProperties.GetProperty("schemaRevision"))
+        await Assert.That(ResolveSchema(root, responseProperties.GetProperty("challengeCatalogRevision"))
                 .GetProperty("type").GetString())
             .IsEqualTo("string");
         var team = ResolveSchema(
@@ -64,30 +67,28 @@ public sealed class LeaderboardOpenApiTests
             "rank",
             "rankingState",
             "totalScore",
-            "theoryScore",
-            "hasTheorySubmission",
-            "scoreOutsideWindow",
             "attackScore",
             "defenseScore",
-            "challengeScores",
-            "challengeBenefits",
-            "memberContributions",
+            "challengeTotals",
+            "members",
             "achievements",
-            "globalAdjustments",
             "globalAdjustmentCount",
             "slots"
         ]);
         var challengeScore = ResolveSchema(
             root,
-            team.GetProperty("properties").GetProperty("challengeScores").GetProperty("items"));
+            team.GetProperty("properties").GetProperty("challengeTotals").GetProperty("items"));
         await Assert.That(PropertyNames(challengeScore)).IsEquivalentTo([
-            "competitionChallengeId",
+            "challenge",
+            "grossPoints",
+            "netPoints",
             "attackScore",
-            "defenseScore"
+            "defenseScore",
+            "writeUp"
         ]);
         var memberContribution = ResolveSchema(
             root,
-            team.GetProperty("properties").GetProperty("memberContributions").GetProperty("items"));
+            team.GetProperty("properties").GetProperty("members").GetProperty("items"));
         await Assert.That(PropertyNames(memberContribution)).IsEquivalentTo([
             "userId",
             "displayName",
@@ -97,15 +98,13 @@ public sealed class LeaderboardOpenApiTests
             root,
             team.GetProperty("properties").GetProperty("slots").GetProperty("items"));
         await Assert.That(PropertyNames(slot)).IsEquivalentTo([
-            "columnIndex",
+            "challenge",
+            "round",
             "scoreState",
-            "earnedPoints",
-            "deductedPoints",
             "netPoints",
-            "entryCount",
-            "breakdown",
-            "entries",
-            "awdComponents",
+            "activity",
+            "award",
+            "awardPoints",
             "offenseState",
             "defenseState"
         ]);
@@ -202,7 +201,8 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(PropertyNames(response)).IsEquivalentTo([
             "competitionId",
             "teamId",
-            "columnIndex",
+            "competitionChallengeId",
+            "roundId",
             "scoreState",
             "earnedPoints",
             "deductedPoints",

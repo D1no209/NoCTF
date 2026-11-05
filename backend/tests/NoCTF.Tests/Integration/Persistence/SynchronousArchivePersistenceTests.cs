@@ -382,7 +382,7 @@ public sealed class SynchronousArchivePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = ids.ChallengeId,
             OwnerId = ids.OwnerId,

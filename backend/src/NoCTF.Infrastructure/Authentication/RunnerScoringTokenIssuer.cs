@@ -23,7 +23,7 @@ public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> conf
         DateTimeOffset now) =>
         Write(runnerId, now, now.AddMinutes(5),
         [
-            new("permission", "awdp:fix-archive:read"),
+            new("permission", "fix:archive:read"),
             new("patch_upload_id", uploadId.ToString("D")),
             new("gameplay_fact_id", gameplayFactId.ToString("D"))
         ]);
@@ -41,14 +41,21 @@ public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> conf
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 
-    public string IssueAwdpFixResult(AwdpFixResultTokenRequest request) =>
-        IssuePatchResult(request, "awdp:fix-result:write");
+    public string IssueFixCheckResult(FixCheckResultTokenRequest request) =>
+        IssuePatchResult(request, "fix:check-result:write");
 
-    public string IssuePatchVerificationResult(AwdpFixResultTokenRequest request) =>
-        IssuePatchResult(request, "patch-verification:result:write");
+    public string IssueTemplateCheckResult(string runnerId, Guid executionId, Guid runtimeInstanceId, DateTimeOffset deadline, DateTimeOffset now) =>
+        Write(runnerId, now, deadline,
+        [
+            new("permission", "template:check-result:write"),
+            new("resource", $"template-test:{executionId:D}:runtime:{runtimeInstanceId:D}"),
+            new("template_test_id", executionId.ToString("D")),
+            new("runtime_instance_id", runtimeInstanceId.ToString("D")),
+            new("deadline", deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        ]);
 
     private string IssuePatchResult(
-        AwdpFixResultTokenRequest request,
+        FixCheckResultTokenRequest request,
         string permission) =>
         Write(request.RunnerId, request.IssuedAt, request.Deadline,
         [

@@ -157,7 +157,7 @@ internal static class WriteUpBenefitProjection
         if (input.Mode == GameMode.Ctf)
             return ordered.ThenBy(x => entries.GetValueOrDefault(x.TeamId)?.LastScoreAt ?? DateTimeOffset.MaxValue)
                 .ThenByDescending(x => entries.GetValueOrDefault(x.TeamId)?.SolveCount ?? 0)
-                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
         if (input.Mode == GameMode.Awd)
         {
             long AttackPoints(ScoreboardTeam team)
@@ -170,12 +170,12 @@ internal static class WriteUpBenefitProjection
             }
             return AwdTeamRanking.Order(teams, input, team => new(team.TeamId, team.TotalScore, AttackPoints(team),
                 entries[team.TeamId].UpRoundCount, entries[team.TeamId].AttackCount,
-                entries[team.TeamId].LastScoreAt, facts[team.TeamId].RegisteredAt, team.TheoryAchievedAt));
+                entries[team.TeamId].LastScoreAt, facts[team.TeamId].RegisteredAt));
         }
         if (input.Mode == GameMode.Awdp)
             return ordered.ThenByDescending(x => entries[x.TeamId].FixCount).ThenByDescending(x => entries[x.TeamId].AttackCount)
                 .ThenBy(x => entries[x.TeamId].PenaltyScore.GetValueOrDefault()).ThenBy(x => entries[x.TeamId].LastFixAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
         return ordered.ThenByDescending(x => entries[x.TeamId].SolveCount).ThenByDescending(x => entries[x.TeamId].ControlledChallengeCount)
             .ThenBy(x => entries[x.TeamId].FirstControlAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
     }

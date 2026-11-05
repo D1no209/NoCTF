@@ -35,8 +35,7 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
             .Where(fact => fact.CompetitionId == competitionId
                 && ids.Contains(fact.TeamId!.Value)
                 && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
-                && (fact.Kind == GameplayFactKind.FlagAttempt
-                    || fact.Kind == GameplayFactKind.FixAttempt)
+                && fact.Kind == GameplayFactKind.BreakAttempt
                 && fact.State == GameplayFactState.Completed
                 && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
@@ -125,8 +124,7 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                         && fact.TeamId == teamId
                         && fact.Id != changedId
                         && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
-                        && (fact.Kind == GameplayFactKind.FlagAttempt
-                            || fact.Kind == GameplayFactKind.FixAttempt)
+                        && fact.Kind == GameplayFactKind.BreakAttempt
                         && fact.State == GameplayFactState.Completed
                         && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
@@ -139,7 +137,7 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                     State: GameplayFactState.Completed,
                     Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
                     TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
-                    Kind: GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt
+                    Kind: GameplayFactKind.BreakAttempt
                 } && changingFact.CompetitionId == competitionId
                     && changingFact.TeamId == teamId)
                 completed.Add(changingFact.CompetitionChallengeId!.Value);

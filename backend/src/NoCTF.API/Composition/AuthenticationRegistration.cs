@@ -125,40 +125,19 @@ public static class AuthenticationRegistration
                 .RequireClaim("resource")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("gameplay_fact_id"));
-            options.AddPolicy("AwdCheckResult", policy => policy
+            options.AddPolicy("CapabilityCheckResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_type", "internal")
-                .RequireClaim("permission", "awd:check-result:write")
-                .RequireClaim("attempt_id")
-                .RequireClaim("receipt_deadline")
+                .RequireClaim("permission", "fix:check-result:write", "template:check-result:write", "awd:check-result:write")
                 .RequireClaim("resource")
-                .RequireClaim("runtime_instance_id")
-                .RequireClaim("gameplay_fact_id")
-                .RequireClaim("deadline"));
-            options.AddPolicy("AwdpFixResult", policy => policy
-                .AddAuthenticationSchemes(InternalScheme)
-                .RequireAuthenticatedUser()
-                .RequireClaim("token_type", "internal")
-                .RequireClaim("permission", "awdp:fix-result:write")
-                .RequireClaim("resource")
-                .RequireClaim("gameplay_fact_id")
-                .RequireClaim("runtime_instance_id")
-                .RequireClaim("deadline"));
-            options.AddPolicy("PatchVerificationResult", policy => policy
-                .AddAuthenticationSchemes(InternalScheme)
-                .RequireAuthenticatedUser()
-                .RequireClaim("token_type", "internal")
-                .RequireClaim("permission", "patch-verification:result:write")
-                .RequireClaim("resource")
-                .RequireClaim("gameplay_fact_id")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("deadline"));
             options.AddPolicy("FixArchiveRead", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_type", "internal")
-                .RequireClaim("permission", "awdp:fix-archive:read")
+                .RequireClaim("permission", "fix:archive:read")
                 .RequireClaim("gameplay_fact_id"));
         });
         return services;

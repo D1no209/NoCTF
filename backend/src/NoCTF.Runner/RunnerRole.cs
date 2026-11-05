@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Messaging;
-using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Application.Challenges.Capabilities;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
@@ -41,7 +41,9 @@ public static class RunnerRole
             options.ListenToNatsSubject(NatsSubjects.Runner(nodeQueueName.Value))
                 .UseJetStream(NatsSubjects.RunnerStream, nodeQueueName.Value)
                 .MaximumAckExtension(TimeSpan.FromSeconds(
-                    AwdpFixExecutionBudget.JetStreamMaximumAckExtensionSeconds));
+                    Math.Max(NoCTF.Application.Challenges.Testing.TemplateCapabilityTestBudget.AckExtensionSeconds,
+                        Math.Max(FixExecutionBudget.JetStreamMaximumAckExtensionSeconds,
+                            NoCTF.Application.Competitions.Awd.Fixes.PersistentFixExecutionBudget.AckExtensionSeconds))));
     }
 
 }

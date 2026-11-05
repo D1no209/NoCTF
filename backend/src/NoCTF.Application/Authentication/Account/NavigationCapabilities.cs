@@ -1,6 +1,6 @@
 namespace NoCTF.Application.Authentication.Account;
 
-public sealed record NavigationCapabilities(bool CanAccessTheoryBank, bool HasManagedCompetitions);
+public sealed record NavigationCapabilities(bool HasManagedCompetitions);
 
 public interface INavigationCapabilitiesReader
 {

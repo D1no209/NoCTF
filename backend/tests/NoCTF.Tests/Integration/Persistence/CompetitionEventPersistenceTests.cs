@@ -67,7 +67,7 @@ public sealed class CompetitionEventPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Challenges.Add(new CtfChallenge
+                setup.Challenges.Add(new Challenge
                 {
                     Id = ids.ChallengeId,
                     OwnerId = ids.OwnerId,
@@ -99,7 +99,7 @@ public sealed class CompetitionEventPersistenceTests
                 setup.Teams.AddRange(
                     ApprovedTeam(ids.TeamAId, ids.CompetitionId, "Team A", ids.TeamAUserId, now),
                     ApprovedTeam(ids.TeamBId, ids.CompetitionId, "Team B", ids.TeamBUserId, now));
-                setup.GameplayFacts.Add(new FlagAttemptGameplayFact
+                setup.GameplayFacts.Add(new BreakAttemptGameplayFact
                 {
                     Id = ids.GameplayFactId,
                     CompetitionId = ids.CompetitionId,
@@ -147,7 +147,7 @@ public sealed class CompetitionEventPersistenceTests
                     TeamId: ids.TeamAId,
                     CompetitionChallengeId: ids.CompetitionChallengeId,
                     GameplayFactId: ids.GameplayFactId,
-                    GameplayFactKind: GameplayFactKind.FlagAttempt), ct),
+                    GameplayFactKind: GameplayFactKind.BreakAttempt), ct),
                 await store.RecordAsync(new(
                     ids.CompetitionId,
                     CompetitionEventKind.RuntimeStateChanged,

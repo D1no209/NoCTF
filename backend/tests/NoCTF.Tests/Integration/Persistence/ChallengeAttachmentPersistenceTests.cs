@@ -50,7 +50,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = administratorId,
@@ -133,7 +133,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new CtfChallenge
+            db.Challenges.Add(new Challenge
             {
                 Id = challengeId,
                 OwnerId = administratorId,
@@ -249,7 +249,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 }));
-                seed.Challenges.Add(new CtfChallenge
+                seed.Challenges.Add(new Challenge
                 {
                     Id = challengeId,
                     OwnerId = users[0],

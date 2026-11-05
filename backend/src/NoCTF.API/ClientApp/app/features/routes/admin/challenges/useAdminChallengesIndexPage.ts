@@ -7,7 +7,6 @@ import { Filter, Plus } from '@lucide/vue'
 import { adminChallengeBankListTemplates } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
-import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTemplateCreateDialogComponent from '../../../admin/ChallengeTemplateCreateDialog.vue'
 import { directionKey, directionLabel } from '../../../../utils/directions'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
@@ -84,6 +83,7 @@ export function useAdminChallengesIndexPage() {
       query: {
         includeDeleted: includeDeleted.value,
         onlyMine: onlyMine.value,
+        requiredCapabilities: [],
         keyword: search.value.trim() || null,
         direction: directionFilter.value === 'all' ? null : directionFilter.value,
         offset,
@@ -219,7 +219,6 @@ export function useAdminChallengesIndexPage() {
 
   const AdminDateTime = markRaw(AdminDateTimeComponent)
 
-  const AdminGameModeBadge = markRaw(AdminGameModeBadgeComponent)
 
   const ChallengeTemplateCreateDialog = markRaw(ChallengeTemplateCreateDialogComponent)
 
@@ -242,7 +241,6 @@ export function useAdminChallengesIndexPage() {
       templateCreated,
       visibilityLabel,
       AdminDateTime,
-      AdminGameModeBadge,
       ChallengeTemplateCreateDialog,
       page: pagination.page,
       pageCount: pagination.pageCount,

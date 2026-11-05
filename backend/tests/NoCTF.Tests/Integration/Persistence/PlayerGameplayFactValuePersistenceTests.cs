@@ -69,7 +69,7 @@ public sealed class PlayerGameplayFactValuePersistenceTests
                 cancellationToken);
 
             await Assert.That(ownFlag?.Value).IsEqualTo(fixture.FlagValue);
-            await Assert.That(ownFlag?.Kind).IsEqualTo(GameplayFactKind.FlagAttempt);
+            await Assert.That(ownFlag?.Kind).IsEqualTo(GameplayFactKind.BreakAttempt);
             await Assert.That(ownBreak?.Value).IsEqualTo(fixture.BreakValue);
             await Assert.That(ownBreak?.Kind).IsEqualTo(GameplayFactKind.BreakAttempt);
             await Assert.That(otherTeamFlag).IsNull();
@@ -119,7 +119,7 @@ public sealed class PlayerGameplayFactValuePersistenceTests
         db.Teams.AddRange(
             Team(teamId, competitionId, teamMemberId, "Player Team", '1', now),
             Team(otherTeamId, competitionId, otherTeamMemberId, "Other Team", '2', now));
-        db.Challenges.Add(new CtfChallenge
+        db.Challenges.Add(new Challenge
         {
             Id = challengeId,
             OwnerId = ownerId,
@@ -141,7 +141,7 @@ public sealed class PlayerGameplayFactValuePersistenceTests
         });
         db.GameplayFacts.AddRange(
             Fact(flagFactId, competitionId, competitionChallengeId, teamId,
-                teamMemberId, GameplayFactKind.FlagAttempt, flagValue, now),
+                teamMemberId, GameplayFactKind.BreakAttempt, flagValue, now),
             Fact(breakFactId, competitionId, competitionChallengeId, teamId,
                 teamMemberId, GameplayFactKind.BreakAttempt, breakValue, now.AddSeconds(1)),
             Fact(fixFactId, competitionId, competitionChallengeId, teamId,

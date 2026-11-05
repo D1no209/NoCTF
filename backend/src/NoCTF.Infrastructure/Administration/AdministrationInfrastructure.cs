@@ -23,7 +23,6 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IPlatformAdministrationStore, NoOpPlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, NoOpUserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, NoOpPlatformConfigurationStore>();
-            services.AddScoped<IExperimentalFeatureReader, NoOpPlatformConfigurationStore>();
             services.AddSingleton<IPlatformLogReader, NoOpPlatformLogReader>();
             services.AddScoped<IPlatformAuditLogStore, NoOpPlatformAuditLogStore>();
             services.AddScoped<IHumanVerificationConfigurationStore,
@@ -36,7 +35,6 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
-            services.AddScoped<IExperimentalFeatureReader, PlatformConfigurationStore>();
             services.AddSingleton<IPlatformLogReader, NoOpPlatformLogReader>();
             services.AddScoped<IPlatformAuditLogStore, PlatformAuditLogStore>();
             AddHumanVerificationConfigurationStore(services);
@@ -46,7 +44,6 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
-            services.AddScoped<IExperimentalFeatureReader, PlatformConfigurationStore>();
             var origin = configuration["Observability:LokiBaseUrl"];
             if (string.IsNullOrWhiteSpace(origin))
             {

@@ -52,9 +52,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
   const hiddenRuleKeys = computed(() => {
-    if (challenge.value?.interactionKind === 'PatchVerification')
-      return ['maxFlagAttempts', 'flagTemplate']
-    const hidden = ['maxPatchAttempts']
+    const hidden: string[] = []
     if (challenge.value?.usesDynamicFlag !== true) hidden.push('flagTemplate')
     return hidden
   })
@@ -446,15 +444,15 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         return { progressLabel: translate("administration.label.successfulYet"), progressVariant: 'outline' }
       }
       case 'Awd':
-        return hasSuccessfulFact(facts, 'FlagAttempt')
+        return hasSuccessfulFact(facts, 'BreakAttempt')
           ? { progressLabel: translate("common.label.attackSucceeded"), progressVariant: 'default' }
           : { progressLabel: translate("administration.label.successfulAttackYet"), progressVariant: 'outline' }
       case 'Koh':
-        return hasSuccessfulFact(facts, 'KohControlObservation')
+        return hasSuccessfulFact(facts, 'ControlObservation')
           ? { progressLabel: translate("administration.label.controlAcquired"), progressVariant: 'default' }
           : { progressLabel: translate("administration.label.controlAcquired.ccIdPage"), progressVariant: 'outline' }
       default:
-        return hasSuccessfulFact(facts, 'FlagAttempt')
+        return hasSuccessfulFact(facts, 'BreakAttempt')
           ? { progressLabel: translate("common.label.solved.competitionChallengeNavigator"), progressVariant: 'default' }
           : { progressLabel: translate("common.label.solved"), progressVariant: 'outline' }
     }

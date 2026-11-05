@@ -46,17 +46,17 @@ public sealed class ChallengeTimingPreviewReader(NoCtfDbContext db, ILeaderboard
         var beforeOpen = current.AutoOpenAt; var beforeClose = current.SubmissionDeadlineAt; var beforeScore = current.ScoringEndsAt;
         var afterOpen = candidate.Timing.AutoOpenAt; var afterClose = candidate.Timing.SubmissionDeadlineAt; var afterScore = candidate.Timing.ScoringEndsAt;
         var facts = db.GameplayFacts.AsNoTracking().Where(x => x.CompetitionChallengeId == challenge.Id
-            && (x.Kind == GameplayFactKind.FlagAttempt || x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt))
+            && (x.Kind == GameplayFactKind.BreakAttempt || x.Kind == GameplayFactKind.FixAttempt))
             .Select(x => new { x.TeamId, x.Result,
                 BeforeValid = (beforeOpen == null || x.OccurredAt >= beforeOpen)
-                    && (challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt
+                    && (challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.BreakAttempt && x.OccurredAt >= official.EndAt
                         || beforeClose == null || x.OccurredAt < beforeClose),
                 AfterValid = (afterOpen == null || x.OccurredAt >= afterOpen)
-                    && (challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt
+                    && (challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.BreakAttempt && x.OccurredAt >= official.EndAt
                         || afterClose == null || x.OccurredAt < afterClose),
-                BeforeScoring = !(challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt)
+                BeforeScoring = !(challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.BreakAttempt && x.OccurredAt >= official.EndAt)
                     && (beforeScore == null || x.OccurredAt < beforeScore),
-                AfterScoring = !(challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt)
+                AfterScoring = !(challenge.Mode == NoCTF.Domain.Competitions.GameMode.Ctf && x.Kind == GameplayFactKind.BreakAttempt && x.OccurredAt >= official.EndAt)
                     && (afterScore == null || x.OccurredAt < afterScore) });
         var completions = await facts.GroupBy(x => x.TeamId).Select(group => new { Team = group.Key,
             Before = group.Count(x => x.BeforeValid && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue)),
@@ -66,12 +66,12 @@ public sealed class ChallengeTimingPreviewReader(NoCtfDbContext db, ILeaderboard
             .SingleOrDefaultAsync(x => x.CompetitionId == candidate.CompetitionId, ct);
         var existingCompletion = graph is { Enabled: true } ? await db.GameplayFacts.AsNoTracking()
             .Where(x => x.CompetitionId == candidate.CompetitionId && x.TeamId != null
-                && (x.Kind == GameplayFactKind.FlagAttempt || x.Kind == GameplayFactKind.FixAttempt)
+                && x.Kind == GameplayFactKind.BreakAttempt
                 && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue)
                 && db.CompetitionChallenges.Any(challenge => challenge.Id == x.CompetitionChallengeId
                     && (challenge.AutoOpenAt == null || x.OccurredAt >= challenge.AutoOpenAt)
                     && (challenge.SubmissionDeadlineAt == null || x.OccurredAt < challenge.SubmissionDeadlineAt
-                        || x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt)))
+                        || x.Kind == GameplayFactKind.BreakAttempt && x.OccurredAt >= official.EndAt)))
             .Select(x => new { Team = x.TeamId!.Value, x.CompetitionChallengeId }).Distinct().ToArrayAsync(ct) : [];
         int Progression(Guid team)
         {

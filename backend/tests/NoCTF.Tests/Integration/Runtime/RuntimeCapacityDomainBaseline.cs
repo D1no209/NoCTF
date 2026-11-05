@@ -78,8 +78,16 @@ internal sealed class GlobalLedgerCapacityBaseline(
         return allocation is not null && await IsReadyOwnerAsync(allocation, ct);
     }
 
+    public async Task<bool> CanMutateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken ct)
+    {
+        var runtime = await db.RuntimeInstances.AsNoTracking().Include(item => item.CapacityAllocationEntries).AsSplitQuery()
+            .SingleOrDefaultAsync(item => item.Id == runtimeInstanceId && item.State == RuntimeState.Running && item.RunnerId == runnerId, ct);
+        var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary && item.RunnerId == runnerId);
+        return allocation is not null && await IsReadyOwnerAsync(allocation, ct);
+    }
+
     public async Task<bool> CanCreateWorkloadAsync(
-        RuntimeWorkloadIdentity identity, Guid factId, string runnerId,
+        RuntimeWorkloadIdentity identity, Guid? factId, string runnerId,
         CancellationToken ct)
     {
         var runtime = await db.RuntimeInstances.AsNoTracking()
@@ -208,7 +216,7 @@ internal sealed class GlobalLedgerCapacityBaseline(
                     && fact.CompetitionChallengeId == runtime.CompetitionChallengeId
                     && fact.TeamId == runtime.TeamId
                     && (identity.Kind == RuntimeWorkloadKind.AwdChecker
-                        && fact.Kind == GameplayFactKind.AwdServiceTransition
+                        && fact.Kind == GameplayFactKind.CheckObservation
                         && fact.Awd != null && fact.Awd.AttemptId == identity.OperationId
                         && fact.Awd.RuntimeId == runtime.Id
                         && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
@@ -454,7 +462,7 @@ internal sealed class GlobalLedgerCapacityBaseline(
         TransactionFailureClassifier.IsRetryable(exception);
 
     public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => new(
-        runtime.Purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
+        runtime.Purpose is RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget
             ? RuntimeWorkloadKind.VerificationTarget
             : RuntimeWorkloadKind.Runtime,
         runtime.Id, runtime.Id);

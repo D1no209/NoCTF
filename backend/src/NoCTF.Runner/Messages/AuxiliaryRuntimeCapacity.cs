@@ -28,7 +28,7 @@ public sealed class AuxiliaryRuntimeCapacity(
     RuntimeExecutionOptions? executionOptions = null)
 {
     public async Task<OneShotResult> RunAsync(ContainerRequest request, RuntimeWorkloadIdentity identity,
-        Guid factId, Func<ContainerRequest, CancellationToken, Task<OneShotResult>> execute, CancellationToken ct)
+        Guid? factId, Func<ContainerRequest, CancellationToken, Task<OneShotResult>> execute, CancellationToken ct)
     {
         using var mutation = await mutations.EnterWorkloadAsync(identity, ct);
         var limits = request.Limits;

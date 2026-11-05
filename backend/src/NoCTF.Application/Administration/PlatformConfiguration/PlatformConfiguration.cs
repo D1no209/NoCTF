@@ -14,7 +14,6 @@ public sealed record PlatformConfigurationView(
     string? Description,
     Guid? LogoFileId,
     DateTimeOffset UpdatedAt,
-    bool CtfPatchVerificationEnabled = false,
     NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo = null,
     string PublicBaseUrl = "http://localhost:5000");
 
@@ -32,11 +31,6 @@ public interface IPlatformConfigurationStore
         DateTimeOffset now,
         CancellationToken cancellationToken,
         string? publicBaseUrl = null);
-
-    Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
-        bool ctfPatchVerificationEnabled,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
 
     Task<PlatformLogoReplacement> ReplaceLogoAsync(
         Guid fileId,
@@ -104,12 +98,6 @@ public sealed class ManagePlatformConfiguration(
             normalizedPublicBaseUrl);
         return new(PlatformConfigurationUpdateState.Updated, updated);
     }
-
-    public Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
-        bool ctfPatchVerificationEnabled,
-        DateTimeOffset now,
-        CancellationToken ct = default) =>
-        settings.UpdateExperimentalFeaturesAsync(ctfPatchVerificationEnabled, now, ct);
 
     public async Task<PlatformLogoUpdateResult> ReplaceLogoAsync(
         string fileName,

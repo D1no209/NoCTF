@@ -38,8 +38,8 @@ public sealed partial class AwdRoundCoordinationTests
         configuration.RoundDurationSeconds = 180;
         configuration.AwdOptions = configuration.AwdOptions with { GenerationPolicy = AwdGenerationPolicy.ActiveInterval, GenerationInterval = 400 };
         var template = await db.Challenges.SingleAsync(ct);
-        var definition = (AwdChallengeDefinition)template.Definition!;
-        definition.FlagStores.Add(new() { Id = Guid.CreateVersion7(), Position = 1, Name = "second", DeliveryMode = AwdFlagDeliveryMode.BusinessChecker });
+        var definition = template.Definition!.Break!;
+        definition.FlagStores.Add(new() { Id = Guid.CreateVersion7(), Position = 1, Name = "second", DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker });
         await db.SaveChangesAsync(ct);
         var clock = new MutableTimeProvider(fixture.Now); var outbox = new RecordingOutbox();
         var coordinator = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, clock, Secrets());
@@ -55,7 +55,7 @@ public sealed partial class AwdRoundCoordinationTests
         await Generate(0);
         var oldValues = await db.ChallengeFlags.AsNoTracking().ToDictionaryAsync(flag => flag.Id, flag => flag.Flag, ct);
         if (edit == IssuanceEdit.FlagCount) configuration.AwdOptions = configuration.AwdOptions with { FlagsPerStore = 2 };
-        else if (edit == IssuanceEdit.AddStore) definition.FlagStores.Add(new() { Id = Guid.CreateVersion7(), Position = 2, Name = "third", DeliveryMode = AwdFlagDeliveryMode.BusinessChecker });
+        else if (edit == IssuanceEdit.AddStore) definition.FlagStores.Add(new() { Id = Guid.CreateVersion7(), Position = 2, Name = "third", DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker });
         else
         {
             var challenge = await db.CompetitionChallenges.SingleAsync(ct);

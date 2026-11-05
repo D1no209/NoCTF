@@ -74,13 +74,10 @@ public sealed record AdminPlatformConfigurationResponse(
     PlatformBrandingResponse Branding,
     AdminHumanVerificationConfigurationResponse HumanVerification,
     EmailVerificationConfigurationResponse EmailVerification,
-    PlatformExperimentalFeaturesResponse ExperimentalFeatures,NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo=null)
+    NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo=null)
 {
     public LiveSoloVideoConfigurationRulesResponse LiveSoloVideoRules=>LiveSoloVideoConfigurationRulesResponse.Current;
 }
-
-public sealed record PlatformExperimentalFeaturesResponse(
-    bool CtfPatchVerificationEnabled);
 
 public sealed class GetPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
@@ -111,7 +108,6 @@ public sealed class GetPlatformConfigurationEndpoint(
         return TypedResults.Ok(new AdminPlatformConfigurationResponse(
             PlatformConfigurationMapping.ToResponse(current, links, HttpContext),
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
-            EmailVerificationConfigurationMapping.ToResponse(email),
-            new(current.CtfPatchVerificationEnabled),current.LiveSoloVideo));
+            EmailVerificationConfigurationMapping.ToResponse(email), current.LiveSoloVideo));
     }
 }

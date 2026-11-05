@@ -1,72 +1,39 @@
 import { markRaw, toRefs } from 'vue'
-
-import type { GameModeValue } from '../../utils/game-config'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api'
-import { applyCtfInteraction, protocolInput, ctfInteractionProtocols } from '../../utils/game-config'
+import type { DefinitionModel } from '../../utils/game-config'
+import { setChallengeCapability } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
 import DefinitionFlagTemplateSectionComponent from './DefinitionFlagTemplateSection.vue'
 import DefinitionPatchSectionComponent from './DefinitionPatchSection.vue'
 import DefinitionRuntimeSectionComponent from './DefinitionRuntimeSection.vue'
+import QuestionnaireCapabilityEditorComponent from './QuestionnaireCapabilityEditor.vue'
+import ControlCapabilityEditorComponent from './ControlCapabilityEditor.vue'
 
-/** Owns state, effects and commands for DefinitionEditor. */
-export function useDefinitionEditor(props: Readonly<Omit<{
-  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
-  mode: GameModeValue
-  disabled?: boolean
-}, "disabled"> & Required<Pick<{
-  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
-  mode: GameModeValue
-  disabled?: boolean
-}, "disabled">>>,
-emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract]): void }) {
-  const { model, parseFailed } = useDefinitionModel(
-    () => props.modelValue,
-    () => props.mode,
-    definition => emit('update:modelValue', definition),
-  )
-
-  const DefinitionCheckerSection = markRaw(DefinitionCheckerSectionComponent)
-
-  const DefinitionFlagInjectionSection = markRaw(DefinitionFlagInjectionSectionComponent)
-  const DefinitionFlagTemplateSection = markRaw(DefinitionFlagTemplateSectionComponent)
-
-  const DefinitionPatchSection = markRaw(DefinitionPatchSectionComponent)
-
-  const DefinitionRuntimeSection = markRaw(DefinitionRuntimeSectionComponent)
-
-  const { configuration } = usePlatform()
-
-  const patchVerificationEnabled = computed(() =>
-    configuration.value?.experimentalFeatures?.ctfPatchVerificationEnabled === true,
-  )
-
-  const showInteractionKind = computed(() => props.mode === 'Ctf'
-    && (patchVerificationEnabled.value
-      || model.value?.interactionKind === 'PatchVerification'),
-  )
-
-  function setInteractionKind(value: unknown): void {
-    if (!model.value || props.disabled) return
-    const interactionKind = protocolInput(value, ctfInteractionProtocols, model.value.interactionKind)
-    if (interactionKind === 'PatchVerification'
-      && !patchVerificationEnabled.value) return
-    applyCtfInteraction(model.value, interactionKind)
+export function useDefinitionEditor(
+  props: Readonly<{ modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract; disabled: boolean; includeRuntime: boolean; challengeId?: string; savedQuestionIds?: string[] }>,
+  emit: { (event: 'update:modelValue', definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract): void },
+) {
+  const { model, parseFailed } = useDefinitionModel(() => props.modelValue, definition => emit('update:modelValue', definition))
+  const options = [
+    { kind: 'Break', label: 'administration.capability.break' },
+    { kind: 'Fix', label: 'administration.capability.fix' },
+    { kind: 'Check', label: 'administration.capability.check' },
+    { kind: 'Control', label: 'administration.capability.control' },
+    { kind: 'Questionnaire', label: 'administration.capability.questionnaire' },
+  ] as const
+  function setCapability(kind: DefinitionModel['capabilities'][number], enabled: boolean) {
+    if (model.value && !props.disabled) setChallengeCapability(model.value, kind, enabled)
   }
-
   return {
-      ...toRefs(props),
-      model,
-      parseFailed,
-      DefinitionCheckerSection,
-      DefinitionFlagInjectionSection,
-      DefinitionFlagTemplateSection,
-      DefinitionPatchSection,
-      DefinitionRuntimeSection,
-      patchVerificationEnabled,
-      showInteractionKind,
-      setInteractionKind
-    }
+    ...toRefs(props), model, parseFailed, options, setCapability,
+    DefinitionRuntimeSection: markRaw(DefinitionRuntimeSectionComponent),
+    DefinitionFlagTemplateSection: markRaw(DefinitionFlagTemplateSectionComponent),
+    DefinitionFlagInjectionSection: markRaw(DefinitionFlagInjectionSectionComponent),
+    DefinitionPatchSection: markRaw(DefinitionPatchSectionComponent),
+    DefinitionCheckerSection: markRaw(DefinitionCheckerSectionComponent),
+    QuestionnaireCapabilityEditor: markRaw(QuestionnaireCapabilityEditorComponent),
+    ControlCapabilityEditor: markRaw(ControlCapabilityEditorComponent),
+  }
 }
-
-export type DefinitionEditorViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useDefinitionEditor>>>
+export type DefinitionEditorViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useDefinitionEditor>>

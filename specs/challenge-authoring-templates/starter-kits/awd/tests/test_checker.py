@@ -84,6 +84,12 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual([x["read"]["outcome"] for x in result["flags"]], ["Passed", "Passed"])
         self.assertEqual(result["flags"][1]["write"]["outcome"], "NotRequired")
         self.assertNotIn(self.current["flag"], json.dumps(result, ensure_ascii=False))
+        callback = checker.callback_evidence(result, self.task)
+        self.assertEqual([probe["kind"] for probe in callback["probes"]],
+                         ["Connection", "Functionality", "FlagWrite", "CurrentFlagRead", "HistoricalFlagRead"])
+        self.assertTrue(all(probe["result"] == "Passed" for probe in callback["probes"]))
+        self.assertEqual(len(callback["flagContexts"]), 2)
+        self.assertNotIn(self.current["flag"], json.dumps(callback, ensure_ascii=False))
 
     def test_history_loss_reports_recovery_evidence_without_rewriting_history(self):
         path = self.save(self.historical)
@@ -111,7 +117,8 @@ class CheckerTests(unittest.TestCase):
             result = checker.evaluate(self.task, {"main": "127.0.0.1"}, "127.0.0.1", unused.getsockname()[1])
         self.assertEqual(result["connection"]["outcome"], "TargetFailure")
         self.assertIn(result["connection"]["reason"], ["ConnectionRefused", "ConnectTimeout"])
-        self.assertEqual(result["functionality"], checker.probe("Unknown"))
+        self.assertEqual(result["functionality"]["outcome"], "NotExecuted")
+        self.assertEqual(result["functionality"]["reason"], result["connection"]["reason"])
         self.assertEqual(len(result["flags"]), 2)
 
     def test_expired_budget_keeps_manifest_and_never_fabricates_success(self):

@@ -1,4 +1,5 @@
 using NoCTF.Domain.Shared;
+using System.ComponentModel.DataAnnotations;
 
 namespace NoCTF.Domain.Challenges;
 
@@ -32,6 +33,8 @@ public abstract class ChallengeFlag : IConcurrencyTracked
     public DateTimeOffset? ValidUntil { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+    [MaxLength(32768)] public byte[]? ProtectedReadContext { get; set; }
+    [MaxLength(2048)] public string? PublicLocator { get; set; }
     public NoCTF.Domain.Competitions.Awd.AwdFlagIssue? AwdIssue { get; set; }
 }
 

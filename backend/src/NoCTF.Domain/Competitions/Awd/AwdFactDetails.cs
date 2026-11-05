@@ -41,6 +41,9 @@ public sealed class AwdFactDetails
     public bool ManifestComplete { get; set; }
     public bool EvidenceComplete { get; set; }
     public DateTimeOffset? AdjudicatedAt { get; set; }
+    public Guid? BlockingFixFactId { get; set; }
+    public DateTimeOffset? MaintenanceWaitStartedAt { get; set; }
+    public DateTimeOffset? MaintenanceWaitEndedAt { get; set; }
     public int RequiredFlags { get; set; }
     public int ReadableFlags { get; set; }
     public List<AwdFactFlagEvidence> Flags { get; set; } = [];

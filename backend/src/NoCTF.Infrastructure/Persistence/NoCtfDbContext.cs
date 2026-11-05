@@ -55,7 +55,7 @@ public sealed class NoCtfDbContext(
     public DbSet<LiveSoloDownloadEvidence> LiveSoloDownloadEvidences => Set<LiveSoloDownloadEvidence>();
     public DbSet<LiveSoloAttachmentAssignment> LiveSoloAttachmentAssignments => Set<LiveSoloAttachmentAssignment>();
     public DbSet<LiveSoloQuestionGroup> LiveSoloQuestionGroups => Set<LiveSoloQuestionGroup>();
-    public DbSet<LiveSoloChallengeSource> LiveSoloChallengeSources => Set<LiveSoloChallengeSource>();
+    public DbSet<ChallengeSource> ChallengeSources => Set<ChallengeSource>();
     public DbSet<LiveSoloQuestionExposure> LiveSoloQuestionExposures => Set<LiveSoloQuestionExposure>();
     public DbSet<LiveSoloMediaSession> LiveSoloMediaSessions => Set<LiveSoloMediaSession>();
     public DbSet<LiveSoloMediaGrant> LiveSoloMediaGrants => Set<LiveSoloMediaGrant>();
@@ -117,12 +117,9 @@ public sealed class NoCtfDbContext(
     public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion> ChallengeWriteUpVersions => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion>();
     public DbSet<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt> WriteUpUnlockReceipts => Set<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
-    public DbSet<NoCTF.Domain.Theory.Questions.TheoryQuestion> TheoryQuestions => Set<NoCTF.Domain.Theory.Questions.TheoryQuestion>();
-    public DbSet<NoCTF.Domain.Theory.Questions.TheoryQuestionRevision> TheoryQuestionRevisions => Set<NoCTF.Domain.Theory.Questions.TheoryQuestionRevision>();
-    public DbSet<NoCTF.Domain.Theory.Activities.TheoryActivity> TheoryActivities => Set<NoCTF.Domain.Theory.Activities.TheoryActivity>();
-    public DbSet<NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity> CompetitionTheoryActivities => Set<NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity>();
-    public DbSet<NoCTF.Domain.Theory.Papers.TheoryParticipant> TheoryParticipants => Set<NoCTF.Domain.Theory.Papers.TheoryParticipant>();
-    public DbSet<NoCTF.Domain.Theory.Papers.TheoryPaper> TheoryPapers => Set<NoCTF.Domain.Theory.Papers.TheoryPaper>();
+    public DbSet<NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity> QuestionnaireActivities => Set<NoCTF.Domain.Questionnaires.Activities.QuestionnaireActivity>();
+    public DbSet<NoCTF.Domain.Questionnaires.Sessions.QuestionnaireParticipant> QuestionnaireParticipants => Set<NoCTF.Domain.Questionnaires.Sessions.QuestionnaireParticipant>();
+    public DbSet<NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession> QuestionnaireSessions => Set<NoCTF.Domain.Questionnaires.Sessions.QuestionnaireSession>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -239,13 +236,20 @@ public sealed class NoCtfDbContext(
 
     private void EnsureAppendOnlyFactsCore(bool detectSynchronizedChanges)
     {
-        NoCTF.Infrastructure.Theory.TheoryPersistenceInvariants.Validate(ChangeTracker);
+        NoCTF.Infrastructure.Questionnaires.QuestionnairePersistenceInvariants.Validate(ChangeTracker);
         foreach (var entry in ChangeTracker.Entries<GameplayFact>().Where(entry => entry.State is EntityState.Added or EntityState.Modified))
         {
             var fact = entry.Entity;
-            if (fact.Kind == GameplayFactKind.TheoryPaperSubmission
-                ? fact.CompetitionChallengeId is not null || fact.TheoryPaperId is null || fact.TheoryPaperId == Guid.Empty
-                : fact.CompetitionChallengeId is null || fact.CompetitionChallengeId == Guid.Empty || fact.TheoryPaperId is not null)
+            if (fact.Kind == GameplayFactKind.QuestionnaireAttempt)
+            {
+                if (fact.CompetitionId is not null || fact.CompetitionChallengeId is not null || fact.TeamId is not null
+                    || fact.QuestionnaireAssignmentId is null || fact.QuestionnaireAssignmentId == Guid.Empty)
+                    throw new InvalidOperationException("Questionnaire attempts require an independent assignment scope.");
+                continue;
+            }
+            if (fact.CompetitionId is null || fact.CompetitionId == Guid.Empty || fact.QuestionnaireAssignmentId is not null)
+                throw new InvalidOperationException("Competition facts require a competition scope.");
+            if (fact.CompetitionChallengeId is null || fact.CompetitionChallengeId == Guid.Empty)
                 throw new InvalidOperationException("Gameplay facts require exactly the target belonging to their fact kind.");
         }
         SynchronizeTypedConfigurationForeignKeys();
@@ -257,6 +261,7 @@ public sealed class NoCtfDbContext(
         ValidateExternalIdentities();
         // 同步过程可能创建关联记录；检查这些更改一次，后续只读验证共享结果。
         if (detectSynchronizedChanges) ChangeTracker.DetectChanges();
+        NoCTF.Infrastructure.Challenges.Capabilities.QuestionnaireContentInvariants.Validate(ChangeTracker);
         foreach (var entry in ChangeTracker.Entries<IConcurrencyTracked>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
         {
@@ -467,17 +472,9 @@ public sealed class NoCtfDbContext(
         {
             var definition = entry.Entity.Definition
                 ?? throw new InvalidOperationException("Challenge definition is required.");
-            if (definition.Mode != entry.Entity.Mode)
-                throw new InvalidOperationException(
-                    "Challenge definition must match the challenge mode.");
-            if (entry.State == EntityState.Added && definition is AwdChallengeDefinition awd && awd.FlagStores.Count == 0)
-                awd.FlagStores.Add(new NoCTF.Domain.Competitions.Awd.AwdFlagStore
-                {
-                    Id = Guid.CreateVersion7(), ChallengeId = entry.Entity.Id,
-                    InjectionCommand = awd.FlagInjectionCommand,
-                    InjectionTimeoutSeconds = awd.FlagInjectionTimeoutSeconds ?? 30,
-                    TargetServiceName = awd.FlagInjectionServiceName
-                });
+            var capabilityErrors = NoCTF.Application.Challenges.Capabilities.ChallengeCapabilityValidation.Validate(definition);
+            if (capabilityErrors.Count != 0)
+                throw new InvalidOperationException($"Challenge capability definitions are invalid: {string.Join(", ", capabilityErrors.Select(error => $"{error.Capability}/{error.Code}"))}.");
             ChallengeDefinitionGraph.AssignChallengeId(definition, entry.Entity.Id);
         }
 
@@ -490,8 +487,8 @@ public sealed class NoCtfDbContext(
                 throw new InvalidOperationException(
                     "Competition challenge rules must match the competition challenge mode.");
             rules.CompetitionChallengeId = entry.Entity.Id;
-            foreach (var reward in rules.BloodRewards)
-                reward.CompetitionChallengeId = entry.Entity.Id;
+            if (rules is CtfCompetitionChallengeRules ctfRules)
+                foreach (var reward in ctfRules.BloodRewards) reward.CompetitionChallengeId = entry.Entity.Id;
         }
     }
 
@@ -639,6 +636,11 @@ public sealed class NoCtfDbContext(
                 nonOwner.Entity.ActiveSlot = null;
 
             var instance = ownerEntry.Entity;
+            if (instance.ActiveSlot is { } previousSlot && previousSlot.Key != group.Key)
+            {
+                Remove(previousSlot);
+                instance.ActiveSlot = null;
+            }
             if (instance.ActiveSlot is not null)
                 continue;
             // A reset may already have handed this slot to a replacement in another

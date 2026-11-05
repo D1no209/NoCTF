@@ -20,7 +20,8 @@ public sealed class KubernetesNamedServicesIntegrationTests
             Skip.Test("Real Kubernetes integration requires NOCTF_KUBERNETES_INTEGRATION=true and a configured cluster.");
         var context = Required("NOCTF_KUBERNETES_CONTEXT");
         if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated integration cluster.");
-        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(currentContext: context));
+        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(
+            Environment.GetEnvironmentVariable("KUBECONFIG"), currentContext: context));
         var scope = $"noctf-it-{Guid.NewGuid():N}";
         await client.CoreV1.CreateNamespaceAsync(new() { Metadata = new() { Name = scope,
             Labels = new Dictionary<string, string> { ["noctf.io/purpose"] = "challenge-runtime" } } }, cancellationToken: ct);
