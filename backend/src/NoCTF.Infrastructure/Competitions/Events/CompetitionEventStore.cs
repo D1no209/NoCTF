@@ -375,8 +375,12 @@ public sealed class CompetitionEventStore(
         {
             var competition = await db.Competitions.AsNoTracking()
                 .Where(item => item.Id == filter.CompetitionId)
-                .Select(item => new { item.Mode, item.TracksEnabled, item.Tracks })
+                .Select(item => new { item.Mode, item.TracksEnabled, item.Tracks, item.FrozenStartAt, item.HiddenStartAt })
                 .SingleAsync(cancellationToken);
+            if (CtfSolveBroadcastPolicy.IsBlackout(competition.Mode, competition.FrozenStartAt,
+                    competition.HiddenStartAt, (clock ?? TimeProvider.System).GetUtcNow()))
+                query = query.Where(item => item.Visibility != CompetitionEventVisibility.Public
+                    || !CtfSolveBroadcastPolicy.EventKinds.Contains(item.Kind));
             var internalTrackKeys = CompetitionTrackConfiguration.EffectiveFor(
                     competition.Mode,
                     competition.TracksEnabled,

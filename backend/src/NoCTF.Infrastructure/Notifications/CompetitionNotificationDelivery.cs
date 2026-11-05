@@ -27,6 +27,16 @@ public sealed class CompetitionNotificationDelivery(
         Guid? requiredTeamId,
         CancellationToken ct)
     {
+        if (kind == NotificationKind.BloodAwarded)
+        {
+            var competition = await db.Competitions.AsNoTracking()
+                .Where(item => item.Id == competitionId)
+                .Select(item => new { item.Mode, item.FrozenStartAt, item.HiddenStartAt })
+                .SingleOrDefaultAsync(ct);
+            if (competition is null || CtfSolveBroadcastPolicy.IsBlackout(competition.Mode,
+                    competition.FrozenStartAt, competition.HiddenStartAt, timeProvider.GetUtcNow()))
+                return;
+        }
         _ = entityId;
         var targetType = requiredTeamId is null
             ? NotificationTargetType.CompetitionParticipants

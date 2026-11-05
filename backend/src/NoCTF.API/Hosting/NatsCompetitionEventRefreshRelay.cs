@@ -9,6 +9,8 @@ using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.API.Endpoints.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.API.Hosting;
 
@@ -35,6 +37,15 @@ public sealed class NatsCompetitionEventRefreshRelay(
                 await using var scope = scopes.CreateAsyncScope();
                 if (!await scope.ServiceProvider.GetRequiredService<ICompetitionEventApplicabilityReader>()
                     .CanPublishAsync(notification.CompetitionId, notification.Kind, stoppingToken)) continue;
+                if (notification.Visibility == CompetitionEventVisibility.Public
+                    && CtfSolveBroadcastPolicy.EventKinds.Contains(notification.Kind))
+                {
+                    var visibility = await scope.ServiceProvider.GetRequiredService<ICompetitionVisibilityAccess>()
+                        .ResolveAsync(Guid.Empty, notification.CompetitionId,
+                            scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow(), stoppingToken);
+                    if (visibility is { GameMode: GameMode.Ctf,
+                            Visibility: CompetitionLeaderboardVisibility.Blackout }) continue;
+                }
                 var clients = notification.Kind == CompetitionEventKind.CompetitionAudienceChanged
                     ? await audiences.AllKnownAsync(notification.CompetitionId, stoppingToken)
                     : await audiences.ForEventAsync(notification.CompetitionId, notification.Visibility,

@@ -207,6 +207,22 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(observer.Items!.Single(item => item.Kind == CompetitionEventKind.CompetitionUpdated).Reason)
                 .DoesNotContain("super-secret-token");
 
+            var bloodId = await store.RecordAsync(new(ids.CompetitionId, CompetitionEventKind.FirstBloodAwarded,
+                CompetitionEventLevel.Information, CompetitionEventVisibility.Public, now,
+                TeamId: ids.TeamAId, CompetitionChallengeId: ids.CompetitionChallengeId), ct);
+            await db.SaveChangesAsync(ct);
+            await db.Competitions.Where(c => c.Id == ids.CompetitionId)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.HiddenStartAt, now.AddMinutes(-1)), ct);
+            var blackedOut = await store.QueryAsync(Query(ids, ids.ParticipantId, now), ct);
+            await Assert.That(blackedOut.Items!.Any(e => e.Id == bloodId)).IsFalse();
+            await Assert.That(blackedOut.Items!.Any(e => e.Kind == CompetitionEventKind.HintPublished)).IsTrue();
+            var staffBlackout = await store.QueryAsync(Query(ids, ids.ObserverId, now), ct);
+            await Assert.That(staffBlackout.Items!.Any(e => e.Id == bloodId)).IsTrue();
+            await db.Competitions.Where(c => c.Id == ids.CompetitionId)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.HiddenStartAt, (DateTimeOffset?)null), ct);
+            var restored = await store.QueryAsync(Query(ids, ids.ParticipantId, now), ct);
+            await Assert.That(restored.Items!.Any(e => e.Id == bloodId)).IsTrue();
+
             var warningOnly = await store.QueryAsync(
                 Query(ids, ids.ManagerId, now) with
                 {
@@ -262,7 +278,7 @@ public sealed class CompetitionEventPersistenceTests
 
             var filteredParticipant = await store.QueryAsync(
                 Query(ids, ids.ParticipantId, now), ct);
-            await Assert.That(filteredParticipant.Items!).Count().IsEqualTo(2);
+            await Assert.That(filteredParticipant.Items!).Count().IsEqualTo(3);
             await Assert.That(filteredParticipant.Items!.Any(item => item.TeamId == ids.TeamBId))
                 .IsFalse();
             var staffAfterInternalEvent = await store.QueryAsync(
@@ -278,7 +294,7 @@ public sealed class CompetitionEventPersistenceTests
             using var reader = new StreamReader(managerExport.Export!.Content, Encoding.UTF8);
             var export = await reader.ReadToEndAsync(ct);
             await Assert.That(export.Split('\n', StringSplitOptions.RemoveEmptyEntries)).Count()
-                .IsEqualTo(6);
+                .IsEqualTo(7);
             await Assert.That(export).DoesNotContain("super-secret-token");
 
             var observerFlag = await store.AccessGameplayFactValueAsync(new(
@@ -363,7 +379,7 @@ public sealed class CompetitionEventPersistenceTests
             var bot = await store.QueryAsync(Query(ids, ids.BotId, now), ct);
             await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Available);
             await Assert.That(outbox.Messages.OfType<CompetitionEventCommitted>()).Count()
-                .IsEqualTo(11);
+                .IsEqualTo(12);
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);

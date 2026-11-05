@@ -289,6 +289,15 @@ public sealed class CompetitionWebhookBloodReadinessTests
                     await Assert.That(retriedBody.RootElement.GetProperty("data")
                             .GetProperty("capturedAt").GetDateTimeOffset() > firstCapturedAt)
                         .IsTrue();
+                    competition.HiddenStartAt = clock.GetUtcNow();
+                    await db.SaveChangesAsync(ct);
+                    var blockedRetry = await store.PrepareDeliveryAsync(command, ct);
+                    await Assert.That(blockedRetry.State).IsEqualTo(CompetitionWebhookDeliveryReadState.Suppressed);
+                    await Assert.That(blockedRetry.Body).IsNull();
+                    competition.HiddenStartAt = null;
+                    await db.SaveChangesAsync(ct);
+                    clock.Advance(TimeSpan.FromSeconds(1));
+                    continue;
                 }
                 await store.RecordHttpCompletedAsync(command,
                     new(CompetitionWebhookSendResult.Delivered, 204),
