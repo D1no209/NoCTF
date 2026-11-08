@@ -7,10 +7,10 @@ import type { UiMessage } from '../../../../utils/i18n'
 import { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 
-import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
+import { adminCreateManualAdjustment, createTeamWriteUpConsultation, prepareTeamWriteUpDownload, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
-import { downloadSdkFile } from '../../../../utils/download'
+import { startTeamWriteUpBrowserDownload } from '../../../../utils/download'
 
 type ReviewItem = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
 type ChallengeScore = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
@@ -108,13 +108,9 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     if (!writeUp?.teamId || downloadPending.value) return
     downloadPending.value = true
     try {
-      await downloadSdkFile(
-        downloadTeamWriteUp({
-          path: { competitionId, teamId: writeUp.teamId },
-          parseAs: 'blob',
-        }),
-        writeUp.fileName ?? `writeup-${writeUp.teamId}.pdf`,
-      )
+      const result = await prepareTeamWriteUpDownload({ path: { competitionId, teamId: writeUp.teamId } })
+      if (result.error || !result.data?.downloadUrl) throw result.error
+      startTeamWriteUpBrowserDownload(result.data.downloadUrl)
     }
     catch (error) {
       toast.error(parseApiError(error, describeMessage('writeUp.downloadFailed')).displayMessage)

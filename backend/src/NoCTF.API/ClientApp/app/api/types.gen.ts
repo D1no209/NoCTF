@@ -391,6 +391,10 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse = {
     netPoints?: number;
 };
 
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpBrowserDownloadResponse = {
+    downloadUrl?: string;
+};
+
 export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse = {
     code?: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode;
     detail?: string;
@@ -7767,6 +7771,73 @@ export type ListTeamWriteUpsResponses = {
 };
 
 export type ListTeamWriteUpsResponse = ListTeamWriteUpsResponses[keyof ListTeamWriteUpsResponses];
+
+export type PrepareMyTeamWriteUpDownloadData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/me/writeup/browser-download';
+};
+
+export type PrepareMyTeamWriteUpDownloadErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PrepareMyTeamWriteUpDownloadResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpBrowserDownloadResponse;
+};
+
+export type PrepareMyTeamWriteUpDownloadResponse = PrepareMyTeamWriteUpDownloadResponses[keyof PrepareMyTeamWriteUpDownloadResponses];
+
+export type PrepareTeamWriteUpDownloadData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/browser-download';
+};
+
+export type PrepareTeamWriteUpDownloadErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PrepareTeamWriteUpDownloadResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpBrowserDownloadResponse;
+};
+
+export type PrepareTeamWriteUpDownloadResponse = PrepareTeamWriteUpDownloadResponses[keyof PrepareTeamWriteUpDownloadResponses];
 
 export type PreviewTeamWriteUpData = {
     body?: never;

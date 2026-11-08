@@ -108,7 +108,15 @@ export function startAttachmentBrowserDownload(downloadUrl: string): void {
   anchor.remove()
 }
 
-/** Native, authenticated WriteUp transfer. Only the two presentation switches may appear in the URL. */
+/** Native, authenticated team WriteUp transfer through a path-scoped browser grant. */
+export function startTeamWriteUpBrowserDownload(downloadUrl: string): void {
+  const url = new URL(downloadUrl, window.location.origin)
+  if (!/^\/api\/v1\/competitions\/[\da-f-]{36}\/teams\/(?:me|[\da-f-]{36})\/writeup\/content$/i.test(url.pathname))
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
+  startAttachmentBrowserDownload(downloadUrl)
+}
+
+/** Native, authenticated challenge WriteUp transfer. */
 export function startWriteUpBrowserDownload(downloadUrl: string): void {
   const url = new URL(downloadUrl, window.location.origin)
   const keys = [...url.searchParams.keys()]

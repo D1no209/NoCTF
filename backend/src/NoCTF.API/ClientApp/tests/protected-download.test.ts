@@ -1,6 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
-import { startAttachmentBrowserDownload, readProtectedDownload } from '../app/utils/download'
+import { startAttachmentBrowserDownload, startTeamWriteUpBrowserDownload, readProtectedDownload } from '../app/utils/download'
 
 describe('protected downloads', () => {
   test('returns the generated client blob and decodes the response file name', async () => {
@@ -59,6 +59,14 @@ describe('protected downloads', () => {
       expect(() => startAttachmentBrowserDownload('https://evil.test/file')).toThrow()
       expect(() => startAttachmentBrowserDownload('/file?access_token=secret')).toThrow()
       expect(() => startAttachmentBrowserDownload('javascript:alert(1)')).toThrow()
+      const own = '/api/v1/competitions/11111111-1111-1111-1111-111111111111/teams/me/writeup/content'
+      const staff = own.replace('/me/', '/22222222-2222-2222-2222-222222222222/')
+      expect(startTeamWriteUpBrowserDownload(own)).toBeUndefined()
+      expect(startTeamWriteUpBrowserDownload(staff)).toBeUndefined()
+      expect(clicked.slice(-2)).toEqual(['https://noctf.test' + own, 'https://noctf.test' + staff])
+      expect(() => startTeamWriteUpBrowserDownload('https://evil.test' + own)).toThrow()
+      expect(() => startTeamWriteUpBrowserDownload(own + '?access_token=secret')).toThrow()
+      expect(() => startTeamWriteUpBrowserDownload('/api/v1/admin/platform/users')).toThrow()
     } finally {
       for (const [key, original] of originals) { if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key) }
     }

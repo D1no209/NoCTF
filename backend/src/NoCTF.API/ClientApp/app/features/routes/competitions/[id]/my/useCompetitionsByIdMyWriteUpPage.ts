@@ -5,9 +5,9 @@ import { useNow } from '@vueuse/core'
 import { BookOpen, Download, Eye, FileText } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
 
-import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
+import { downloadMyTeamWriteUp, getMyTeamWriteUp, prepareMyTeamWriteUpDownload, replaceMyTeamWriteUp } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api'
-import { downloadSdkFile, readProtectedDownload } from '../../../../../utils/download'
+import { startTeamWriteUpBrowserDownload, readProtectedDownload } from '../../../../../utils/download'
 import MySingleWriteUpsComponent from '~/features/writeups/MySingleWriteUps.vue'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
 
@@ -154,13 +154,9 @@ export function useCompetitionsByIdMyWriteUpPage() {
     if (!writeUp.value || downloadPending.value) return
     downloadPending.value = true
     try {
-      await downloadSdkFile(
-        downloadMyTeamWriteUp({
-          path: { competitionId },
-          parseAs: 'blob',
-        }),
-        writeUp.value.fileName ?? 'writeup.pdf',
-      )
+      const result = await prepareMyTeamWriteUpDownload({ path: { competitionId } })
+      if (result.error || !result.data?.downloadUrl) throw result.error
+      startTeamWriteUpBrowserDownload(result.data.downloadUrl)
     }
     catch (error) {
       toast.error(parseApiError(error, describeMessage('writeUp.downloadFailed')).displayMessage)

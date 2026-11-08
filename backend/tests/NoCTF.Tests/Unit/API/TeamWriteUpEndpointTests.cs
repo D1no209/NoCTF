@@ -33,6 +33,62 @@ public sealed class TeamWriteUpEndpointTests
     private static readonly Guid ActorId = Guid.CreateVersion7();
 
     [Test]
+    public async Task Another_request_completes_while_native_Pdf_stream_is_still_open()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var app = await CreateApplicationAsync(true, false,
+            openFile: () => new DelayedPdfStream(started, release));
+        using var client = app.GetTestClient();
+        var downloading = client.GetAsync($"/api/v1/competitions/{CompetitionId}/teams/{TeamId}/writeup/content",
+            HttpCompletionOption.ResponseHeadersRead);
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            using var other = await client.GetAsync($"/api/v1/competitions/{CompetitionId}/writeups")
+                .WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.That(other.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(release.Task.IsCompleted).IsFalse();
+        }
+        finally { release.TrySetResult(); }
+        using var completed = await downloading;
+        await Assert.That(await completed.Content.ReadAsStringAsync()).StartsWith("%PDF-");
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task Native_download_preparation_returns_only_a_path_and_scoped_cookie(bool own)
+    {
+        await using var app = await CreateApplicationAsync(canObserve: true, canJudge: false);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "WRITEUP_ACCESS_TOKEN");
+        var scope = own ? "me" : TeamId.ToString();
+        var prefix = $"/api/v1/competitions/{CompetitionId}/teams/{scope}/writeup";
+        using var response = await client.PostAsync(prefix + "/browser-download", null);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<TeamWriteUpBrowserDownloadResponse>();
+        await Assert.That(result!.DownloadUrl).IsEqualTo(prefix + "/content");
+        var cookie = response.Headers.GetValues("Set-Cookie").Single();
+        await Assert.That(cookie).DoesNotContain("WRITEUP_ACCESS_TOKEN");
+        await Assert.That(cookie.ToLowerInvariant()).Contains("httponly");
+        await Assert.That(cookie).Contains("path=" + result.DownloadUrl);
+        using var file = await client.GetAsync(result.DownloadUrl);
+        await Assert.That(file.Content.Headers.ContentDisposition!.DispositionType).IsEqualTo("attachment");
+    }
+
+    [Test]
+    public async Task Non_staff_cannot_prepare_another_teams_download()
+    {
+        await using var app = await CreateApplicationAsync(canObserve: false, canJudge: false);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "TOKEN");
+        using var response = await client.PostAsync($"/api/v1/competitions/{CompetitionId}/teams/{TeamId}/writeup/browser-download", null);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(response.Headers.Contains("Set-Cookie")).IsFalse();
+    }
+
+    [Test]
     public async Task Preview_ticket_expires_after_ten_minutes()
     {
         var clock = new FakeTimeProvider(
@@ -211,7 +267,8 @@ public sealed class TeamWriteUpEndpointTests
     private static async Task<WebApplication> CreateApplicationAsync(
         bool canObserve,
         bool canJudge,
-        TeamWriteUpSubmissionContext? submissionContext = null)
+        TeamWriteUpSubmissionContext? submissionContext = null,
+        Func<Stream>? openFile = null)
     {
         var reference = new TeamWriteUpReference(
             TeamId,
@@ -234,6 +291,7 @@ public sealed class TeamWriteUpEndpointTests
             .Returns([]);
         store.FindAsync(CompetitionId, TeamId, Arg.Any<CancellationToken>())
             .Returns(reference);
+        store.FindMineAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>()).Returns(reference);
         store.FindSubmissionContextAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>())
             .Returns(submissionContext ?? new TeamWriteUpSubmissionContext(
                 TeamId,
@@ -255,7 +313,7 @@ public sealed class TeamWriteUpEndpointTests
                 }));
         var objects = Substitute.For<IStore>();
         objects.OpenRead(reference.ObjectKey, Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromResult<Stream>(new MemoryStream(
+            .Returns(_ => Task.FromResult(openFile?.Invoke() ?? new MemoryStream(
                 "%PDF-1.7\ntest\n%%EOF"u8.ToArray())));
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var manager = new ManageTeamWriteUps(
@@ -271,10 +329,10 @@ public sealed class TeamWriteUpEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListTeamWriteUpsEndpoint).Assembly];
             options.Filter = type => type == typeof(ListTeamWriteUpsEndpoint)
-                || type == typeof(DownloadTeamWriteUpEndpoint)
-                || type == typeof(UploadMyTeamWriteUpEndpoint)
-                || type == typeof(IssueTeamWriteUpPreviewEndpoint)
-                || type == typeof(PreviewTeamWriteUpEndpoint);
+                || type == typeof(DownloadTeamWriteUpEndpoint) || type == typeof(DownloadMyTeamWriteUpEndpoint)
+                || type == typeof(UploadMyTeamWriteUpEndpoint) || type == typeof(IssueTeamWriteUpPreviewEndpoint)
+                || type == typeof(PreviewTeamWriteUpEndpoint) || type == typeof(PrepareMyTeamWriteUpDownloadEndpoint)
+                || type == typeof(PrepareTeamWriteUpDownloadEndpoint);
         });
         builder.Services
             .AddAuthentication(options =>
@@ -290,6 +348,8 @@ public sealed class TeamWriteUpEndpointTests
             Options.Create(new RefreshHttpOptions { RefreshCookieSecure = false }));
         builder.Services.AddSingleton(manager);
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddDataProtection();
+        builder.Services.AddSingleton<AttachmentBrowserDownload>();
         builder.Services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(
             new TestAuthorizer(canObserve, canJudge));
@@ -301,6 +361,30 @@ public sealed class TeamWriteUpEndpointTests
         app.UseNoCtfEndpoints();
         await app.StartAsync();
         return app;
+    }
+
+    private sealed class DelayedPdfStream(TaskCompletionSource started, TaskCompletionSource release) : Stream
+    {
+        private readonly MemoryStream content = new("%PDF-1.7\ntest\n%%EOF"u8.ToArray());
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            started.TrySetResult();
+            await release.Task.WaitAsync(ct);
+            return content.Read(buffer.Span);
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) { if (disposing) content.Dispose(); base.Dispose(disposing); }
     }
 
     private sealed class TestAuthorizer(bool canObserve, bool canJudge)

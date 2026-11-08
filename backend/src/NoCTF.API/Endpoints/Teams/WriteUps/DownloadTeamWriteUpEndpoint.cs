@@ -18,7 +18,7 @@ public sealed class DownloadTeamWriteUpEndpoint(
         Get("/competitions/{competitionId}/teams/{teamId}/writeup/content");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ApiRequestMetricsMetadata(
-            NoCTF.Application.Observability.ApiRequestKind.Download)));
+            NoCTF.Application.Observability.ApiRequestKind.Download), new AttachmentBrowserDownloadMetadata()));
         Description(builder => builder
             .WithName("DownloadTeamWriteUp")
             .Produces<TeamWriteUpBinaryResponse>(StatusCodes.Status200OK, "application/pdf"));

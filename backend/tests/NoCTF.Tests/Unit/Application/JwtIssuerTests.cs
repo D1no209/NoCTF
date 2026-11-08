@@ -15,7 +15,8 @@ public class JwtIssuerTests
     [Test]
     public async Task Refresh_preserves_Mfa_time_and_access_expiry_is_clipped_to_the_Mfa_deadline()
     {
-        var now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        // JWT 验证器使用系统时钟，为下面虚拟时钟推进十秒预留余量。
+        var now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()).AddMinutes(-1);
         var clock = new FakeTimeProvider(now);
         var issuer = new JwtIssuer(Options.Create(new AuthenticationTokenOptions { SigningKey = new string('x', 32) }), clock);
         var user = new AuthenticatedUser(Guid.NewGuid(), "mfa-user", UserRole.User, UserKind.Human, 1);
