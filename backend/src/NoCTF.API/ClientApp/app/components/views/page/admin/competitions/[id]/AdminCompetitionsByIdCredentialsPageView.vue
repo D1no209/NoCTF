@@ -22,7 +22,7 @@ const {
         <div v-else class="flex flex-wrap items-end gap-3">
           <Field>
             <FieldLabel for="credential-import-file">{{ $t('administration.credentials.importFile') }}</FieldLabel>
-            <Input id="credential-import-file" type="file" accept=".csv,.xlsx" @change="chooseFile" />
+            <FileUpload id="credential-import-file" accept=".csv,.xlsx" @change="chooseFile" />
             <FieldDescription>{{ $t('administration.credentials.importHint') }}</FieldDescription>
           </Field>
           <Button :disabled="!selectedFile || importPending" @click="importCredentials">
@@ -54,16 +54,16 @@ const {
             <Spinner v-if="rotatePending" data-icon="inline-start" />{{ $t('administration.credentials.rotateBatch') }}
           </Button>
         </div>
-        <div v-if="batch?.rows?.length" class="overflow-x-auto">
-          <table class="w-full min-w-[900px] text-sm">
-            <thead><tr class="border-b text-left"><th class="p-2">{{ $t('administration.credentials.username') }}</th><th class="p-2">{{ $t('administration.credentials.email') }}</th><th class="p-2">{{ $t('administration.credentials.team') }}</th><th class="p-2">{{ $t('administration.credentials.captain') }}</th><th class="p-2">{{ $t('administration.credentials.password') }}</th><th class="p-2" /></tr></thead>
-            <tbody>
-              <tr v-for="row in batch.rows" :key="`${row.userName}-${row.teamName}`" class="border-b">
-                <td class="p-2 font-mono">{{ row.userName }}</td><td class="p-2">{{ row.email || '—' }}</td><td class="p-2">{{ row.teamName }}</td><td class="p-2">{{ row.captain ? $t('administration.credentials.captainYes') : $t('administration.credentials.captainNo') }}</td><td class="p-2 font-mono">{{ row.password }}</td><td class="p-2 text-right"><Button size="sm" variant="ghost" :disabled="rotatePending" @click="rotateUser(row.userId)">{{ $t('administration.credentials.rotateUser') }}</Button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ScrollSurface v-if="batch?.rows?.length" axis="x" class="max-w-full rounded-lg border">
+          <Table class="min-w-[900px]">
+            <TableHeader><TableRow><TableHead>{{ $t('administration.credentials.username') }}</TableHead><TableHead>{{ $t('administration.credentials.email') }}</TableHead><TableHead>{{ $t('administration.credentials.team') }}</TableHead><TableHead>{{ $t('administration.credentials.captain') }}</TableHead><TableHead>{{ $t('administration.credentials.password') }}</TableHead><TableHead class="text-right" /></TableRow></TableHeader>
+            <TableBody>
+              <TableRow v-for="row in batch.rows" :key="`${row.userId}-${row.teamName}`">
+                <TableCell class="font-mono">{{ row.userName }}</TableCell><TableCell>{{ row.email || '—' }}</TableCell><TableCell>{{ row.teamName }}</TableCell><TableCell>{{ row.captain ? $t('administration.credentials.captainYes') : $t('administration.credentials.captainNo') }}</TableCell><TableCell class="font-mono">{{ row.password }}</TableCell><TableCell class="text-right"><Button size="sm" variant="ghost" :disabled="rotatePending" @click="rotateUser(row.userId)">{{ $t('administration.credentials.rotateUser') }}</Button></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </ScrollSurface>
         <Empty v-else><EmptyHeader><EmptyTitle>{{ $t('administration.credentials.empty') }}</EmptyTitle></EmptyHeader></Empty>
       </CardContent>
     </Card>
