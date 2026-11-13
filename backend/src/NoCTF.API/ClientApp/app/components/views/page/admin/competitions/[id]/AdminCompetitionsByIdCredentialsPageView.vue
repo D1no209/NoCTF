@@ -5,7 +5,7 @@ import type { AdminCompetitionsByIdCredentialsPageViewState } from '~/features/r
 const props = defineProps<{ state: AdminCompetitionsByIdCredentialsPageViewState }>()
 const {
   canJudge, selectedFile, chooseFile, importPending, importError, importCredentials,
-  batch, batchId, loadPending, loadBatch, rotatePending, rotateBatch, rotateUser,
+  batch, batchId, batches, loadPending, loadBatch, rotatePending, rotateBatch, rotateUser,
   downloadPackage, downloadPdf, printPage,
 } = toRefs(props.state)
 </script>
@@ -40,7 +40,14 @@ const {
       </CardHeader>
       <CardContent class="flex flex-col gap-4">
         <div class="flex flex-wrap items-end gap-3">
-          <Field>
+          <Field v-if="batches.length">
+            <FieldLabel for="credential-batch-id">{{ $t('administration.credentials.batchId') }}</FieldLabel>
+            <Select v-model="batchId">
+              <SelectTrigger id="credential-batch-id" class="w-80"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem v-for="item in batches" :key="item.batchId" :value="item.batchId!">{{ item.sourceFileName }} · {{ item.batchId }}</SelectItem></SelectContent>
+            </Select>
+          </Field>
+          <Field v-else>
             <FieldLabel for="credential-batch-id">{{ $t('administration.credentials.batchId') }}</FieldLabel>
             <Input id="credential-batch-id" v-model="batchId" class="w-80 font-mono" />
           </Field>

@@ -56,6 +56,7 @@ internal static class CompetitionInfrastructure
         services.AddSingleton<CompetitionCredentialExportService>();
         services.AddScoped<ImportCompetitionCredentials>();
         services.AddScoped<ReadCompetitionCredentialBatch>();
+        services.AddScoped<ListCompetitionCredentialBatches>();
         services.AddScoped<RotateCompetitionCredentialBatch>();
         services.AddScoped<RotateCompetitionCredentialUser>();
         services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, Awdp.AwdpRoundScheduleSource>();

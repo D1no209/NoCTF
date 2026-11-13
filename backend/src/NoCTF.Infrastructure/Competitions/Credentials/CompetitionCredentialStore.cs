@@ -204,6 +204,26 @@ public sealed class CompetitionCredentialStore(
             }).ToArray());
     }
 
+    public async Task<IReadOnlyList<CompetitionCredentialBatchSummary>> ListBatchesAsync(
+        Guid competitionId,
+        Guid actorUserId,
+        CancellationToken ct)
+    {
+        if (!await authorizer.CanJudgeAsync(actorUserId, competitionId, ct))
+            return [];
+        return await db.CompetitionCredentialBatches.AsNoTracking()
+            .Where(batch => batch.CompetitionId == competitionId)
+            .OrderByDescending(batch => batch.CreatedAt)
+            .Select(batch => new CompetitionCredentialBatchSummary(
+                batch.Id,
+                batch.CompetitionId,
+                batch.CreatedAt,
+                batch.SourceFileName,
+                batch.Credentials.Count,
+                batch.Credentials.Select(value => (int?)value.PasswordVersion).Max() ?? 0))
+            .ToArrayAsync(ct);
+    }
+
     public async Task<CompetitionCredentialMutationResult> RotateBatchAsync(
         CompetitionCredentialBatchRequest request,
         CancellationToken ct)

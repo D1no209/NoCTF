@@ -25930,6 +25930,49 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin List Competition Credential Batches",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/credential-batches.",
+        "operationId": "AdminListCompetitionCredentialBatches",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsListCompetitionCredentialBatchesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/rotate": {
       "post": {
         "tags": [
@@ -54168,6 +54211,47 @@
             "type": "string",
             "format": "binary",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsListCompetitionCredentialBatchesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceFileName": {
+            "type": "string"
+          },
+          "credentialCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passwordVersion": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

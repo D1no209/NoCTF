@@ -6354,6 +6354,19 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetit
     file?: Blob | File | null;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsListCompetitionCredentialBatchesResponse = {
+    items?: Array<NoCtfApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary>;
+};
+
+export type NoCtfApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary = {
+    batchId?: string;
+    competitionId?: string;
+    createdAt?: string;
+    sourceFileName?: string;
+    credentialCount?: number;
+    passwordVersion?: number;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsRotateCompetitionCredentialUserResponse = {
     password?: string;
 };
@@ -20389,6 +20402,35 @@ export type AdminImportCompetitionCredentialsResponses = {
 };
 
 export type AdminImportCompetitionCredentialsResponse = AdminImportCompetitionCredentialsResponses[keyof AdminImportCompetitionCredentialsResponses];
+
+export type AdminListCompetitionCredentialBatchesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches';
+};
+
+export type AdminListCompetitionCredentialBatchesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListCompetitionCredentialBatchesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCredentialsListCompetitionCredentialBatchesResponse;
+};
+
+export type AdminListCompetitionCredentialBatchesResponse = AdminListCompetitionCredentialBatchesResponses[keyof AdminListCompetitionCredentialBatchesResponses];
 
 export type AdminRotateCompetitionCredentialBatchData = {
     body?: never;

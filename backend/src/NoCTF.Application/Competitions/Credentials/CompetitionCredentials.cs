@@ -81,6 +81,14 @@ public sealed record CompetitionCredentialBatchView(
     int PasswordVersion,
     IReadOnlyList<CompetitionCredentialDownloadRow> Rows);
 
+public sealed record CompetitionCredentialBatchSummary(
+    Guid BatchId,
+    Guid CompetitionId,
+    DateTimeOffset CreatedAt,
+    string SourceFileName,
+    int CredentialCount,
+    int PasswordVersion);
+
 public sealed record CompetitionCredentialBatchRequest(
     Guid CompetitionId,
     Guid BatchId,
@@ -107,6 +115,11 @@ public interface ICompetitionCredentialStore
         CompetitionCredentialBatchRequest request,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<CompetitionCredentialBatchSummary>> ListBatchesAsync(
+        Guid competitionId,
+        Guid actorUserId,
+        CancellationToken cancellationToken);
+
     Task<CompetitionCredentialMutationResult> RotateBatchAsync(
         CompetitionCredentialBatchRequest request,
         CancellationToken cancellationToken);
@@ -130,6 +143,15 @@ public sealed class ReadCompetitionCredentialBatch(ICompetitionCredentialStore s
         CompetitionCredentialBatchRequest request,
         CancellationToken cancellationToken = default) =>
         store.ReadBatchAsync(request, cancellationToken);
+}
+
+public sealed class ListCompetitionCredentialBatches(ICompetitionCredentialStore store)
+{
+    public Task<IReadOnlyList<CompetitionCredentialBatchSummary>> ExecuteAsync(
+        Guid competitionId,
+        Guid actorUserId,
+        CancellationToken cancellationToken = default) =>
+        store.ListBatchesAsync(competitionId, actorUserId, cancellationToken);
 }
 
 public sealed class RotateCompetitionCredentialBatch(ICompetitionCredentialStore store)

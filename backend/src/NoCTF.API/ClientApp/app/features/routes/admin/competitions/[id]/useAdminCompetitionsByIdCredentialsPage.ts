@@ -6,11 +6,13 @@ import {
   adminDownloadCompetitionCredentialBatch,
   adminDownloadCompetitionCredentialBatchPdf,
   adminGetCompetitionCredentialBatch,
+  adminListCompetitionCredentialBatches,
   adminImportCompetitionCredentials,
   adminRotateCompetitionCredentialBatch,
   adminRotateCompetitionCredentialUser,
 } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse } from '../../../../../api'
+import type { NoCtfApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { downloadSdkFile } from '../../../../../utils/download'
 
@@ -21,6 +23,7 @@ export function useAdminCompetitionsByIdCredentialsPage() {
   const importError = ref<UiMessage | null>(null)
   const batch = ref<NoCtfapiEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse | null>(null)
   const batchId = ref('')
+  const batches = ref<NoCtfApplicationCompetitionsCredentialsCompetitionCredentialBatchSummary[]>([])
   const loadPending = ref(false)
   const rotatePending = ref(false)
 
@@ -49,6 +52,16 @@ export function useAdminCompetitionsByIdCredentialsPage() {
     }
   }
 
+  async function loadBatches(): Promise<void> {
+    const { data, error } = await adminListCompetitionCredentialBatches({ path: { competitionId } })
+    if (error || !data) return
+    batches.value = data.items ?? []
+    if (!batchId.value && batches.value[0]?.batchId) {
+      batchId.value = batches.value[0].batchId
+      await loadBatch()
+    }
+  }
+
   async function importCredentials(): Promise<void> {
     if (!selectedFile.value || importPending.value) return
     importPending.value = true
@@ -63,6 +76,7 @@ export function useAdminCompetitionsByIdCredentialsPage() {
         throw new Error(data.issues?.map(issue => issue.message).join('；') || translate('administration.credentials.importFailed'))
       batchId.value = data.batchId
       await loadBatch()
+      await loadBatches()
       toast.success(describeMessage('administration.credentials.imported', {
         users: data.createdUsers ?? 0,
         teams: data.createdTeams ?? 0,
@@ -130,6 +144,8 @@ export function useAdminCompetitionsByIdCredentialsPage() {
     }
   }
 
+  onMounted(() => { void loadBatches() })
+
   return {
     canJudge,
     selectedFile,
@@ -139,8 +155,10 @@ export function useAdminCompetitionsByIdCredentialsPage() {
     importCredentials,
     batch,
     batchId,
+    batches,
     loadPending,
     loadBatch,
+    loadBatches,
     rotatePending,
     rotateBatch,
     rotateUser,
