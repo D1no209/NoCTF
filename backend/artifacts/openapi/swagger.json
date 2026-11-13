@@ -10611,6 +10611,70 @@
         }
       }
     },
+    "/api/internal/v1/capabilities/control-results": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "summary": "Record Control Result Endpoint",
+        "description": "Executes POST /api/internal/v1/capabilities/control-results.",
+        "operationId": "RecordControlResultEndpoint",
+        "requestBody": {
+          "x-name": "RecordControlResultRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalRecordControlResultRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state": {
       "get": {
         "tags": [
@@ -28626,12 +28690,12 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeControlTestResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse"
                 }
               }
             }
@@ -35235,8 +35299,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "checker",
-          "requirements"
+          "checker"
         ],
         "properties": {
           "checker": {
@@ -35248,12 +35311,6 @@
           },
           "acceptsFixInput": {
             "type": "boolean"
-          },
-          "requirements": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankCheckItemProtocol"
-            }
           }
         }
       },
@@ -35286,52 +35343,28 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationChallengeBankCheckItemProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Connection",
-          "Functionality",
-          "Vulnerability",
-          "FlagWrite",
-          "CurrentFlagRead",
-          "HistoricalFlagRead"
-        ],
-        "enum": [
-          "Connection",
-          "Functionality",
-          "Vulnerability",
-          "FlagWrite",
-          "CurrentFlagRead",
-          "HistoricalFlagRead"
-        ]
-      },
       "NoCTFAPIEndpointsAdministrationChallengeBankControlCapabilityContract": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "protocol": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankControlProtocolKind"
+          "image": {
+            "type": "string",
+            "nullable": true
           },
-          "urlTemplate": {
-            "type": "string"
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           },
           "serviceName": {
             "type": "string",
-            "nullable": true
-          },
-          "containerPort": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "vmId": {
-            "type": "string",
-            "nullable": true
-          },
-          "guestPort": {
-            "type": "integer",
-            "format": "int32",
             "nullable": true
           },
           "timeoutSeconds": {
@@ -35339,16 +35372,6 @@
             "format": "int32"
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankControlProtocolKind": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "HttpTeamIdentifier"
-        ],
-        "enum": [
-          "HttpTeamIdentifier"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract": {
         "type": "object",
@@ -39382,6 +39405,101 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsInternalRecordControlResultRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observedAt"
+        ],
+        "properties": {
+          "executionState": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesCapabilityExecutionState"
+          },
+          "result": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesControlResult"
+          },
+          "controllerIdentifier": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": true
+          },
+          "executionFailure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesCapabilityExecutionFailure"
+              }
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFDomainChallengesCapabilitiesCapabilityExecutionState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Completed",
+          "PlatformFailed",
+          "NotExecuted"
+        ],
+        "enum": [
+          "Completed",
+          "PlatformFailed",
+          "NotExecuted"
+        ]
+      },
+      "NoCTFDomainChallengesCapabilitiesControlResult": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Controlled",
+          "Uncontrolled",
+          "Indeterminate"
+        ],
+        "enum": [
+          "Controlled",
+          "Uncontrolled",
+          "Indeterminate"
+        ]
+      },
+      "NoCTFDomainChallengesCapabilitiesCapabilityExecutionFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InvalidInput",
+          "RuntimeUnavailable",
+          "TargetSuperseded",
+          "ExecutionInterrupted",
+          "DeadlineExceeded",
+          "InvalidEvidence",
+          "MissingEvidence",
+          "InvalidCallback",
+          "ResourceCleanupFailed",
+          "InputPreparationFailed",
+          "TargetExecutionFailed",
+          "ResourceUnavailable"
+        ],
+        "enum": [
+          "InvalidInput",
+          "RuntimeUnavailable",
+          "TargetSuperseded",
+          "ExecutionInterrupted",
+          "DeadlineExceeded",
+          "InvalidEvidence",
+          "MissingEvidence",
+          "InvalidCallback",
+          "ResourceCleanupFailed",
+          "InputPreparationFailed",
+          "TargetExecutionFailed",
+          "ResourceUnavailable"
+        ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse": {
         "type": "object",
@@ -47427,14 +47545,16 @@
           "VerificationTarget",
           "AwdChecker",
           "PatchChecker",
-          "TemplateChecker"
+          "TemplateChecker",
+          "ControlObserver"
         ],
         "enum": [
           0,
           1,
           2,
           3,
-          4
+          4,
+          5
         ]
       },
       "NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse": {
@@ -55144,6 +55264,23 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankTemplateCheckProbeResponse"
             }
+          },
+          "controlResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesControlResult"
+              }
+            ]
+          },
+          "controllerIdentifier": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -55153,12 +55290,14 @@
         "x-enumNames": [
           "Fix",
           "Check",
-          "FixAndCheck"
+          "FixAndCheck",
+          "Control"
         ],
         "enum": [
           "Fix",
           "Check",
-          "FixAndCheck"
+          "FixAndCheck",
+          "Control"
         ]
       },
       "NoCTFDomainChallengesTestingTemplateCapabilityTestState": {
@@ -55181,38 +55320,6 @@
           "Completed",
           "PlatformFailed",
           "Canceled"
-        ]
-      },
-      "NoCTFDomainChallengesCapabilitiesCapabilityExecutionFailure": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "InvalidInput",
-          "RuntimeUnavailable",
-          "TargetSuperseded",
-          "ExecutionInterrupted",
-          "DeadlineExceeded",
-          "InvalidEvidence",
-          "MissingEvidence",
-          "InvalidCallback",
-          "ResourceCleanupFailed",
-          "InputPreparationFailed",
-          "TargetExecutionFailed",
-          "ResourceUnavailable"
-        ],
-        "enum": [
-          "InvalidInput",
-          "RuntimeUnavailable",
-          "TargetSuperseded",
-          "ExecutionInterrupted",
-          "DeadlineExceeded",
-          "InvalidEvidence",
-          "MissingEvidence",
-          "InvalidCallback",
-          "ResourceCleanupFailed",
-          "InputPreparationFailed",
-          "TargetExecutionFailed",
-          "ResourceUnavailable"
         ]
       },
       "NoCTFDomainChallengesCapabilitiesFixResult": {
@@ -55681,74 +55788,21 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeControlTestResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "executionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "result": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesControlResult"
-          },
-          "controllerIdentifier": {
-            "type": "string",
-            "nullable": true
-          },
-          "executionState": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesCapabilityExecutionState"
-          },
-          "executionFailure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFDomainChallengesCapabilitiesCapabilityExecutionFailure"
-              }
-            ]
-          },
-          "observedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "NoCTFDomainChallengesCapabilitiesControlResult": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Controlled",
-          "Uncontrolled",
-          "Indeterminate"
-        ],
-        "enum": [
-          "Controlled",
-          "Uncontrolled",
-          "Indeterminate"
-        ]
-      },
-      "NoCTFDomainChallengesCapabilitiesCapabilityExecutionState": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Completed",
-          "PlatformFailed",
-          "NotExecuted"
-        ],
-        "enum": [
-          "Completed",
-          "PlatformFailed",
-          "NotExecuted"
-        ]
-      },
       "NoCTFAPIEndpointsAdministrationChallengeBankTestChallengeControlRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "runtimeInstanceId"
+          "runtimeInstanceId",
+          "requestId"
         ],
         "properties": {
           "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "requestId": {
             "type": "string",
             "format": "guid",
             "minLength": 1,

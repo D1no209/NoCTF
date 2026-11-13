@@ -1486,7 +1486,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCheckCapabilityContract 
     checker: NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract;
     readyTimeoutSeconds?: number;
     acceptsFixInput?: boolean;
-    requirements: Array<NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
@@ -1499,19 +1498,15 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
     targetServiceName?: string | null;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol = 'Connection' | 'Functionality' | 'Vulnerability' | 'FlagWrite' | 'CurrentFlagRead' | 'HistoricalFlagRead';
-
 export type NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract = {
-    protocol?: NoCtfapiEndpointsAdministrationChallengeBankControlProtocolKind;
-    urlTemplate?: string;
+    image?: string | null;
+    command?: Array<string>;
+    environment?: {
+        [key: string]: string;
+    };
     serviceName?: string | null;
-    containerPort?: number | null;
-    vmId?: string | null;
-    guestPort?: number | null;
     timeoutSeconds?: number;
 };
-
-export type NoCtfapiEndpointsAdministrationChallengeBankControlProtocolKind = 'HttpTeamIdentifier';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract = {
     revisionId?: string;
@@ -2662,6 +2657,20 @@ export type NoCtfapiEndpointsInternalCheckFlagContextRequest = {
     privateReadContext?: string | null;
     publicLocator?: string | null;
 };
+
+export type NoCtfapiEndpointsInternalRecordControlResultRequest = {
+    executionState?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionState;
+    result?: NoCtfDomainChallengesCapabilitiesControlResult;
+    controllerIdentifier?: string | null;
+    executionFailure?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure | null;
+    observedAt: string;
+};
+
+export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionState = 'Completed' | 'PlatformFailed' | 'NotExecuted';
+
+export type NoCtfDomainChallengesCapabilitiesControlResult = 'Controlled' | 'Uncontrolled' | 'Indeterminate';
+
+export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure = 'InvalidInput' | 'RuntimeUnavailable' | 'TargetSuperseded' | 'ExecutionInterrupted' | 'DeadlineExceeded' | 'InvalidEvidence' | 'MissingEvidence' | 'InvalidCallback' | 'ResourceCleanupFailed' | 'InputPreparationFailed' | 'TargetExecutionFailed' | 'ResourceUnavailable';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
     currentRound?: number | null;
@@ -4711,7 +4720,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse
     budget?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse;
 };
 
-export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4;
+export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse = {
     memoryBytes?: number;
@@ -6737,13 +6746,14 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityTestR
     fixExecutionUncertain?: boolean;
     checkCompleted?: boolean;
     probes?: Array<NoCtfapiEndpointsAdministrationChallengeBankTemplateCheckProbeResponse>;
+    controlResult?: NoCtfDomainChallengesCapabilitiesControlResult | null;
+    controllerIdentifier?: string | null;
+    controlObservedAt?: string | null;
 };
 
-export type NoCtfDomainChallengesTestingTemplateCapabilityTestKind = 'Fix' | 'Check' | 'FixAndCheck';
+export type NoCtfDomainChallengesTestingTemplateCapabilityTestKind = 'Fix' | 'Check' | 'FixAndCheck' | 'Control';
 
 export type NoCtfDomainChallengesTestingTemplateCapabilityTestState = 'Queued' | 'Applying' | 'Checking' | 'Finalizing' | 'Completed' | 'PlatformFailed' | 'Canceled';
-
-export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure = 'InvalidInput' | 'RuntimeUnavailable' | 'TargetSuperseded' | 'ExecutionInterrupted' | 'DeadlineExceeded' | 'InvalidEvidence' | 'MissingEvidence' | 'InvalidCallback' | 'ResourceCleanupFailed' | 'InputPreparationFailed' | 'TargetExecutionFailed' | 'ResourceUnavailable';
 
 export type NoCtfDomainChallengesCapabilitiesFixResult = 'Applied' | 'Failed' | 'TimedOut';
 
@@ -6882,21 +6892,9 @@ export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeCheckReques
     runtimeInstanceId: string;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeControlTestResponse = {
-    executionId?: string;
-    result?: NoCtfDomainChallengesCapabilitiesControlResult;
-    controllerIdentifier?: string | null;
-    executionState?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionState;
-    executionFailure?: NoCtfDomainChallengesCapabilitiesCapabilityExecutionFailure | null;
-    observedAt?: string;
-};
-
-export type NoCtfDomainChallengesCapabilitiesControlResult = 'Controlled' | 'Uncontrolled' | 'Indeterminate';
-
-export type NoCtfDomainChallengesCapabilitiesCapabilityExecutionState = 'Completed' | 'PlatformFailed' | 'NotExecuted';
-
 export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeControlRequest = {
     runtimeInstanceId: string;
+    requestId: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankTestChallengeFixAndCheckRequest = {
@@ -12231,6 +12229,44 @@ export type RecordCheckResultEndpointResponses = {
 };
 
 export type RecordCheckResultEndpointResponse = RecordCheckResultEndpointResponses[keyof RecordCheckResultEndpointResponses];
+
+export type RecordControlResultEndpointData = {
+    body: NoCtfapiEndpointsInternalRecordControlResultRequest;
+    path?: never;
+    query?: never;
+    url: '/api/internal/v1/capabilities/control-results';
+};
+
+export type RecordControlResultEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsInternalInternalResultResponse;
+};
+
+export type RecordControlResultEndpointError = RecordControlResultEndpointErrors[keyof RecordControlResultEndpointErrors];
+
+export type RecordControlResultEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsInternalInternalResultResponse;
+};
+
+export type RecordControlResultEndpointResponse = RecordControlResultEndpointResponses[keyof RecordControlResultEndpointResponses];
 
 export type GetAwdpParticipantStateEndpointData = {
     body?: never;
@@ -21796,9 +21832,9 @@ export type AdminChallengeBankTestControlError = AdminChallengeBankTestControlEr
 
 export type AdminChallengeBankTestControlResponses = {
     /**
-     * Success
+     * Accepted
      */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeControlTestResponse;
+    202: NoCtfapiEndpointsAdministrationChallengeBankTemplateCapabilityTestAcceptedResponse;
 };
 
 export type AdminChallengeBankTestControlResponse = AdminChallengeBankTestControlResponses[keyof AdminChallengeBankTestControlResponses];

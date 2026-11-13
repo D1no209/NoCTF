@@ -620,6 +620,7 @@ ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 
 ```text
 POST /api/internal/v1/capabilities/check-results
+POST /api/internal/v1/capabilities/control-results
 GET /api/internal/v1/fixes/{gameplayFactId}/archive
 ```
 
@@ -951,11 +952,11 @@ POST /api/v1/admin/challenges/{challengeId}/fix-and-check-tests
 GET /api/v1/admin/challenges/{challengeId}/capability-tests/{executionId}
 ```
 
-测试只使用已保存的题目配置，并检查题库目录和管理权限。Break、Control、Questionnaire 同步返回客观结果。Fix、Check、FixAndCheck 返回 202、executionId、runtimeInstanceId 和 statusUrl；状态查询返回当前阶段、失败阶段及允许公开的证据。客户端不能指定 Flag 候选集合、目标地址、Runner、提供方或检查要求。
+测试只使用已保存的题目配置，并检查题库目录和管理权限。Break、Questionnaire 同步返回客观结果。Fix、Check、FixAndCheck、Control 返回 202、executionId、runtimeInstanceId 和 statusUrl；状态查询返回当前阶段、失败阶段及允许公开的证据。客户端不能指定 Flag 候选集合、目标地址、Runner、提供方或检查要求。
 
 Fix 与 FixAndCheck 每次使用独立干净环境，资源停止与容量释放确认后结束。Check 使用指定的当前交互测试环境；独立验证不替换交互环境。上传使用 multipart file 与 requestId，同一请求重放返回相同受理结果，内容冲突返回 RequestConflict。模板测试不写入 GameplayFact，不计分，也不产生比赛通知。
 
-Checker 回调统一使用上面的 capabilities/check-results 路径。签名绑定执行作用范围、执行标识、Runtime UUID、检查要求和期限；回调由服务端分派到正式 Fix、AWD 观察或模板测试。
+Checker 回调使用 capabilities/check-results，Control 容器使用 capabilities/control-results。签名绑定执行作用范围、执行标识、Runtime UUID、Runner 和期限。Check 的必要证据由调用场景确定，题目模板不保存验证清单。Control 回传 executionState、result、controllerIdentifier、executionFailure 和 observedAt；Controlled 必须提供控制标识，Uncontrolled 不携带标识，Indeterminate 必须提供平台故障原因。
 
 ## Competition workspace reads
 

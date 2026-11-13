@@ -3,12 +3,14 @@ import { toRefs } from 'vue'
 import type { ChallengeTemplateCreateDialogViewState } from '~/features/admin/useChallengeTemplateCreateDialog'
 
 const viewProps = defineProps<{ state: ChallengeTemplateCreateDialogViewState }>()
-const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources, sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, open, title, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
+const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources, sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, open, title, visibility, direction, description, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
+const { definitionModel } = toRefs(viewProps.state)
+const { discardOpen, setDiscardOpen, discardAndClose } = toRefs(viewProps.state)
 </script>
 
 <template>
   <Dialog :open="open" @update:open="setOpen">
-    <DialogContent class="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+    <DialogContent class="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
       <DialogHeader class="shrink-0 border-b px-6 py-5 pr-14">
         <DialogTitle>{{ $t('administration.challengeTemplate.label.createNewQuestionTemplate') }}</DialogTitle>
         <DialogDescription>{{ $t('administration.challengeTemplate.description.optionalConfigureLaterCreation') }}</DialogDescription>
@@ -26,14 +28,7 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
           </AlertDescription>
         </Alert>
 
-        <Tabs v-if="variant === 'blank'" default-value="basic" class="flex min-h-0 flex-1 flex-col px-6 pt-5">
-          <TabsList class="shrink-0 self-start">
-            <TabsTrigger value="basic">{{ $t('administration.label.basicInformation') }}</TabsTrigger>
-            <TabsTrigger value="definition">{{ $t('administration.label.questionDefinition') }}</TabsTrigger>
-          </TabsList>
-          <ScrollSurface axis="y" class="mt-4 -mx-3 min-h-0 flex-1 overscroll-contain px-3" :aria-label="$t('administration.challengeTemplate.label.createNewQuestionTemplate')">
-            <div class="px-1">
-            <TabsContent value="basic" class="mt-0 pb-5">
+          <ScrollSurface v-if="variant === 'blank'" axis="y" class="min-h-0 flex-1 px-6 py-5" :aria-label="$t('administration.challengeTemplate.label.createNewQuestionTemplate')">
               <FieldGroup>
                 <Field :data-invalid="titleInvalid || undefined">
                   <FieldLabel for="create-template-title">{{ $t('common.label.title') }}</FieldLabel>
@@ -64,14 +59,9 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
                   <FieldLabel for="create-template-description">{{ $t('administration.label.question') }}</FieldLabel>
                   <Textarea id="create-template-description" v-model="description" rows="6" :placeholder="$t('administration.label.titleDescriptionSupportsMarkdown')" />
                 </Field>
+                <component :is="DefinitionEditor" :draft-model="definitionModel" section="basic" :include-runtime="false" :disabled="pending" />
               </FieldGroup>
-            </TabsContent>
-            <TabsContent value="definition" class="mt-0 pb-5">
-              <component :is="DefinitionEditor" v-model="definition" />
-            </TabsContent>
-            </div>
           </ScrollSurface>
-        </Tabs>
 
         <ScrollSurface v-if="variant === 'copy'" class="min-h-0 flex-1 px-6 py-5">
           <div class="flex flex-col gap-4"><p class="text-sm text-muted-foreground">{{ $t('liveSolo.bank.copyHelp') }}</p>
@@ -94,4 +84,16 @@ const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, cop
       </UiForm>
     </DialogContent>
   </Dialog>
+  <AlertDialog :open="discardOpen" @update:open="setDiscardOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('administration.capability.unsavedTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription>{{ $t('administration.capability.unsavedDescription') }}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="discardAndClose">{{ $t('administration.capability.discardAndLeave') }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

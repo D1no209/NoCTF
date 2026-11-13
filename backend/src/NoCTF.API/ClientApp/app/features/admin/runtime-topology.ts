@@ -15,7 +15,7 @@ export function runtimeTopology(
     selectable: true,
   }))
   const edges: ConnectionEdge[] = []
-  const entries = [...bindings, ...(controlBinding ? [controlBinding] : [])]
+  const entries = [...bindings]
   entries.forEach((binding, index) => {
     const serviceIndex = definition.services.findIndex(service => service.name === binding.serviceName)
     const id = `entry-${index}`
@@ -23,11 +23,16 @@ export function runtimeTopology(
       id,
       column: 1,
       label: `${binding.serviceName || labels.missingService}:${binding.containerPort ?? '—'}`,
-      detail: index >= bindings.length ? `${labels.controlEntry} · ${binding.urlTemplate}` : binding.urlTemplate,
+      detail: binding.urlTemplate,
       invalid: serviceIndex < 0,
     })
     if (serviceIndex >= 0) edges.push({ source: `service-${serviceIndex}`, target: id })
   })
-  if (entries.length === 0) nodes.push({ id: 'no-entries', column: 1, label: labels.noEntries })
+  if (controlBinding) {
+    const serviceIndex = definition.services.findIndex(service => service.name === controlBinding.serviceName)
+    nodes.push({ id: 'control-job', column: 1, label: labels.controlEntry, detail: controlBinding.job.image || labels.missingImage, invalid: serviceIndex < 0 })
+    if (serviceIndex >= 0) edges.push({ source: 'control-job', target: `service-${serviceIndex}` })
+  }
+  if (entries.length === 0 && !controlBinding) nodes.push({ id: 'no-entries', column: 1, label: labels.noEntries })
   return { nodes, edges }
 }

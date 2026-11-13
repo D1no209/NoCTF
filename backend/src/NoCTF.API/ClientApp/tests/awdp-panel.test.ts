@@ -140,19 +140,20 @@ describe('AWDP participant panel', () => {
     expect(challengeDetail).toContain("<component :is=\"ChallengeSubmissionHistory\"")
   })
 
-  test('Check retains its evidence requirements when reused with Break and Fix', () => {
+  test('Check retains its container configuration when reused with Break and Fix', () => {
     const model = emptyDefinition()
     setChallengeCapability(model, 'Fix', true)
     setChallengeCapability(model, 'Check', true)
     model.checker!.targetServiceName = 'api'
     model.checkerFixInput = true
-    model.checkRequirements = ['Connection', 'Functionality', 'Vulnerability']
+    model.checker!.job.image = 'checker:latest'
     const contract = definitionModelToContract(model)
     const loaded = definitionContractToModel(contract)
     expect(contract.capabilities?.map(item => item.kind)).toEqual(['Break', 'Fix', 'Check'])
     expect(loaded.checker?.targetServiceName).toBe('api')
     expect(loaded.checkerFixInput).toBeTrue()
-    expect(loaded.checkRequirements).toEqual(['Connection', 'Functionality', 'Vulnerability'])
+    expect(loaded.checker?.job.image).toBe('checker:latest')
+    expect('requirements' in contract.capabilities.find(item => item.kind === 'Check')!.check!).toBeFalse()
     expect('mode' in contract).toBeFalse()
   })
 

@@ -3,14 +3,14 @@ import { toRefs } from 'vue'
 import type { RunnerJobEditorViewState } from '~/features/admin/useRunnerJobEditor'
 
 const viewProps = defineProps<{ state: RunnerJobEditorViewState }>()
-const { job, disabled, onUpdateModelValueJobCommand, onUpdateModelValueJobEnvironment, onUpdateModelValueJobTimeoutSeconds } = toRefs(viewProps.state)
+const { job, disabled, imageId, timeoutId, onUpdateModelValueJobCommand, onUpdateModelValueJobEnvironment, onUpdateModelValueJobTimeoutSeconds } = toRefs(viewProps.state)
 </script>
 
 <template>
   <FieldGroup>
     <Field>
-      <FieldLabel>{{ $t('administration.label.mirror') }}</FieldLabel>
-      <Input v-model="job.image" :placeholder="$t('administration.runnerJob.label.registryExampleComChecker')" class="font-mono text-sm" :disabled="disabled" />
+      <FieldLabel :for="imageId">{{ $t('administration.label.mirror') }}</FieldLabel>
+      <Input :id="imageId" v-model="job.image" required :aria-invalid="!job.image.trim() || undefined" :placeholder="$t('administration.runnerJob.label.registryExampleComChecker')" class="font-mono text-sm" :disabled="disabled" />
     </Field>
     <Field>
       <FieldLabel>{{ $t('administration.label.startCommand') }}</FieldLabel>
@@ -36,8 +36,9 @@ const { job, disabled, onUpdateModelValueJobCommand, onUpdateModelValueJobEnviro
       <FieldDescription>{{ $t('administration.runnerJob.description.variableNamesPrefixedNoctf') }}</FieldDescription>
     </Field>
     <Field>
-      <FieldLabel>{{ $t('administration.label.timeoutSeconds') }}</FieldLabel>
+      <FieldLabel :for="timeoutId">{{ $t('administration.label.timeoutSeconds') }}</FieldLabel>
       <NullableNumberInput
+        :id="timeoutId"
         :model-value="job.timeoutSeconds"
         :min="1"
         :max="1800"

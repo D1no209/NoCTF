@@ -3,9 +3,10 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, supportsStaticFlags, runtimeDefinitionDirty, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, DefinitionEditor, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, runtimeDefinitionModel, runtimeDefinitionParseFailed, supportsStaticFlags, runtimeDefinitionDirty, resetRuntimeDefinition, saveConfiguration, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, DefinitionEditor, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 const { templateFlagAttachmentName } = toRefs(viewProps.state)
 const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps.state)
+const { capabilitySections, capabilityPanels, configurationDirty, leaveOpen, setLeaveOpen, discardAndLeave } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -38,6 +39,9 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
             <Badge v-if="isDeleted" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
           </div>
           <div class="flex items-center gap-2">
+            <Button v-if="!isDeleted" :disabled="saving || !configurationDirty" @click="saveConfiguration">
+              <Spinner v-if="saving" data-icon="inline-start" />{{ $t('administration.capability.saveConfiguration') }}
+            </Button>
             <Button v-if="isDeleted" variant="outline" :disabled="restoring" @click="restoreTemplate">
               <Spinner v-if="restoring" data-icon="inline-start" />
               <RotateCcw v-else data-icon="inline-start" /> {{ $t('administration.label.recoveryTemplate') }} </Button>
@@ -63,6 +67,10 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
           </div>
         </div>
 
+        <Alert v-if="basicSaveErrors.length" variant="destructive">
+          <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
+          <AlertDescription><ul><li v-for="(error, index) in basicSaveErrors" :key="index">{{ $message(error) }}</li></ul></AlertDescription>
+        </Alert>
         <Tabs
           v-model="selectedSection"
           orientation="vertical"
@@ -72,15 +80,11 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
             <TabsList class="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-3 lg:flex lg:flex-col">
               <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('administration.label.basicInformation') }}</TabsTrigger>
               <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('common.label.runtimeEnvironment') }}</TabsTrigger>
-              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('administration.capability.title') }}</TabsTrigger>
+              <TabsTrigger v-for="option in capabilitySections" :key="option.kind" :value="option.section" class="w-full justify-start px-3 py-2">{{ $t(option.tabLabel) }}<Badge v-if="option.configurationRequired" variant="secondary" class="ml-auto">{{ $t('administration.capability.configurationRequired') }}</Badge><Badge v-else-if="option.kind === 'Break'" variant="secondary" class="ml-auto">{{ flags.length }}</Badge></TabsTrigger>
               <TabsTrigger value="tests" class="w-full justify-start px-3 py-2">{{ $t('administration.capabilityTests.title') }}</TabsTrigger>
               <TabsTrigger value="attachments" class="w-full justify-start px-3 py-2">
                 {{ $t('common.label.accessories') }}
                 <Badge variant="secondary" class="ml-auto">{{ attachments.length }}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="flags" class="w-full justify-start px-3 py-2">
-                {{ $t('administration.label.flags') }}
-                <Badge variant="secondary" class="ml-auto">{{ flags.length }}</Badge>
               </TabsTrigger>
               <TabsTrigger value="permissions" class="w-full justify-start px-3 py-2">{{ $t('administration.label.permissions') }}</TabsTrigger>
               <TabsTrigger value="placements" class="w-full justify-start px-3 py-2">{{ $t('placements.title') }}</TabsTrigger>
@@ -89,21 +93,13 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
 
           <div data-slot="challenge-template-panels" class="min-h-0 min-w-0">
           <TabsContent value="placements" class="mt-0">
-            <component :is="ChallengeCompetitionPlacements" :challenge-id="challengeId" :capabilities="template.capabilities ?? []" :disabled="isDeleted" />
+            <component :is="ChallengeCompetitionPlacements" :challenge-id="challengeId" :capabilities="template.capabilities ?? []" :disabled="isDeleted || capabilityDefinitionDirty" />
           </TabsContent>
           <TabsContent value="basic" class="mt-0">
             <Card>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
-                <Alert v-if="basicSaveErrors.length" variant="destructive" class="mb-4">
-                  <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
-                  <AlertDescription>
-                    <ul class="list-disc pl-5">
-                      <li v-for="(message, index) in basicSaveErrors" :key="index">{{ message }}</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-                <UiForm validation="feature" @submit.prevent="saveBasic">
+                <UiForm validation="feature" @submit.prevent="saveConfiguration">
                   <FieldGroup>
                     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <Field :data-invalid="titleInvalid || undefined">
@@ -144,6 +140,7 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                       />
                     </Field>
                     </div>
+                    <component :is="DefinitionEditor" :draft-model="definitionModel" section="basic" :include-runtime="false" :disabled="isDeleted" />
                     <Field>
                       <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
                       <MarkdownEditor v-model="form.description" :disabled="isDeleted" :label="$t('administration.label.question')" />
@@ -153,10 +150,6 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                       <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>
                       <span v-if="template.deletedAt">{{ $t('common.action.delete') }} <component :is="AdminDateTime" :value="template.deletedAt" /></span>
                     </div>
-                    <Field v-if="!isDeleted" orientation="horizontal">
-                      <Button type="submit" :disabled="saving">
-                        <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }} </Button>
-                    </Field>
                   </FieldGroup>
                 </UiForm>
               </CardContent>
@@ -170,9 +163,6 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
                       <RotateCcw data-icon="inline-start" /> {{ $t('administration.capability.reloadRuntime') }}
-                    </Button>
-                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }}
                     </Button>
                   </div>
               </CardHeader>
@@ -213,42 +203,10 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                 :definition="template.definition" :definition-dirty="runtimeDefinitionDirty || capabilityDefinitionDirty" />
             </CardContent></ScrollSurface></Card>
           </TabsContent>
-          <TabsContent value="definition" class="mt-0">
-            <Card>
-              <CardHeader v-if="!isDeleted" class="shrink-0">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="resetModeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
-                    </Button>
-                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="saveModeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }}
-                    </Button>
-                  </div>
-              </CardHeader>
-              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              <CardContent>
-                <Alert v-if="definitionSaveErrors.length" variant="destructive" class="mb-4">
-                  <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
-                  <AlertDescription>
-                    <ul class="list-disc pl-5">
-                      <li v-for="(message, index) in definitionSaveErrors" :key="index">{{ message }}</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-                <Alert v-if="definitionParseFailed" variant="destructive">
-                  <AlertDescription class="flex flex-col items-start gap-3">
-                    <span>{{ $t('administration.challengesBy.validation.existingDefinitionFormat.idPageView') }}</span>
-                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetModeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-                <FieldGroup v-else-if="definitionModel">
-                  <component :is="DefinitionEditor" v-model="form.definition" :include-runtime="false" :disabled="isDeleted" :challenge-id="challengeId" :saved-question-ids="viewProps.state.savedQuestionIds" />
-                </FieldGroup>
-              </CardContent>
-              </ScrollSurface>
-            </Card>
+          <TabsContent v-for="option in capabilityPanels" :key="option.kind" :value="option.section" class="mt-0">
+            <Card><ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain"><CardContent>
+              <component :is="DefinitionEditor" :draft-model="definitionModel" :section="option.section" :include-runtime="false" :disabled="isDeleted" :challenge-id="challengeId" :saved-question-ids="viewProps.state.savedQuestionIds" />
+            </CardContent></ScrollSurface></Card>
           </TabsContent>
 
           <TabsContent value="attachments" class="mt-0">
@@ -390,6 +348,8 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
               </CardHeader>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
+                <component :is="DefinitionEditor" :draft-model="definitionModel" section="flags" :include-runtime="false" :disabled="isDeleted" />
+                <Separator class="my-5" />
                 <section v-if="supportsStaticFlags" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
                   <div>
                     <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('administration.label.addFlag') }}</h3>
@@ -398,7 +358,7 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                     <div class="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto] lg:items-end">
                       <Field>
                         <FieldLabel for="flag-match-kind">{{ $t('administration.label.matchType') }}</FieldLabel>
-                        <Select v-model="flagForm.matchKind" :disabled="isDeleted || flagCreating">
+                        <Select v-model="flagForm.matchKind" :disabled="isDeleted || flagCreating || !supportsStaticFlags">
                           <SelectTrigger id="flag-match-kind" class="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Exact">{{ $t('administration.label.exactMatch') }}</SelectItem>
@@ -408,9 +368,9 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
                       </Field>
                       <Field>
                         <FieldLabel for="flag-value">{{ flagForm.matchKind === 'RegularExpression' ? $t('administration.label.regularExpression.idPageView') : $t('administration.label.flagContent') }}</FieldLabel>
-                        <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" :disabled="isDeleted || flagCreating" :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('administration.label.flagF') : $t('administration.label.flag.idPageView')" />
+                        <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" :disabled="isDeleted || flagCreating || !supportsStaticFlags" :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('administration.label.flagF') : $t('administration.label.flag.idPageView')" />
                       </Field>
-                      <Button type="submit" :disabled="isDeleted || flagCreating || !flagForm.flag.trim()">
+                      <Button type="submit" :disabled="isDeleted || flagCreating || !supportsStaticFlags || !flagForm.flag.trim()">
                         <Spinner v-if="flagCreating" data-icon="inline-start" />{{ $t('administration.label.add') }}
                       </Button>
                     </div>
@@ -642,6 +602,12 @@ const { ChallengeCapabilityTests, capabilityDefinitionDirty } = toRefs(viewProps
           <AlertDialogAction variant="destructive" :disabled="transferring" @click="transferOwner">
             <Spinner v-if="transferring" data-icon="inline-start" /> {{ $t('common.label.confirmTransfer') }} </AlertDialogAction>
         </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog :open="leaveOpen" @update:open="setLeaveOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{{ $t('administration.capability.unsavedTitle') }}</AlertDialogTitle><AlertDialogDescription>{{ $t('administration.capability.unsavedDescription') }}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel><AlertDialogAction @click="discardAndLeave">{{ $t('administration.capability.discardAndLeave') }}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </div>

@@ -6,7 +6,7 @@ import {
 } from '../../api'
 import type {
   AdminChallengeBankGetCapabilityTestResponse, AdminChallengeBankGetTestRuntimeResponse,
-  AdminChallengeBankTestBreakResponse, AdminChallengeBankTestControlResponse, AdminChallengeBankTestQuestionnaireResponse,
+  AdminChallengeBankTestBreakResponse, AdminChallengeBankTestQuestionnaireResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
 } from '../../api'
 import { parseApiError } from '../../utils/api-error'
@@ -23,7 +23,10 @@ export function useChallengeCapabilityTests(props: Readonly<{
   const runtime = ref<AdminChallengeBankGetTestRuntimeResponse | null>(null)
   const execution = ref<AdminChallengeBankGetCapabilityTestResponse | null>(null)
   const breakResult = ref<AdminChallengeBankTestBreakResponse | null>(null)
-  const controlResult = ref<AdminChallengeBankTestControlResponse | null>(null)
+  const controlResult = computed(() => execution.value?.kind === 'Control' ? {
+    result: execution.value.controlResult, controllerIdentifier: execution.value.controllerIdentifier,
+    executionFailure: execution.value.failure,
+  } : null)
   const questionnaireResult = ref<AdminChallengeBankTestQuestionnaireResponse | null>(null)
   const error = ref<UiMessage | null>(null), acting = ref(false)
   const flag = ref(''), useRuntimeFlag = ref(false), archive = ref<File | null>(null)
@@ -81,9 +84,9 @@ export function useChallengeCapabilityTests(props: Readonly<{
   })
   const testControl = () => run(async () => {
     if (!runtime.value?.id) return
-    const response = await adminChallengeBankTestControl({ path: path.value, body: { runtimeInstanceId: runtime.value.id } })
+    const response = await adminChallengeBankTestControl({ path: path.value, body: { runtimeInstanceId: runtime.value.id, requestId: requestId('Control') } })
     if (response.error) throw response.error
-    controlResult.value = response.data ?? null
+    await accepted(response.data?.executionId, 'Control')
   })
   const testQuestionnaire = () => run(async () => {
     const response = await adminChallengeBankTestQuestionnaire({ path: path.value, body: {

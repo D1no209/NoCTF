@@ -1,6 +1,7 @@
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
@@ -8,10 +9,9 @@ import { adminChallengeBankPermanentlyDeleteAttachment } from '../../../../api'
 import { toast } from '../../../../utils/message-toast'
 import { adminChallengeBankCreateFlag, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
-import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
-import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
-import type { DefinitionModel } from '../../../../utils/game-config'
-import { defaultDefinition, definitionContractToModel, definitionModelToContract } from '../../../../utils/game-config'
+import { challengeTemplateWriteErrorMessages, challengeTemplateWriteErrorSection } from '../../../../lib/challenge-template-error'
+import { validateChallengeTemplateIssues } from '../../../../lib/challenge-template-validation'
+import { defaultDefinition, definitionContractToModel } from '../../../../utils/game-config'
 import DefinitionEditorComponent from '../../../admin/DefinitionEditor.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
@@ -22,7 +22,8 @@ import DefinitionFlagInjectionSectionComponent from '../../../admin/DefinitionFl
 import DefinitionFlagTemplateSectionComponent from '../../../admin/DefinitionFlagTemplateSection.vue'
 import DefinitionPatchSectionComponent from '../../../admin/DefinitionPatchSection.vue'
 import DefinitionRuntimeSectionComponent from '../../../admin/DefinitionRuntimeSection.vue'
-import { challengeCapabilityDefinitionsEqual, challengeRuntimeDefinitionsEqual, mergeChallengeCapabilityDefinition, mergeChallengeRuntimeDefinition } from '../../../admin/challenge-definition-sections'
+import { challengeRuntimeDefinitionsEqual } from '../../../admin/challenge-definition-sections'
+import { challengeTemplateDraftContent, enabledCapabilitySections } from '../../../admin/capability-editor'
 
 type Template = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
@@ -65,8 +66,6 @@ export function useAdminChallengesByIdPage() {
 
   const runtimeSaveErrors = ref<UiMessage[]>([])
 
-  const definitionSaveErrors = ref<UiMessage[]>([])
-
   const basicSaveAttempted = ref(false)
 
   const deleting = ref(false)
@@ -86,9 +85,8 @@ export function useAdminChallengesByIdPage() {
     (definition) => { form.definition = definition },
   )
 
-  const runtimeDefinitionModel = ref<DefinitionModel | null>(null)
-
-  const runtimeDefinitionParseFailed = ref(false)
+  const runtimeDefinitionModel = definitionModel
+  const runtimeDefinitionParseFailed = definitionParseFailed
 
 
   const persistedDefinitionModel = computed(() => {
@@ -113,19 +111,36 @@ export function useAdminChallengesByIdPage() {
     return !challengeRuntimeDefinitionsEqual(current, persisted)
   })
 
-  const capabilityDefinitionDirty = computed(() => !definitionModel.value || !persistedDefinitionModel.value
-    || !challengeCapabilityDefinitionsEqual(definitionModel.value, persistedDefinitionModel.value))
+  const capabilitySections = computed(() => enabledCapabilitySections(definitionModel.value))
+  const capabilityPanels = computed(() => capabilitySections.value.filter(option => option.section !== 'flags'))
+  const configurationDirty = computed(() => !!template.value && (
+    form.title !== template.value.title || form.direction !== directionLabel(template.value.direction)
+    || form.visibility !== template.value.visibility || form.description !== (template.value.description ?? '')
+    || JSON.stringify(form.definition) !== JSON.stringify(template.value.definition)))
+  const capabilityDefinitionDirty = computed(() => !!template.value
+    && JSON.stringify(form.definition) !== JSON.stringify(template.value.definition))
+  const leaveOpen = ref(false)
+  let leaveTo: string | null = null, allowLeave = false
+  function setLeaveOpen(value: boolean) { leaveOpen.value = value }
+  async function discardAndLeave() { leaveOpen.value = false; allowLeave = true; if (leaveTo) await navigateTo(leaveTo) }
+  function beforeUnload(event: BeforeUnloadEvent) { if (configurationDirty.value) { event.preventDefault(); event.returnValue = '' } }
+  onBeforeRouteLeave(to => {
+    if (allowLeave || !configurationDirty.value || isDeleted.value) return true
+    if (saving.value) return false
+    leaveTo = to.fullPath; leaveOpen.value = true; return false
+  })
+  onMounted(() => window.addEventListener('beforeunload', beforeUnload))
+  onScopeDispose(() => window.removeEventListener('beforeunload', beforeUnload))
+  watch(capabilitySections, sections => {
+    const conditional = ['flags', 'fix', 'check', 'control', 'questionnaire']
+    if (conditional.includes(selectedSection.value) && !sections.some(option => option.section === selectedSection.value))
+      selectedSection.value = 'basic'
+  })
 
   function resetRuntimeDefinition(): void {
     if (!template.value) return
-    runtimeDefinitionModel.value = definitionContractToModel(defaultDefinition())
-    runtimeDefinitionParseFailed.value = false
-    toast.info(describeMessage("administration.challengesBy.description.loadedModeSDefault"))
-  }
-
-  function resetModeDefinition(): void {
-    form.definition = defaultDefinition()
-    toast.info(describeMessage("administration.challengesBy.description.loadedModeSDefault"))
+    if (definitionModel.value && template.value.definition)
+      definitionModel.value.runtime = definitionContractToModel(template.value.definition).runtime
   }
 
   function syncBasicForm(value: Template): void {
@@ -139,31 +154,9 @@ export function useAdminChallengesByIdPage() {
     form.definition = value.definition ?? defaultDefinition()
   }
 
-  function syncRuntimeDefinition(value: Template): void {
-    runtimeDefinitionModel.value = value.definition
-      ? definitionContractToModel(value.definition)
-      : null
-    runtimeDefinitionParseFailed.value = runtimeDefinitionModel.value === null
-  }
-
   function syncForm(value: Template): void {
     syncBasicForm(value)
     syncModeDefinition(value)
-    syncRuntimeDefinition(value)
-  }
-
-  function contentFromTemplate(
-    value: Template,
-    overrides: Partial<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest> = {},
-  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest {
-    return {
-      visibility: value.visibility ?? 'Private',
-      title: value.title ?? '',
-      description: value.description ?? null,
-      direction: directionLabel(value.direction),
-      definition: value.definition ?? defaultDefinition(),
-      ...overrides,
-    }
   }
 
   async function updateContent(
@@ -173,38 +166,29 @@ export function useAdminChallengesByIdPage() {
   ): Promise<Template | null> {
     if (savingSection.value !== null) return null
     savingSection.value = section
-    const { data, error } = await adminChallengeBankPatchTemplate({
-      path: { challengeId },
-      body: { content },
-    })
-    savingSection.value = null
-    if (error || !data) {
-      errors.value = challengeTemplateWriteErrorMessages(error)
+    try {
+      const { data, error } = await adminChallengeBankPatchTemplate({
+        path: { challengeId },
+        body: { content },
+      })
+      if (error || !data) {
+        errors.value = challengeTemplateWriteErrorMessages(error)
+        if (definitionModel.value) selectedSection.value = challengeTemplateWriteErrorSection(error, definitionModel.value) ?? selectedSection.value
+        toast.error(errors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
+        return null
+      }
+      template.value = data
+      errors.value = []
+      toast.success(describeMessage("common.label.saved"))
+      return data
+    } catch (cause) {
+      errors.value = challengeTemplateWriteErrorMessages(cause)
+      if (definitionModel.value) selectedSection.value = challengeTemplateWriteErrorSection(cause, definitionModel.value) ?? selectedSection.value
       toast.error(errors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return null
+    } finally {
+      savingSection.value = null
     }
-    template.value = data
-    errors.value = []
-    toast.success(describeMessage("common.label.saved"))
-    return data
-  }
-
-  function validateDefinitionForSave(
-    definition: DefinitionModel,
-    errors: { value: UiMessage[] },
-  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
-    const value = template.value
-    const validationErrors = validateChallengeTemplateDraft({
-      title: value?.title ?? '',
-      direction: value?.direction ?? '',
-      definition,
-    })
-    if (validationErrors.length > 0) {
-      errors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
-      return null
-    }
-    return definitionModelToContract(definition)
   }
 
   async function loadTemplate(): Promise<void> {
@@ -224,7 +208,7 @@ export function useAdminChallengesByIdPage() {
     syncPermissions(data)
   }
 
-  async function saveBasic(): Promise<void> {
+  async function saveConfiguration(): Promise<void> {
     basicSaveAttempted.value = true
     basicSaveErrors.value = []
     const value = template.value
@@ -233,84 +217,24 @@ export function useAdminChallengesByIdPage() {
       toast.error(basicSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return
     }
-    const validationErrors: string[] = []
-    if (!form.title.trim()) validationErrors.push(translate("challenges.validation.titleRequired"))
-    else if (form.title.trim().length > 160)
-      validationErrors.push(translate("challenges.validation.titleLength"))
-    if (!form.direction.trim()) validationErrors.push(translate("challenges.validation.directionRequired"))
-    else if (form.direction.trim().length > 96)
-      validationErrors.push(translate("challenges.validation.directionLength"))
-    if (validationErrors.length > 0) {
-      basicSaveErrors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
+    const model = definitionModel.value
+    if (!model) return
+    const issues = validateChallengeTemplateIssues({ title: form.title, direction: form.direction, definition: model }, false)
+    if (issues.length > 0) {
+      basicSaveErrors.value = issues.map(issue => issue.message)
+      selectedSection.value = issues[0]!.section
+      await nextTick()
+      document.querySelector<HTMLElement>('[data-slot="challenge-template-panels"] [data-state="active"] input:invalid, [data-slot="challenge-template-panels"] [data-state="active"] input[aria-invalid="true"]')?.focus()
+      toast.error(issues[0]!.message)
       return
     }
-    const updated = await updateContent('basic', contentFromTemplate(value, {
+    const updated = await updateContent('basic', challengeTemplateDraftContent({
       title: form.title.trim(),
       visibility: form.visibility,
       direction: directionLabel(form.direction),
       description: form.description.trim() || null,
-    }), basicSaveErrors)
-    if (updated) syncBasicForm(updated)
-  }
-
-  async function saveRuntimeDefinition(): Promise<void> {
-    runtimeSaveErrors.value = []
-    const value = template.value
-    if (!value) {
-      runtimeSaveErrors.value = [translate("administration.challengesBy.validation.templateFinishedFormat")]
-      toast.error(runtimeSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
-      return
-    }
-    const persisted = persistedDefinitionModel.value
-    const merged = runtimeDefinitionModel.value && persisted
-      ? mergeChallengeRuntimeDefinition(
-          persisted,
-          runtimeDefinitionModel.value,
-        )
-      : null
-    const normalized = merged
-      ? validateDefinitionForSave(merged, runtimeSaveErrors)
-      : null
-    if (!normalized) return
-    const updated = await updateContent('runtime', contentFromTemplate(value, {
-      definition: normalized,
-    }), runtimeSaveErrors)
-    if (updated) {
-      syncRuntimeDefinition(updated)
-      if (definitionModel.value && updated.definition)
-        definitionModel.value.runtime = definitionContractToModel(updated.definition).runtime
-    }
-  }
-
-  async function saveModeDefinition(): Promise<void> {
-    definitionSaveErrors.value = []
-    const value = template.value
-    if (!value) {
-      definitionSaveErrors.value = [translate("administration.challengesBy.validation.templateFinishedFormat")]
-      toast.error(definitionSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
-      return
-    }
-    const runtimeWasDirty = runtimeDefinitionDirty.value
-    const persisted = persistedDefinitionModel.value
-    const merged = definitionModel.value && persisted
-      ? mergeChallengeCapabilityDefinition(
-          persisted,
-          definitionModel.value,
-        )
-      : null
-    const normalized = merged
-      ? validateDefinitionForSave(merged, definitionSaveErrors)
-      : null
-    if (!normalized) return
-    const updated = await updateContent('definition', contentFromTemplate(value, {
-      definition: normalized,
-    }), definitionSaveErrors)
-    if (!updated) return
-    syncModeDefinition(updated)
-    if (!runtimeWasDirty) {
-      syncRuntimeDefinition(updated)
-    }
+    }, model), basicSaveErrors)
+    if (updated) { syncForm(updated); await loadFlags() }
   }
 
   async function removeTemplate(): Promise<void> {
@@ -540,6 +464,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   async function loadFlags(): Promise<void> {
+    if (!supportsStaticFlags.value) { flags.value = []; return }
     flagsLoading.value = true
     const { data, error } = await adminChallengeBankListFlags({
       path: { challengeId },
@@ -561,6 +486,7 @@ export function useAdminChallengesByIdPage() {
   })
 
   async function createFlag(): Promise<void> {
+    if (!supportsStaticFlags.value) return
     if (!flagForm.flag.trim()) {
       toast.error(describeMessage("administration.challengesBy.description.fillFlagContent"))
       return
@@ -738,6 +664,12 @@ export function useAdminChallengesByIdPage() {
       challengeId,
       savedQuestionIds,
       selectedSection,
+      capabilitySections,
+      capabilityPanels,
+      configurationDirty,
+      leaveOpen,
+      setLeaveOpen,
+      discardAndLeave,
       canOrganize,
       template,
       loading,
@@ -746,7 +678,6 @@ export function useAdminChallengesByIdPage() {
       saving,
       basicSaveErrors,
       runtimeSaveErrors,
-      definitionSaveErrors,
       deleting,
       restoring,
       isDeleted,
@@ -761,10 +692,7 @@ export function useAdminChallengesByIdPage() {
       runtimeDefinitionDirty,
       capabilityDefinitionDirty,
       resetRuntimeDefinition,
-      resetModeDefinition,
-      saveBasic,
-      saveRuntimeDefinition,
-      saveModeDefinition,
+      saveConfiguration,
       removeTemplate,
       restoreTemplate,
       attachments,

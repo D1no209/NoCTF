@@ -5,7 +5,7 @@ import { toast } from '../../utils/message-toast'
 import { adminChallengeBankCreateTemplate, adminChallengeBankListTemplates, adminChallengeBankGetTemplate, adminChallengeBankCopyTemplate } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol } from '../../api'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
-import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
+import { validateChallengeTemplateIssues } from '../../lib/challenge-template-validation'
 import { challengeDirectionOptions, directionLabel } from '../../utils/directions'
 import { defaultDefinition, definitionContractToModel } from '../../utils/game-config'
 import DefinitionEditorComponent from './DefinitionEditor.vue'
@@ -46,9 +46,16 @@ export function useChallengeTemplateCreateDialog(
   const definition = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
     defaultDefinition(),
   )
+  const { model: definitionModel } = useDefinitionModel(() => definition.value, value => { definition.value = value })
   const saveErrors = ref<UiMessage[]>([])
   const saveAttempted = ref(false)
   const pending = ref(false)
+  const discardOpen = ref(false)
+  const hasDraft = computed(() => variant.value === 'blank' && (title.value !== '' || description.value !== ''
+    || visibility.value !== 'Private' || direction.value !== 'Misc'
+    || JSON.stringify(definition.value) !== JSON.stringify(defaultDefinition())))
+  function setDiscardOpen(value: boolean) { discardOpen.value = value }
+  function discardAndClose() { discardOpen.value = false; reset(); emit('update:open', false) }
 
   const titleInvalid = computed(() => saveAttempted.value
     && (!title.value.trim() || title.value.trim().length > 160))
@@ -67,6 +74,7 @@ export function useChallengeTemplateCreateDialog(
 
   function setOpen(value: boolean) {
     if (pending.value) return
+    if (!value && hasDraft.value) { discardOpen.value = true; return }
     if (!value) reset()
     emit('update:open', value)
   }
@@ -85,14 +93,14 @@ export function useChallengeTemplateCreateDialog(
     }
     saveAttempted.value = true
     saveErrors.value = []
-    const validationErrors = validateChallengeTemplateDraft({
+    const validationIssues = validateChallengeTemplateIssues({
       title: title.value,
       direction: direction.value,
-      definition: definitionContractToModel(definition.value),
-    })
-    if (validationErrors.length > 0) {
-      saveErrors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
+      definition: definitionModel.value ?? definitionContractToModel(definition.value),
+    }, false)
+    if (validationIssues.length > 0) {
+      saveErrors.value = validationIssues.map(issue => issue.message)
+      toast.error(validationIssues[0]!.message)
       return
     }
 
@@ -142,8 +150,12 @@ export function useChallengeTemplateCreateDialog(
     directionInvalid,
     directionOptions: challengeDirectionOptions,
     setOpen,
+    discardOpen,
+    setDiscardOpen,
+    discardAndClose,
     submit,
     DefinitionEditor,
+    definitionModel,
   }
   return proxyRefs(viewBindings)
 }

@@ -7,8 +7,6 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityContract,
   NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract,
   NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract,
-  NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol,
-  NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract,
   NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
   NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol,
@@ -142,10 +140,9 @@ export interface DefinitionModel {
   capabilities: NoCtfapiEndpointsAdministrationChallengeBankChallengeCapabilityProtocol[]
   runtime: RuntimeTemplateModel | null
   checker: { job: RunnerJobModel; targetServiceName: string } | null
-  checkRequirements: NoCtfapiEndpointsAdministrationChallengeBankCheckItemProtocol[]
   flagStores: NoCtfapiEndpointsAdministrationChallengeBankFlagStoreContract[]
   flagEnvironmentTargets: NoCtfapiEndpointsAdministrationChallengeBankFlagEnvironmentTargetContract[]
-  control: NoCtfapiEndpointsAdministrationChallengeBankControlCapabilityContract | null
+  control: { job: RunnerJobModel; serviceName: string } | null
   questionnaire: NoCtfapiEndpointsAdministrationChallengeBankQuestionnaireCapabilityContract | null
   flagInjection: FlagInjectionModel | null
   flagTemplate: FlagTemplateModel | null
@@ -212,7 +209,6 @@ export function emptyDefinition(): DefinitionModel {
     capabilities: ['Break'],
     runtime: null,
     checker: null,
-    checkRequirements: ['Functionality', 'Vulnerability'],
     flagStores: [],
     flagEnvironmentTargets: [],
     control: null,
@@ -384,12 +380,14 @@ export function definitionContractToModel(
         } }
         model.readyTimeoutSeconds = capability.check.readyTimeoutSeconds ?? 30
         model.checkerFixInput = capability.check.acceptsFixInput ?? false
-        model.checkRequirements = [...capability.check.requirements]
         break
       }
       case 'Control':
         if (!capability.control) throw new Error('Missing Control definition.')
-        model.control = structuredClone(toRaw(capability.control))
+        model.control = { serviceName: capability.control.serviceName ?? '', job: {
+          image: capability.control.image ?? '', command: [...(capability.control.command ?? [])],
+          environment: { ...capability.control.environment }, timeoutSeconds: capability.control.timeoutSeconds ?? 10,
+        } }
         break
       case 'Questionnaire':
         if (!capability.questionnaire) throw new Error('Missing Questionnaire definition.')
@@ -405,7 +403,7 @@ export function setChallengeCapability(model: DefinitionModel, kind: DefinitionM
   if (!model.capabilities.includes(kind)) model.capabilities.push(kind)
   if (kind === 'Fix' || kind === 'Check' || kind === 'Control') model.runtime ??= emptyRuntimeTemplate()
   if (kind === 'Check') model.checker ??= { job: emptyRunnerJob(), targetServiceName: 'main' }
-  if (kind === 'Control') model.control ??= { protocol: 'HttpTeamIdentifier', urlTemplate: 'http://{host}:{port}/control', serviceName: 'main', containerPort: 80, timeoutSeconds: 10 }
+  if (kind === 'Control') model.control ??= { serviceName: 'main', job: { ...emptyRunnerJob(), timeoutSeconds: 10 } }
   if (kind === 'Questionnaire') model.questionnaire ??= { revisionId: crypto.randomUUID(), revisionNumber: 1, questions: [] }
 }
 
@@ -758,8 +756,11 @@ export function definitionModelToContract(
       case 'Fix': return { kind, fix: { targetServiceName: model.patchTargetServiceName, entrypoint: model.patchEntrypoint,
         command: [...model.patchCommand], timeoutSeconds: model.patchTimeoutSeconds ?? 60, maximumUploadBytes: model.maximumPatchUploadBytes ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES } }
       case 'Check': return { kind, check: { checker: runnerJobContract(model.checker?.job ?? emptyRunnerJob(), model.checker?.targetServiceName || null),
-        readyTimeoutSeconds: model.readyTimeoutSeconds ?? 30, acceptsFixInput: model.checkerFixInput, requirements: [...model.checkRequirements] } }
-      case 'Control': return { kind, control: model.control ? structuredClone(toRaw(model.control)) : null }
+        readyTimeoutSeconds: model.readyTimeoutSeconds ?? 30, acceptsFixInput: model.checkerFixInput } }
+      case 'Control': return { kind, control: model.control ? {
+        image: model.control.job.image, command: [...model.control.job.command], environment: { ...model.control.job.environment },
+        serviceName: model.control.serviceName, timeoutSeconds: model.control.job.timeoutSeconds ?? 10,
+      } : null }
       case 'Questionnaire': return { kind, questionnaire: model.questionnaire ? structuredClone(toRaw(model.questionnaire)) : null }
     }
   })

@@ -1,5 +1,5 @@
 import { proxyRefs } from 'vue'
-import { toRefs } from 'vue'
+import { toRefs, useId } from 'vue'
 
 import type { RunnerJobModel } from '../../utils/game-config'
 
@@ -14,6 +14,8 @@ export function useRunnerJobEditor(props: Readonly<Omit<{
 
   const viewBindings = {
       ...toRefs(props),
+      imageId: useId(),
+      timeoutId: useId(),
 
     }
   const viewState = proxyRefs(viewBindings)

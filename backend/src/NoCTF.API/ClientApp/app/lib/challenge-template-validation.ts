@@ -4,17 +4,20 @@ import { translate } from '../utils/i18n'
 
 const environmentNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 export interface ChallengeTemplateDraft { title: string; direction: string; definition: DefinitionModel }
+export type ChallengeTemplateSection = 'basic' | 'runtime' | 'flags' | 'fix' | 'check' | 'control' | 'questionnaire'
+export interface ChallengeTemplateValidationIssue { section: ChallengeTemplateSection; message: string }
+type IssueSink = { push(...messages: string[]): number }
 
 function validPort(value: number | null | undefined): value is number {
   return value != null && Number.isInteger(value) && value >= 1 && value <= 65535
 }
-function validateEnvironment(issues: string[], environment: Record<string, string>, label: string) {
+function validateEnvironment(issues: IssueSink, environment: Record<string, string>, label: string) {
   for (const name of Object.keys(environment)) {
     if (!environmentNamePattern.test(name)) issues.push(translate('challenges.challengeTemplate.error.environmentVariableNameInvalid', { label, name }))
     if (name.toUpperCase().startsWith('NOCTF_')) issues.push(translate('challenges.challengeTemplate.validation.environmentVariablesFormat', { label }))
   }
 }
-function validateChecker(issues: string[], job: RunnerJobModel | undefined) {
+function validateChecker(issues: IssueSink, job: RunnerJobModel | undefined) {
   const label = translate('challenges.checker.label')
   if (!job || !job.image.trim()) { issues.push(translate('challenges.validation.imageRequired', { label })); return }
   if (job.image.length > 512) issues.push(translate('challenges.validation.imageExceedLength', { label }))
@@ -25,7 +28,13 @@ function validateChecker(issues: string[], job: RunnerJobModel | undefined) {
 }
 
 export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): string[] {
-  const issues: string[] = []
+  return [...new Set(validateChallengeTemplateIssues(draft).map(issue => issue.message))]
+}
+
+export function validateChallengeTemplateIssues(draft: ChallengeTemplateDraft, requireComplete = true): ChallengeTemplateValidationIssue[] {
+  const messages: ChallengeTemplateValidationIssue[] = []
+  let section: ChallengeTemplateSection = 'basic'
+  const issues: IssueSink = { push(...values) { return messages.push(...values.map(message => ({ section, message }))) } }
   if (!draft.title.trim()) issues.push(translate('challenges.validation.titleRequired'))
   else if (draft.title.trim().length > 160) issues.push(translate('challenges.validation.titleLength'))
   if (!draft.direction.trim()) issues.push(translate('challenges.validation.directionRequired'))
@@ -33,7 +42,9 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   const model = draft.definition
   if (model.capabilities.length === 0 || new Set(model.capabilities).size !== model.capabilities.length)
     issues.push(translate('administration.capability.selectCapability'))
+  if (!requireComplete) return messages
   if (model.capabilities.includes('Fix')) {
+    section = 'fix'
     if (!model.patchEntrypoint || model.patchEntrypoint.length > 256
       || /^[A-Za-z]:|^[\\/]/.test(model.patchEntrypoint) || model.patchEntrypoint.split(/[\\/]/).some(part => part === '.' || part === '..'))
       issues.push(translate('challenges.challengeTemplate.validation.patchEntrypointFormat'))
@@ -47,8 +58,8 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       issues.push(translate('challenges.challengeTemplate.validation.fixArchiveFormat'))
   }
   if (model.capabilities.includes('Check')) {
+    section = 'check'
     validateChecker(issues, model.checker?.job)
-    if (!model.checkRequirements.length) issues.push(translate('administration.capability.checkRequired'))
     if (model.readyTimeoutSeconds !== null && (model.readyTimeoutSeconds <= 0 || !Number.isInteger(model.readyTimeoutSeconds)))
       issues.push(translate('challenges.challengeTemplate.validation.readyTimeoutFormat'))
     if ((model.readyTimeoutSeconds ?? 30) > (model.checker?.job.timeoutSeconds ?? 30))
@@ -57,6 +68,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       issues.push(translate('challenges.challengeTemplate.validation.totalFixFormat'))
   }
   if (model.capabilities.includes('Questionnaire')) {
+    section = 'questionnaire'
     const questions = model.questionnaire?.questions
     if (!questions?.length || questions.some(question => !question.title?.trim() || !question.body?.trim()
       || !question.options || question.options.length < 2 || question.options.some(option => !option.content?.trim())
@@ -64,11 +76,13 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       || question.kind !== 'MultipleChoice' && question.options.filter(option => option.isCorrect).length !== 1))
       issues.push(translate('administration.capability.questionnaireInvalid'))
   }
+  if (model.capabilities.includes('Control')) { section = 'control'; validateChecker(issues, model.control?.job) }
+  section = 'runtime'
   const runtime = model.runtime
   if (!runtime) {
     if (model.capabilities.some(kind => kind === 'Fix' || kind === 'Check' || kind === 'Control'))
       issues.push(translate('administration.capability.runtimeRequired'))
-    return [...new Set(issues)]
+    return messages
   }
   if (runtime.operationTimeoutSeconds !== null && (runtime.operationTimeoutSeconds < 1 || runtime.operationTimeoutSeconds > 300))
     issues.push(translate('challenges.challengeTemplate.validation.runtimeTimeoutRange'))
@@ -101,23 +115,28 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       || !services.some(service => service.name === binding.serviceName && service.internalPorts.includes(binding.containerPort))))
       issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
   }
+  section = 'fix'
   if (model.capabilities.includes('Fix') && !services.some(service => service.name === model.patchTargetServiceName))
     issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
+  section = 'flags'
   if (model.capabilities.includes('Break')) for (const target of model.flagEnvironmentTargets) {
     if (!services.some(service => service.name === target.serviceName)) issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
     if (!environmentNamePattern.test(target.variableName ?? '') || target.variableName?.toUpperCase().startsWith('NOCTF_'))
       issues.push(translate('challenges.challengeTemplate.error.flagEnvironmentVariableInvalid'))
   }
+  section = 'check'
   if (model.capabilities.includes('Check') && !services.some(service => service.name === model.checker?.targetServiceName))
     issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
-  if (model.capabilities.includes('Control') && (!model.control?.urlTemplate?.trim()
-    || definition.kind === 'container' && !services.some(service => service.name === model.control?.serviceName)))
+  section = 'control'
+  if (model.capabilities.includes('Control') && (!model.control?.job.image.trim()
+    || definition.kind !== 'container' || !services.some(service => service.name === model.control?.serviceName)))
     issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
+  section = 'flags'
   if (model.capabilities.includes('Break')) for (const store of model.flagStores) {
     if (!store.name?.trim() || !services.some(service => service.name === store.targetServiceName))
       issues.push(translate('runtime.error.runtimeServiceReferenceInvalid'))
     if (store.delivery === 'RunnerCommand' && !store.injectionCommand?.trim())
       issues.push(translate('challenges.challengeTemplate.validation.awdFlagFormat'))
   }
-  return [...new Set(issues)]
+  return messages
 }

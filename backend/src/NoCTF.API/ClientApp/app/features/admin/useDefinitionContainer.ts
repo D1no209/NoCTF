@@ -18,7 +18,7 @@ export function useDefinitionContainer(props: Readonly<{
       unnamedService: index => translate('runtime.label.runtimeUnnamedService', { index }),
       missingImage: translate('runtime.label.runtimeImageSet'),
       missingService: translate('runtime.label.runtimeServiceFound'),
-      controlEntry: translate('runtime.label.controlCheckEntry'),
+      controlEntry: translate('administration.capability.controlConfiguration'),
       noEntries: translate('runtime.label.runtimeAccessEntries'),
     }))
   const advancedOpen = computed(() => {

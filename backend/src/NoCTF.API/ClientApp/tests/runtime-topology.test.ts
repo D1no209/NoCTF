@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { runtimeTopology } from '../app/features/admin/runtime-topology'
 import { layoutConnections } from '../app/components/ui/connection-canvas/connection-layout'
-import { emptyRuntimeService } from '../app/utils/game-config'
+import { emptyRunnerJob, emptyRuntimeService } from '../app/utils/game-config'
 import type { ContainerDefinitionModel, UrlBindingModel } from '../app/utils/game-config'
 
 const labels = {
@@ -12,16 +12,16 @@ const binding = (name: string, port: number): UrlBindingModel => ({
   serviceName: name, containerPort: port, exposure: 0, urlTemplate: 'tcp://{HOST}:{PORT}',
 })
 
-test('topology connects only explicit access entries and the separate control entry', () => {
+test('topology separates public access entries from the Control container', () => {
   const definition: ContainerDefinitionModel = { kind: 'container', services: [emptyRuntimeService('web'), emptyRuntimeService('db')] }
   definition.services[1]!.internalPorts = [5432]
-  const graph = runtimeTopology(definition, [binding('web', 80), binding('web', 443)], binding('db', 5432), labels)
+  const graph = runtimeTopology(definition, [binding('web', 80), binding('web', 443)], { serviceName: 'db', job: { ...emptyRunnerJob(), image: 'control:latest' } }, labels)
   expect(graph.edges).toEqual([
     { source: 'service-0', target: 'entry-0' },
     { source: 'service-0', target: 'entry-1' },
-    { source: 'service-1', target: 'entry-2' },
+    { source: 'control-job', target: 'service-1' },
   ])
-  expect(graph.nodes.find(node => node.id === 'entry-2')?.detail).toStartWith('Control')
+  expect(graph.nodes.find(node => node.id === 'control-job')).toMatchObject({ label: 'Control', detail: 'control:latest', invalid: false })
   const withoutEntries = runtimeTopology(definition, [], null, labels)
   expect(withoutEntries.edges).toHaveLength(0)
   expect(withoutEntries.nodes.filter(node => node.column === 1)).toEqual([{ id: 'no-entries', column: 1, label: 'No entries' }])

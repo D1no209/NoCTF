@@ -100,8 +100,6 @@ describe('challenge template list navigation', () => {
     expect(dialog).toContain('v-for="option in directionOptions"')
     expect(dialog).toContain('challengeDirectionOptions')
     expect(dialog).not.toMatch(/<Input[\s\S]{0,160}v-model="direction"/)
-    expect(dialog).toContain('class="px-1"')
-    expect(dialog).toContain('overscroll-contain')
   })
 
   test('filters the challenge library by direction', async () => {

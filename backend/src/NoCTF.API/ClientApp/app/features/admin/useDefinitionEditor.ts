@@ -1,7 +1,8 @@
-import { markRaw, toRefs } from 'vue'
+import { computed, markRaw, toRefs } from 'vue'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api'
 import type { DefinitionModel } from '../../utils/game-config'
-import { setChallengeCapability } from '../../utils/game-config'
+import { defaultDefinition, setChallengeCapability } from '../../utils/game-config'
+import { capabilityEditorOptions, type CapabilityEditorSection } from './capability-editor'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
 import DefinitionFlagTemplateSectionComponent from './DefinitionFlagTemplateSection.vue'
@@ -11,22 +12,20 @@ import QuestionnaireCapabilityEditorComponent from './QuestionnaireCapabilityEdi
 import ControlCapabilityEditorComponent from './ControlCapabilityEditor.vue'
 
 export function useDefinitionEditor(
-  props: Readonly<{ modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract; disabled: boolean; includeRuntime: boolean; challengeId?: string; savedQuestionIds?: string[] }>,
+  props: Readonly<{ modelValue?: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract; draftModel?: DefinitionModel | null; section: CapabilityEditorSection; disabled: boolean; includeRuntime: boolean; challengeId?: string; savedQuestionIds?: string[] }>,
   emit: { (event: 'update:modelValue', definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract): void },
 ) {
-  const { model, parseFailed } = useDefinitionModel(() => props.modelValue, definition => emit('update:modelValue', definition))
-  const options = [
-    { kind: 'Break', label: 'administration.capability.break' },
-    { kind: 'Fix', label: 'administration.capability.fix' },
-    { kind: 'Check', label: 'administration.capability.check' },
-    { kind: 'Control', label: 'administration.capability.control' },
-    { kind: 'Questionnaire', label: 'administration.capability.questionnaire' },
-  ] as const
+  const owned = props.draftModel === undefined
+    ? useDefinitionModel(() => props.modelValue ?? defaultDefinition(), definition => emit('update:modelValue', definition)) : null
+  const model = computed(() => props.draftModel !== undefined ? props.draftModel : owned?.model.value ?? null)
+  const parseFailed = computed(() => owned?.parseFailed.value ?? false)
+  const options = capabilityEditorOptions
+  const visible = (section: CapabilityEditorSection) => props.section === 'all' || props.section === section
   function setCapability(kind: DefinitionModel['capabilities'][number], enabled: boolean) {
     if (model.value && !props.disabled) setChallengeCapability(model.value, kind, enabled)
   }
   return {
-    ...toRefs(props), model, parseFailed, options, setCapability,
+    ...toRefs(props), model, parseFailed, options, setCapability, visible,
     DefinitionRuntimeSection: markRaw(DefinitionRuntimeSectionComponent),
     DefinitionFlagTemplateSection: markRaw(DefinitionFlagTemplateSectionComponent),
     DefinitionFlagInjectionSection: markRaw(DefinitionFlagInjectionSectionComponent),
