@@ -32,7 +32,7 @@ exposure: OwnerOnly
 
 TCP 题可使用 `nc {HOST} {PORT}`。显示模板只使用受支持的 `{HOST}`、`{PORT}`；同服务同端口的多个显示模板共享一次发布。没有第二份每服务公开端口列表，也不指定宿主固定端口。
 
-Docker 直接发布题目服务，随机 host port；Kubernetes 为公开入口创建 NodePort。Control Check 入口解析实际内部服务地址，不因轮询而另加公网端口。
+Docker 直接发布题目服务，随机 host port；Kubernetes 为公开入口创建 NodePort。Control 容器通过目标服务的内部地址采集状态，无需添加公开端口。
 
 ## 按模式选择定义
 
@@ -42,11 +42,17 @@ Docker 直接发布题目服务，随机 host port；Kubernetes 为公开入口�
 | CTF Patch 验证 | 单服务，不注入 Flag | 内部端口、Patch 和 Checker |
 | AWD | 每队目标、轮换 Flag | Checker 与各 Flag Store 的目标命名服务必须存在 |
 | AWDP | 单服务目标、每队 Flag | Break、独立 Fix、Patch 和 Checker |
-| KoH | 共享 Hill | 独立 Control URL，返回精确队伍 Flag |
+| KoH | 共享 Hill | Control 容器返回结构化控制状态和精确控制标识 |
 
 ## 配置 Checker 与修复包
 
 Checker 镜像、命令、目标服务、超时、就绪等待和修复包入口应按题目约定配置。修复包必须使用安全相对路径，执行命令中的入口占位符遵守当前表单校验。正常服务和漏洞修复必须分别验证，不能只检查“容器能启动”。
+
+能力在基本信息选择，侧栏立即显示对应配置页。基本信息、运行环境与能力参数通过“保存题目配置”统一保存。取消能力后，保存前重新选择可以恢复草稿；存在未保存配置时，能力测试与投放暂停。静态 Flag、附件和权限分别保存。
+
+Check 没有作者填写的验证清单。容器通过签名回调报告 `probes`、`flagContexts` 和 `observedAt`。AWD 的本次任务决定连接、功能、Flag 写入及读取的必需证据；AWDP / LiveSolo 的 Fix→Check 要求功能与漏洞判定。独立 Check 测试接受非空合法报告。缺失、未知和未执行状态不会自动通过。
+
+Control 配置镜像、命令、环境变量、目标服务和超时。Runner 注入 `NOCTF_TARGET_HOST`、`NOCTF_CALLBACK_URL`、`NOCTF_CALLBACK_TOKEN` 和执行用途；容器自行访问目标，通过 `/api/internal/v1/capabilities/control-results` 返回执行状态、`Controlled` / `Uncontrolled` / `Indeterminate`、控制标识、稳定故障码与观察时间。有效回调、容器正常结束和辅助资源清理全部完成后，本次观察才完成。模板测试异步返回 `202 + statusUrl`，保留交互目标，不产生正式比赛事实。
 
 Fix 上传上限和 archive 展开上限不同：压缩文件可能小但展开很大。平台拒绝路径穿越、链接、特殊文件、冲突条目和超过展开预算的包。资源耗尽或存储故障应与修复失败区分。
 
