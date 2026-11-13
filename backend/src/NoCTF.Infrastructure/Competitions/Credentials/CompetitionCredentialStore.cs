@@ -7,6 +7,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Credentials;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams.Moderation;
@@ -19,6 +21,7 @@ public sealed class CompetitionCredentialStore(
     IPasswordHasher<User> passwordHasher,
     PlatformSecretProtector secrets,
     ICompetitionModerationAuthorizer authorizer,
+    ICompetitionEventRecorder eventRecorder,
     TimeProvider? clock = null) : ICompetitionCredentialStore
 {
     private const string PasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -124,6 +127,16 @@ public sealed class CompetitionCredentialStore(
                 }).ToList()
             };
             db.Teams.Add(team);
+            await eventRecorder.RecordAsync(new(
+                team.CompetitionId,
+                CompetitionEventKind.TeamRegistered,
+                CompetitionEventLevel.Information,
+                track.IsInternal ? CompetitionEventVisibility.Staff : CompetitionEventVisibility.Public,
+                command.Now,
+                ActorUserId: command.ActorUserId,
+                TeamId: team.Id,
+                TeamRegistrationStatus: TeamRegistrationStatus.Approved,
+                TrackKey: track.Key), ct);
             foreach (var row in group)
             {
                 var user = usersByRow[row.RowNumber];
@@ -286,6 +299,8 @@ public sealed class CompetitionCredentialStore(
                     issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.DuplicateEmail, email));
             }
             var name = row.TeamName.Trim();
+            if (ResolveTrack(competition, row.TrackKey) is null)
+                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.InvalidTrackKey, row.TrackKey ?? string.Empty));
             teams.TryGetValue(name, out var summary);
             if (summary.Count > 0 && !string.Equals(summary.TrackKey, row.TrackKey, StringComparison.OrdinalIgnoreCase))
                 issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.InvalidTrackKey, name));
