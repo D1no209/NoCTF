@@ -369,6 +369,13 @@ Judge/Observer 必须完成邮箱验证；资格或角色冲突返回 typed 409�
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/teams
 GET  /api/v1/admin/competitions/{competitionId}/teams/{teamId}
+GET  /api/v1/admin/competitions/{competitionId}/credential-batches
+POST /api/v1/admin/competitions/{competitionId}/credential-batches/import
+GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}
+GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/download
+GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/print.pdf
+POST /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/rotate
+POST /api/v1/admin/competitions/{competitionId}/credential-users/{userId}/rotate
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban
 GET  /api/v1/admin/competitions/{competitionId}/team-ban-appeals
 PUT  /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/resolution
@@ -748,6 +755,8 @@ GET /api/v1/competitions/{competitionId}/teams/me/challenge-writeups
 GET /api/v1/competitions/{competitionId}/writeup-settings
 PATCH /api/v1/admin/competitions/{competitionId}/writeup-settings
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/submit
+POST /api/v1/competitions/{competitionId}/teams/me/writeup/browser-download
+POST /api/v1/competitions/{competitionId}/teams/{teamId}/writeup/browser-download
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/browser-access
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/unlock
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/{writeUpId}/review

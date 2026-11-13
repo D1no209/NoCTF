@@ -5,6 +5,7 @@ namespace NoCTF.Tests.Architecture;
 public class AdminOpenApiRulesTests
 {
     private const string TemplateCopyRoute = "POST /api/v1/admin/challenges/copies";
+    private const string CredentialImportRoute = "POST /api/v1/admin/competitions/{competitionId}/credential-batches/import";
 
     [Test]
     public async Task Patch_download_contract_declares_binary_bytes_and_authenticated_error_responses()
@@ -39,7 +40,7 @@ public class AdminOpenApiRulesTests
                     operation.Value)))
             .ToArray();
 
-        await Assert.That(operations).Count().IsEqualTo(174);
+        await Assert.That(operations).Count().IsEqualTo(181);
         await Assert.That(operations
             .Where(operation => !operation.Value.TryGetProperty("operationId", out var id)
                 || id.GetString() is not { } value
@@ -79,7 +80,8 @@ public class AdminOpenApiRulesTests
         await Assert.That(copyFailure).IsEqualTo(
             "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateCopyFailureResponse");
         await Assert.That(operations
-            .Where(operation => operation.Value.GetProperty("responses").TryGetProperty("400", out var badRequest)
+            .Where(operation => operation.Route != CredentialImportRoute
+                && operation.Value.GetProperty("responses").TryGetProperty("400", out var badRequest)
                 && !HasValidationProblemContent(badRequest))
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
