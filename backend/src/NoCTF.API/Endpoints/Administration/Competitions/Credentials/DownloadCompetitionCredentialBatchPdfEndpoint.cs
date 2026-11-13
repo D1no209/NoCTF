@@ -26,6 +26,8 @@ public sealed class DownloadCompetitionCredentialBatchPdfEndpoint(
             Route<Guid>("competitionId"), Route<Guid>("batchId"), user.UserId, clock.GetUtcNow()), ct);
         if (value is null)
             return TypedResults.NotFound();
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        HttpContext.Response.Headers.Pragma = "no-cache";
         var pdf = export.CreatePdf(value);
         return TypedResults.Stream(pdf, "application/pdf", $"noctf-credentials-{value.BatchId:N}.pdf");
     }

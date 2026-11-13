@@ -33,10 +33,12 @@ public sealed class GetCompetitionCredentialBatchEndpoint(
             Route<Guid>("batchId"),
             user.UserId,
             clock.GetUtcNow()), ct);
-        return value is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(new GetCompetitionCredentialBatchResponse(
-                value.BatchId, value.CompetitionId, value.CreatedAt, value.SourceFileName,
-                value.PasswordVersion, value.Rows));
+        if (value is null)
+            return TypedResults.NotFound();
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        HttpContext.Response.Headers.Pragma = "no-cache";
+        return TypedResults.Ok(new GetCompetitionCredentialBatchResponse(
+            value.BatchId, value.CompetitionId, value.CreatedAt, value.SourceFileName,
+            value.PasswordVersion, value.Rows));
     }
 }
