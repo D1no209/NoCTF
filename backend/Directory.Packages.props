@@ -5,6 +5,9 @@
   <ItemGroup>
     <PackageVersion Include="AsyncKeyedLock" Version="8.1.2" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="ExcelDataReader" Version="3.9.0" />
+    <PackageVersion Include="ExcelDataReader.DataSet" Version="3.9.0" />
+    <PackageVersion Include="QuestPDF" Version="2026.9.2" />
     <PackageVersion Include="TngTech.ArchUnitNET" Version="0.13.3" />
     <PackageVersion Include="FluentStorage" Version="8.0.22" />
     <PackageVersion Include="FluentStorage.AWS" Version="8.0.23" />

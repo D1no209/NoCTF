@@ -21,7 +21,8 @@ public enum PlatformSecretPurpose
     AwdFlagKey,
     FlagReadContext,
     AwdScoringPreview,
-    CheckFlagContextEvidence
+    CheckFlagContextEvidence,
+    CompetitionCredentialPassword
 }
 
 public sealed class PlatformSecretProtector
@@ -214,6 +215,7 @@ public sealed class PlatformSecretProtector
             PlatformSecretPurpose.AwdScoringPreview => "NoCTF.AWD.ScoringPreview.v1",
             PlatformSecretPurpose.FlagReadContext => "NoCTF.FlagReadContext.v1",
             PlatformSecretPurpose.CheckFlagContextEvidence => "NoCTF.Check.FlagContextEvidence.v1",
+            PlatformSecretPurpose.CompetitionCredentialPassword => "NoCTF.Competition.CredentialPassword.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
         return Encoding.UTF8.GetBytes(scopeId is null

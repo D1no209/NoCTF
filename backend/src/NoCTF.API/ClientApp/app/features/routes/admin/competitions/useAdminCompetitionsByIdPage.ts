@@ -169,6 +169,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: competitionChallengeManagementPath(competitionId, competition.value?.mode), label: translate('common.label.challenge.pageTitle'), icon: Puzzle },
         ...(competition.value?.mode === 'Ctf' ? [{ to: `${base}/score-presets`, label: translate('scorePresets.title'), icon: Settings }] : []),
         { to: `${base}/teams`, label: translate("common.label.teamManagement"), icon: Users },
+        ...(canJudge.value ? [{ to: `${base}/credentials`, label: translate('administration.credentials.title'), icon: KeyRound }] : []),
       ],
     },
     {

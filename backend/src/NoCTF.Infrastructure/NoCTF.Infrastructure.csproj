@@ -10,6 +10,8 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="AsyncKeyedLock" />
+    <PackageReference Include="ExcelDataReader" />
+    <PackageReference Include="ExcelDataReader.DataSet" />
     <PackageReference Include="FluentStorage.AWS" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="Otp.NET" />
@@ -22,6 +24,7 @@
     <PackageReference Include="NATS.Client.Core" />
     <PackageReference Include="NATS.Client.KeyValueStore" />
     <PackageReference Include="NATS.Net" />
+    <PackageReference Include="QuestPDF" />
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="MetadataExtractor" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />

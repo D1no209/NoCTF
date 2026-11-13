@@ -31,6 +31,8 @@ using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Application.Competitions.Progression;
 using NoCTF.Infrastructure.Competitions.Progression;
+using NoCTF.Application.Competitions.Credentials;
+using NoCTF.Infrastructure.Competitions.Credentials;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -49,6 +51,13 @@ internal static class CompetitionInfrastructure
         services.AddScoped<NoCTF.Application.Competitions.Scoring.ManageCompetitionScorePresets>();
         services.AddScoped<ICompetitionFeatureReader, CompetitionFeatureReader>();
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
+        services.AddScoped<ICompetitionCredentialStore, CompetitionCredentialStore>();
+        services.AddSingleton<ICompetitionCredentialImportReader, CompetitionCredentialImportReader>();
+        services.AddSingleton<CompetitionCredentialExportService>();
+        services.AddScoped<ImportCompetitionCredentials>();
+        services.AddScoped<ReadCompetitionCredentialBatch>();
+        services.AddScoped<RotateCompetitionCredentialBatch>();
+        services.AddScoped<RotateCompetitionCredentialUser>();
         services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, Awdp.AwdpRoundScheduleSource>();
         services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
         services.AddSingleton<ProgressionGraphReadCache>();

@@ -35,6 +35,8 @@ public sealed class PasswordResetStore(
         }
 
         var canonicalEmail = EmailCanonicalizer.Canonicalize(email);
+        if (canonicalEmail.Length == 0)
+            return Observe(PasswordResetRequestState.Ignored, null);
         var userId = await db.Users.AsNoTracking()
             .Where(user => user.Kind == UserKind.Human
                 && user.AccountStatus == UserAccountStatus.Active

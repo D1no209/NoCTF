@@ -25722,6 +25722,315 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/download": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Download Competition Credential Batch",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/download.",
+        "operationId": "AdminDownloadCompetitionCredentialBatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/print.pdf": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Download Competition Credential Batch Pdf",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/print.pdf.",
+        "operationId": "AdminDownloadCompetitionCredentialBatchPdf",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Get Competition Credential Batch",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}.",
+        "operationId": "AdminGetCompetitionCredentialBatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/import": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Import Competition Credentials",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/credential-batches/import.",
+        "operationId": "AdminImportCompetitionCredentials",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ImportCompetitionCredentialsRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/rotate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Rotate Competition Credential Batch",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/rotate.",
+        "operationId": "AdminRotateCompetitionCredentialBatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/credential-users/{userId}/rotate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Rotate Competition Credential User",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/credential-users/{userId}/rotate.",
+        "operationId": "AdminRotateCompetitionCredentialUser",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsRotateCompetitionCredentialUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}": {
       "get": {
         "tags": [
@@ -53745,6 +54054,131 @@
           "TrackConfigurationInvalid",
           "TeamTrackInvalid"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceFileName": {
+            "type": "string"
+          },
+          "passwordVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsCredentialsCompetitionCredentialDownloadRow"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsCredentialsCompetitionCredentialDownloadRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "captain": {
+            "type": "boolean"
+          },
+          "trackKey": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "createdUsers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdTeams": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdCredentials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsRotateCompetitionCredentialUserResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse": {
         "type": "object",

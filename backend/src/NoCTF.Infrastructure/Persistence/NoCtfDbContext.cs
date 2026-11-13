@@ -14,6 +14,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Competitions.Credentials;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
@@ -84,6 +85,8 @@ public sealed class NoCtfDbContext(
     public DbSet<UserBadgeGrant> UserBadgeGrants => Set<UserBadgeGrant>();
     public DbSet<UserBadgeTransition> UserBadgeTransitions => Set<UserBadgeTransition>();
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
+    public DbSet<CompetitionCredentialBatch> CompetitionCredentialBatches => Set<CompetitionCredentialBatch>();
+    public DbSet<CompetitionCredential> CompetitionCredentials => Set<CompetitionCredential>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
@@ -370,7 +373,9 @@ public sealed class NoCtfDbContext(
         static string Normalize(string value) => value.Trim().ToUpperInvariant();
         foreach (var entry in ChangeTracker.Entries<User>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
-            entry.Entity.NormalizedEmail = Normalize(entry.Entity.Email);
+            entry.Entity.NormalizedEmail = string.IsNullOrWhiteSpace(entry.Entity.Email)
+                ? $"__NO_EMAIL__:{entry.Entity.Id:N}"
+                : Normalize(entry.Entity.Email);
         foreach (var entry in ChangeTracker.Entries<ExternalIdentity>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
             entry.Entity.NormalizedSubject = Normalize(entry.Entity.Subject);

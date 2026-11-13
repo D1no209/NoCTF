@@ -46,7 +46,7 @@ public sealed class AuthenticationStore(
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
             item => item.Kind == UserKind.Human
                 && item.AccountStatus == UserAccountStatus.Active
-                && (item.Email == canonicalEmail
+                && (canonicalEmail.Length > 0 && item.Email == canonicalEmail
                 || item.NormalizedUserName == normalizedUserName
                 || item.Id.ToString() == login),
             ct);

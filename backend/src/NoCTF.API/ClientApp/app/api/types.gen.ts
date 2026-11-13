@@ -6317,6 +6317,47 @@ export type NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse = 
 
 export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid';
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse = {
+    batchId?: string;
+    competitionId?: string;
+    createdAt?: string;
+    sourceFileName?: string;
+    passwordVersion?: number;
+    rows?: Array<NoCtfApplicationCompetitionsCredentialsCompetitionCredentialDownloadRow>;
+};
+
+export type NoCtfApplicationCompetitionsCredentialsCompetitionCredentialDownloadRow = {
+    userId?: string;
+    userName?: string;
+    email?: string | null;
+    teamName?: string;
+    captain?: boolean;
+    trackKey?: string;
+    password?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse = {
+    batchId?: string | null;
+    createdUsers?: number;
+    createdTeams?: number;
+    createdCredentials?: number;
+    issues?: Array<NoCtfapiEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse = {
+    code?: string;
+    rowNumber?: number;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest = {
+    file?: Blob | File | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsRotateCompetitionCredentialUserResponse = {
+    password?: string;
+};
+
 export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse = {
     gameplayFactId?: string;
     value?: string;
@@ -20229,6 +20270,193 @@ export type AdminValidateCompetitionStartResponses = {
 };
 
 export type AdminValidateCompetitionStartResponse = AdminValidateCompetitionStartResponses[keyof AdminValidateCompetitionStartResponses];
+
+export type AdminDownloadCompetitionCredentialBatchData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/download';
+};
+
+export type AdminDownloadCompetitionCredentialBatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminDownloadCompetitionCredentialBatchPdfData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/print.pdf';
+};
+
+export type AdminDownloadCompetitionCredentialBatchPdfErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionCredentialBatchData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}';
+};
+
+export type AdminGetCompetitionCredentialBatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionCredentialBatchResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCredentialsGetCompetitionCredentialBatchResponse;
+};
+
+export type AdminGetCompetitionCredentialBatchResponse = AdminGetCompetitionCredentialBatchResponses[keyof AdminGetCompetitionCredentialBatchResponses];
+
+export type AdminImportCompetitionCredentialsData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/import';
+};
+
+export type AdminImportCompetitionCredentialsErrors = {
+    /**
+     * Bad Request
+     */
+    400: NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminImportCompetitionCredentialsError = AdminImportCompetitionCredentialsErrors[keyof AdminImportCompetitionCredentialsErrors];
+
+export type AdminImportCompetitionCredentialsResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse;
+};
+
+export type AdminImportCompetitionCredentialsResponse = AdminImportCompetitionCredentialsResponses[keyof AdminImportCompetitionCredentialsResponses];
+
+export type AdminRotateCompetitionCredentialBatchData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/rotate';
+};
+
+export type AdminRotateCompetitionCredentialBatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminRotateCompetitionCredentialBatchResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminRotateCompetitionCredentialBatchResponse = AdminRotateCompetitionCredentialBatchResponses[keyof AdminRotateCompetitionCredentialBatchResponses];
+
+export type AdminRotateCompetitionCredentialUserData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-users/{userId}/rotate';
+};
+
+export type AdminRotateCompetitionCredentialUserErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminRotateCompetitionCredentialUserResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCredentialsRotateCompetitionCredentialUserResponse;
+};
+
+export type AdminRotateCompetitionCredentialUserResponse = AdminRotateCompetitionCredentialUserResponses[keyof AdminRotateCompetitionCredentialUserResponses];
 
 export type AdminGetCheatIncidentData = {
     body?: never;

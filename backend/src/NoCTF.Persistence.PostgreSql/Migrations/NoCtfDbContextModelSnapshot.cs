@@ -2739,6 +2739,123 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Credentials.CompetitionCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<byte[]>("PasswordCiphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("password_ciphertext");
+
+                    b.Property<long>("PasswordUpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("password_updated_at");
+
+                    b.Property<int>("PasswordVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("password_version");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_credentials");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_competition_credentials_team_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_competition_credentials_user_id");
+
+                    b.HasIndex("BatchId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_credentials_batch_id_user_id");
+
+                    b.HasIndex("CompetitionId", "UserId")
+                        .HasDatabaseName("ix_competition_credentials_competition_id_user_id");
+
+                    b.ToTable("competition_credentials", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Credentials.CompetitionCredentialBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("SourceFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("source_file_name");
+
+                    b.Property<string>("SourceSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_sha256");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_credential_batches");
+
+                    b.HasIndex("CompetitionId", "CreatedAt")
+                        .HasDatabaseName("ix_competition_credential_batches_competition_id_created_at");
+
+                    b.ToTable("competition_credential_batches", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Directions.CompetitionDirection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -13322,6 +13439,32 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_competition_mode_configurations_competitions_competition_id");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Credentials.CompetitionCredential", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Credentials.CompetitionCredentialBatch", "Batch")
+                        .WithMany("Credentials")
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_credentials_competition_credential_batches_batc");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_credentials_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_credentials_users_user_id");
+
+                    b.Navigation("Batch");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Directions.CompetitionDirection", b =>
                 {
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
@@ -16669,6 +16812,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Directions");
 
                     b.Navigation("ModeConfiguration");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Credentials.CompetitionCredentialBatch", b =>
+                {
+                    b.Navigation("Credentials");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionProgression", b =>
