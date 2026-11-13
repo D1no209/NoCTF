@@ -36,7 +36,7 @@ public sealed class ExecuteCheck(ICheckRuntimeExecutor executor)
             || input.Provider != input.TargetReceipt.Provider || string.IsNullOrWhiteSpace(input.TargetHost)
             || string.IsNullOrWhiteSpace(input.Image) || string.IsNullOrWhiteSpace(input.CallbackToken)
             || input.CallbackUrl is not { IsAbsoluteUri: true, Scheme: "http" or "https" }
-            || input.Timeout <= TimeSpan.Zero || input.Requirements.Count == 0
+            || input.Timeout <= TimeSpan.Zero
             || !Enum.IsDefined(input.Use) || input.ExecutionId == Guid.Empty
             || input.Requirements.Any(kind => !Enum.IsDefined(kind)) || input.Requirements.Distinct().Count() != input.Requirements.Count
             || archive is not null && !input.FixInputEnabled)

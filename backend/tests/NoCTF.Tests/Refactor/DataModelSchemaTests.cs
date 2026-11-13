@@ -96,7 +96,7 @@ public sealed class DataModelSchemaTests
             await using var migrationModel = new NoCtfDbContext(options);
             await Assert.That(migrations).Count().IsEqualTo(migrationModel.Database.GetMigrations().Count());
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
-            await Assert.That(migrations).HasSingleItem();
+            await Assert.That(migrations).Count().IsEqualTo(2);
 
             await using var removedGatewayColumnsCommand = new NpgsqlCommand(
                 "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'platform_settings' AND column_name LIKE 'public_gateway_%'",
@@ -144,6 +144,7 @@ public sealed class DataModelSchemaTests
             await Assert.That((int)(await primaryKeyCommand.ExecuteScalarAsync(ct))!)
                 .IsEqualTo(actual.Count);
 
+            // WebAuthn clientDataJSON 保存签名验证所需的原始二进制字节。
             await using var nonPortableColumnCommand = new NpgsqlCommand(
                 """
                 SELECT count(*)::int
@@ -151,7 +152,10 @@ public sealed class DataModelSchemaTests
                 WHERE table_schema = 'public'
                   AND (data_type IN ('ARRAY', 'json', 'jsonb')
                     OR udt_name IN ('json', 'jsonb')
-                    OR column_name LIKE '%\_json' ESCAPE '\')
+                    OR (column_name LIKE '%\_json' ESCAPE '\'
+                        AND NOT (table_name = 'user_passkeys'
+                            AND column_name = 'client_data_json'
+                            AND data_type = 'bytea')))
                 """,
                 connection);
             await Assert.That((int)(await nonPortableColumnCommand.ExecuteScalarAsync(ct))!)
@@ -165,12 +169,12 @@ public sealed class DataModelSchemaTests
                   AND (
                     table_name = 'data_exports'
                     OR (column_name = 'revision'
-                        AND table_name <> 'competition_progressions')
+                        AND table_name NOT IN ('competition_progressions', 'awd_round_rules'))
+                    OR (column_name = 'generation' AND table_name = 'runtime_instances')
                     OR column_name IN (
                         'expected_revision',
                         'concurrency_token',
                         'leaderboard_dirty',
-                        'generation',
                         'runner_pool',
                         'checker_deadline'))
                 """,

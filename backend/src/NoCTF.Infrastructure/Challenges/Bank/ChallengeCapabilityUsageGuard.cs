@@ -4,6 +4,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Challenges.Capabilities;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Challenges.Testing;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 
@@ -44,14 +45,23 @@ public sealed class ChallengeCapabilityUsageGuard(NoCtfDbContext db)
                 (value.State == RuntimeState.Queued || value.State == RuntimeState.Provisioning || value.State == RuntimeState.Running || value.State == RuntimeState.Stopping)
                 && (value.ChallengeId == challengeId || value.CompetitionChallengeId != null && entries.Contains(value.CompetitionChallengeId.Value)))
             .Select(value => new { value.Purpose, value.TestFlagDelivery, value.CompetitionChallengeId,
-                TestKind = value.CapabilityTest == null ? (NoCTF.Domain.Challenges.Testing.TemplateCapabilityTestKind?)null : value.CapabilityTest.Kind }).ToArrayAsync(ct);
+                TestKind = value.CapabilityTest == null
+                    || value.CapabilityTest.State == TemplateCapabilityTestState.Completed
+                    || value.CapabilityTest.State == TemplateCapabilityTestState.PlatformFailed
+                    || value.CapabilityTest.State == TemplateCapabilityTestState.Canceled
+                    ? (TemplateCapabilityTestKind?)null : value.CapabilityTest.Kind }).ToArrayAsync(ct);
         foreach (var runtime in runtimes)
         {
             IReadOnlyList<ChallengeCapabilityKind> capabilities = runtime.Purpose switch
             {
-                RuntimePurpose.TemplateTest => runtime.TestKind is not null
-                    ? [ChallengeCapabilityKind.Break, ChallengeCapabilityKind.Fix, ChallengeCapabilityKind.Check, ChallengeCapabilityKind.Control]
-                    : runtime.TestFlagDelivery is RuntimeTestFlagDelivery.Environment or RuntimeTestFlagDelivery.Command ? [ChallengeCapabilityKind.Break] : [],
+                RuntimePurpose.TemplateTest => runtime.TestKind switch
+                {
+                    TemplateCapabilityTestKind.Check => [ChallengeCapabilityKind.Check],
+                    TemplateCapabilityTestKind.Control => [ChallengeCapabilityKind.Control],
+                    TemplateCapabilityTestKind.Fix => [ChallengeCapabilityKind.Fix],
+                    TemplateCapabilityTestKind.FixAndCheck => [ChallengeCapabilityKind.Fix, ChallengeCapabilityKind.Check],
+                    _ => runtime.TestFlagDelivery is RuntimeTestFlagDelivery.Environment or RuntimeTestFlagDelivery.Command ? [ChallengeCapabilityKind.Break] : []
+                },
                 RuntimePurpose.AttackTarget => [ChallengeCapabilityKind.Break],
                 RuntimePurpose.FixTarget or RuntimePurpose.ScopedFixTarget => [ChallengeCapabilityKind.Fix, ChallengeCapabilityKind.Check],
                 _ => GameModeChallengeConfigurationCatalog.RequiredCapabilities(rules[runtime.CompetitionChallengeId!.Value])

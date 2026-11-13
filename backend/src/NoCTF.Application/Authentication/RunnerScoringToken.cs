@@ -23,4 +23,6 @@ public interface IRunnerScoringTokenIssuer
     string IssueAwdChecker(AwdCheckerTokenRequest request);
     string IssueFixCheckResult(FixCheckResultTokenRequest request);
     string IssueTemplateCheckResult(string runnerId, Guid executionId, Guid runtimeInstanceId, DateTimeOffset deadline, DateTimeOffset now);
+    string IssueControlResult(string runnerId, Guid executionId, Guid runtimeInstanceId,
+        NoCTF.Application.Challenges.Capabilities.CapabilityExecutionScope scope, DateTimeOffset deadline, DateTimeOffset now);
 }

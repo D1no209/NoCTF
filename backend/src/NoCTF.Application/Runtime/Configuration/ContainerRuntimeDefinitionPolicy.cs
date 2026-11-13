@@ -13,7 +13,8 @@ public static partial class ContainerRuntimeDefinitionPolicy
         ContainerRuntimeDefinition definition,
         IReadOnlyList<RuntimeUrlBinding>? bindings = null,
         RuntimeUrlBinding? control = null,
-        RuntimeInternalEndpointBinding? checker = null)
+        RuntimeInternalEndpointBinding? checker = null,
+        bool requireComplete = true)
     {
         var errors = new List<string>();
         if (definition.Services is not { Count: >= 1 and <= 64 })
@@ -25,7 +26,7 @@ public static partial class ContainerRuntimeDefinitionPolicy
             if (service.Name is null || !ServiceNamePattern().IsMatch(service.Name))
                 errors.Add("Service names must be lowercase DNS labels of 1 to 63 characters.");
             else if (!names.Add(service.Name)) errors.Add($"Duplicate Runtime service '{service.Name}'.");
-            if (string.IsNullOrWhiteSpace(service.Image) || service.Image.Length > 512)
+            if (requireComplete && string.IsNullOrWhiteSpace(service.Image) || service.Image.Length > 512)
                 errors.Add("Every service requires an image of at most 512 characters.");
             if (service.MemoryMiB <= 0 || service.MemoryMiB > long.MaxValue / (1024 * 1024)
                 || service.CpuCores <= 0 || service.CpuCores > long.MaxValue / 1000m

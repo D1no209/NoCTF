@@ -90,6 +90,9 @@ public sealed class ChallengeTestRuntimeStore(
                 {
                     return new(null, RuntimeMutationFailure.Unsupported);
                 }
+                if (template.Definition is ContainerRuntimeDefinition draftRuntime
+                    && NoCTF.Application.Runtime.Configuration.ContainerRuntimeDefinitionPolicy.Validate(draftRuntime, template.UrlBindings).Count != 0)
+                    return new(null, RuntimeMutationFailure.ConfigurationInvalid);
                 newRuntimeInstanceId = Guid.CreateVersion7(command.Now);
                 template = template with
                 {

@@ -6,6 +6,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Runtime.Configuration;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Infrastructure.Runtime.Targets;
 using NoCTF.Infrastructure.Runtime.Placement;
@@ -26,9 +27,7 @@ internal static class RuntimeInfrastructure
     {
         services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
         services.AddScoped<IExecutionRuntimeIsolation, RunnerExecutionRuntimeIsolation>();
-        services.AddOptions<RuntimeExecutionOptions>().Bind(configuration.GetSection("Runtime:Execution"))
-            .Validate(options => options.ProcessesPerService > 0, "ProcessesPerService must be positive.").ValidateOnStart();
-        services.AddSingleton(provider => provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RuntimeExecutionOptions>>().Value);
+        services.AddNoCtfRuntimeExecutionOptions(configuration);
         services.AddSingleton<RuntimeResourceBudgetPolicy>();
         var proxyOptions = configuration.GetSection("RuntimeProxy")
             .Get<RuntimeProxyOptions>() ?? new RuntimeProxyOptions();

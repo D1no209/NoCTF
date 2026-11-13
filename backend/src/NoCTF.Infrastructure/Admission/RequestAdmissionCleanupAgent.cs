@@ -10,6 +10,12 @@ public sealed class RequestAdmissionCleanupAgent(
     TimeProvider clock,
     ILogger<RequestAdmissionCleanupAgent> logger) : BackgroundService
 {
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await new PersistedRequestAdmission(contexts, clock).WarmupAsync(cancellationToken);
+        await base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30), clock);

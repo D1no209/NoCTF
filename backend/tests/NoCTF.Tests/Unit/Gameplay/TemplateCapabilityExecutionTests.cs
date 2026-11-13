@@ -8,6 +8,37 @@ namespace NoCTF.Tests.Unit.Gameplay;
 
 public sealed class TemplateCapabilityExecutionTests
 {
+    [Test, Arguments("NOCTF_CHECK_REQUIREMENTS"), Arguments("NOCTF_CALLBACK_TOKEN"), Arguments("bad-name")]
+    public async Task Checker_authors_cannot_override_platform_inputs_or_use_invalid_environment_names(string name)
+    {
+        var definition = new ChallengeDefinition
+        {
+            Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = "target:1" }] },
+            Capabilities = [new CheckCapabilityDefinition { Image = "checker:1", TargetServiceName = "main",
+                Environment = [new() { Name = name, Value = "author-value" }] }]
+        };
+        await Assert.That(ChallengeCapabilityValidation.Validate(definition).Any(issue => issue.Capability == ChallengeCapabilityKind.Check
+            && issue.Code == CapabilityConfigurationFailure.InvalidChecker)).IsTrue();
+    }
+
+    [Test]
+    public async Task Independent_Check_accepts_actual_probes_without_author_requirements_and_rejects_foreign_flags()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var flagId = Guid.NewGuid();
+        var input = new CheckEvidenceInput(Guid.NewGuid(), Guid.NewGuid(), [],
+            [new(CheckItemKind.Functionality, null, CheckProbeResult.Passed, CheckFailureReason.None)],
+            now.AddSeconds(-1), now.AddSeconds(30), now, now, CapabilityExecutionScope.TemplateTest);
+        await Assert.That(CheckEvidenceValidation.Evaluate(input).Succeeded).IsTrue();
+        await Assert.That(CheckEvidenceValidation.Evaluate(input with { Probes = [] }).FailureCode).IsEqualTo(CapabilityExecutionFailure.MissingEvidence);
+        var flagReport = input with { Probes = [new(CheckItemKind.CurrentFlagRead, flagId, CheckProbeResult.Passed, CheckFailureReason.None)] };
+        await Assert.That(CheckEvidenceValidation.Evaluate(flagReport).FailureCode).IsEqualTo(CapabilityExecutionFailure.InvalidEvidence);
+        await Assert.That(CheckEvidenceValidation.Evaluate(flagReport with { AllowedFlagIds = new HashSet<Guid> { flagId } }).Succeeded).IsTrue();
+        var unknown = CheckEvidenceValidation.Evaluate(input with { Probes = [new(CheckItemKind.Functionality, null, CheckProbeResult.Unknown, CheckFailureReason.IncompleteEvidence)] });
+        await Assert.That(unknown.Succeeded).IsTrue();
+        await Assert.That(unknown.Value!.ExecutionState).IsEqualTo(CapabilityExecutionState.PlatformFailed);
+    }
+
     [Test]
     public async Task Template_break_returns_evidence_and_cannot_be_attached_to_a_formal_fact()
     {

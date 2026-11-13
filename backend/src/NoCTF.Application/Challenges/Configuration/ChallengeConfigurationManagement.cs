@@ -38,6 +38,7 @@ public interface IChallengeConfigurationCatalog
         Validate(mode, rules, competitionConfiguration, eligibleTeamCount);
 
     IReadOnlyList<string> ValidateDefinition(ChallengeDefinition definition);
+    IReadOnlyList<string> ValidateDraftDefinition(ChallengeDefinition definition) => ValidateDefinition(definition);
 
     IReadOnlyList<string> ValidateDefinitionForStart(
         GameMode mode,

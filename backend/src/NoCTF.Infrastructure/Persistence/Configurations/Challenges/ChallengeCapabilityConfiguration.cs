@@ -77,12 +77,27 @@ internal sealed class CheckCapabilityConfiguration : IEntityTypeConfiguration<Ch
             environment.WithOwner().HasForeignKey("ChallengeId", "CapabilityKind");
             environment.HasKey(value => new { value.ChallengeId, value.Name });
         });
-        builder.OwnsMany(value => value.Requirements, requirements =>
+    }
+}
+
+internal sealed class ControlCapabilityConfiguration : IEntityTypeConfiguration<ControlCapabilityDefinition>
+{
+    public void Configure(EntityTypeBuilder<ControlCapabilityDefinition> builder)
+    {
+        builder.OwnsMany(value => value.Command, command =>
         {
-            requirements.ToTable("challenge_check_requirements");
-            requirements.Property<ChallengeCapabilityKind>("CapabilityKind");
-            requirements.WithOwner().HasForeignKey("ChallengeId", "CapabilityKind");
-            requirements.HasKey(value => new { value.ChallengeId, value.Kind });
+            command.ToTable("challenge_control_command");
+            command.Property<ChallengeCapabilityKind>("CapabilityKind");
+            command.WithOwner().HasForeignKey("ChallengeId", "CapabilityKind");
+            command.HasKey(value => new { value.ChallengeId, value.Position });
+            command.Property(value => value.Position).ValueGeneratedNever();
+        });
+        builder.OwnsMany(value => value.Environment, environment =>
+        {
+            environment.ToTable("challenge_control_environment");
+            environment.Property<ChallengeCapabilityKind>("CapabilityKind");
+            environment.WithOwner().HasForeignKey("ChallengeId", "CapabilityKind");
+            environment.HasKey(value => new { value.ChallengeId, value.Name });
         });
     }
 }

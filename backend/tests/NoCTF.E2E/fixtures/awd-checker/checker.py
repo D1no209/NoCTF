@@ -1,4 +1,3 @@
-"""AWD evidence checker example. Never log task material, tokens or response bodies."""
 import datetime as dt
 import errno
 import json
@@ -19,8 +18,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
 
-def probe(outcome, reason="None"):
-    return {"outcome": outcome, "reason": reason}
+def probe(result, reason="None"):
+    return {"result": result, "reason": reason}
 
 
 def request(url, timeout, token=None, body=None, method=None):
@@ -49,9 +48,9 @@ def failure(error, missing_reason):
 
 
 def combine(observations):
-    for outcome in ("PlatformFailure", "Unknown", "TargetFailure"):
+    for result in ("PlatformFailure", "Unknown", "TargetFailure"):
         for item in observations:
-            if item["outcome"] == outcome:
+            if item["result"] == result:
                 return item
     return probe("Passed")
 
@@ -107,7 +106,11 @@ def evaluate(task, targets, fallback, port=8080):
         except (OSError, ValueError) as error:
             functionality.append(failure(error, "FunctionalCheckFailed"))
 
-    results = []
+    probes = [
+        {"kind": "Connection", **combine(connection)},
+        {"kind": "Functionality", **combine(functionality)},
+    ]
+    contexts = []
     for flag in flags:
         path = f"/flags/{uuid.UUID(flag['storeId']).hex}/{uuid.UUID(flag['flagId']).hex}"
         url = f"http://{host(flag)}:{port}{path}"
@@ -120,20 +123,23 @@ def evaluate(task, targets, fallback, port=8080):
                     request(url, timeout(), body=flag["flag"].encode("utf-8"), method="PUT")
                     write = probe("Passed")
                 except (OSError, ValueError) as error:
-                    write = failure(error, "FlagStoreFailed")
+                    write = failure(error, "FlagWriteFailed")
         if time.monotonic() >= stop:
             read = probe("Unknown", "CheckerTimedOut")
         else:
-            reason = "HistoricalFlagMissing" if flag["historical"] else "CurrentFlagMissing"
+            reason = "FlagReadFailed"
             try:
-                # Read every assigned Flag, even after a write or functionality failure.
+                # 每个分配的 Flag 都进行读取检查。
                 actual = request(url, timeout())
                 read = probe("Passed") if actual == flag["flag"].encode("utf-8") else probe("TargetFailure", reason)
             except (OSError, ValueError) as error:
                 read = failure(error, reason)
-        results.append({"flagId": flag["flagId"], "write": write, "read": read,
-                        "privateReadContext": None, "publicLocator": path})
-    return {"connection": combine(connection), "functionality": combine(functionality), "flags": results,
+        if flag["requiresWrite"]:
+            probes.append({"kind": "FlagWrite", "flagId": flag["flagId"], **write})
+        probes.append({"kind": "HistoricalFlagRead" if flag["historical"] else "CurrentFlagRead",
+                       "flagId": flag["flagId"], **read})
+        contexts.append({"flagId": flag["flagId"], "privateReadContext": None, "publicLocator": path})
+    return {"probes": probes, "flagContexts": contexts,
             "observedAt": dt.datetime.now(dt.timezone.utc).isoformat()}
 
 
@@ -142,7 +148,7 @@ def main():
         token = os.environ["NOCTF_CALLBACK_TOKEN"]
         task = json.loads(request(os.environ["NOCTF_AWD_TASK_URL"], 5, token=token))
         result = evaluate(task, json.loads(os.environ.get("NOCTF_AWD_TARGETS", "{}")), os.environ["NOCTF_TARGET_HOST"])
-        # One immutable receipt; transport failure never changes evidence to success.
+        # 发送本次真实证据，传输失败立即终止。
         data = json.dumps(result, separators=(",", ":")).encode("utf-8")
         req = urllib.request.Request(os.environ["NOCTF_CALLBACK_URL"], data,
                                      {"Authorization": "Bearer " + token, "Content-Type": "application/json"})

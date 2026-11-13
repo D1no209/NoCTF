@@ -25,7 +25,7 @@ public sealed class CopyChallengeTemplate(IChallengeTemplateCopyStore store)
 public static class ChallengeTemplateCopyPolicy
 {
     public static bool Supports(ChallengeDefinition? definition) => definition is not null
-        && NoCTF.Application.Challenges.Capabilities.ChallengeCapabilityValidation.Validate(definition).Count == 0;
+        && NoCTF.Application.Challenges.Capabilities.ChallengeCapabilityValidation.Validate(definition, requireComplete: false).Count == 0;
 
     public static ChallengeDefinition Copy(ChallengeDefinition source, Guid id)
     {

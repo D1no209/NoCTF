@@ -463,7 +463,7 @@ public sealed partial class AwdRoundCoordinationTests
                     ? [breakDefinition,
                         new NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition
                         { ChallengeId = challengeId, Image = "checker:test", TargetServiceName = "main", TimeoutSeconds = 30,
-                            Requirements = [new() { Kind = NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Functionality }] }]
+                            }]
                     : [breakDefinition]
             },
             CreatedAt = now,

@@ -13,7 +13,9 @@ internal static class CurrentRunnerRegistration
         bool hasActiveAssignments = false,
         bool providerAvailable = true,
         TimeSpan? timeToLive = null,
-        ulong resourceDomainFencingToken = 0)
+        ulong resourceDomainFencingToken = 0,
+        RuntimeProvider provider = RuntimeProvider.Docker,
+        long processesPerService = 256)
     {
         var now = DateTimeOffset.UtcNow;
         var options = new RunnerAdmissionOptions();
@@ -40,7 +42,7 @@ internal static class CurrentRunnerRegistration
         return new(
             pool,
             runnerId,
-            RuntimeProvider.Docker,
+            provider,
             "current-test",
             timeToLive ?? TimeSpan.FromMinutes(1),
             hasActiveAssignments,
@@ -48,6 +50,7 @@ internal static class CurrentRunnerRegistration
             snapshot,
             options,
             Reconciled: true,
-            ResourceDomainFencingToken: resourceDomainFencingToken);
+            ResourceDomainFencingToken: resourceDomainFencingToken,
+            ProcessesPerService: processesPerService);
     }
 }

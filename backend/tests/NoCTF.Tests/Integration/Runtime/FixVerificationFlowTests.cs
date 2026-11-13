@@ -86,7 +86,7 @@ public sealed class FixVerificationFlowTests
                     new CheckCapabilityDefinition { Image = PythonImage, TargetServiceName = "service-0", AcceptsFixInput = true,
                         Command = [new() { Position = 0, Value = "python" }, new() { Position = 1, Value = "-c" }, new() { Position = 2, Value = checkerScript }],
                         Environment = [new() { Name = "PATCH_SCRIPT_SHA256", Value = Convert.ToHexStringLower(SHA256.HashData(script)) }],
-                        Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }] }]
+                        }]
             };
             var template = new Challenge { Id = Guid.NewGuid(), OwnerId = fixture.Application.OwnerId, Title = "Shared repair capabilities", Definition = definition };
             db.Challenges.Add(template);
@@ -160,7 +160,7 @@ public sealed class FixVerificationFlowTests
             server.UseAuthentication(); server.UseAuthorization(); server.UseNoCtfEndpoints(); await server.StartAsync(ct);
             var port = new Uri(server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()).Port;
             var baseUri = new Uri($"http://{Environment.MachineName}:{port}");
-            await using var gateway = new ContainerBuilder(PythonImage).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
+            await using var gateway = new ContainerBuilder(PythonImage).WithName(fixture.CallbackContainerName).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
                 .WithExtraHost("host.docker.internal", "host-gateway").WithEnvironment("API_PORT", port.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .WithResourceMapping(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Capabilities", "callback_proxy.py"), "/work/")
                 .WithCommand("python", "/work/callback_proxy.py").WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(port)).Build();
@@ -231,21 +231,28 @@ public sealed class FixVerificationFlowTests
             var completionConsumer = await completionConnection.CreateJetStreamContext().CreateOrUpdateConsumerAsync(NatsSubjects.GameplayStream,
                 new ConsumerConfig("fix-work-completion") { FilterSubject = NatsSubjects.Subject(WorkerQueue.Gameplay), AckPolicy = ConsumerConfigAckPolicy.Explicit }, ct);
             await handler.Handle(command, ct);
-            db.ChangeTracker.Clear();
-            var pending = await db.GameplayFacts.AsSplitQuery().SingleAsync(value => value.Id == factId, ct);
-            await Assert.That(pending.State).IsEqualTo(GameplayFactState.Processing);
-            await Assert.That(pending.FixExecution!.Phase).IsEqualTo(FixExecutionPhase.Finalizing);
-            await Assert.That(await db.CompetitionEvents.CountAsync(value => value.GameplayFactId == factId
-                && value.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.ScoringRecorded, ct)).IsEqualTo(0);
             var deliveredCompletion = await completionConsumer.NextAsync<byte[]>(opts: new() { Expires = TimeSpan.FromSeconds(10) }, cancellationToken: ct)
                 ?? throw new InvalidOperationException("The real Runner did not publish its work completion.");
             var completionJson = new JsonSerializerOptions(JsonSerializerDefaults.Web); completionJson.Converters.Add(new JsonStringEnumConverter());
             var completion = JsonSerializer.Deserialize<CompleteFixExecutionWork>(deliveredCompletion.Data!, completionJson)!;
             await deliveredCompletion.AckAsync(cancellationToken: ct);
+            await Assert.That(completion.Result).IsEqualTo(new FixWorkCompletion(FixWorkCompletionKind.Completed));
+            db.ChangeTracker.Clear();
+            var pending = await db.GameplayFacts.AsSplitQuery().SingleAsync(value => value.Id == factId, ct);
+            await Assert.That(pending.State).IsEqualTo(GameplayFactState.Processing);
+            await Assert.That(pending.FixExecution!.Phase).IsEqualTo(FixExecutionPhase.Finalizing);
+            await Assert.That(pending.FixExecution.WorkCompletedAt).IsNull();
+            await Assert.That(await db.CompetitionEvents.CountAsync(value => value.GameplayFactId == factId
+                && value.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.ScoringRecorded, ct)).IsEqualTo(0);
             var results = new InternalResultStore(db, fixture.Application.Publisher, new CompetitionEventStore(db, fixture.Application.Publisher));
             await Assert.That(await results.CompleteFixWorkAsync(completion, ct)).IsEqualTo(InternalResultDisposition.Applied);
             db.ChangeTracker.Clear();
-            await Assert.That((await db.GameplayFacts.SingleAsync(value => value.Id == factId, ct)).State).IsEqualTo(GameplayFactState.Processing);
+            var finalizing = await db.GameplayFacts.AsSplitQuery().SingleAsync(value => value.Id == factId, ct);
+            await Assert.That(finalizing.State).IsEqualTo(GameplayFactState.Processing);
+            await Assert.That(finalizing.FixExecution!.Phase).IsEqualTo(FixExecutionPhase.Finalizing);
+            await Assert.That(await results.FinalizeFixExecutionAsync(factId, runtimeId, DateTimeOffset.UtcNow, ct))
+                .IsEqualTo(InternalResultDisposition.Superseded);
+            db.ChangeTracker.Clear();
             await AssertCleanupAsync(fixture, provisioned, attack, ct);
             db.ChangeTracker.Clear();
             await Assert.That(await results.FinalizeFixExecutionAsync(factId, runtimeId, DateTimeOffset.UtcNow, ct)).IsEqualTo(InternalResultDisposition.Applied);

@@ -8,7 +8,8 @@ public enum RuntimeWorkloadKind : short
     VerificationTarget,
     AwdChecker,
     PatchChecker,
-    TemplateChecker
+    TemplateChecker,
+    ControlObserver
 }
 
 public enum RunnerAdmissionState : short
@@ -41,7 +42,7 @@ public readonly record struct RuntimeWorkloadIdentity(
     Guid OperationId)
 {
     [JsonIgnore]
-    public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker;
+    public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker or RuntimeWorkloadKind.ControlObserver;
 
     // Text is used only at external provider and diagnostic boundaries.
     [JsonIgnore]

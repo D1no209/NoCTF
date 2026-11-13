@@ -22,7 +22,10 @@ public static class ChallengeDefinitionGraph
                 case CheckCapabilityDefinition value:
                     foreach (var argument in value.Command) argument.ChallengeId = challengeId;
                     foreach (var variable in value.Environment) variable.ChallengeId = challengeId;
-                    foreach (var requirement in value.Requirements) requirement.ChallengeId = challengeId;
+                    break;
+                case ControlCapabilityDefinition value:
+                    foreach (var argument in value.Command) argument.ChallengeId = challengeId;
+                    foreach (var variable in value.Environment) variable.ChallengeId = challengeId;
                     break;
                 case QuestionnaireCapabilityDefinition value:
                     value.CurrentRevision.ChallengeId = challengeId;
@@ -82,12 +85,11 @@ public static class ChallengeDefinitionStructuralComparer
                 a.Image == b.Image && a.TargetServiceName == b.TargetServiceName && a.TimeoutSeconds == b.TimeoutSeconds
                 && a.ReadyTimeoutSeconds == b.ReadyTimeoutSeconds && a.AcceptsFixInput == b.AcceptsFixInput
                 && SequenceEqual(a.Command, b.Command, item => (item.Position, item.Value))
-                && SequenceEqual(a.Environment, b.Environment, item => (item.Name, item.Value))
-                && SequenceEqual(a.Requirements, b.Requirements, item => item.Kind),
+                && SequenceEqual(a.Environment, b.Environment, item => (item.Name, item.Value)),
             (ControlCapabilityDefinition a, ControlCapabilityDefinition b) =>
-                a.Protocol == b.Protocol && a.UrlTemplate == b.UrlTemplate && a.ServiceName == b.ServiceName
-                && a.ContainerPort == b.ContainerPort && a.VmId == b.VmId && a.GuestPort == b.GuestPort
-                && a.TimeoutSeconds == b.TimeoutSeconds,
+                a.Image == b.Image && a.ServiceName == b.ServiceName && a.TimeoutSeconds == b.TimeoutSeconds
+                && SequenceEqual(a.Command, b.Command, item => (item.Position, item.Value))
+                && SequenceEqual(a.Environment, b.Environment, item => (item.Name, item.Value)),
             (QuestionnaireCapabilityDefinition a, QuestionnaireCapabilityDefinition b) =>
                 a.CurrentRevisionId == b.CurrentRevisionId && QuestionnaireContentEquals(a.CurrentRevision, b.CurrentRevision),
             _ => false

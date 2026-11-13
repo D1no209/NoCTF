@@ -26,7 +26,7 @@ public sealed class LiveSoloFoundationPersistenceTests
                 provider => provider.MigrationsAssembly("NoCTF.Persistence.PostgreSql")).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
             var migrations = db.Database.GetMigrations().ToArray();
-            await Assert.That(migrations).HasSingleItem();
+            await Assert.That(migrations).Count().IsEqualTo(2);
             await db.Database.MigrateAsync(ct);
             var now = DateTimeOffset.UtcNow;
             var user = new User { Id = Guid.NewGuid(), UserName = "livesolo-owner", Email = "livesolo@example.test", PasswordHash = "unused",

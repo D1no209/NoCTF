@@ -24,6 +24,7 @@ public sealed class MaintenanceTickAgent(
     private static readonly HashSet<ClusterScheduleKind> RebuiltKinds =
     [
         ClusterScheduleKind.AwdRound,
+        ClusterScheduleKind.AwdpRound,
         ClusterScheduleKind.AwdChecker,
         ClusterScheduleKind.KohPoll,
         ClusterScheduleKind.LiveSoloRound,
@@ -301,6 +302,7 @@ public sealed class MaintenanceTickAgent(
     internal static ValueTask PublishMessageAsync(IMessageBus bus,object message)=>message switch
         {
             AdvanceAwdRound value => bus.PublishAsync(value),
+            ProjectLeaderboard value => bus.PublishAsync(value),
             DispatchAwdCheckers value => bus.PublishAsync(value),
             PollKohChallenge value => bus.PublishAsync(value),
             AdvanceCompetitionLifecycle value => bus.PublishAsync(value),
@@ -309,6 +311,7 @@ public sealed class MaintenanceTickAgent(
             DispatchPendingGameplayFacts value => bus.PublishAsync(value),
             NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests value => bus.PublishAsync(value),
             RecoverFixExecutions value => bus.PublishAsync(value),
+            RecoverControlObservations value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => bus.PublishAsync(value),
@@ -334,6 +337,8 @@ public sealed class MaintenanceTickAgent(
             now, TimeSpan.FromSeconds(5), new NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests()));
         AddFixed(new("fix-execution-recovery", ClusterScheduleKind.FixExecutionRecovery,
             now, TimeSpan.FromSeconds(5), new RecoverFixExecutions()));
+        AddFixed(new("control-execution-recovery", ClusterScheduleKind.ControlExecutionRecovery,
+            now, TimeSpan.FromSeconds(5), new RecoverControlObservations()));
         AddFixed(new("account-source-retention", ClusterScheduleKind.AccountPrivacyRetention,
             now, TimeSpan.FromHours(1), new ExpireAccountSourceAddresses(now)));
         AddFixed(new(
@@ -360,6 +365,7 @@ public sealed class MaintenanceTickAgent(
     internal static string ScheduleKind(ClusterScheduleKind kind) => kind switch
     {
         ClusterScheduleKind.AwdRound => "awd_round",
+        ClusterScheduleKind.AwdpRound => "awdp_round",
         ClusterScheduleKind.AwdChecker => "awd_checker",
         ClusterScheduleKind.KohPoll => "koh_poll",
         ClusterScheduleKind.CompetitionLifecycle => "competition_lifecycle",
@@ -368,6 +374,7 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.GameplayFactRecovery => "gameplay_fact_recovery",
         ClusterScheduleKind.TemplateCapabilityTestRecovery => "template_capability_test_recovery",
         ClusterScheduleKind.FixExecutionRecovery => "fix_execution_recovery",
+        ClusterScheduleKind.ControlExecutionRecovery => "control_execution_recovery",
         ClusterScheduleKind.LiveSoloRound => "live_solo_round",
         ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
         ClusterScheduleKind.LiveSoloCapture => "live_solo_capture",

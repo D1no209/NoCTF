@@ -29,13 +29,13 @@ public static class ChallengeCapabilityCopy
             Image = value.Image, TargetServiceName = value.TargetServiceName, TimeoutSeconds = value.TimeoutSeconds,
             ReadyTimeoutSeconds = value.ReadyTimeoutSeconds, AcceptsFixInput = value.AcceptsFixInput,
             Command = value.Command.Select(argument => new CheckCommandArgument { Position = argument.Position, Value = argument.Value }).ToList(),
-            Environment = value.Environment.Select(variable => new CheckEnvironmentVariable { Name = variable.Name, Value = variable.Value }).ToList(),
-            Requirements = value.Requirements.Select(requirement => new CheckRequirement { Kind = requirement.Kind }).ToList()
+            Environment = value.Environment.Select(variable => new CheckEnvironmentVariable { Name = variable.Name, Value = variable.Value }).ToList()
         },
         ControlCapabilityDefinition value => new ControlCapabilityDefinition
         {
-            Protocol = value.Protocol, UrlTemplate = value.UrlTemplate, ServiceName = value.ServiceName,
-            ContainerPort = value.ContainerPort, VmId = value.VmId, GuestPort = value.GuestPort, TimeoutSeconds = value.TimeoutSeconds
+            Image = value.Image, ServiceName = value.ServiceName, TimeoutSeconds = value.TimeoutSeconds,
+            Command = value.Command.Select(argument => new ControlCommandArgument { Position = argument.Position, Value = argument.Value }).ToList(),
+            Environment = value.Environment.Select(variable => new ControlEnvironmentVariable { Name = variable.Name, Value = variable.Value }).ToList()
         },
         QuestionnaireCapabilityDefinition value => CopyQuestionnaire(value),
         _ => throw new ArgumentOutOfRangeException(nameof(source), source.GetType(), "Unknown capability definition.")

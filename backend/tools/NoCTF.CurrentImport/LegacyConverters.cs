@@ -343,9 +343,10 @@ internal static class LegacyConverters
             Runtime = Runtime(challengeId, value.Runtime),
             Capabilities = [new ControlCapabilityDefinition
             {
-                ChallengeId = challengeId, UrlTemplate = value.Runtime?.ControlCheckUrlBinding?.UrlTemplate ?? string.Empty,
-                ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName, ContainerPort = value.Runtime?.ControlCheckUrlBinding?.ContainerPort,
-                VmId = value.Runtime?.ControlCheckUrlBinding?.VmId, GuestPort = value.Runtime?.ControlCheckUrlBinding?.GuestPort
+                ChallengeId = challengeId, ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName,
+                Environment = value.Runtime?.ControlCheckUrlBinding is { } binding
+                    ? [new ControlEnvironmentVariable { ChallengeId = challengeId, Name = "CONTROL_URL_TEMPLATE", Value = binding.UrlTemplate }]
+                    : []
             }]
         };
     }
@@ -361,8 +362,7 @@ internal static class LegacyConverters
         TimeoutSeconds = job.TimeoutSeconds,
         TargetServiceName = targetServiceName,
         Command = (job.Command ?? []).Select((value, position) => new CheckCommandArgument { ChallengeId = challengeId, Position = position, Value = value }).ToList(),
-        Environment = (job.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { ChallengeId = challengeId, Name = item.Key, Value = item.Value }).ToList(),
-        Requirements = required.Select(kind => new CheckRequirement { ChallengeId = challengeId, Kind = kind }).ToList()
+        Environment = (job.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { ChallengeId = challengeId, Name = item.Key, Value = item.Value }).ToList()
     };
 
     private static BreakCapabilityDefinition Break(Guid challengeId, NoCTF.GameModes.Flags.PerTeamFlagTemplate? template, ChallengeRuntimeTemplate? runtime) => new()

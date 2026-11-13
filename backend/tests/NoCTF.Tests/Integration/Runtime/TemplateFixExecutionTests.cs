@@ -56,7 +56,6 @@ public sealed class TemplateFixExecutionTests
             Command = [new() { Position = 0, Value = "python" }, new() { Position = 1, Value = "-c" },
                 new() { Position = 2, Value = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Capabilities", "check_repair.py"), ct) }],
             Environment = [new() { Name = "PATCH_SCRIPT_SHA256", Value = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(script))) }],
-            Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }]
         });
         await db.SaveChangesAsync(ct);
         var placement = new ConfiguredRuntimePlacementPolicy(Options.Create(new RuntimePlacementOptions
@@ -138,7 +137,6 @@ public sealed class TemplateFixExecutionTests
             Image = CapabilityCallbackFixture.PythonImage, TargetServiceName = "service-0",
             Command = [new() { Position = 0, Value = "python" }, new() { Position = 1, Value = "-c" },
                 new() { Position = 2, Value = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Capabilities", "check_template.py"), ct) }],
-            Requirements = [new() { Kind = CheckItemKind.Functionality }]
         }];
         await db.SaveChangesAsync(ct);
         var queued = await fixture.QueueAsync(1, ct);

@@ -48,7 +48,7 @@ public sealed class AwdStartGateTests
             Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
                 { InjectionCommand = "printf '%s' \"$FLAG\" > /dev/shm/flag", InjectionTimeoutSeconds = 30, InjectionServiceName = "main" },
                 new NoCTF.Domain.Challenges.Capabilities.CheckCapabilityDefinition { TargetServiceName = "main", Image = "checker:test",
-                    Requirements = [new() { Kind = NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Functionality }] }],
+                    }],
             Runtime = new ContainerChallengeRuntimeTemplate
             {
                 Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/awd:v1" }],

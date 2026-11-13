@@ -198,8 +198,7 @@ internal sealed class ModeEnvironment(
             ["NOCTF_E2E_DOCKER_GID"] = dockerSocketGroupId,
             ["NOCTF_E2E_RUNTIME_PROVIDER"] = "Docker",
             ["NOCTF_E2E_RUNNER_POOL"] = runnerPool,
-            ["NOCTF_E2E_CALLBACK_CONTAINER"] =
-                mode == E2EMode.Koh ? $"{projectName}-worker" : $"{projectName}-backend",
+            ["NOCTF_E2E_CALLBACK_CONTAINER"] = $"{projectName}-backend",
             ["NOCTF_E2E_POSTGRES_PASSWORD"] = $"postgres-{RandomToken(18)}",
             ["NOCTF_E2E_MINIO_USER"] = $"e2e{RandomToken(6)}",
             ["NOCTF_E2E_MINIO_PASSWORD"] = $"minio-{RandomToken(20)}",
@@ -230,6 +229,7 @@ internal sealed class ModeEnvironment(
                 break;
             case E2EMode.Koh:
                 environment["NOCTF_E2E_RUNTIME_IMAGE"] = $"{imagePrefix}-runtime:latest";
+                environment["NOCTF_E2E_CONTROL_IMAGE"] = $"{imagePrefix}-control:latest";
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
@@ -261,7 +261,7 @@ internal sealed class ModeEnvironment(
         E2EMode.Ctf => ["runtime-fixture"],
         E2EMode.Awd => ["runtime-fixture", "checker-fixture"],
         E2EMode.Awdp => ["target-fixture", "checker-fixture"],
-        E2EMode.Koh => ["runtime-fixture"],
+        E2EMode.Koh => ["runtime-fixture", "control-fixture"],
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
     };
 

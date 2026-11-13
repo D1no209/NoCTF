@@ -58,6 +58,16 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             _ => ["Challenge rules type does not match the competition mode."]
         };
 
+    public IReadOnlyList<string> ValidateDraftDefinition(ChallengeDefinition definition)
+    {
+        var errors = ChallengeCapabilityValidation.Validate(definition, requireComplete: false)
+            .Select(error => $"{error.Capability}: {error.Code}.").ToList();
+        if (definition.Runtime is ContainerChallengeRuntimeTemplate
+            && TypedGameModeConfiguration.Runtime(definition)?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition container)
+            errors.AddRange(NoCTF.Application.Runtime.Configuration.ContainerRuntimeDefinitionPolicy.Validate(container, requireComplete: false));
+        return errors;
+    }
+
     public IReadOnlyList<string> ValidateDefinition(ChallengeDefinition definition)
     {
         var errors = ChallengeCapabilityValidation.Validate(definition).Select(error => $"{error.Capability}: {error.Code}.").ToList();
@@ -137,11 +147,6 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         if (mode == GameMode.Awd) errors.AddRange(AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(definition) with { Runtime = effectiveRuntime }));
         if (mode == GameMode.Koh) errors.AddRange(KohConfigurationValidator.Validate(TypedGameModeConfiguration.Koh(definition) with { Runtime = effectiveRuntime }));
         if (mode == GameMode.LiveSolo) errors.AddRange(LiveSoloConfigurationValidator.ValidateDefinition(definition));
-        if (required.Contains(ChallengeCapabilityKind.Fix) && definition.Check is { } checker
-            && mode is GameMode.Awdp or GameMode.LiveSolo
-            && (!checker.Requirements.Any(item => item.Kind == CheckItemKind.Functionality)
-                || !checker.Requirements.Any(item => item.Kind == CheckItemKind.Vulnerability)))
-            errors.Add("Fix completion requires functionality and vulnerability checks.");
         return errors;
     }
 

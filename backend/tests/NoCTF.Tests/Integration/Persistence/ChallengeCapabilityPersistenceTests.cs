@@ -127,7 +127,7 @@ public sealed class ChallengeCapabilityPersistenceTests
         await Assert.That(loaded.Definition!.Capabilities.Count).IsEqualTo(3);
         await Assert.That(loaded.Definition.Fix!.TargetServiceName).IsEqualTo("web");
         await Assert.That(loaded.Definition.Break!.EnvironmentTargets.Single().VariableName).IsEqualTo("FLAG");
-        await Assert.That(loaded.Definition.Check!.Requirements.Count).IsEqualTo(2);
+        await Assert.That(loaded.Definition.Check!.Image).IsEqualTo(template.Definition!.Check!.Image);
         await Assert.That(await db.CompetitionChallenges.CountAsync(value => value.ChallengeId == template.Id, ct)).IsEqualTo(2);
         var revisionId = Guid.NewGuid();
         var quiz = new Challenge { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "Questionnaire", Definition = new()

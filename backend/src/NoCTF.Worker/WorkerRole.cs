@@ -52,7 +52,7 @@ public static class WorkerRole
         services.AddTransient<Competitions.CompetitionDeletionMessageHandler>();
         services.AddTransient<AwdMessageHandler>();
         services.AddTransient<KohPollingHandler>();
-        services.AddTransient<KohObservationHandler>();
+        services.AddTransient<ControlObservationMessageHandler>();
         services.AddTransient<CompetitionLifecycleMessageHandler>();
         services.AddTransient<FixExecutionMessageHandler>();
         services.AddTransient<Challenges.Capabilities.TemplateCapabilityTestMessageHandler>();
@@ -118,7 +118,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(Competitions.CompetitionDeletionMessageHandler));
         options.Discovery.IncludeType(typeof(AwdMessageHandler));
         options.Discovery.IncludeType(typeof(KohPollingHandler));
-        options.Discovery.IncludeType(typeof(KohObservationHandler));
+        options.Discovery.IncludeType(typeof(ControlObservationMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
         options.Discovery.IncludeType(typeof(Challenges.Timing.ChallengeTimingMessageHandler));
         options.Discovery.IncludeType(typeof(Questionnaires.QuestionnaireActivityMessageHandler));

@@ -102,7 +102,9 @@ public sealed class PersistedRunnerCapacityGate(
                 && fact.State == GameplayFactState.Processing
                 && (identity.Kind != RuntimeWorkloadKind.AwdChecker || fact.Awd != null
                     && fact.Awd.AttemptId == identity.OperationId && fact.Awd.RuntimeId == identity.RuntimeInstanceId
-                    && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running), ct)
+                    && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running)
+                && (identity.Kind != RuntimeWorkloadKind.ControlObserver || fact.ControlExecution != null
+                    && fact.ControlExecution.ExecutionId == identity.OperationId && fact.ControlExecution.RuntimeInstanceId == identity.RuntimeInstanceId), ct)
             && await IsReadyOwnerAsync(allocation, ct);
     }
 
@@ -274,7 +276,9 @@ public sealed class PersistedRunnerCapacityGate(
                     && fact.Awd.RuntimeId == current.Id
                     && fact.Awd.Execution == NoCTF.Domain.Competitions.Awd.AwdCheckExecution.Running
                     || identity.Kind == RuntimeWorkloadKind.PatchChecker
-                        && current.GameplayFactId == fact.Id), ct)))
+                        && current.GameplayFactId == fact.Id
+                    || identity.Kind == RuntimeWorkloadKind.ControlObserver && fact.ControlExecution != null
+                        && fact.ControlExecution.ExecutionId == identity.OperationId && fact.ControlExecution.RuntimeInstanceId == current.Id), ct)))
             return new(RunnerCapacityAvailability.Unavailable,
                 Failure: RunnerAdmissionFailure.NoEligibleRunner);
 
@@ -314,9 +318,11 @@ public sealed class PersistedRunnerCapacityGate(
                 && (item.Allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker
                     || item.Allocation.WorkloadKind != RuntimeWorkloadKind.AwdChecker
                     && item.Allocation.WorkloadKind != RuntimeWorkloadKind.PatchChecker
+                    && item.Allocation.WorkloadKind != RuntimeWorkloadKind.ControlObserver
                     && (item.State != RuntimeState.Running || item.RunningAt == null || observedAt < item.RunningAt)
                     || (item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
-                        || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker)
+                        || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker
+                        || item.Allocation.WorkloadKind == RuntimeWorkloadKind.ControlObserver)
                         && item.Allocation.GameplayFactId != null
                         && db.GameplayFacts.Any(fact => fact.Id == item.Allocation.GameplayFactId
                             && fact.State == GameplayFactState.Processing)))
@@ -325,6 +331,7 @@ public sealed class PersistedRunnerCapacityGate(
                 item.Allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
                     || item.Allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker
                     || item.Allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker
+                    || item.Allocation.WorkloadKind == RuntimeWorkloadKind.ControlObserver
                     || item.State == RuntimeState.Queued || item.State == RuntimeState.Provisioning
                     || item.State == RuntimeState.Running))
             .ToArrayAsync(ct);
@@ -390,7 +397,7 @@ public sealed class PersistedRunnerCapacityGate(
         RuntimeWorkloadKind Kind, long MemoryBytes, long CpuMillicores, long PidsLimit,
         bool CountsTowardStartup)
     {
-        public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker;
+        public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker or RuntimeWorkloadKind.TemplateChecker or RuntimeWorkloadKind.ControlObserver;
     }
 
     private static RunnerAdmissionFailure? CheckCapacity(

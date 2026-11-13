@@ -52,6 +52,28 @@ namespace NoCTF.Tests.Integration.API;
 public sealed class ChallengeTemplateValidationHttpTests
 {
     [Test, Timeout(300_000)]
+    public async Task Incomplete_Check_and_Control_can_be_created_then_saved_as_drafts(CancellationToken ct)
+    {
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
+        await using var server = await StartAsync(fixture, ct);
+        using var client = Client(server, fixture);
+        var definition = Definition(ChallengeCapabilityKind.Check);
+        definition.AsObject().Remove("runtime");
+        definition["capabilities"]![0]!["check"]!["checker"]!["image"] = "";
+        using var response = await client.PostAsJsonAsync("/api/v1/admin/challenges", new JsonObject
+        { ["title"] = "Basic draft", ["direction"] = "Web", ["visibility"] = "Private", ["definition"] = definition }, ct);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
+        var saved = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var id = saved.GetProperty("id").GetGuid();
+        fixture.Db.ChangeTracker.Clear();
+        var material = await fixture.Db.Challenges.AsNoTracking().AsSplitQuery().SingleAsync(item => item.Id == id, ct);
+        material.Definition!.Capabilities.Add(new ControlCapabilityDefinition());
+        var result = await new UpdateChallengeTemplate(new ChallengeBankStore(fixture.Db, fixture.Publisher,
+            new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(fixture.Db, fixture.Publisher)), fixture.Catalog).ExecuteAsync(
+            new(id, fixture.OwnerId, false, material.Visibility, "Continued draft", null, "Web", material.Definition, DateTimeOffset.UtcNow), ct);
+        await Assert.That(result.Succeeded).IsTrue();
+    }
+    [Test, Timeout(300_000)]
     public async Task Browser_ordered_capability_branches_create_real_bank_material_without_competition_fields(CancellationToken ct)
     {
         await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Draft, ct);
@@ -112,9 +134,8 @@ public sealed class ChallengeTemplateValidationHttpTests
                 UrlBindings = [new() { Position = 0, ServiceName = "service-0", ContainerPort = 8080,
                     Exposure = PersistedRuntimeExposure.OwnerOnly, UrlTemplate = "http://{HOST}:{PORT}" }] },
             Capabilities = [new BreakCapabilityDefinition(), new FixCapabilityDefinition { TargetServiceName = "service-0", Entrypoint = "fix.sh" },
-                new CheckCapabilityDefinition { TargetServiceName = "service-0", Image = CapabilityCallbackFixture.PythonImage,
-                    Requirements = [new() { Kind = CheckItemKind.Functionality }] },
-                new ControlCapabilityDefinition { ServiceName = "service-0", ContainerPort = 8081, TimeoutSeconds = 1, UrlTemplate = "http://{HOST}:{PORT}/control" },
+                new CheckCapabilityDefinition { TargetServiceName = "service-0", Image = CapabilityCallbackFixture.PythonImage },
+                new ControlCapabilityDefinition { ServiceName = "service-0", Image = CapabilityCallbackFixture.PythonImage, TimeoutSeconds = 1 },
                 new QuestionnaireCapabilityDefinition { CurrentRevisionId = revisionId, CurrentRevision = new() { Id = revisionId, Number = 1,
                     Questions = [new() { Id = questionId, SourceId = sourceId, Title = "Saved choice", Body = "Choose one.", Options =
                         [new() { Id = optionId, Content = "Correct", IsCorrect = true }, new() { Id = Guid.NewGuid(), Position = 1, Content = "Wrong" }] }] } }]
@@ -163,9 +184,23 @@ public sealed class ChallengeTemplateValidationHttpTests
         using var invalidAnswers = await client.PostAsJsonAsync(root + "/questionnaire-tests", new { answers = new[] { new { questionId, selectedOptionIds = new[] { Guid.NewGuid() } } } }, ct);
         await Assert.That(invalidAnswers.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(invalidAnswers.Content.Headers.ContentType!.MediaType).IsEqualTo("application/problem+json");
-        using var control = await client.PostAsJsonAsync(root + "/control-tests", new { runtimeInstanceId = provisioned.RuntimeInstanceId }, ct);
-        await Assert.That(control.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That((await control.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("result").GetString()).IsEqualTo("Indeterminate");
+        var controlTemplateId = Guid.NewGuid();
+        fixture.Db.Challenges.Add(new Challenge { Id = controlTemplateId, OwnerId = fixture.OwnerId, Title = "Control HTTP contract", Direction = "Misc",
+            Definition = new()
+            {
+                Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "service-0", Image = RuntimeExecutionFixture.Image }] },
+                Capabilities = [new ControlCapabilityDefinition { Image = RuntimeExecutionFixture.Image, ServiceName = "service-0" }]
+            } });
+        await fixture.Db.SaveChangesAsync(ct);
+        var controlQueued = await runtime.QueueAsync(1, ct, new TemplateTestRuntimeInstance { Id = Guid.NewGuid(), ChallengeId = controlTemplateId,
+            RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, State = RuntimeState.Queued,
+            TestFlagDelivery = RuntimeTestFlagDelivery.NotRequired, TestFlagState = RuntimeTestFlagState.NotRequired, CreatedAt = DateTimeOffset.UtcNow });
+        var controlTarget = await runtime.Handler.ProvisionContainerAsync(controlQueued, ct) as NoCTF.Application.Runtime.Instances.RuntimeProvisioned
+            ?? throw new InvalidOperationException("The real Control target was not provisioned.");
+        await runtime.PersistAsync(controlTarget, ct);
+        using var control = await client.PostAsJsonAsync($"/api/v1/admin/challenges/{controlTemplateId}/control-tests", new { runtimeInstanceId = controlTarget.RuntimeInstanceId, requestId = Guid.NewGuid() }, ct);
+        await Assert.That(control.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That((await control.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("statusUrl").GetString()).IsNotNull();
         using var check = await client.PostAsJsonAsync(root + "/check-tests", new { runtimeInstanceId = provisioned.RuntimeInstanceId, requestId = Guid.NewGuid() }, ct);
         await Assert.That(check.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
         using var wrongTarget = await client.PostAsJsonAsync(root + "/check-tests", new { runtimeInstanceId = Guid.NewGuid(), requestId = Guid.NewGuid() }, ct);
@@ -215,8 +250,8 @@ public sealed class ChallengeTemplateValidationHttpTests
         {
             ChallengeCapabilityKind.Break => new BreakCapabilityDefinition(),
             ChallengeCapabilityKind.Fix => new FixCapabilityDefinition { TargetServiceName = "web" },
-            ChallengeCapabilityKind.Check => new CheckCapabilityDefinition { TargetServiceName = "web", Image = "checker:1", Requirements = [new() { Kind = CheckItemKind.Functionality }] },
-            ChallengeCapabilityKind.Control => new ControlCapabilityDefinition { ServiceName = "web", ContainerPort = 8080, UrlTemplate = "http://{HOST}:{PORT}/owner" },
+            ChallengeCapabilityKind.Check => new CheckCapabilityDefinition { TargetServiceName = "web", Image = "checker:1" },
+            ChallengeCapabilityKind.Control => new ControlCapabilityDefinition { ServiceName = "web", Image = "control:1" },
             ChallengeCapabilityKind.Questionnaire => new QuestionnaireCapabilityDefinition { CurrentRevisionId = revisionId, CurrentRevision = new() { Id = revisionId, Number = 1, Questions = [new() { Id = Guid.NewGuid(),
                 SourceId = Guid.NewGuid(), Title = "Choice", Body = "Choose one.", Options = [new() { Id = Guid.NewGuid(), Content = "First", IsCorrect = true }, new() { Id = Guid.NewGuid(), Position = 1, Content = "Second" }] }] } },
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -254,9 +289,6 @@ public sealed class ChallengeTemplateValidationHttpTests
         builder.Services.AddSingleton<IStore>(_ => StorageFactory.Disk(Path.GetFullPath(Path.Combine("artifacts", "capability-http-files", Guid.NewGuid().ToString("N")))));
         builder.Services.AddScoped<ManagedFileUploads>(services => new(new ManagedFileUploadRegistry(services.GetRequiredService<NoCtfDbContext>(),
             services.GetRequiredService<IPostCommitMessagePublisher>(), NullLogger<ManagedFileUploadRegistry>.Instance), services.GetRequiredService<IStore>()));
-        builder.Services.AddHttpClient(HttpControlObservationClient.ClientName).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
-        builder.Services.AddScoped<IControlObservationClient, HttpControlObservationClient>();
-        builder.Services.AddScoped<ObserveControl>();
         builder.Services.AddScoped<TestChallengeCapabilities>(); builder.Services.AddScoped<StartTemplateCapabilityTest>();
         builder.Services.AddSingleton<IOptions<EmailVerificationProtectionOptions>>(Options.Create(new EmailVerificationProtectionOptions { EncryptionKey = key }));
         builder.Services.AddSingleton<PlatformSecretProtector>();

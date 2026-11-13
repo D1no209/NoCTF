@@ -49,6 +49,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<NoCTF.Application.Competitions.Scoring.ManageCompetitionScorePresets>();
         services.AddScoped<ICompetitionFeatureReader, CompetitionFeatureReader>();
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
+        services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, Awdp.AwdpRoundScheduleSource>();
         services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
         services.AddSingleton<ProgressionGraphReadCache>();
         services.AddScoped<GetCompetitionProgression>();
@@ -80,25 +81,6 @@ internal static class CompetitionInfrastructure
         services.AddSingleton<KohProducerConfigurationCatalog>();
         services.AddSingleton<IKohProducerConfigurationCatalog,
             FusionKohProducerConfigurationCatalog>();
-        services.AddHttpClient(NoCTF.Infrastructure.Challenges.Capabilities.HttpControlObservationClient.ClientName)
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                AllowAutoRedirect = false
-            })
-            .AddResilienceHandler("koh-observe", pipeline =>
-            {
-                var retry = new HttpRetryStrategyOptions
-                {
-                    MaxRetryAttempts = 1,
-                    Delay = TimeSpan.FromMilliseconds(100),
-                    BackoffType = DelayBackoffType.Constant,
-                    UseJitter = true
-                };
-                retry.DisableForUnsafeHttpMethods();
-                pipeline.AddRetry(retry);
-            });
-        services.AddTransient<NoCTF.Application.Challenges.Capabilities.IControlObservationClient, NoCTF.Infrastructure.Challenges.Capabilities.HttpControlObservationClient>();
-        services.AddTransient<NoCTF.Application.Challenges.Capabilities.ObserveControl>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, CompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();

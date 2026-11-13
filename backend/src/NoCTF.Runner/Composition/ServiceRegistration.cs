@@ -18,6 +18,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Application.Authentication;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Runtime.Configuration;
 using NoCTF.Runtime.Kubernetes.Networking;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -43,6 +44,7 @@ public static class ServiceRegistration
         IConfiguration configuration,
         bool development = false)
     {
+        services.AddNoCtfRuntimeExecutionOptions(configuration);
         var callbackBaseUrl = configuration
             .GetSection(RunnerScoringOptions.SectionName)
             .Get<RunnerScoringOptions>()?
@@ -145,6 +147,7 @@ public static class ServiceRegistration
         services.AddScoped<NoCTF.Application.Challenges.Capabilities.ICheckRuntimeExecutor, NoCTF.Runner.Challenges.Capabilities.RuntimeCheckExecutor>();
         services.AddScoped<NoCTF.Application.Challenges.Capabilities.ExecuteCheck>();
         services.TryAddScoped<NoCTF.Infrastructure.Challenges.Testing.TemplateCapabilityTestExecutionStore>();
+        services.TryAddScoped<NoCTF.Infrastructure.Challenges.Capabilities.ControlExecutionStore>();
         services.AddScoped<NoCTF.Runner.Challenges.Capabilities.TemplateCapabilityTestHandler>();
         services.AddSingleton<IAwdpAttackProvisioningPlanReader,
             AwdpAttackProvisioningPlanReader>();

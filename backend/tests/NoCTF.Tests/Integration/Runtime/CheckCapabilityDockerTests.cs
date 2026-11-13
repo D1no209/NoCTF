@@ -34,9 +34,9 @@ public sealed class CheckCapabilityDockerTests
         var name = $"capability-check-{Guid.NewGuid():N}";
         var targetNetwork = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters { Name = name, Driver = "bridge", Internal = true }, ct);
         var callbackNetwork = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters { Name = name + "-callback", Driver = "bridge", Internal = true }, ct);
-        var callback = new ContainerBuilder(Image).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
+        var callback = new ContainerBuilder(Image).WithName(name + "-gateway").WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
             .WithCommand("sleep", "3600").Build();
-        var options = new DockerRuntimeOptions(Endpoint: endpoint, NetworkName: name, CallbackNetworkName: name + "-callback",
+        var options = new DockerRuntimeOptions(Endpoint: endpoint, NetworkName: name, CallbackNetworkName: name + "-callback", CallbackContainerName: name + "-gateway",
             RegistryConfigDirectory: Path.Combine(AppContext.BaseDirectory, "Fixtures", "Docker"));
         using var containers = new DockerContainerLifecycle(options);
         var directory = Path.Combine(AppContext.BaseDirectory, "check-input-tests", Guid.NewGuid().ToString("N"));
@@ -60,7 +60,7 @@ public sealed class CheckCapabilityDockerTests
                 "capability-check-credential", duration, ScopeId: factId)
                 { Requirements = [CheckItemKind.Functionality], Use = use, ExecutionId = Guid.NewGuid() };
             var success = await execute.ExecuteAsync(Input(["/bin/sh", "-c",
-                "test \"$NOCTF_CALLBACK_TOKEN\" = capability-check-credential && test \"$NOCTF_CHECK_REQUIREMENTS\" = '[\"Functionality\"]'"], TimeSpan.FromSeconds(20)), null, ct);
+                "test \"$NOCTF_CALLBACK_TOKEN\" = capability-check-credential && test -z \"${NOCTF_CHECK_REQUIREMENTS+x}\""], TimeSpan.FromSeconds(20)), null, ct);
             await Assert.That(success.Succeeded).IsTrue();
             await Assert.That(success.Value!.ScopeId).IsEqualTo(factId);
             Directory.CreateDirectory(directory);

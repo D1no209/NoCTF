@@ -128,11 +128,7 @@ public sealed partial class InternalResultStore(
                 || execution.RuntimeInstanceId != result.RuntimeInstanceId
                 || fact.CapabilityOutcomes.OfType<FixOutcome>().SingleOrDefault() is not { ExecutionState: CapabilityExecutionState.Completed, Result: FixResult.Applied })
                 return InternalResultDisposition.Superseded;
-            var definition = await db.Set<CheckCapabilityDefinition>().AsNoTracking()
-                .SingleAsync(capability => db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId
-                    && challenge.ChallengeId == capability.ChallengeId), ct);
-            var required = definition.Requirements.Where(item => item.Kind is CheckItemKind.Connection or CheckItemKind.Functionality or CheckItemKind.Vulnerability)
-                .Select(item => new RequiredCheckEvidence(item.Kind)).Append(new(CheckItemKind.Functionality)).Distinct().ToArray();
+            RequiredCheckEvidence[] required = [new(CheckItemKind.Functionality), new(CheckItemKind.Vulnerability)];
             var evaluated = CheckEvidenceValidation.Evaluate(new(fact.Id, runtime.Id, required, check.Probes,
                 appliedAt, execution.Deadline, check.ObservedAt, check.ReceivedAt));
             if (!evaluated.Succeeded)

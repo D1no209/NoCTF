@@ -35,7 +35,8 @@ public enum ContainerNetworkPurpose
 {
     PersistentRuntime,
     AwdpVerification,
-    AwdChecker
+    AwdChecker,
+    ControlObserver
 }
 
 public sealed record RuntimeUrlBinding(

@@ -59,6 +59,11 @@ public sealed class GitOpsRepositoryHttpTests
                     foreach (var file in Directory.EnumerateFiles(Path.Combine(source, "..", folder), "*.yml"))
                         File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
                 }
+                File.Copy(Path.Combine(Path.GetFullPath(templateRoot), "global.json"), Path.Combine(temporary, "global.json"));
+                var documentation = Path.Combine(temporary, "docs");
+                Directory.CreateDirectory(documentation);
+                File.Copy(Path.Combine(Path.GetFullPath(templateRoot), "docs", "challenge-guide.md"),
+                    Path.Combine(documentation, "challenge-guide.md"));
 
                 await using var app = await CreateApplicationAsync(postgres.GetConnectionString(), temporary, ct);
                 var competitionId = Guid.NewGuid();

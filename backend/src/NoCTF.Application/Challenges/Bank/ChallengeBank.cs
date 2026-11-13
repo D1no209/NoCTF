@@ -200,7 +200,7 @@ public sealed class CreateChallengeTemplate(
                 ChallengeTemplateWriteState.InvalidRequest,
                 Detail: validation.ErrorMessage);
         }
-        var definitionErrors = configurations.ValidateDefinition(
+        var definitionErrors = configurations.ValidateDraftDefinition(
             command.Definition);
         if (definitionErrors.Count > 0)
         {
@@ -254,7 +254,7 @@ public sealed class UpdateChallengeTemplate(
                 ChallengeTemplateWriteState.InvalidRequest,
                 Detail: validation.ErrorMessage);
         }
-        var definitionErrors = configurations.ValidateDefinition(
+        var definitionErrors = configurations.ValidateDraftDefinition(
             command.Definition);
         if (definitionErrors.Count > 0)
         {

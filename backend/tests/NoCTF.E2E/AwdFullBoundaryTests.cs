@@ -85,7 +85,6 @@ public sealed class AwdFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = "Awd",
                 visibility = "Private",
                 title = "Rotating AWD Service",
                 description = "Exposes rotating Flags and a controllable health endpoint.",
@@ -117,7 +116,8 @@ public sealed class AwdFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { configuration = new { mode = "Awd", awd = new { } } }
+                rules = new { configuration = new { mode = "Awd", awd = new
+                    { runtime = new { allocation = "PerTeam", flagSource = "AwdRotation" } } } }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -399,29 +399,35 @@ public sealed class AwdFullBoundaryTests
     private static object BuildDefinition(string runtimeImage, string checkerImage) =>
         new
         {
-            mode = "Awd",
-            awd = new
+            capabilities = new object[]
             {
-                flagInjection = (object?)null,
+              new { kind = "Break", @break = new
+              {
                 flagStores = new[]
                 {
                     new
                     {
                         id = Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
                         name = "main",
-                        deliveryMode = "RunnerCommand",
+                        delivery = "RunnerCommand",
                         targetServiceName = "main",
                         injectionCommand = "mkdir -p \"/dev/shm/flags/${STORE_ID}\"; printf '%s' \"${FLAG}\" > \"/dev/shm/flags/${STORE_ID}/${FLAG_ID}\"",
                         injectionTimeoutSeconds = 5,
                         preservesHistoricalFlags = true
                     }
                 }
+              } },
+              new { kind = "Check", check = new
+              {
+                  checker = new { image = checkerImage, command = Array.Empty<string>(),
+                      environment = new Dictionary<string, string>(), timeoutSeconds = 15, targetServiceName = "main" },
+                  readyTimeoutSeconds = 10,
+              } }
             },
             runtime = new
             {
                 kind = "Container",
-                allocation = "PerTeam",
-                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>(), flagEnvironmentVariableName = (string?)null } } },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = new[] { 8080 } } } },
                 egressPolicy = "Isolated",
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -433,19 +439,9 @@ public sealed class AwdFullBoundaryTests
                         containerPort = 8080,
                         serviceName = "main",
                         vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = false
+                        guestPort = (int?)null
                     }
-                },
-                flagSource = "AwdRotation"
-            },
-            checker = new
-            {
-                image = checkerImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                timeoutSeconds = 15,
-                targetServiceName = "main"
+                }
             }
         };
 

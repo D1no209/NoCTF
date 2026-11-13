@@ -80,7 +80,6 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = "Ctf",
                 visibility = "Private",
                 title = "Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real Docker runtime.",
@@ -121,6 +120,7 @@ public sealed class CtfFullBoundaryTests
             mode = "Ctf",
             ctf = new
             {
+                runtime = new { allocation = "PerTeam", flagSource = "PerTeam", ttlSeconds = 300 },
                 scoreCurve = new { initialPoints = 500L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
                 bloodRewards = new[] { new { policy = "FixedPoints", value = 25m } },
                 maxFlagAttempts = 5
@@ -158,7 +158,6 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = "Ctf",
                 visibility = "Private",
                 title = "Services Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real multi-service Docker Services runtime.",
@@ -184,6 +183,7 @@ public sealed class CtfFullBoundaryTests
             mode = "Ctf",
             ctf = new
             {
+                runtime = new { allocation = "PerTeam", flagSource = "PerTeam", ttlSeconds = 300 },
                 scoreCurve = new { initialPoints = 250L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
                 bloodRewards = Array.Empty<object>(),
                 maxFlagAttempts = 5
@@ -700,15 +700,13 @@ public sealed class CtfFullBoundaryTests
     private static object BuildContainerDefinition(string runtimeImage) =>
         new
         {
-            mode = "Ctf",
-            ctf = new { interactionKind = "FlagSubmission" },
+            capabilities = new[] { new { kind = "Break", @break = new
+                { environmentTargets = new[] { new { serviceName = "main", variableName = "FLAG" } } } } },
             runtime = new
             {
                 kind = "Container",
-                allocation = "PerTeam",
-                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>(), flagEnvironmentVariableName = "FLAG" } } },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>() } } },
                 egressPolicy = "Isolated",
-                ttlSeconds = 300,
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
                 {
@@ -719,26 +717,25 @@ public sealed class CtfFullBoundaryTests
                         containerPort = 8080,
                         serviceName = "main",
                         vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = false
+                        guestPort = (int?)null
                     }
-                },
-                flagSource = "PerTeam"
+                }
             }
         };
 
     private static object BuildNamedServicesDefinition(string runtimeImage) => new
     {
-        mode = "Ctf", ctf = new { interactionKind = "FlagSubmission" },
+        capabilities = new[] { new { kind = "Break", @break = new
+            { environmentTargets = new[] { new { serviceName = "web", variableName = "FLAG" } } } } },
         runtime = new
         {
-            kind = "Container", allocation = "PerTeam", egressPolicy = "Isolated", ttlSeconds = 300, operationTimeoutSeconds = 60, flagSource = "PerTeam",
+            kind = "Container", egressPolicy = "Isolated", operationTimeoutSeconds = 60,
             container = new { services = new object[]
             {
-                new { name = "web", image = runtimeImage, cpuCores = .1m, memoryMiB = 64L, flagEnvironmentVariableName = "FLAG" },
+                new { name = "web", image = runtimeImage, cpuCores = .1m, memoryMiB = 64L },
                 new { name = "db", image = Environment.GetEnvironmentVariable("NOCTF_E2E_SIDECAR_IMAGE") ?? "busybox:1.37", cpuCores = .1m, memoryMiB = 64L, command = new[] { "sleep" }, arguments = new[] { "300" } }
             } },
-            urlBindings = new[] { new { urlTemplate = "http://{HOST}:{PORT}/", exposure = "OwnerOnly", containerPort = 8080, serviceName = "web", isControlCheck = false } }
+            urlBindings = new[] { new { urlTemplate = "http://{HOST}:{PORT}/", exposure = "OwnerOnly", containerPort = 8080, serviceName = "web" } }
         }
     };
 

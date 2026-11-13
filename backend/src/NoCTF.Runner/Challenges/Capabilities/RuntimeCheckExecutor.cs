@@ -23,7 +23,6 @@ public sealed class RuntimeCheckExecutor(IOneShotRuntimeProviderCatalog provider
         {
             ["TARGET_HOST"] = input.TargetHost,
             ["NOCTF_TARGET_HOST"] = input.TargetHost,
-            ["NOCTF_CHECK_REQUIREMENTS"] = JsonSerializer.Serialize(input.Requirements.Select(kind => kind.ToString())),
             ["TARGET_READY_TIMEOUT_SECONDS"] = input.TargetReadyTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["NOCTF_CALLBACK_URL"] = input.CallbackUrl.AbsoluteUri,
             ["NOCTF_CALLBACK_TOKEN"] = input.CallbackToken

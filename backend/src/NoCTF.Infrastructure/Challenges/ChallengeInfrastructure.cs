@@ -55,6 +55,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<TestChallengeCapabilities>();
         services.AddScoped<StartTemplateCapabilityTest>();
         services.AddScoped<TemplateCapabilityTestExecutionStore>();
+        services.AddScoped<NoCTF.Infrastructure.Challenges.Capabilities.ControlExecutionStore>();
+        services.AddScoped<NoCTF.Application.Challenges.Capabilities.IControlResultStore, NoCTF.Infrastructure.Challenges.Capabilities.ControlExecutionStore>();
         services.AddScoped<ITemplateCapabilityCheckResultStore>(provider => provider.GetRequiredService<TemplateCapabilityTestExecutionStore>());
         services.AddScoped<IChallengeAttachmentStore, ChallengeAttachmentStore>();
         services.AddScoped<ManageChallengeAttachments>();

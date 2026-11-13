@@ -13,6 +13,11 @@ internal sealed class TemplateCapabilityTestConfiguration : IEntityTypeConfigura
         builder.HasIndex(test => test.ExecutionId).IsUnique();
         builder.HasIndex(test => new { test.State, test.Deadline });
         builder.Ignore(test => test.IsTerminal);
+        builder.OwnsOne(test => test.ControlExecution, execution =>
+        {
+            execution.ToTable("template_control_execution_details");
+            execution.HasIndex(value => value.ExecutionId).IsUnique();
+        });
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany().HasForeignKey(test => test.ActorUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Storage.StoredFile>().WithMany().HasForeignKey(test => test.FileId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsMany(test => test.Requirements, requirements =>

@@ -41,6 +41,13 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
             execution.HasOne<NoCTF.Domain.Runtime.RuntimeInstance>().WithMany().HasForeignKey(value => value.RuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
         });
         builder.HasIndex(fact => new { fact.CompetitionId, fact.OccurredAt, fact.Id });
+        builder.OwnsOne(fact => fact.ControlExecution, execution =>
+        {
+            execution.ToTable("control_execution_details");
+            execution.HasIndex(value => value.ExecutionId).IsUnique();
+            execution.HasOne<NoCTF.Domain.Runtime.RuntimeInstance>().WithMany()
+                .HasForeignKey(value => value.RuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
+        });
         builder.HasIndex(fact => new
         {
             fact.CompetitionId,

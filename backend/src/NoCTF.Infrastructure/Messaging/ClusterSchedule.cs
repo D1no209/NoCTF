@@ -17,7 +17,9 @@ public enum ClusterScheduleKind
     ChallengeTiming,
     Questionnaire,
     TemplateCapabilityTestRecovery,
-    FixExecutionRecovery
+    FixExecutionRecovery,
+    AwdpRound,
+    ControlExecutionRecovery
 }
 
 public sealed record ClusterScheduleEntry(
@@ -184,6 +186,7 @@ internal static class ClusterScheduleMessageClock
     internal static object MoveTo(object message, DateTimeOffset dueAt) => message switch
     {
         NoCTF.Application.Messaging.AdvanceAwdRound value => value with { At = dueAt },
+        NoCTF.Application.Messaging.ProjectLeaderboard value => value,
         NoCTF.Application.Messaging.DispatchAwdCheckers =>
             new NoCTF.Application.Messaging.DispatchAwdCheckers(dueAt),
         NoCTF.Application.Messaging.PollKohChallenge value => value.At(dueAt),
@@ -197,6 +200,7 @@ internal static class ClusterScheduleMessageClock
             new NoCTF.Application.Messaging.DispatchPendingGameplayFacts(dueAt),
         NoCTF.Application.Challenges.Testing.RecoverTemplateCapabilityTests value => value,
         NoCTF.Application.Messaging.RecoverFixExecutions value => value,
+        NoCTF.Application.Messaging.RecoverControlObservations value => value,
         NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => value with { At = dueAt },
         NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => value,
         NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => value,

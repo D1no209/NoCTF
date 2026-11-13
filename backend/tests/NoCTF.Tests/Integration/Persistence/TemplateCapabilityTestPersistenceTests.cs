@@ -84,8 +84,7 @@ public sealed class TemplateCapabilityTestPersistenceTests
         var store = new TemplateCapabilityTestStore(fixture.Db, new ChallengeRuntimeTemplateCatalog(), placement,
             fixture.Application.Publisher, TimeProvider.System);
         await using var services = new ServiceCollection().AddHttpClient().BuildServiceProvider();
-        var tests = new TestChallengeCapabilities(store, new(new HttpControlObservationClient(services.GetRequiredService<IHttpClientFactory>()),
-            TimeProvider.System), TimeProvider.System);
+        var tests = new TestChallengeCapabilities(store, TimeProvider.System);
         var material = await fixture.Db.Challenges.AsNoTracking().AsSplitQuery().SingleAsync(value => value.Id == fixture.ChallengeId, ct);
         var revision = material.Definition!.Questionnaire!.CurrentRevision;
         var answers = revision.Questions.Select(question => new NoCTF.Application.Challenges.Capabilities.QuestionnaireAnswer(question.Id,

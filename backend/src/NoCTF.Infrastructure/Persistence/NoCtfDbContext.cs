@@ -472,7 +472,7 @@ public sealed class NoCtfDbContext(
         {
             var definition = entry.Entity.Definition
                 ?? throw new InvalidOperationException("Challenge definition is required.");
-            var capabilityErrors = NoCTF.Application.Challenges.Capabilities.ChallengeCapabilityValidation.Validate(definition);
+            var capabilityErrors = NoCTF.Application.Challenges.Capabilities.ChallengeCapabilityValidation.Validate(definition, requireComplete: false);
             if (capabilityErrors.Count != 0)
                 throw new InvalidOperationException($"Challenge capability definitions are invalid: {string.Join(", ", capabilityErrors.Select(error => $"{error.Capability}/{error.Code}"))}.");
             ChallengeDefinitionGraph.AssignChallengeId(definition, entry.Entity.Id);

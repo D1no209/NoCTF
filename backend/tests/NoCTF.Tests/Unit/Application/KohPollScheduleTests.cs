@@ -33,11 +33,11 @@ public sealed class KohPollScheduleTests
     }
 
     [Test]
-    public async Task External_poll_is_non_transactional_and_fact_writer_uses_explicit_transaction()
+    public async Task Control_dispatch_and_finalization_use_explicit_transactions()
     {
         var pollAttributes = typeof(KohPollingHandler)
             .GetCustomAttributes(typeof(NonTransactionalAttribute), inherit: true);
-        var writeAttributes = typeof(KohObservationHandler)
+        var writeAttributes = typeof(ControlObservationMessageHandler)
             .GetCustomAttributes(typeof(TransactionalAttribute), inherit: true);
 
         await Assert.That(pollAttributes).HasSingleItem();

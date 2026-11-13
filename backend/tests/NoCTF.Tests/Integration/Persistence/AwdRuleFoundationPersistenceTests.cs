@@ -62,7 +62,8 @@ public sealed class AwdRuleFoundationPersistenceTests
             {
                 Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = "challenge:test" }] },
                 Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
-                { FlagStores = [new() { Id = storeId, Name = "orders", Position = 0, TargetServiceName = "main" }] }]
+                { FlagStores = [new() { Id = storeId, Name = "orders", Position = 0, TargetServiceName = "main",
+                    InjectionCommand = "printf '%s' \"${FLAG}\" > /dev/shm/flag" }] }]
             };
             var challenge = new AwdCompetitionChallenge
             {

@@ -32,6 +32,7 @@ public sealed class KubernetesContainerLifecycle(
     private const string JobKindPersistentRuntime = "persistent-runtime";
     private const string JobKindAwdpVerification = "awdp-verification";
     private const string JobKindAwdChecker = "awd-checker";
+    private const string JobKindControlObserver = "control-observer";
     private const string NetworkPurposeAwdChecker = "awd-checker";
     private const string NetworkPurposeAwdpChecker = "awdp-checker";
     private const string NetworkPurposeAwdpVerification = "awdp-verification";
@@ -719,8 +720,8 @@ public sealed class KubernetesContainerLifecycle(
         {
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = target.Identity.RuntimeInstanceId.ToString("D"),
-            ["noctf.io/job-kind"] = JobKindAwdChecker,
-            ["noctf.io/purpose"] = NetworkPurposeAwdChecker
+            ["noctf.io/job-kind"] = JobKind(request.NetworkPurpose),
+            ["noctf.io/purpose"] = CallbackPurpose(request.NetworkPurpose)
         };
         return await RunAsync(
             request with
@@ -1034,7 +1035,7 @@ public sealed class KubernetesContainerLifecycle(
     private static IReadOnlyList<string> WithTimeout(IReadOnlyList<string> command, TimeSpan timeout)
     {
         var seconds = Math.Max(1, checked((int)Math.Ceiling(timeout.TotalSeconds)));
-        return ["/bin/sh", "-c", ExecTimeoutScript, "noctf-exec",
+        return ["/bin/sh", "-c", ExecTimeoutScript.ReplaceLineEndings("\n"), "noctf-exec",
             seconds.ToString(System.Globalization.CultureInfo.InvariantCulture), .. command];
     }
 
@@ -1545,7 +1546,7 @@ public sealed class KubernetesContainerLifecycle(
 
     private static string JobKindFromLabels(IReadOnlyDictionary<string, string> labels) =>
         labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-            && jobKind is JobKindPersistentRuntime or JobKindAwdpVerification or JobKindAwdChecker
+            && jobKind is JobKindPersistentRuntime or JobKindAwdpVerification or JobKindAwdChecker or JobKindControlObserver
                 ? jobKind
                 : throw new InvalidOperationException(
                     "A Kubernetes Container service requires a supported job kind.");
@@ -1708,6 +1709,7 @@ public sealed class KubernetesContainerLifecycle(
 
     private static string CallbackPurpose(ContainerNetworkPurpose purpose) => purpose switch
     {
+        ContainerNetworkPurpose.ControlObserver => JobKindControlObserver,
         ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
         ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpChecker,
         ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
@@ -1976,6 +1978,7 @@ public sealed class KubernetesContainerLifecycle(
 
     private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
     {
+        ContainerNetworkPurpose.ControlObserver => JobKindControlObserver,
         ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
         ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpVerification,
         ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,

@@ -82,6 +82,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await using var postgres = await StartPostgresAsync(cancellationToken);
             var options = Options(postgres);
             var fixture = await SeedAsync(options, cancellationToken);
+            fixture = fixture with { Now = fixture.Now.AddTicks(1 - fixture.Now.Ticks % TimeSpan.TicksPerMicrosecond) };
             var requested = await RequestTargetAsync(options, fixture, cancellationToken);
             await Assert.That(requested.State).IsEqualTo(AwdpDefenseTargetRequestState.Created);
             var runtimeId = requested.RuntimeInstanceId!.Value;
@@ -105,6 +106,9 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 item => item.Id == runtimeId,
                 cancellationToken);
             var factId = saved.Result.GameplayFactId!.Value;
+            var admittedDeadline = await db.GameplayFacts.Where(item => item.Id == factId)
+                .Select(item => item.FixExecution!.Deadline).SingleAsync(cancellationToken);
+            await Assert.That(admittedDeadline).IsEqualTo(fixture.Now.AddSeconds(1).AddMinutes(4));
             await Assert.That(await db.GameplayFacts.Where(item => item.Id == factId)
                 .Select(item => item.SourceIpAddress).SingleAsync(cancellationToken)).IsEqualTo("2001:db8::42");
             var start = new StartFixExecution(factId, runtimeId);

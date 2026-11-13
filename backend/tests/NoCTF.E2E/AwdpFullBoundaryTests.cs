@@ -102,7 +102,6 @@ public sealed class AwdpFullBoundaryTests
                 title = "Continuous AWDP Service",
                 description = "Exposes an injected generation Flag and validates isolated Fix archives.",
                 direction = "Pwn",
-                mode = "Awdp",
                 definition = BuildDefinition(targetImage, checkerImage)
             },
             HttpStatusCode.Created,
@@ -122,6 +121,7 @@ public sealed class AwdpFullBoundaryTests
             mode = "Awdp",
             awdp = new
             {
+                runtime = new { allocation = "PerTeam", flagSource = "PerTeam", ttlSeconds = 600 },
                 requireBreakBeforeFix = false,
                 maxBreakSubmissions = 5,
                 maxFixSubmissions = 20,
@@ -696,15 +696,27 @@ public sealed class AwdpFullBoundaryTests
     private static object BuildDefinition(string targetImage, string checkerImage) =>
         new
         {
-            mode = "Awdp",
-            awdp = new { },
+            capabilities = new object[]
+            {
+                new { kind = "Break", @break = new
+                    { environmentTargets = new[] { new { serviceName = "main", variableName = "FLAG" } } } },
+                new { kind = "Fix", fix = new
+                {
+                    targetServiceName = "main", entrypoint = "fix.sh", command = new[] { "/bin/sh", "{entrypoint}" },
+                    timeoutSeconds = 75, maximumUploadBytes = 1_048_576L
+                } },
+                new { kind = "Check", check = new
+                {
+                    checker = new { image = checkerImage, command = Array.Empty<string>(),
+                        environment = new Dictionary<string, string>(), timeoutSeconds = 20, targetServiceName = "main" },
+                    readyTimeoutSeconds = 10
+                } }
+            },
             runtime = new
             {
                 kind = "Container",
-                allocation = "PerTeam",
-                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = targetImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = new[] { 8080 }, flagEnvironmentVariableName = "FLAG" } } },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = targetImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = new[] { 8080 } } } },
                 egressPolicy = "Isolated",
-                ttlSeconds = 600,
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
                 {
@@ -715,25 +727,10 @@ public sealed class AwdpFullBoundaryTests
                         containerPort = 8080,
                         serviceName = "main",
                         vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = false
+                        guestPort = (int?)null
                     }
-                },
-                flagSource = "PerTeam"
-            },
-            patchEntrypoint = "fix.sh",
-            patchCommand = new[] { "/bin/sh", "{entrypoint}" },
-            patchTimeoutSeconds = 75,
-            checker = new
-            {
-                image = checkerImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                timeoutSeconds = 20,
-                targetServiceName = "main"
-            },
-            readyTimeoutSeconds = 10,
-            maximumPatchUploadBytes = 1_048_576L
+                }
+            }
         };
 
     private static async Task<TeamSession> RegisterTeamAsync(
@@ -897,7 +894,7 @@ public sealed class AwdpFullBoundaryTests
         form.Add(content, "File", fileName);
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix")
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes")
         {
             Content = form
         };
@@ -923,7 +920,7 @@ public sealed class AwdpFullBoundaryTests
         form.Add(content, "File", fileName);
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix")
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}/fixes")
         {
             Content = form
         };
@@ -1313,13 +1310,12 @@ public sealed class AwdpFullBoundaryTests
         observation.Snapshot.GetProperty("rounds").EnumerateArray()
             .Count(round => round.GetProperty("state").GetString() == "Settled");
 
-    /// <summary>Sums one competition-wide AWDP total; penalty is attack + defense - net.</summary>
+    /// <summary>汇总比赛范围的题目总分。</summary>
     private static long ChallengeTotal(JsonElement snapshot, Guid teamId, Func<JsonElement, long> select) =>
         Team(snapshot, teamId).GetProperty("challengeTotals").EnumerateArray().Sum(select);
 
     private static long Penalty(JsonElement total) =>
-        total.GetProperty("attackScore").GetInt64()
-        + total.GetProperty("defenseScore").GetInt64()
+        total.GetProperty("grossPoints").GetInt64()
         - total.GetProperty("netPoints").GetInt64();
 
     /// <summary>Identifies a slot by stable ids: round positions move with the visible window.</summary>

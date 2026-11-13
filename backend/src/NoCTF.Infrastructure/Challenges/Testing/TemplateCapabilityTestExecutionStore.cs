@@ -32,6 +32,19 @@ public sealed class TemplateCapabilityTestExecutionStore(IDbContextFactory<NoCtf
         if (runtime is not { Purpose: RuntimePurpose.TemplateTest, CapabilityTest: { } test }
             || test.ExecutionId != command.ExecutionId || test.IsTerminal) return;
         var now = clock.GetUtcNow();
+        if (test.Kind == TemplateCapabilityTestKind.Control)
+        {
+            if (test.ControlExecution is not { } execution) throw new InvalidOperationException("A Control test requires its execution state.");
+            if (execution.WorkCompletedAt is not null)
+                await messages.PublishAsync(new FinalizeControlObservation(test.ExecutionId, runtime.Id, CapabilityExecutionScope.TemplateTest));
+            else if (now >= test.Deadline || runtime.State != RuntimeState.Running || test.CancellationRequested)
+                await messages.PublishAsync(new RecoverControlObservations());
+            else if (test.State == TemplateCapabilityTestState.Queued)
+                await messages.PublishToRunnerNodeAsync(new RunControlObservation(test.ExecutionId, runtime.Id,
+                    CapabilityExecutionScope.TemplateTest, test.Deadline, execution.RunnerId));
+            await transaction.CommitAsync(ct); await messages.FlushCommittedMessagesAsync();
+            return;
+        }
         if (test.State == TemplateCapabilityTestState.Queued && runtime.TestFlagState is RuntimeTestFlagState.Failed or RuntimeTestFlagState.Canceled)
         {
             test.Fail(CapabilityExecutionFailure.InvalidEvidence);
@@ -104,6 +117,7 @@ public sealed class TemplateCapabilityTestExecutionStore(IDbContextFactory<NoCtf
         var runtime = await db.RuntimeInstances.AsSplitQuery().SingleOrDefaultAsync(value => value.Id == command.RuntimeInstanceId, ct);
         if (runtime is not { Purpose: RuntimePurpose.TemplateTest, State: RuntimeState.Running, CapabilityTest: { } test }
             || runtime.RunnerId != command.RunnerId || test.ExecutionId != command.ExecutionId || test.IsTerminal) return null;
+        if (test.Kind == TemplateCapabilityTestKind.Control) return null;
         if (test.State == TemplateCapabilityTestState.Finalizing) return null;
         async Task<TemplateCapabilityTestWork?> RejectAsync(CapabilityExecutionFailure? failure)
         {
@@ -134,10 +148,9 @@ public sealed class TemplateCapabilityTestExecutionStore(IDbContextFactory<NoCtf
         if (test.Kind != TemplateCapabilityTestKind.Fix)
         {
             if (definition.Check is not { } check) return await RejectAsync(CapabilityExecutionFailure.InvalidInput);
-            var kinds = test.Kind == TemplateCapabilityTestKind.FixAndCheck
-                ? check.Requirements.Select(item => item.Kind).Where(kind => kind is CheckItemKind.Connection or CheckItemKind.Functionality or CheckItemKind.Vulnerability)
-                    .Append(CheckItemKind.Functionality).Distinct().ToArray()
-                : check.Requirements.Select(item => item.Kind).ToArray();
+            CheckItemKind[] kinds = test.Kind == TemplateCapabilityTestKind.FixAndCheck
+                ? [CheckItemKind.Functionality, CheckItemKind.Vulnerability]
+                : [CheckItemKind.FlagWrite, CheckItemKind.CurrentFlagRead, CheckItemKind.HistoricalFlagRead];
             foreach (var kind in kinds)
             {
                 if (kind is CheckItemKind.FlagWrite or CheckItemKind.CurrentFlagRead or CheckItemKind.HistoricalFlagRead)
@@ -148,7 +161,6 @@ public sealed class TemplateCapabilityTestExecutionStore(IDbContextFactory<NoCtf
                 }
                 else test.Requirements.Add(new() { RuntimeInstanceId = runtime.Id, Position = test.Requirements.Count, Kind = kind });
             }
-            if (test.Requirements.Count == 0) return await RejectAsync(CapabilityExecutionFailure.MissingEvidence);
         }
         test.State = test.Kind == TemplateCapabilityTestKind.Check ? TemplateCapabilityTestState.Checking : TemplateCapabilityTestState.Applying;
         if (test.Kind == TemplateCapabilityTestKind.Check) test.CheckStartedAt = clock.GetUtcNow();
@@ -226,8 +238,10 @@ public sealed class TemplateCapabilityTestExecutionStore(IDbContextFactory<NoCtf
             return InternalResultDisposition.Conflict;
         }
         var result = CheckEvidenceValidation.Evaluate(new(executionId, runtimeId,
-            test.Requirements.Select(value => new RequiredCheckEvidence(value.Kind, value.FlagId)).ToArray(), probes,
-            test.CheckStartedAt.Value, test.Deadline, observedAt, clock.GetUtcNow(), CapabilityExecutionScope.TemplateTest));
+            test.Kind == TemplateCapabilityTestKind.Check ? []
+                : test.Requirements.Select(value => new RequiredCheckEvidence(value.Kind, value.FlagId)).ToArray(), probes,
+            test.CheckStartedAt.Value, test.Deadline, observedAt, clock.GetUtcNow(), CapabilityExecutionScope.TemplateTest,
+            test.Requirements.Where(value => value.FlagId.HasValue).Select(value => value.FlagId!.Value).ToHashSet()));
         if (!result.Succeeded)
         {
             test.Fail(result.FailureCode!.Value);

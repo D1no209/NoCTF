@@ -53,9 +53,7 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
         ChallengeTemplateValidation.Validate(title, direction, definition).Succeeded
         && configurations.ValidateDefinition(definition).Count == 0 && Enum.IsDefined(completion)
         && (completion == LiveSoloCompletionKind.Break ? definition.Break is not null
-            : definition.Fix is not null && definition.Check is { } check
-                && check.Requirements.Any(item => item.Kind == NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Functionality)
-                && check.Requirements.Any(item => item.Kind == NoCTF.Domain.Challenges.Capabilities.CheckItemKind.Vulnerability));
+            : definition.Fix is not null && definition.Check is not null);
     private Task<bool> ActiveRoundAsync(Guid entry, CancellationToken ct) => db.LiveSoloRoundQuestions.Where(x => x.CompetitionChallengeId == entry)
         .Join(db.LiveSoloRounds, x => x.RoundId, x => x.Id, (_, round) => round)
         .AnyAsync(x => x.State == LiveSoloRoundState.Preparing || x.State == LiveSoloRoundState.Countdown

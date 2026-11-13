@@ -104,7 +104,9 @@ public class WolverinePostCommitMessagePublisher(
         var typeName = typeof(T).FullName ?? typeof(T).Name;
         var scheduleIdentity = scheduledAt?.UtcTicks.ToString(
             System.Globalization.CultureInfo.InvariantCulture) ?? "immediate";
-        var identity = message is ProjectLeaderboard or NavigationCapabilitiesChanged
+        // Finalize 在资源仍停止中时会结束本次处理；清理完成后的恢复消息必须能再次入队。
+        var identity = message is ProjectLeaderboard or NavigationCapabilitiesChanged or FinalizeFixExecution
+            or FinalizeControlObservation or RunControlObservation
             ? $"{typeName}:{Guid.NewGuid():N}"
             : $"{typeName}:{scheduleIdentity}:{Convert.ToHexString(SHA256.HashData(payload))}";
         var options = new DeliveryOptions

@@ -4,7 +4,7 @@ using NoCTF.Domain.Shared;
 namespace NoCTF.Domain.Challenges.Testing;
 
 public enum TemplateTestUse : short { Interactive, CapabilityVerification }
-public enum TemplateCapabilityTestKind : short { Fix, Check, FixAndCheck }
+public enum TemplateCapabilityTestKind : short { Fix, Check, FixAndCheck, Control }
 public enum TemplateCapabilityTestState : short { Queued, Applying, Checking, Finalizing, Completed, PlatformFailed, Canceled }
 
 public sealed class TemplateCapabilityTest : IConcurrencyTracked
@@ -27,6 +27,7 @@ public sealed class TemplateCapabilityTest : IConcurrencyTracked
     public int? FixExitCode { get; set; }
     public bool FixExecutionUncertain { get; set; }
     public bool CheckCompleted { get; set; }
+    public ControlExecutionDetails? ControlExecution { get; set; }
     public bool CancellationRequested { get; set; }
     public DateTimeOffset? CheckObservedAt { get; set; }
     public DateTimeOffset? CheckStartedAt { get; set; }

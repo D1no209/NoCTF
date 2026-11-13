@@ -10,6 +10,10 @@ namespace NoCTF.Application.Challenges.Testing;
 
 public sealed class StartTemplateCapabilityTest(ITemplateCapabilityTestStore store, ManagedFileUploads uploads, TimeProvider clock)
 {
+    public Task<OperationResult<TemplateCapabilityTestAccepted, TemplateCapabilityTestFailure>> ControlAsync(
+        ChallengeTestAccess access, Guid requestId, CancellationToken ct) =>
+        store.StartAsync(new(access, requestId, TemplateCapabilityTestKind.Control, null, string.Empty, clock.GetUtcNow()), ct);
+
     public Task<OperationResult<TemplateCapabilityTestAccepted, TemplateCapabilityTestFailure>> CheckAsync(
         ChallengeTestAccess access, Guid requestId, CancellationToken ct) =>
         store.StartAsync(new(access, requestId, TemplateCapabilityTestKind.Check, null, string.Empty, clock.GetUtcNow()), ct);

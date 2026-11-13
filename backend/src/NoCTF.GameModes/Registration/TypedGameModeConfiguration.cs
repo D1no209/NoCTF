@@ -133,9 +133,8 @@ public static class TypedGameModeConfiguration
         ControlPointsPerInterval: value.ControlPointsPerInterval);
 
     public static KohChallengeConfiguration Koh(ChallengeDefinition value) => new(
-        Runtime(value) is { } runtime && value.Control is { } control
-            ? runtime with { Allocation = RuntimeAllocation.Shared, ControlCheckUrlBinding = new(control.UrlTemplate, RuntimeExposure.Participants,
-                control.ContainerPort, control.ServiceName, control.VmId, control.GuestPort) }
+        Runtime(value) is { } runtime
+            ? runtime with { Allocation = RuntimeAllocation.Shared }
             : Runtime(value));
 
     public static ChallengeRuntimeTemplate? Runtime(ChallengeDefinition? definition)
@@ -190,10 +189,7 @@ public static class TypedGameModeConfiguration
             FlagSource = (RuntimeFlagSource)policy.Runtime.FlagSource,
             TtlSeconds = policy.Runtime.TtlSeconds
         };
-        return rules is KohCompetitionChallengeRules && definition?.Control is { } control
-            ? effective with { ControlCheckUrlBinding = new(control.UrlTemplate, RuntimeExposure.Participants,
-                control.ContainerPort, control.ServiceName, control.VmId, control.GuestPort) }
-            : effective;
+        return effective;
     }
 
     public static RunnerJobConfiguration? Checker(ChallengeDefinition value) =>

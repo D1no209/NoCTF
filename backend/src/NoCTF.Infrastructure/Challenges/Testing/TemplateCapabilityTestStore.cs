@@ -35,6 +35,8 @@ public sealed class TemplateCapabilityTestStore(NoCtfDbContext db, IChallengeRun
             return Failure<ChallengeTestMaterial>(TemplateCapabilityTestFailure.CapabilityMissing);
         if (ChallengeCapabilityValidation.Validate(definition).Any(error => error.Capability is null || error.Capability == capability))
             return Failure<ChallengeTestMaterial>(TemplateCapabilityTestFailure.InvalidConfiguration);
+        if (capability == ChallengeCapabilityKind.Fix && !RuntimeConfigured(definition))
+            return Failure<ChallengeTestMaterial>(TemplateCapabilityTestFailure.InvalidConfiguration);
         RuntimeInstance? runtime = null;
         if (access.RuntimeInstanceId is { } runtimeId)
         {
@@ -76,14 +78,20 @@ public sealed class TemplateCapabilityTestStore(NoCtfDbContext db, IChallengeRun
                 receipt.SecondaryResultId ?? throw new InvalidOperationException("A test receipt requires a Runtime identity.")));
         }
         if (challenge.Definition is not { } definition
-            || command.Kind != TemplateCapabilityTestKind.Check && definition.Fix is null
-            || command.Kind != TemplateCapabilityTestKind.Fix && definition.Check is null)
+            || command.Kind is TemplateCapabilityTestKind.Fix or TemplateCapabilityTestKind.FixAndCheck && definition.Fix is null
+            || command.Kind is TemplateCapabilityTestKind.Check or TemplateCapabilityTestKind.FixAndCheck && definition.Check is null
+            || command.Kind == TemplateCapabilityTestKind.Control && definition.Control is null)
             return Failure<TemplateCapabilityTestAccepted>(TemplateCapabilityTestFailure.CapabilityMissing);
-        if (ChallengeCapabilityValidation.Validate(definition).Count != 0)
+        if (ChallengeCapabilityValidation.Validate(definition).Any(error => error.Capability is null
+            || error.Capability == ChallengeCapabilityKind.Control && command.Kind == TemplateCapabilityTestKind.Control
+            || error.Capability == ChallengeCapabilityKind.Check && command.Kind is TemplateCapabilityTestKind.Check or TemplateCapabilityTestKind.FixAndCheck
+            || error.Capability == ChallengeCapabilityKind.Fix && command.Kind is TemplateCapabilityTestKind.Fix or TemplateCapabilityTestKind.FixAndCheck))
             return Failure<TemplateCapabilityTestAccepted>(TemplateCapabilityTestFailure.InvalidConfiguration);
         var executionId = Guid.CreateVersion7(command.Now);
+        if (command.Kind is TemplateCapabilityTestKind.Fix or TemplateCapabilityTestKind.FixAndCheck && !RuntimeConfigured(definition))
+            return Failure<TemplateCapabilityTestAccepted>(TemplateCapabilityTestFailure.InvalidConfiguration);
         RuntimeInstance runtime;
-        if (command.Kind == TemplateCapabilityTestKind.Check)
+        if (command.Kind is TemplateCapabilityTestKind.Check or TemplateCapabilityTestKind.Control)
         {
             var target = await db.RuntimeInstances.AsSplitQuery().SingleOrDefaultAsync(value => value.Id == command.Access.RuntimeInstanceId
                 && value.ChallengeId == challenge.Id && value.Purpose == RuntimePurpose.TemplateTest
@@ -141,14 +149,22 @@ public sealed class TemplateCapabilityTestStore(NoCtfDbContext db, IChallengeRun
             db.RuntimeInstances.Add(runtime);
             await messages.PublishAsync(new DispatchRuntime(runtime.Id));
         }
-        var deadline = command.Now.AddSeconds(TemplateCapabilityTestBudget.PreparationAndCleanupSeconds + (command.Kind == TemplateCapabilityTestKind.Check ? 0 : definition.Fix!.TimeoutSeconds)
-            + (command.Kind == TemplateCapabilityTestKind.Fix ? 0 : definition.Check!.TimeoutSeconds + definition.Check.ReadyTimeoutSeconds));
+        var seconds = command.Kind == TemplateCapabilityTestKind.Control ? definition.Control!.TimeoutSeconds
+            : (command.Kind == TemplateCapabilityTestKind.Check ? 0 : definition.Fix!.TimeoutSeconds)
+                + (command.Kind == TemplateCapabilityTestKind.Fix ? 0 : definition.Check!.TimeoutSeconds + definition.Check.ReadyTimeoutSeconds);
+        var deadline = command.Now.AddSeconds(TemplateCapabilityTestBudget.PreparationAndCleanupSeconds + seconds);
         runtime.CapabilityTest = new()
         {
             RuntimeInstanceId = runtime.Id, ExecutionId = executionId, ActorUserId = command.Access.ActorUserId,
             RequestId = command.RequestId, Kind = command.Kind, State = TemplateCapabilityTestState.Queued,
             AcceptedAt = command.Now, Deadline = deadline, FileId = command.FileId
         };
+        if (command.Kind == TemplateCapabilityTestKind.Control)
+            runtime.CapabilityTest.ControlExecution = new()
+            {
+                ExecutionId = executionId, RuntimeInstanceId = runtime.Id, Deadline = deadline,
+                RunnerId = runtime.RunnerId ?? throw new InvalidOperationException("A running Control target requires its Runner.")
+            };
         if (runtime.TemplateTestUse == TemplateTestUse.CapabilityVerification) runtime.ExpiresAt = deadline;
         var savedReceipt = CommandReceiptGeneratedCatalog.Create(ReplayOperation.TemplateCapabilityTest);
         savedReceipt.Id = receiptId; savedReceipt.UserId = command.Access.ActorUserId; savedReceipt.ResourceId = challenge.Id;
@@ -171,8 +187,16 @@ public sealed class TemplateCapabilityTestStore(NoCtfDbContext db, IChallengeRun
             .Select(runtime => runtime.CapabilityTest).SingleOrDefaultAsync(ct);
         return test is null ? null : new(test.ExecutionId, test.RuntimeInstanceId, test.Kind, test.State, test.AcceptedAt, test.Deadline,
             test.CompletedAt, test.Failure, test.FailureStage, test.FixResult, test.FixExitCode, test.FixExecutionUncertain, test.CheckCompleted,
-            test.Probes.OrderBy(probe => probe.Position).Select(probe => new CheckProbeEvidence(probe.Kind, probe.FlagId, probe.Result, probe.Reason)).ToArray());
+            test.Probes.OrderBy(probe => probe.Position).Select(probe => new CheckProbeEvidence(probe.Kind, probe.FlagId, probe.Result, probe.Reason)).ToArray())
+        {
+            ControlResult = test.ControlExecution is { Failure: not null } ? ControlResult.Indeterminate : test.ControlExecution?.Result,
+            ControllerIdentifier = test.ControlExecution is { Failure: null } ? test.ControlExecution.ControllerIdentifier : null,
+            ControlObservedAt = test.ControlExecution?.ObservedAt
+        };
     }
+
+    private bool RuntimeConfigured(ChallengeDefinition definition) => templates.Get(definition) is { Definition: ContainerRuntimeDefinition container } template
+        && NoCTF.Application.Runtime.Configuration.ContainerRuntimeDefinitionPolicy.Validate(container, template.UrlBindings).Count == 0;
 
     private static OperationResult<T, TemplateCapabilityTestFailure> Failure<T>(TemplateCapabilityTestFailure failure) =>
         OperationResult<T, TemplateCapabilityTestFailure>.Failure(failure, $"The capability test was rejected: {failure}.");

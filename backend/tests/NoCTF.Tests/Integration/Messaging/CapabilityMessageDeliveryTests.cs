@@ -17,6 +17,28 @@ namespace NoCTF.Tests.Integration.Messaging;
 public sealed class CapabilityMessageDeliveryTests
 {
     [Test, Timeout(300_000)]
+    public async Task Fix_finalization_recovery_can_publish_again_after_an_earlier_attempt_was_acknowledged(CancellationToken ct)
+    {
+        await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Running, ct);
+        await using var connection = new NatsConnection(new NatsOpts { Url = fixture.NatsUrl });
+        var consumer = await connection.CreateJetStreamContext().CreateOrUpdateConsumerAsync(NatsSubjects.ControlStream,
+            new ConsumerConfig("fix-finalization-recovery")
+            {
+                FilterSubject = NatsSubjects.Subject(WorkerQueue.Control),
+                AckPolicy = ConsumerConfigAckPolicy.Explicit
+            }, ct);
+        var command = new FinalizeFixExecution(Guid.NewGuid(), Guid.NewGuid());
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await fixture.Publisher.PublishAsync(command);
+            await fixture.Publisher.FlushCommittedMessagesAsync();
+            var message = await consumer.NextAsync<byte[]>(opts: new() { Expires = TimeSpan.FromSeconds(5) }, cancellationToken: ct);
+            await Assert.That(message).IsNotNull();
+            await message!.AckAsync(cancellationToken: ct);
+        }
+    }
+
+    [Test, Timeout(300_000)]
     public async Task Committed_event_replay_keeps_each_destination_and_scheduled_recovery_reaches_its_queue(CancellationToken ct)
     {
         await using var fixture = await ChallengeApplicationFixture.CreateAsync(CompetitionStatus.Running, ct);

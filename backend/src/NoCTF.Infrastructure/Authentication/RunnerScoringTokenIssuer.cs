@@ -66,6 +66,18 @@ public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> conf
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 
+    public string IssueControlResult(string runnerId, Guid executionId, Guid runtimeInstanceId,
+        NoCTF.Application.Challenges.Capabilities.CapabilityExecutionScope scope, DateTimeOffset deadline, DateTimeOffset now) =>
+        Write(runnerId, now, deadline,
+        [
+            new("permission", "capability:control-result:write"),
+            new("resource", $"control:{scope}:{executionId:D}:runtime:{runtimeInstanceId:D}"),
+            new("execution_scope", scope.ToString()),
+            new("execution_id", executionId.ToString("D")),
+            new("runtime_instance_id", runtimeInstanceId.ToString("D")),
+            new("deadline_ticks", deadline.UtcTicks.ToString(), ClaimValueTypes.Integer64)
+        ]);
+
     private string Write(
         string runnerId,
         DateTimeOffset issuedAt,

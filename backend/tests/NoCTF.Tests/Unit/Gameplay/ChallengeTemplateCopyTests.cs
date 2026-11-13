@@ -27,7 +27,7 @@ public sealed class ChallengeTemplateCopyTests
     }
 
     [Test]
-    public async Task Valid_repair_capabilities_are_preserved_and_invalid_targets_are_rejected()
+    public async Task Repair_capabilities_and_unresolved_draft_targets_are_preserved()
     {
         var source = NoCTF.Tests.Unit.Gameplay.ChallengeCapabilityTests.Repairable();
         await Assert.That(ChallengeTemplateCopyPolicy.Supports(source)).IsTrue();
@@ -36,7 +36,7 @@ public sealed class ChallengeTemplateCopyTests
         source.Check!.TimeoutSeconds = 45;
         await Assert.That(copy.Check!.TimeoutSeconds).IsEqualTo(30);
         source.Fix!.TargetServiceName = "missing";
-        await Assert.That(ChallengeTemplateCopyPolicy.Supports(source)).IsFalse();
-        await Assert.That(() => ChallengeTemplateCopyPolicy.Copy(source, Guid.NewGuid())).Throws<ArgumentException>();
+        await Assert.That(ChallengeTemplateCopyPolicy.Supports(source)).IsTrue();
+        await Assert.That(ChallengeTemplateCopyPolicy.Copy(source, Guid.NewGuid()).Fix!.TargetServiceName).IsEqualTo("missing");
     }
 }

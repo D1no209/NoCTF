@@ -33,6 +33,7 @@ public abstract class GameplayFact : IConcurrencyTracked
     public GameplayFactFailureCode? FailureCode { get; set; }
     public List<NoCTF.Domain.Challenges.Capabilities.CapabilityOutcome> CapabilityOutcomes { get; set; } = [];
     public NoCTF.Domain.Challenges.Capabilities.FixExecutionDetails? FixExecution { get; set; }
+    public NoCTF.Domain.Challenges.Capabilities.ControlExecutionDetails? ControlExecution { get; set; }
     public FlagAcquisitionEvidence? AcquisitionEvidence { get; set; }
     public NoCTF.Domain.Competitions.Awd.AwdFactDetails? Awd { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

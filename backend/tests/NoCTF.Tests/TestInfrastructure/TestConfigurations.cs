@@ -32,7 +32,7 @@ internal static class TestConfigurations
             GameMode.Awd => ServiceDefinition(includeFix: false),
             GameMode.Awdp => ServiceDefinition(includeFix: true),
             GameMode.Koh => new() { Runtime = ServiceRuntime(), Capabilities = [new ControlCapabilityDefinition {
-                ServiceName = "main", ContainerPort = 8080, UrlTemplate = "http://{HOST}:{PORT}/control" }] },
+                ServiceName = "main", Image = "control:1" }] },
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
 
@@ -44,8 +44,7 @@ internal static class TestConfigurations
     private static ChallengeDefinition ServiceDefinition(bool includeFix)
     {
         var definition = new ChallengeDefinition { Runtime = ServiceRuntime(), Capabilities = [new BreakCapabilityDefinition(),
-            new CheckCapabilityDefinition { Image = "checker:1", TargetServiceName = "main", Command = [new() { Value = "check" }],
-                Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }] }] };
+            new CheckCapabilityDefinition { Image = "checker:1", TargetServiceName = "main", Command = [new() { Value = "check" }] }] };
         if (includeFix)
         {
             definition.Break!.EnvironmentTargets.Add(new() { ServiceName = "main", VariableName = "FLAG" });
@@ -238,10 +237,7 @@ internal static class TestConfigurations
     {
         Runtime = Runtime(value.Runtime), Capabilities = [new ControlCapabilityDefinition
         {
-            UrlTemplate = value.Runtime?.ControlCheckUrlBinding?.UrlTemplate ?? string.Empty,
-            ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName,
-            ContainerPort = value.Runtime?.ControlCheckUrlBinding?.ContainerPort,
-            VmId = value.Runtime?.ControlCheckUrlBinding?.VmId, GuestPort = value.Runtime?.ControlCheckUrlBinding?.GuestPort
+            Image = "control:1", ServiceName = value.Runtime?.ControlCheckUrlBinding?.ServiceName ?? "main"
         }]
     };
 
@@ -292,8 +288,7 @@ internal static class TestConfigurations
             Image = checker.Image, TimeoutSeconds = checker.TimeoutSeconds, ReadyTimeoutSeconds = readyTimeoutSeconds ?? 30,
             AcceptsFixInput = checkerFixInput, TargetServiceName = service,
             Command = (checker.Command ?? []).Select((argument, position) => new CheckCommandArgument { Position = position, Value = argument }).ToList(),
-            Environment = (checker.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { Name = item.Key, Value = item.Value }).ToList(),
-            Requirements = [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }]
+            Environment = (checker.Environment ?? new Dictionary<string, string>()).Select(item => new CheckEnvironmentVariable { Name = item.Key, Value = item.Value }).ToList()
         });
         return value;
     }

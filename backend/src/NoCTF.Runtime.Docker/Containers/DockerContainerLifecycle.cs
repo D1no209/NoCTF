@@ -18,6 +18,7 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
 {
     private const string NetworkPurposeAwdpCallback = "awdp-callback";
     private const string NetworkPurposeAwdCheckerCallback = "awd-checker-callback";
+    private const string NetworkPurposeControlCallback = "control-observer-callback";
     private const string NetworkPurposeAwdChecker = "awd-checker";
     private const string NetworkPurposeAwdpVerification = "awdp-verification";
     private const string NetworkPurposePersistentRuntime = "persistent-runtime";
@@ -1017,7 +1018,7 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         CancellationToken cancellationToken)
     {
         if (network.Labels?.TryGetValue("noctf.io/network-purpose", out var purpose) == true
-            && purpose is NetworkPurposeAwdpCallback or NetworkPurposeAwdCheckerCallback)
+            && purpose is NetworkPurposeAwdpCallback or NetworkPurposeAwdCheckerCallback or NetworkPurposeControlCallback)
         {
             var current = await client.Networks.InspectNetworkAsync(network.ID, cancellationToken);
             foreach (var containerId in current.Containers?.Keys ?? [])
@@ -1217,13 +1218,17 @@ public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOne
         $"noctf-callback-{operationId:N}";
 
     private static string CallbackNetworkPurpose(ContainerRequest request) =>
-        request.NetworkPurpose == ContainerNetworkPurpose.AwdChecker
-            ? NetworkPurposeAwdCheckerCallback
-            : NetworkPurposeAwdpCallback;
+        request.NetworkPurpose switch
+        {
+            ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdCheckerCallback,
+            ContainerNetworkPurpose.ControlObserver => NetworkPurposeControlCallback,
+            _ => NetworkPurposeAwdpCallback
+        };
 
     private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
     {
         ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
+        ContainerNetworkPurpose.ControlObserver => "control-observer",
         ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpVerification,
         ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
         _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)

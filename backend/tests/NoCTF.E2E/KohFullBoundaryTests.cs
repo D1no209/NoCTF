@@ -73,8 +73,7 @@ public sealed class KohFullBoundaryTests
                 title = "Shared KoH Hill",
                 description = "Returns the current controlling Team Flag as a raw response body.",
                 direction = "Pwn",
-                mode = "Koh",
-                definition = BuildDefinition(runtimeImage)
+                definition = BuildDefinition(runtimeImage, RequiredEnvironment("NOCTF_E2E_CONTROL_IMAGE"))
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -89,7 +88,8 @@ public sealed class KohFullBoundaryTests
         var configuration = new
         {
             mode = "Koh",
-            koh = new { pollIntervalSeconds = 2, controlPointsPerInterval = 10L }
+            koh = new { pollIntervalSeconds = 2, controlPointsPerInterval = 10L,
+                runtime = new { allocation = "Shared", flagSource = "Static" } }
         };
         await SendJsonAsync(
             admin,
@@ -249,16 +249,18 @@ public sealed class KohFullBoundaryTests
             cancellationToken);
     }
 
-    private static object BuildDefinition(string runtimeImage) =>
+    private static object BuildDefinition(string runtimeImage, string controlImage) =>
         new
         {
-            mode = "Koh",
-            koh = new { },
+            capabilities = new[] { new { kind = "Control", control = new
+            {
+                image = controlImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(),
+                serviceName = "main", timeoutSeconds = 15
+            } } },
             runtime = new
             {
                 kind = "Container",
-                allocation = "Shared",
-                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>(), flagEnvironmentVariableName = (string?)null } } },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = new[] { 8080 } } } },
                 egressPolicy = "Isolated",
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -270,21 +272,9 @@ public sealed class KohFullBoundaryTests
                         containerPort = 8080,
                         serviceName = "main",
                         vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = false
-                    },
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/control",
-                        exposure = "OwnerOnly",
-                        containerPort = 8080,
-                        serviceName = "main",
-                        vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = true
+                        guestPort = (int?)null
                     }
-                },
-                flagSource = "Static"
+                }
             }
         };
 

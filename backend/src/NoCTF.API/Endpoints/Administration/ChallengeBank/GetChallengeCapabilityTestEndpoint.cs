@@ -38,7 +38,12 @@ public sealed record ChallengeCapabilityTestResponse(Guid ExecutionId, Guid Runt
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<CapabilityExecutionFailure>))] CapabilityExecutionFailure? Failure,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<TemplateCapabilityTestState>))] TemplateCapabilityTestState? FailureStage,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<FixResult>))] FixResult? FixResult,
-    int? FixExitCode, bool FixExecutionUncertain, bool CheckCompleted, IReadOnlyList<TemplateCheckProbeResponse> Probes);
+    int? FixExitCode, bool FixExecutionUncertain, bool CheckCompleted, IReadOnlyList<TemplateCheckProbeResponse> Probes)
+{
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<ControlResult>))] public ControlResult? ControlResult { get; init; }
+    public string? ControllerIdentifier { get; init; }
+    public DateTimeOffset? ControlObservedAt { get; init; }
+}
 
 public sealed class GetChallengeCapabilityTestEndpoint(ITemplateCapabilityTestStore tests, IUserContext user)
     : Endpoint<GetChallengeCapabilityTestRequest, Results<Ok<ChallengeCapabilityTestResponse>, NotFound>>
@@ -56,6 +61,9 @@ public sealed class GetChallengeCapabilityTestEndpoint(ITemplateCapabilityTestSt
         var result = await tests.FindAsync(new(request.ChallengeId, user.UserId, user.IsAdministrator), request.ExecutionId, ct);
         return result is null ? TypedResults.NotFound() : TypedResults.Ok(new ChallengeCapabilityTestResponse(result.ExecutionId, result.RuntimeInstanceId,
             result.Kind, result.State, result.AcceptedAt, result.Deadline, result.CompletedAt, result.Failure, result.FailureStage, result.FixResult, result.FixExitCode,
-            result.FixExecutionUncertain, result.CheckCompleted, result.Probes.Select(probe => new TemplateCheckProbeResponse(probe.Kind, probe.FlagId, probe.Result, probe.Reason)).ToArray()));
+            result.FixExecutionUncertain, result.CheckCompleted, result.Probes.Select(probe => new TemplateCheckProbeResponse(probe.Kind, probe.FlagId, probe.Result, probe.Reason)).ToArray())
+        {
+            ControlResult = result.ControlResult, ControllerIdentifier = result.ControllerIdentifier, ControlObservedAt = result.ControlObservedAt
+        });
     }
 }

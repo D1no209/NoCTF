@@ -191,7 +191,8 @@ public sealed class RuntimeResourceReconciliationHandler(
                     allocation.RunnerId == runnerId
                     && (allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
                         || allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker
-                        || allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker)))
+                        || allocation.WorkloadKind == RuntimeWorkloadKind.TemplateChecker
+                        || allocation.WorkloadKind == RuntimeWorkloadKind.ControlObserver)))
             .OrderBy(runtime => runtime.Id)
             .Take(500)
             .AsSplitQuery()
@@ -204,7 +205,9 @@ public sealed class RuntimeResourceReconciliationHandler(
                 ? runtime.CapabilityTest is { State: NoCTF.Domain.Challenges.Testing.TemplateCapabilityTestState.Checking } test
                     && test.ExecutionId == allocation.Identity.OperationId
                 : await db.GameplayFacts.AnyAsync(fact => fact.Id == allocation.GameplayFactId
-                    && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing, ct);
+                    && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing
+                    && (allocation.Identity.Kind != RuntimeWorkloadKind.ControlObserver
+                        || fact.ControlExecution != null && fact.ControlExecution.WorkCompletedAt == null), ct);
             if (processing && runtime.State is RuntimeState.Running or RuntimeState.Provisioning) continue;
             if (await reconciler.WorkloadExistsAsync(allocation.Identity, ct) == true)
             {

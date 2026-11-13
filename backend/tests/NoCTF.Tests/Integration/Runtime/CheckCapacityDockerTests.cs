@@ -36,7 +36,7 @@ public sealed class CheckCapacityDockerTests
     {
         await using var fixture = await RuntimeExecutionFixture.CreateAsync(ct);
         var target = (await SeedAsync(fixture, 1, ct))[0];
-        await using var callback = new ContainerBuilder(PythonImage).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
+        await using var callback = new ContainerBuilder(PythonImage).WithName(fixture.CallbackContainerName).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
             .WithCommand("python", "-m", "http.server", "8080").WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080)).Build();
         await callback.StartAsync(ct); await fixture.RefreshOwnerAsync(ct);
         using var mutations = new RunnerResourceMutationCoordinator();
@@ -62,7 +62,7 @@ public sealed class CheckCapacityDockerTests
     {
         await using var fixture = await RuntimeExecutionFixture.CreateAsync(ct);
         var targets = await SeedAsync(fixture, 2, ct);
-        await using var callback = new ContainerBuilder(PythonImage).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
+        await using var callback = new ContainerBuilder(PythonImage).WithName(fixture.CallbackContainerName).WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
             .WithCommand("python", "-m", "http.server", "8080").WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080)).Build();
         await callback.StartAsync(ct);
         await fixture.RefreshOwnerAsync(ct, auxiliaryConcurrency: 1);
@@ -124,7 +124,7 @@ public sealed class CheckCapacityDockerTests
             { Services = [new() { Name = "service-0", Image = RuntimeExecutionFixture.Image, InternalPorts = [new() { Port = 8080 }] }] };
         template.Definition.Break!.FlagStores.Add(new() { Id = Guid.NewGuid(), Name = "main", TargetServiceName = "service-0", DeliveryKind = FlagDeliveryKind.BusinessChecker });
         template.Definition.Capabilities.Add(new CheckCapabilityDefinition { Image = RuntimeExecutionFixture.Image, TargetServiceName = "service-0",
-            Requirements = [new() { Kind = CheckItemKind.Functionality }] });
+            });
         db.Competitions.Add(new AwdCompetition { Id = competitionId, OwnerId = fixture.Application.OwnerId, Title = "Auxiliary admission",
             Status = CompetitionStatus.Running, StartAt = now.AddMinutes(-1), EndAt = now.AddHours(1),
             ModeConfiguration = CompetitionModeConfigurationDefaults.Create(GameMode.Awd, competitionId) });

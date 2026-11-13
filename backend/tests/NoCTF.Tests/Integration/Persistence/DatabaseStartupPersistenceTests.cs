@@ -33,6 +33,44 @@ public sealed class DatabaseStartupPersistenceTests
         });
     }
 
+    [Test, Arguments(true), Arguments(false), Timeout(300_000)]
+    public async Task Administrator_seed_rejects_an_identity_owned_by_a_non_administrator(bool matchesUserName, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options);
+            await db.Database.EnsureCreatedAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var existing = new User
+            {
+                Id = Guid.NewGuid(), UserName = matchesUserName ? "startup-admin" : "existing-user",
+                NormalizedUserName = matchesUserName ? "STARTUP-ADMIN" : "EXISTING-USER",
+                Email = matchesUserName ? "existing@example.test" : "startup-admin@example.test",
+                Role = UserRole.User, Kind = UserKind.Human, CreatedAt = now, UpdatedAt = now
+            };
+            var passwordHasher = new PasswordHasher<User>();
+            existing.PasswordHash = passwordHasher.HashPassword(existing, "Existing-User-Password1!");
+            var originalHash = existing.PasswordHash;
+            db.Users.Add(existing);
+            await db.SaveChangesAsync(ct);
+            var bootstrapper = new AdministratorBootstrapper(db, Options.Create(new SeedAdministratorOptions
+            {
+                UserName = "startup-admin", Email = "startup-admin@example.test", Password = "Startup-Test-Password1!"
+            }), passwordHasher, TimeProvider.System);
+
+            await Assert.That(async () => await bootstrapper.SeedAsync(ct)).Throws<InvalidOperationException>();
+
+            db.ChangeTracker.Clear();
+            var preserved = await db.Users.SingleAsync(ct);
+            await Assert.That(preserved.Id).IsEqualTo(existing.Id);
+            await Assert.That(preserved.Role).IsEqualTo(UserRole.User);
+            await Assert.That(preserved.PasswordHash).IsEqualTo(originalHash);
+        });
+    }
+
     [Test]
     [Arguments(1)]
     [Arguments(4)]
@@ -74,14 +112,9 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
-                await Assert.That(appliedMigrations).Count().IsEqualTo(db.Database.GetMigrations().Count());
+                await Assert.That(appliedMigrations).Count().IsEqualTo(2);
+                await Assert.That(appliedMigrations).IsEquivalentTo(db.Database.GetMigrations());
                 await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
-                await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
-                await Assert.That(appliedMigrations[2]).EndsWith("_PersistedSsoFlows");
-                await Assert.That(appliedMigrations[3]).EndsWith("_PersistedRequestAdmission");
-                await Assert.That(appliedMigrations[4]).EndsWith("_CompetitionWebhookOutbox");
-                await Assert.That(appliedMigrations[5]).EndsWith("_ProgressionReadableMap");
-                await Assert.That(appliedMigrations[6]).EndsWith("_ProgressionNodePrerequisitePolicy");
                 var tables = db.Model.GetEntityTypes()
                     .Select(entity => entity.GetTableName())
                     .Where(name => name is not null)

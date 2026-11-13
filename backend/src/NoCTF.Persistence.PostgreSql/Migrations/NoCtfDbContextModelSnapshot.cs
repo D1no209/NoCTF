@@ -9479,17 +9479,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.Capabilities.ChallengeCapabilityDefinition");
 
-                    b.Property<int?>("ContainerPort")
-                        .HasColumnType("integer")
-                        .HasColumnName("container_port");
-
-                    b.Property<int?>("GuestPort")
-                        .HasColumnType("integer")
-                        .HasColumnName("guest_port");
-
-                    b.Property<short>("Protocol")
-                        .HasColumnType("smallint")
-                        .HasColumnName("protocol");
+                    b.Property<string>("Image")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("image");
 
                     b.Property<string>("ServiceName")
                         .HasMaxLength(63)
@@ -9500,18 +9493,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("timeout_seconds");
 
-                    b.Property<string>("UrlTemplate")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("url_template");
-
-                    b.Property<string>("VmId")
-                        .HasColumnType("text")
-                        .HasColumnName("vm_id");
-
                     b.ToTable("challenge_capabilities", null, t =>
                         {
+                            t.Property("Image")
+                                .HasColumnName("control_capability_definition_image");
+
                             t.Property("TimeoutSeconds")
                                 .HasColumnName("control_capability_definition_timeout_seconds");
                         });
@@ -12662,6 +12648,83 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasConstraintName("fk_template_check_requirements_template_capability_tests_runti");
                         });
 
+                    b.OwnsOne("NoCTF.Domain.Challenges.Capabilities.ControlExecutionDetails", "ControlExecution", b1 =>
+                        {
+                            b1.Property<Guid>("TemplateCapabilityTestRuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("template_capability_test_runtime_instance_id");
+
+                            b1.Property<string>("ControllerIdentifier")
+                                .HasMaxLength(4096)
+                                .HasColumnType("character varying(4096)")
+                                .HasColumnName("controller_identifier");
+
+                            b1.Property<long>("Deadline")
+                                .HasColumnType("bigint")
+                                .HasColumnName("deadline");
+
+                            b1.Property<Guid>("ExecutionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("execution_id");
+
+                            b1.Property<short?>("Failure")
+                                .HasColumnType("smallint")
+                                .HasColumnName("failure");
+
+                            b1.Property<long?>("FinalizedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("finalized_at");
+
+                            b1.Property<long?>("ObservedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("observed_at");
+
+                            b1.Property<long?>("ReceivedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("received_at");
+
+                            b1.Property<short?>("ReportedFailure")
+                                .HasColumnType("smallint")
+                                .HasColumnName("reported_failure");
+
+                            b1.Property<short?>("Result")
+                                .HasColumnType("smallint")
+                                .HasColumnName("result");
+
+                            b1.Property<string>("RunnerId")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("runner_id");
+
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<long?>("StartedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("started_at");
+
+                            b1.Property<long?>("WorkCompletedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("work_completed_at");
+
+                            b1.HasKey("TemplateCapabilityTestRuntimeInstanceId")
+                                .HasName("pk_template_control_execution_details");
+
+                            b1.HasIndex("ExecutionId")
+                                .IsUnique()
+                                .HasDatabaseName("ix_template_control_execution_details_execution_id");
+
+                            b1.ToTable("template_control_execution_details", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TemplateCapabilityTestRuntimeInstanceId")
+                                .HasConstraintName("fk_template_control_execution_details_template_capability_test");
+                        });
+
+                    b.Navigation("ControlExecution");
+
                     b.Navigation("FlagContexts");
 
                     b.Navigation("Probes");
@@ -13696,7 +13759,94 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasConstraintName("fk_flag_acquisition_evidence_gameplay_facts_id");
                         });
 
+                    b.OwnsOne("NoCTF.Domain.Challenges.Capabilities.ControlExecutionDetails", "ControlExecution", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("ControllerIdentifier")
+                                .HasMaxLength(4096)
+                                .HasColumnType("character varying(4096)")
+                                .HasColumnName("controller_identifier");
+
+                            b1.Property<long>("Deadline")
+                                .HasColumnType("bigint")
+                                .HasColumnName("deadline");
+
+                            b1.Property<Guid>("ExecutionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("execution_id");
+
+                            b1.Property<short?>("Failure")
+                                .HasColumnType("smallint")
+                                .HasColumnName("failure");
+
+                            b1.Property<long?>("FinalizedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("finalized_at");
+
+                            b1.Property<long?>("ObservedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("observed_at");
+
+                            b1.Property<long?>("ReceivedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("received_at");
+
+                            b1.Property<short?>("ReportedFailure")
+                                .HasColumnType("smallint")
+                                .HasColumnName("reported_failure");
+
+                            b1.Property<short?>("Result")
+                                .HasColumnType("smallint")
+                                .HasColumnName("result");
+
+                            b1.Property<string>("RunnerId")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("runner_id");
+
+                            b1.Property<Guid>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<long?>("StartedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("started_at");
+
+                            b1.Property<long?>("WorkCompletedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("work_completed_at");
+
+                            b1.HasKey("GameplayFactId")
+                                .HasName("pk_control_execution_details");
+
+                            b1.HasIndex("ExecutionId")
+                                .IsUnique()
+                                .HasDatabaseName("ix_control_execution_details_execution_id");
+
+                            b1.HasIndex("RuntimeInstanceId")
+                                .HasDatabaseName("ix_control_execution_details_runtime_instance_id");
+
+                            b1.ToTable("control_execution_details", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId")
+                                .HasConstraintName("fk_control_execution_details_gameplay_facts_id");
+
+                            b1.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                                .WithMany()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_control_execution_details_runtime_instances_runtime_instanc");
+                        });
+
                     b.Navigation("AcquisitionEvidence");
+
+                    b.Navigation("ControlExecution");
 
                     b.Navigation("FixExecution");
                 });
@@ -16253,38 +16403,82 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasConstraintName("fk_challenge_check_environment_challenge_capabilities_challeng");
                         });
 
-                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.CheckRequirement", "Requirements", b1 =>
+                    b.Navigation("Command");
+
+                    b.Navigation("Environment");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.ControlCapabilityDefinition", b =>
+                {
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.ControlCommandArgument", "Command", b1 =>
                         {
                             b1.Property<Guid>("ChallengeId")
                                 .HasColumnType("uuid")
                                 .HasColumnName("challenge_id");
 
-                            b1.Property<short>("Kind")
-                                .HasColumnType("smallint")
-                                .HasColumnName("kind");
+                            b1.Property<int>("Position")
+                                .HasColumnType("integer")
+                                .HasColumnName("position");
 
                             b1.Property<short>("CapabilityKind")
                                 .HasColumnType("smallint")
                                 .HasColumnName("capability_kind");
 
-                            b1.HasKey("ChallengeId", "Kind")
-                                .HasName("pk_challenge_check_requirements");
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(4096)
+                                .HasColumnType("character varying(4096)")
+                                .HasColumnName("value");
+
+                            b1.HasKey("ChallengeId", "Position")
+                                .HasName("pk_challenge_control_command");
 
                             b1.HasIndex("ChallengeId", "CapabilityKind")
-                                .HasDatabaseName("ix_challenge_check_requirements_challenge_id_capability_kind");
+                                .HasDatabaseName("ix_challenge_control_command_challenge_id_capability_kind");
 
-                            b1.ToTable("challenge_check_requirements", (string)null);
+                            b1.ToTable("challenge_control_command", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("ChallengeId", "CapabilityKind")
-                                .HasConstraintName("fk_challenge_check_requirements_challenge_capabilities_challen");
+                                .HasConstraintName("fk_challenge_control_command_challenge_capabilities_challenge_");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.Capabilities.ControlEnvironmentVariable", "Environment", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("challenge_id");
+
+                            b1.Property<string>("Name")
+                                .HasMaxLength(256)
+                                .HasColumnType("character varying(256)")
+                                .HasColumnName("name");
+
+                            b1.Property<short>("CapabilityKind")
+                                .HasColumnType("smallint")
+                                .HasColumnName("capability_kind");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("value");
+
+                            b1.HasKey("ChallengeId", "Name")
+                                .HasName("pk_challenge_control_environment");
+
+                            b1.HasIndex("ChallengeId", "CapabilityKind")
+                                .HasDatabaseName("ix_challenge_control_environment_challenge_id_capability_kind");
+
+                            b1.ToTable("challenge_control_environment", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId", "CapabilityKind")
+                                .HasConstraintName("fk_challenge_control_environment_challenge_capabilities_challe");
                         });
 
                     b.Navigation("Command");
 
                     b.Navigation("Environment");
-
-                    b.Navigation("Requirements");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.Capabilities.FixCapabilityDefinition", b =>

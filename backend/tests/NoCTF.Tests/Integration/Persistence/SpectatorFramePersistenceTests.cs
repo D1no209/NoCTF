@@ -152,7 +152,8 @@ public sealed class SpectatorFramePersistenceTests
                 await Assert.That(frame.Points.Single().ControllerId).IsNull();
                 await Assert.That(frame.Points.Single().Health).IsEqualTo(SpectatorHealth.Unknown);
                 await Assert.That(frame.Changes.Count).IsEqualTo(2);
-                await Assert.That(frame.Changes.All(x => x.ControllerId == teamId)).IsTrue();
+                await Assert.That(frame.Changes.Single(x => x.Kind == SpectatorChangeKind.Control).ControllerId).IsEqualTo(teamId);
+                await Assert.That(frame.Changes.Single(x => x.Kind == SpectatorChangeKind.DetectionFailed).ControllerId).IsNull();
                 await Assert.That(frame.Changes.Single(x => x.Kind == SpectatorChangeKind.Control).TeamId).IsEqualTo(exhibitionId);
                 db.GameplayFacts.Add(Fact(null, now.AddSeconds(-20), GameplayFactResult.Uncontrolled));
                 await db.SaveChangesAsync(ct);

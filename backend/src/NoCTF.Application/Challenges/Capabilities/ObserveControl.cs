@@ -1,57 +1,46 @@
-using System.Text;
-using NoCTF.Application.Common;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges.Capabilities;
+using NoCTF.Domain.Runtime;
+using NoCTF.Application.GameplayFacts.Processing;
 
 namespace NoCTF.Application.Challenges.Capabilities;
 
-public enum ControlReadState { Completed, TimedOut, Unavailable }
-
-public sealed record ControlReadResponse(ControlReadState State, ReadOnlyMemory<byte> Body)
+public interface IControlResultStore
 {
-    public override string ToString() => $"ControlReadResponse {{ State = {State}, Body = [REDACTED] }}";
+    Task<InternalResultDisposition> RecordAsync(Guid executionId, Guid runtimeId, CapabilityExecutionScope scope,
+        string runnerId, DateTimeOffset deadline, ControlEvidence evidence, CancellationToken ct);
 }
 
-public interface IControlObservationClient
+public sealed record ControlExecutionInput(Guid ExecutionId, Guid RuntimeInstanceId, CapabilityExecutionScope Scope,
+    ContainerRuntimeReceiptData Receipt, ControlCapabilityDefinition Definition, DateTimeOffset Deadline);
+
+public sealed record ControlEvidence(CapabilityExecutionState ExecutionState, ControlResult Result,
+    string? ControllerIdentifier, CapabilityExecutionFailure? Failure, DateTimeOffset ObservedAt)
 {
-    Task<ControlReadResponse> ReadAsync(Uri target, TimeSpan timeout, CancellationToken ct);
+    public override string ToString() => $"ControlEvidence {{ ExecutionState = {ExecutionState}, Result = {Result}, Failure = {Failure} }}";
 }
 
-public sealed record ControlInput(Guid ExecutionId, Guid? RuntimeInstanceId, ControlCapabilityDefinition Definition,
-    Uri? Target, DateTimeOffset Deadline, CapabilityExecutionScope Scope = CapabilityExecutionScope.GameplayFact)
+public static class ControlEvidenceValidation
 {
-    public override string ToString() => $"ControlInput {{ ExecutionId = {ExecutionId}, Scope = {Scope}, RuntimeInstanceId = {RuntimeInstanceId}, Target = [REDACTED] }}";
-}
-
-public sealed class ObserveControl(IControlObservationClient client, TimeProvider clock)
-{
-    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
-
-    public async Task<OperationResult<ControlEvaluation, CapabilityExecutionFailure>> ExecuteAsync(ControlInput input, CancellationToken ct)
+    public static CapabilityExecutionFailure? Validate(ControlEvidence evidence, DateTimeOffset startedAt,
+        DateTimeOffset deadline, DateTimeOffset receivedAt)
     {
-        if (input.ExecutionId == Guid.Empty || !Enum.IsDefined(input.Scope) || input.Definition.Protocol != ControlProtocol.HttpTeamIdentifier
-            || input.Definition.TimeoutSeconds is < 1 or > 3600)
-            return OperationResult<ControlEvaluation, CapabilityExecutionFailure>.Failure(CapabilityExecutionFailure.InvalidInput, "Invalid control observation configuration.");
-        var remaining = input.Deadline - clock.GetUtcNow();
-        if (remaining <= TimeSpan.Zero) return Outcome(input, ControlResult.Indeterminate, failure: CapabilityExecutionFailure.DeadlineExceeded);
-        if (input.Target is not { IsAbsoluteUri: true, Scheme: "http" or "https" })
-            return Outcome(input, ControlResult.Indeterminate, failure: CapabilityExecutionFailure.RuntimeUnavailable);
-        var timeout = TimeSpan.FromSeconds(input.Definition.TimeoutSeconds);
-        var response = await client.ReadAsync(input.Target, remaining < timeout ? remaining : timeout, ct);
-        if (response.State != ControlReadState.Completed)
-            return Outcome(input, ControlResult.Indeterminate, failure: response.State == ControlReadState.TimedOut
-                ? CapabilityExecutionFailure.DeadlineExceeded : CapabilityExecutionFailure.RuntimeUnavailable);
-        if (response.Body.Length > 4096 || response.Body.Span.Contains((byte)0))
-            return Outcome(input, ControlResult.Indeterminate, failure: CapabilityExecutionFailure.InvalidEvidence);
-        if (response.Body.IsEmpty) return Outcome(input, ControlResult.Uncontrolled);
-        try { return Outcome(input, ControlResult.Controlled, StrictUtf8.GetString(response.Body.Span)); }
-        catch (DecoderFallbackException) { return Outcome(input, ControlResult.Indeterminate, failure: CapabilityExecutionFailure.InvalidEvidence); }
+        if (!Enum.IsDefined(evidence.ExecutionState) || !Enum.IsDefined(evidence.Result)
+            || evidence.Failure is { } failure && !Enum.IsDefined(failure)
+            || evidence.ObservedAt == default || evidence.ObservedAt < startedAt
+            || evidence.ObservedAt > receivedAt || evidence.ObservedAt > deadline || receivedAt > deadline)
+            return CapabilityExecutionFailure.InvalidEvidence;
+        if (evidence.ExecutionState == CapabilityExecutionState.PlatformFailed)
+            return evidence.Result == ControlResult.Indeterminate && evidence.ControllerIdentifier is null && evidence.Failure is not null
+                ? null : CapabilityExecutionFailure.InvalidEvidence;
+        if (evidence.ExecutionState != CapabilityExecutionState.Completed || evidence.Failure is not null || evidence.Result == ControlResult.Indeterminate)
+            return CapabilityExecutionFailure.InvalidEvidence;
+        return evidence.Result switch
+        {
+            ControlResult.Controlled when evidence.ControllerIdentifier is { Length: > 0 and <= 4096 } identifier
+                && !identifier.Contains('\0') => null,
+            ControlResult.Uncontrolled when evidence.ControllerIdentifier is null => null,
+            _ => CapabilityExecutionFailure.InvalidEvidence
+        };
     }
-
-    private OperationResult<ControlEvaluation, CapabilityExecutionFailure> Outcome(ControlInput input, ControlResult result,
-        string? controller = null, CapabilityExecutionFailure? failure = null) => OperationResult<ControlEvaluation, CapabilityExecutionFailure>.Success(new()
-    {
-        ExecutionId = input.ExecutionId, Scope = input.Scope, RuntimeInstanceId = input.RuntimeInstanceId, ObservedAt = clock.GetUtcNow(),
-        Result = result, ControllerIdentifier = controller, ExecutionFailure = failure,
-        ExecutionState = failure is null ? CapabilityExecutionState.Completed : CapabilityExecutionState.PlatformFailed
-    });
 }

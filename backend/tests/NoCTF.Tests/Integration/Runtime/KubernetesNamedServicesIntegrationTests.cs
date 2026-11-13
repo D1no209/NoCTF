@@ -40,6 +40,8 @@ public sealed class KubernetesNamedServicesIntegrationTests
             var runtime = new KubernetesContainerRuntime(client, containers, options);
             var image = Required("NOCTF_KUBERNETES_TEST_IMAGE");
             var single = await runtime.UpAsync(Request([new("main", image)], options), ct);
+            var executed = await runtime.ExecAsync(single, "main", ["/bin/sh", "-c", "cat /dev/null"], TimeSpan.FromSeconds(10), ct);
+            await Assert.That(executed.ExitCode).IsEqualTo(0);
             var group = await runtime.UpAsync(Request([new("web", image), new("db", image, Command: ["sleep"], Arguments: ["300"])], options), ct);
             await Assert.That(single.DiscoveryServiceName).IsNull();
             await Assert.That(group.DiscoveryServiceName).IsNotNull();

@@ -1,5 +1,6 @@
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Challenges.Capabilities;
+using NoCTF.Application.Runtime.Configuration;
 
 namespace NoCTF.Application.Challenges.Capabilities;
 
@@ -14,7 +15,7 @@ public sealed record CapabilityConfigurationError(ChallengeCapabilityKind? Capab
 
 public static class ChallengeCapabilityValidation
 {
-    public static IReadOnlyList<CapabilityConfigurationError> Validate(ChallengeDefinition definition)
+    public static IReadOnlyList<CapabilityConfigurationError> Validate(ChallengeDefinition definition, bool requireComplete = true)
     {
         var errors = new List<CapabilityConfigurationError>();
         if (definition.Capabilities.Count is < 1 or > 5
@@ -25,7 +26,7 @@ public static class ChallengeCapabilityValidation
         foreach (var capability in definition.Capabilities)
         {
             void Fail(CapabilityConfigurationFailure code) => errors.Add(new(capability.Kind, code));
-            bool HasService(string? name) => definition.Runtime is ContainerChallengeRuntimeTemplate container
+            bool HasService(string? name) => !requireComplete || definition.Runtime is ContainerChallengeRuntimeTemplate container
                 && !string.IsNullOrWhiteSpace(name) && container.Services.Any(service => service.Name == name);
             switch (capability)
             {
@@ -56,9 +57,9 @@ public static class ChallengeCapabilityValidation
                     if (!Ordered(value.FlagStores.Select(store => store.Position))) Fail(CapabilityConfigurationFailure.InvalidOrder);
                     break;
                 case FixCapabilityDefinition value:
-                    if (definition.Runtime is not ContainerChallengeRuntimeTemplate) Fail(CapabilityConfigurationFailure.RuntimeRequired);
+                    if (requireComplete && definition.Runtime is not ContainerChallengeRuntimeTemplate) Fail(CapabilityConfigurationFailure.RuntimeRequired);
                     else if (!HasService(value.TargetServiceName)) Fail(CapabilityConfigurationFailure.TargetServiceMissing);
-                    if (!FixCommand.IsValid(value))
+                    if (requireComplete && !FixCommand.IsValid(value))
                         Fail(CapabilityConfigurationFailure.InvalidCommand);
                     if (!Ordered(value.Command.Select(argument => argument.Position))) Fail(CapabilityConfigurationFailure.InvalidOrder);
                     if (value.TimeoutSeconds is < 1 or > 3600) Fail(CapabilityConfigurationFailure.InvalidTimeout);
@@ -66,21 +67,25 @@ public static class ChallengeCapabilityValidation
                     break;
                 case CheckCapabilityDefinition value:
                     if (!HasService(value.TargetServiceName)) Fail(CapabilityConfigurationFailure.TargetServiceMissing);
-                    if (string.IsNullOrWhiteSpace(value.Image)
-                        || value.Command.Any(argument => string.IsNullOrWhiteSpace(argument.Value))
-                        || value.Environment.Any(variable => string.IsNullOrWhiteSpace(variable.Name))
+                    if (requireComplete && string.IsNullOrWhiteSpace(value.Image) || value.Image.Length > 512
+                        || value.Command.Any(argument => string.IsNullOrWhiteSpace(argument.Value) || argument.Value.Length > 4096)
+                        || value.Environment.Any(variable => variable.Name.Length > 256 || !ContainerRuntimeDefinitionPolicy.IsEnvironmentName(variable.Name)
+                            || variable.Name.StartsWith("NOCTF_", StringComparison.OrdinalIgnoreCase))
                         || value.Environment.Select(variable => variable.Name).Distinct(StringComparer.Ordinal).Count() != value.Environment.Count)
                         Fail(CapabilityConfigurationFailure.InvalidChecker);
                     if (value.TimeoutSeconds is < 1 or > 3600 || value.ReadyTimeoutSeconds is < 1 or > 3600)
                         Fail(CapabilityConfigurationFailure.InvalidTimeout);
                     if (!Ordered(value.Command.Select(argument => argument.Position))) Fail(CapabilityConfigurationFailure.InvalidOrder);
-                    if (value.Requirements.Count == 0 || value.Requirements.Any(item => !Enum.IsDefined(item.Kind))
-                        || value.Requirements.Select(item => item.Kind).Distinct().Count() != value.Requirements.Count)
-                        Fail(CapabilityConfigurationFailure.InvalidRequirements);
                     break;
                 case ControlCapabilityDefinition value:
-                    if (definition.Runtime is null) Fail(CapabilityConfigurationFailure.RuntimeRequired);
-                    if (!Enum.IsDefined(value.Protocol) || string.IsNullOrWhiteSpace(value.UrlTemplate))
+                    if (requireComplete && definition.Runtime is null) Fail(CapabilityConfigurationFailure.RuntimeRequired);
+                    else if (requireComplete && definition.Runtime is not ContainerChallengeRuntimeTemplate) Fail(CapabilityConfigurationFailure.InvalidControl);
+                    if (requireComplete && string.IsNullOrWhiteSpace(value.Image) || value.Image?.Length > 512
+                        || value.Command.Any(argument => string.IsNullOrWhiteSpace(argument.Value) || argument.Value.Length > 4096)
+                        || !Ordered(value.Command.Select(argument => argument.Position))
+                        || value.Environment.Any(variable => variable.Name.Length > 256 || !ContainerRuntimeDefinitionPolicy.IsEnvironmentName(variable.Name)
+                            || variable.Name.StartsWith("NOCTF_", StringComparison.OrdinalIgnoreCase))
+                        || value.Environment.Select(variable => variable.Name).Distinct(StringComparer.Ordinal).Count() != value.Environment.Count)
                         Fail(CapabilityConfigurationFailure.InvalidControl);
                     if (definition.Runtime is ContainerChallengeRuntimeTemplate && !HasService(value.ServiceName))
                         Fail(CapabilityConfigurationFailure.TargetServiceMissing);
@@ -88,7 +93,7 @@ public static class ChallengeCapabilityValidation
                     break;
                 case QuestionnaireCapabilityDefinition value:
                     if (value.CurrentRevision is not { } revision || revision.Id == Guid.Empty
-                        || value.CurrentRevisionId != revision.Id || revision.Number < 1 || revision.Questions.Count == 0)
+                        || value.CurrentRevisionId != revision.Id || revision.Number < 1 || requireComplete && revision.Questions.Count == 0)
                     {
                         Fail(CapabilityConfigurationFailure.InvalidQuestionnaire);
                         break;
@@ -99,16 +104,16 @@ public static class ChallengeCapabilityValidation
                     foreach (var question in revision.Questions)
                     {
                         if (question.Id == Guid.Empty || question.SourceId == Guid.Empty || !Enum.IsDefined(question.Kind)
-                            || !Enum.IsDefined(question.Difficulty) || string.IsNullOrWhiteSpace(question.Title) || question.Title.Length > 160
-                            || string.IsNullOrWhiteSpace(question.Body) || question.Body.Length > 64000 || question.Explanation?.Length > 64000)
+                            || !Enum.IsDefined(question.Difficulty) || requireComplete && string.IsNullOrWhiteSpace(question.Title) || question.Title.Length > 160
+                            || requireComplete && string.IsNullOrWhiteSpace(question.Body) || question.Body.Length > 64000 || question.Explanation?.Length > 64000)
                             Fail(CapabilityConfigurationFailure.InvalidQuestion);
                         var correct = question.Options.Count(option => option.IsCorrect);
-                        if (question.Options.Count is < 2 or > 8 || correct == 0
+                        if (question.Options.Count > 8 || requireComplete && (question.Options.Count < 2 || correct == 0
                             || question.Kind == QuestionnaireQuestionKind.MultipleChoice && correct < 2
-                            || question.Kind != QuestionnaireQuestionKind.MultipleChoice && correct != 1
-                            || question.Options.Any(option => option.Id == Guid.Empty || string.IsNullOrWhiteSpace(option.Content) || option.Content.Length > 16000)
+                            || question.Kind != QuestionnaireQuestionKind.MultipleChoice && correct != 1)
+                            || question.Options.Any(option => option.Id == Guid.Empty || requireComplete && string.IsNullOrWhiteSpace(option.Content) || option.Content.Length > 16000)
                             || question.Options.Select(option => option.Id).Distinct().Count() != question.Options.Count
-                            || question.Kind == QuestionnaireQuestionKind.TrueFalse && (question.Options.Count != 2
+                            || requireComplete && question.Kind == QuestionnaireQuestionKind.TrueFalse && (question.Options.Count != 2
                                 || !question.Options.Select(option => option.TruthValue).ToHashSet().SetEquals([true, false])))
                             Fail(CapabilityConfigurationFailure.InvalidOptions);
                         if (!Ordered(question.Options.Select(option => option.Position))) Fail(CapabilityConfigurationFailure.InvalidOrder);

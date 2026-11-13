@@ -73,9 +73,11 @@ public sealed partial class AwdScoreProjectionReaderPersistenceTests
             var definition = new ChallengeDefinition
             {
                 ChallengeId = templateId,
+                Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "main", Image = "challenge:test" }] },
                 Capabilities = [new NoCTF.Domain.Challenges.Capabilities.BreakCapabilityDefinition
                 { FlagStores = Enumerable.Range(0, 2).Select(store => new NoCTF.Domain.Challenges.Capabilities.FlagStoreDefinition
-                    { Id = Id(), Position = store, Name = $"store-{store}", DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker }).ToList() }]
+                    { Id = Id(), Position = store, Name = $"store-{store}", TargetServiceName = "main",
+                        DeliveryKind = NoCTF.Domain.Challenges.Capabilities.FlagDeliveryKind.BusinessChecker }).ToList() }]
             };
             db.Challenges.Add(new Challenge { Id = templateId, OwnerId = users[0].Id,
                 Title = $"Question {index}", Definition = definition, CreatedAt = start, UpdatedAt = start });

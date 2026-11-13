@@ -131,7 +131,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Track_changes_are_information_and_patch_completion_uses_the_current_interaction(CancellationToken ct)
+    public async Task Track_changes_are_information_and_ctf_history_excludes_fix_attempts(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -185,8 +185,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(await access.CanReadInternalHistoricalAuditAsync(fixture.JudgeId, fixture.CompetitionId, ct)).IsTrue();
 
             await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
-            // Archive content is outside this read-only projection; only the typed reference identity is relevant.
-            var currentFact = await db.GameplayFacts.SingleAsync(
+            var currentFact = await db.GameplayFacts.AsSplitQuery().SingleAsync(
                 row => row.Id == fixture.LaterFactId,
                 ct);
             db.GameplayFacts.Remove(currentFact);
@@ -207,10 +206,10 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 UpdatedAt = currentFact.UpdatedAt
             });
             await db.SaveChangesAsync(ct);
-            var patch = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Single();
-            await Assert.That(patch.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
-            await Assert.That(patch.MatchesCurrentInteraction).IsFalse();
-            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(patch).CurrentProjectedBloodRank).IsNull();
+            var current = await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 20, ct);
+            await Assert.That(current.State).IsEqualTo(HistoricalAdjudicationPreviewReadState.Available);
+            await Assert.That(current.Items).IsEmpty();
+            await Assert.That(await db.GameplayFacts.OfType<FixAttemptGameplayFact>().CountAsync(ct)).IsEqualTo(1);
         });
     }
 

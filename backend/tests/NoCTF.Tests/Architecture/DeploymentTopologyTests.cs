@@ -67,7 +67,7 @@ public sealed class DeploymentTopologyTests
         var generatedRegistry = await ReadAsync("backend", "src", "NoCTF.Host",
             "Internal", "Generated", "WolverineHandlers", "GeneratedHandlerRegistry.cs");
         await Assert.That(generatedRegistry).Contains("typeof(NoCTF.Worker.KohPollingHandler)");
-        await Assert.That(generatedRegistry).Contains("typeof(NoCTF.Worker.KohObservationHandler)");
+        await Assert.That(generatedRegistry).Contains("typeof(NoCTF.Worker.ControlObservationMessageHandler)");
         await Assert.That(generatedRegistry).Contains(
             "typeof(NoCTF.Worker.ExpireAccountSourceAddressesHandler)");
         var generatedHandlers = Path.Combine(RepositoryRoot, "backend", "src",
@@ -104,7 +104,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(workerTopology)
             .Contains("endpoint.BrokerRole, \"stream\"");
         await Assert.That(workerRole).Contains("IncludeType(typeof(KohPollingHandler))");
-        await Assert.That(workerRole).Contains("IncludeType(typeof(KohObservationHandler))");
+        await Assert.That(workerRole).Contains("IncludeType(typeof(ControlObservationMessageHandler))");
         await Assert.That(workerTopology)
             .Contains("typeof(SendEmailVerification)")
             .And.Contains("BackgroundEndpointAddress()");

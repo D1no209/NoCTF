@@ -196,7 +196,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             await using var workerDb = new NoCtfDbContext(options);
             await ProcessAsync(workerDb, new RecordingOutbox(), NullCompetitionEventRecorder.Instance,
                 result.GameplayFactId!.Value, cancellationToken);
-            var evaluated = await workerDb.GameplayFacts.AsNoTracking()
+            var evaluated = await workerDb.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .SingleAsync(fact => fact.Id == result.GameplayFactId, cancellationToken);
             await Assert.That(evaluated.State).IsEqualTo(GameplayFactState.Completed);
             await Assert.That(evaluated.Result).IsNotEqualTo(GameplayFactResult.AttemptsExhausted);
@@ -287,7 +287,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             await Assert.That(correct.Succeeded).IsTrue();
             await ProcessAsync(db, outbox, events, correct.Value!.GameplayFactId, cancellationToken);
 
-            var practiceFacts = await db.GameplayFacts.AsNoTracking()
+            var practiceFacts = await db.GameplayFacts.AsNoTracking().AsSplitQuery()
                 .Where(fact => fact.OccurredAt >= fixture.FinishedAt)
                 .OrderBy(fact => fact.OccurredAt)
                 .ToArrayAsync(cancellationToken);

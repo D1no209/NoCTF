@@ -28,5 +28,7 @@ internal sealed class CapabilityExecutionTimeoutPolicy : IHandlerPolicy
             ? NoCTF.Application.Challenges.Testing.TemplateCapabilityTestBudget.HandlerSeconds
             : messageType == typeof(RunFixExecution)
             ? FixExecutionBudget.HandlerExecutionTimeoutSeconds
+            : messageType == typeof(RunControlObservation)
+            ? NoCTF.Application.Challenges.Testing.TemplateCapabilityTestBudget.HandlerSeconds
             : null;
 }

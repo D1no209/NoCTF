@@ -7,13 +7,14 @@ public sealed record RequiredCheckEvidence(CheckItemKind Kind, Guid? FlagId = nu
 public sealed record CheckProbeEvidence(CheckItemKind Kind, Guid? FlagId, CheckProbeResult Result, CheckFailureReason Reason);
 public sealed record CheckEvidenceInput(Guid ExecutionId, Guid RuntimeInstanceId, IReadOnlyList<RequiredCheckEvidence> Required,
     IReadOnlyList<CheckProbeEvidence> Probes, DateTimeOffset StartedAt, DateTimeOffset Deadline, DateTimeOffset ObservedAt, DateTimeOffset ReceivedAt,
-    CapabilityExecutionScope Scope = CapabilityExecutionScope.GameplayFact);
+    CapabilityExecutionScope Scope = CapabilityExecutionScope.GameplayFact,
+    IReadOnlySet<Guid>? AllowedFlagIds = null);
 
 public static class CheckEvidenceValidation
 {
     public static OperationResult<CheckEvaluation, CapabilityExecutionFailure> Evaluate(CheckEvidenceInput input)
     {
-        if (input.ExecutionId == Guid.Empty || !Enum.IsDefined(input.Scope) || input.RuntimeInstanceId == Guid.Empty || input.Required.Count == 0
+        if (input.ExecutionId == Guid.Empty || !Enum.IsDefined(input.Scope) || input.RuntimeInstanceId == Guid.Empty
             || input.Required.Distinct().Count() != input.Required.Count || input.Required.Any(item => !Enum.IsDefined(item.Kind)
                 || IsFlag(item.Kind) != item.FlagId.HasValue || item.FlagId == Guid.Empty))
             return Failure(CapabilityExecutionFailure.InvalidInput);
@@ -21,17 +22,22 @@ public static class CheckEvidenceValidation
             || input.ReceivedAt > input.Deadline)
             return Failure(CapabilityExecutionFailure.DeadlineExceeded);
         var expected = input.Required.ToHashSet();
+        var allowedFlags = input.AllowedFlagIds ?? input.Required.Where(item => item.FlagId.HasValue).Select(item => item.FlagId!.Value).ToHashSet();
         if (input.Probes.Any(probe => !Enum.IsDefined(probe.Kind) || !Enum.IsDefined(probe.Result) || !Enum.IsDefined(probe.Reason)
-                || !expected.Contains(new(probe.Kind, probe.FlagId)) || probe.Result == CheckProbeResult.NotRequired
+                || IsFlag(probe.Kind) != probe.FlagId.HasValue || probe.FlagId == Guid.Empty
+                || probe.FlagId is { } flagId && !allowedFlags.Contains(flagId)
+                || probe.Result == CheckProbeResult.NotRequired && expected.Contains(new(probe.Kind, probe.FlagId))
                 || probe.Result == CheckProbeResult.NotExecuted && (!HasFailedDependency(probe, input.Probes)
                     || probe.Reason is not (CheckFailureReason.ConnectionRefused or CheckFailureReason.ConnectTimeout
                         or CheckFailureReason.RequestTimeout or CheckFailureReason.FunctionalCheckFailed))
                 || probe.Reason == CheckFailureReason.PlayerMaintenance
-                || probe.Result == CheckProbeResult.Passed && probe.Reason != CheckFailureReason.None
-                || probe.Result != CheckProbeResult.Passed && probe.Reason == CheckFailureReason.None)
+                || probe.Result is CheckProbeResult.Passed or CheckProbeResult.NotRequired && probe.Reason != CheckFailureReason.None
+                || probe.Result is not (CheckProbeResult.Passed or CheckProbeResult.NotRequired) && probe.Reason == CheckFailureReason.None)
             || input.Probes.Select(probe => (probe.Kind, probe.FlagId)).Distinct().Count() != input.Probes.Count)
             return Failure(CapabilityExecutionFailure.InvalidEvidence);
-        if (input.Probes.Count != expected.Count) return Failure(CapabilityExecutionFailure.MissingEvidence);
+        if (input.Probes.Count == 0 || input.Probes.All(probe => probe.Result == CheckProbeResult.NotRequired)
+            || expected.Any(item => !input.Probes.Any(probe => probe.Kind == item.Kind && probe.FlagId == item.FlagId)))
+            return Failure(CapabilityExecutionFailure.MissingEvidence);
         var incomplete = input.Probes.Any(probe => probe.Result is CheckProbeResult.PlatformFailure or CheckProbeResult.Unknown);
         return OperationResult<CheckEvaluation, CapabilityExecutionFailure>.Success(new()
         {

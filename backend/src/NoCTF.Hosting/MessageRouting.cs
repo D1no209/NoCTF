@@ -53,7 +53,6 @@ public static class MessageRouting
         Route<DispatchAwdCheckers>(options, WorkerQueue.Gameplay);
         Route<AwdCheckerCallbackMissing>(options, WorkerQueue.Control);
         Route<PollKohChallenge>(options, WorkerQueue.Control);
-        Route<RecordKohObservation>(options, WorkerQueue.Gameplay);
         Route<DispatchRuntime>(options, WorkerQueue.Control);
         Route<DispatchQueuedRuntimes>(options, WorkerQueue.Control);
         Route<ReleaseRunnerCapacity>(options, WorkerQueue.Control);
@@ -91,6 +90,8 @@ public static class MessageRouting
         Route<CompleteFixExecutionWork>(options, WorkerQueue.Gameplay);
         Route<FinalizeFixExecution>(options, WorkerQueue.Control);
         Route<RecoverFixExecutions>(options, WorkerQueue.Control);
+        Route<FinalizeControlObservation>(options, WorkerQueue.Gameplay);
+        Route<RecoverControlObservations>(options, WorkerQueue.Control);
     }
 
     private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue, bool durableOutbox = true)

@@ -102,6 +102,11 @@ services:
 
   backend:
     image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
+    container_name: ${NOCTF_E2E_CALLBACK_CONTAINER}
+    labels:
+      noctf.io/internal-role: scoring-callback-gateway
+      noctf.io/runtime-proxy-gateway: "true"
+    networks: [default, callbacks]
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -123,7 +128,6 @@ services:
 
   worker:
     image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
-    container_name: ${NOCTF_E2E_CALLBACK_CONTAINER}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -132,10 +136,6 @@ services:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
-    labels:
-      noctf.io/internal-role: scoring-callback-gateway
-      noctf.io/runtime-proxy-gateway: "true"
-    networks: [default, callbacks]
     environment:
       <<: *api-environment
       Hosting__Roles__0: Worker
@@ -196,6 +196,12 @@ services:
     image: ${NOCTF_E2E_RUNTIME_IMAGE}
     build:
       context: fixtures/koh-runtime
+    profiles: ["fixture"]
+
+  control-fixture:
+    image: ${NOCTF_E2E_CONTROL_IMAGE}
+    build:
+      context: fixtures/koh-control
     profiles: ["fixture"]
 
 networks:

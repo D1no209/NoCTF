@@ -260,7 +260,7 @@ public sealed class PersistentFixPersistenceTests
             {
                 Runtime = new ContainerChallengeRuntimeTemplate { Services = [new() { Name = "web", Image = Image }] },
                 Capabilities = [new BreakCapabilityDefinition(), new FixCapabilityDefinition { TargetServiceName = "web", Entrypoint = "fix.sh", TimeoutSeconds = 5 },
-                    new CheckCapabilityDefinition { TargetServiceName = "web", Image = Image, Requirements = [new() { Kind = CheckItemKind.Functionality }] }]
+                    new CheckCapabilityDefinition { TargetServiceName = "web", Image = Image }]
             } });
             db.CompetitionChallenges.Add(new AwdCompetitionChallenge { Id = ChallengeId, CompetitionId = CompetitionId, ChallengeId = templateId,
                 IsPublished = true, Rules = new AwdCompetitionChallengeRules { AllowFixSubmissions = true } });

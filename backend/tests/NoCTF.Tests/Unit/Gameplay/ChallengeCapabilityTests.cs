@@ -153,8 +153,8 @@ public sealed class ChallengeCapabilityTests
     {
         var original = Repairable().Check!;
         var copied = (CheckCapabilityDefinition)ChallengeCapabilityCopy.Copy(original);
-        copied.Requirements[0].Kind = CheckItemKind.Connection;
-        await Assert.That(original.Requirements[0].Kind).IsEqualTo(CheckItemKind.Functionality);
+        copied.Command.Add(new() { Position = copied.Command.Count, Value = "--copied" });
+        await Assert.That(original.Command.Count).IsEqualTo(0);
     }
 
     [Test]
@@ -226,8 +226,7 @@ public sealed class ChallengeCapabilityTests
         Capabilities =
         [
             new BreakCapabilityDefinition(), new FixCapabilityDefinition { TargetServiceName = "web" },
-            new CheckCapabilityDefinition { Image = "checker", TargetServiceName = "web", Requirements =
-                [new() { Kind = CheckItemKind.Functionality }, new() { Kind = CheckItemKind.Vulnerability }] }
+            new CheckCapabilityDefinition { Image = "checker", TargetServiceName = "web" }
         ]
     };
 }

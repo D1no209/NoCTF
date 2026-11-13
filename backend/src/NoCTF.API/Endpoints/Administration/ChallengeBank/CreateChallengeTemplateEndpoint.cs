@@ -36,8 +36,6 @@ public enum ChallengeRuntimeKindProtocol { Container, Ova }
 public enum FlagDeliveryProtocol { RunnerCommand, BusinessChecker }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CheckItemProtocol>))]
 public enum CheckItemProtocol { Connection, Functionality, Vulnerability, FlagWrite, CurrentFlagRead, HistoricalFlagRead }
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<ControlProtocolKind>))]
-public enum ControlProtocolKind { HttpTeamIdentifier }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<QuestionnaireQuestionProtocol>))]
 public enum QuestionnaireQuestionProtocol { SingleChoice, MultipleChoice, TrueFalse }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<QuestionnaireDifficultyProtocol>))]
@@ -116,10 +114,9 @@ public sealed class CheckCapabilityContract
     public required RunnerJobContract Checker { get; set; }
     public int ReadyTimeoutSeconds { get; set; } = 30;
     public bool AcceptsFixInput { get; set; }
-    public required IReadOnlyList<CheckItemProtocol> Requirements { get; set; }
 }
-public sealed record ControlCapabilityContract(ControlProtocolKind Protocol, string UrlTemplate,
-    string? ServiceName, int? ContainerPort, string? VmId, int? GuestPort, int TimeoutSeconds);
+public sealed record ControlCapabilityContract(string? Image, IReadOnlyList<string> Command,
+    IReadOnlyDictionary<string, string> Environment, string? ServiceName, int TimeoutSeconds);
 public sealed record QuestionnaireCapabilityContract(Guid RevisionId, int RevisionNumber,
     IReadOnlyList<QuestionnaireQuestionContract> Questions);
 public sealed record QuestionnaireQuestionContract(Guid Id, Guid SourceId, QuestionnaireQuestionProtocol Kind,
@@ -221,8 +218,8 @@ public static class ChallengeDefinitionContractMapper
                 && candidate.EnvironmentTargets.All(target => target is { ServiceName: not null, VariableName: not null })
                 && candidate.FlagTemplate is not ({ Header: null } or { BodyTemplate: null }),
             ChallengeCapabilityProtocol.Fix => value.Fix is { TargetServiceName: not null, Entrypoint: not null, Command: not null },
-            ChallengeCapabilityProtocol.Check => value.Check is { Checker: { Image: not null, Command: not null, Environment: not null }, Requirements: not null },
-            ChallengeCapabilityProtocol.Control => value.Control is { UrlTemplate: not null },
+            ChallengeCapabilityProtocol.Check => value.Check is { Checker: { Image: not null, Command: not null, Environment: not null } },
+            ChallengeCapabilityProtocol.Control => value.Control is { Command: not null, Environment: not null },
             ChallengeCapabilityProtocol.Questionnaire => value.Questionnaire is { Questions: not null } questionnaire
                 && questionnaire.Questions.All(question => question is { Title: not null, Body: not null, Options: not null, Classifications: not null, FileIds: not null }
                     && question.Options.All(option => option is { Content: not null })
@@ -292,14 +289,13 @@ public static class ChallengeDefinitionContractMapper
             TimeoutSeconds = value.Check.Checker.TimeoutSeconds, ReadyTimeoutSeconds = value.Check.ReadyTimeoutSeconds,
             AcceptsFixInput = value.Check.AcceptsFixInput,
             Command = value.Check.Checker.Command.Select((argument, position) => new CheckCommandArgument { Position = position, Value = argument }).ToList(),
-            Environment = value.Check.Checker.Environment.Select(variable => new CheckEnvironmentVariable { Name = variable.Key, Value = variable.Value }).ToList(),
-            Requirements = value.Check.Requirements.Select(kind => new CheckRequirement { Kind = (CheckItemKind)kind }).ToList()
+            Environment = value.Check.Checker.Environment.Select(variable => new CheckEnvironmentVariable { Name = variable.Key, Value = variable.Value }).ToList()
         },
         ChallengeCapabilityProtocol.Control => new ControlCapabilityDefinition
         {
-            Protocol = (ControlProtocol)value.Control!.Protocol, UrlTemplate = value.Control.UrlTemplate,
-            ServiceName = value.Control.ServiceName, ContainerPort = value.Control.ContainerPort,
-            VmId = value.Control.VmId, GuestPort = value.Control.GuestPort, TimeoutSeconds = value.Control.TimeoutSeconds
+            Image = value.Control!.Image, ServiceName = value.Control.ServiceName, TimeoutSeconds = value.Control.TimeoutSeconds,
+            Command = value.Control.Command.Select((argument, position) => new ControlCommandArgument { Position = position, Value = argument }).ToList(),
+            Environment = value.Control.Environment.Select(variable => new ControlEnvironmentVariable { Name = variable.Key, Value = variable.Value }).ToList()
         },
         ChallengeCapabilityProtocol.Questionnaire => Questionnaire(value.Questionnaire!),
         _ => throw new ArgumentOutOfRangeException(nameof(value))
@@ -350,15 +346,14 @@ public static class ChallengeDefinitionContractMapper
             {
                 Checker = new(capability.Image, capability.Command.OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
                     capability.Environment.ToDictionary(item => item.Name, item => item.Value), capability.TimeoutSeconds, capability.TargetServiceName),
-                ReadyTimeoutSeconds = capability.ReadyTimeoutSeconds, AcceptsFixInput = capability.AcceptsFixInput,
-                Requirements = capability.Requirements.Select(item => (CheckItemProtocol)item.Kind).ToArray()
+                ReadyTimeoutSeconds = capability.ReadyTimeoutSeconds, AcceptsFixInput = capability.AcceptsFixInput
             }
         },
         ControlCapabilityDefinition capability => new()
         {
             Kind = ChallengeCapabilityProtocol.Control,
-            Control = new((ControlProtocolKind)capability.Protocol, capability.UrlTemplate, capability.ServiceName, capability.ContainerPort,
-                capability.VmId, capability.GuestPort, capability.TimeoutSeconds)
+            Control = new(capability.Image, capability.Command.OrderBy(argument => argument.Position).Select(argument => argument.Value).ToArray(),
+                capability.Environment.ToDictionary(variable => variable.Name, variable => variable.Value), capability.ServiceName, capability.TimeoutSeconds)
         },
         QuestionnaireCapabilityDefinition capability => new()
         {

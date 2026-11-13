@@ -239,8 +239,7 @@ public sealed class FixExecutionWorkReader(
                     check.AcceptsFixInput,
                     message.GameplayFactId)
                 {
-                    Requirements = check.Requirements.Where(item => item.Kind is CheckItemKind.Connection or CheckItemKind.Functionality or CheckItemKind.Vulnerability)
-                        .Select(item => item.Kind).Append(CheckItemKind.Functionality).Distinct().ToArray()
+                    Requirements = [CheckItemKind.Functionality, CheckItemKind.Vulnerability]
                 }));
     }
 }

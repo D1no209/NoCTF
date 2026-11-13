@@ -15,7 +15,6 @@ public sealed class CheckCapabilityDefinition() : ChallengeCapabilityDefinition(
     public bool AcceptsFixInput { get; set; }
     public List<CheckCommandArgument> Command { get; set; } = [];
     public List<CheckEnvironmentVariable> Environment { get; set; } = [];
-    public List<CheckRequirement> Requirements { get; set; } = [];
 }
 
 public sealed class CheckCommandArgument
@@ -30,10 +29,4 @@ public sealed class CheckEnvironmentVariable
     public Guid ChallengeId { get; set; }
     [MaxLength(256)] public string Name { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
-}
-
-public sealed class CheckRequirement
-{
-    public Guid ChallengeId { get; set; }
-    public CheckItemKind Kind { get; set; }
 }
