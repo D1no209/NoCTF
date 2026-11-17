@@ -102,7 +102,7 @@ public sealed class TransferTeamCaptain(ITeamMembershipStore store)
     }
 }
 
-internal static class InvitationTokenGenerator
+public static class InvitationTokenGenerator
 {
     private const string Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 

@@ -25810,6 +25810,39 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/credential-batches/import-template.csv": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Download Competition Credential Template",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/credential-batches/import-template.csv.",
+        "operationId": "AdminDownloadCompetitionCredentialTemplate",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}": {
       "get": {
         "tags": [
@@ -25908,6 +25941,19 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -54155,6 +54201,18 @@
           },
           "password": {
             "type": "string"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "studentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "school": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -54184,6 +54242,12 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse"
             }
+          },
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsCredentialsCompetitionCredentialImportFailure"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -54192,7 +54256,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsCredentialsCompetitionCredentialImportIssueCode"
           },
           "rowNumber": {
             "type": "integer",
@@ -54202,6 +54266,88 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFApplicationCompetitionsCredentialsCompetitionCredentialImportIssueCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "MissingColumn",
+          "MissingValue",
+          "InvalidBoolean",
+          "InvalidTrackKey",
+          "DuplicateUserName",
+          "DuplicateEmail",
+          "DuplicateTeam",
+          "TeamCaptainConflict",
+          "TeamMemberLimitExceeded",
+          "InvalidValue",
+          "ValueTooLong",
+          "DuplicateColumn",
+          "UnsupportedFile",
+          "InvalidFile",
+          "ExistingUserName",
+          "ExistingEmail",
+          "ExistingTeam"
+        ],
+        "enum": [
+          "MissingColumn",
+          "MissingValue",
+          "InvalidBoolean",
+          "InvalidTrackKey",
+          "DuplicateUserName",
+          "DuplicateEmail",
+          "DuplicateTeam",
+          "TeamCaptainConflict",
+          "TeamMemberLimitExceeded",
+          "InvalidValue",
+          "ValueTooLong",
+          "DuplicateColumn",
+          "UnsupportedFile",
+          "InvalidFile",
+          "ExistingUserName",
+          "ExistingEmail",
+          "ExistingTeam"
+        ]
+      },
+      "NoCTFApplicationCompetitionsCredentialsCompetitionCredentialImportFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "CompetitionNotFound",
+          "CompetitionDeleted",
+          "CompetitionFinished",
+          "Forbidden",
+          "EmptyFile",
+          "InvalidRows",
+          "DuplicateUserName",
+          "DuplicateEmail",
+          "DuplicateTeam",
+          "TeamMemberLimitExceeded",
+          "InvalidTrack",
+          "UserNameConflict",
+          "EmailConflict",
+          "TransactionConflict",
+          "CredentialNotFound"
+        ],
+        "enum": [
+          "None",
+          "CompetitionNotFound",
+          "CompetitionDeleted",
+          "CompetitionFinished",
+          "Forbidden",
+          "EmptyFile",
+          "InvalidRows",
+          "DuplicateUserName",
+          "DuplicateEmail",
+          "DuplicateTeam",
+          "TeamMemberLimitExceeded",
+          "InvalidTrack",
+          "UserNameConflict",
+          "EmailConflict",
+          "TransactionConflict",
+          "CredentialNotFound"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest": {
         "type": "object",

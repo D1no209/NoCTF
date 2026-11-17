@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +12,8 @@ using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams.Moderation;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Teams.Membership;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Infrastructure.Competitions.Credentials;
 
@@ -22,20 +23,44 @@ public sealed class CompetitionCredentialStore(
     PlatformSecretProtector secrets,
     ICompetitionModerationAuthorizer authorizer,
     ICompetitionEventRecorder eventRecorder,
-    TimeProvider? clock = null) : ICompetitionCredentialStore
+    IPostCommitMessagePublisher publisher,
+    IDatabaseConstraintClassifier constraints) : ICompetitionCredentialStore
 {
-    private const string PasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+    private const string PasswordInitialAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    private const string PasswordAlphabet = PasswordInitialAlphabet + "!@#$%";
 
     public async Task<CompetitionCredentialImportResult> ImportAsync(
         CompetitionCredentialImportCommand command,
         CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var committed = false;
+            try
+            {
+                return await ImportCoreAsync(command, () => committed = true, ct);
+            }
+            catch (Exception exception) when (!committed && (TransactionFailureClassifier.IsRetryable(exception)
+                || constraints.IsCredentialIdentityConflict(exception)))
+            {
+                publisher.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                if (attempt == 2) return Failure(CompetitionCredentialImportFailure.TransactionConflict);
+            }
+        }
+        throw new InvalidOperationException("Credential import retries did not complete.");
+    }
+
+    private async Task<CompetitionCredentialImportResult> ImportCoreAsync(
+        CompetitionCredentialImportCommand command, Action markCommitted, CancellationToken ct)
     {
         if (!await authorizer.CanJudgeAsync(command.ActorUserId, command.CompetitionId, ct))
             return Failure(CompetitionCredentialImportFailure.Forbidden);
         if (command.Rows.Count == 0)
             return Failure(CompetitionCredentialImportFailure.EmptyFile);
 
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, ct);
         var competition = await db.Competitions
             .Include(value => value.Tracks)
             .SingleOrDefaultAsync(value => value.Id == command.CompetitionId && value.DeletedAt == null, ct);
@@ -44,30 +69,34 @@ public sealed class CompetitionCredentialStore(
         if (competition.Status == CompetitionStatus.Finished)
             return Failure(CompetitionCredentialImportFailure.CompetitionFinished);
 
-        var issues = ValidateRows(command.Rows, competition);
-        if (issues.Count > 0)
-            return new(null, CompetitionCredentialImportFailure.InvalidRows, issues, 0, 0, 0);
-
+        var issues = CompetitionCredentialImportPolicy.ValidateRows(command.Rows, competition);
         var usernames = command.Rows.Select(row => row.UserName.Trim().ToUpperInvariant()).ToArray();
         var emails = command.Rows.Where(row => !string.IsNullOrWhiteSpace(row.Email))
             .Select(row => EmailCanonicalizer.Canonicalize(row.Email!))
             .Where(value => value.Length > 0)
             .Select(value => value.ToUpperInvariant())
             .ToArray();
-        if (await db.Users.AnyAsync(user => usernames.Contains(user.NormalizedUserName), ct))
-            return Failure(CompetitionCredentialImportFailure.UserNameConflict);
-        if (emails.Length > 0 && await db.Users.AnyAsync(user => emails.Contains(user.NormalizedEmail), ct))
-            return Failure(CompetitionCredentialImportFailure.EmailConflict);
-
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            System.Data.IsolationLevel.Serializable, ct);
+        var existingUsers = await db.Users.AsNoTracking()
+            .Where(user => usernames.Contains(user.NormalizedUserName) || emails.Contains(user.NormalizedEmail))
+            .Select(user => new { user.NormalizedUserName, user.NormalizedEmail }).ToArrayAsync(ct);
+        var existingUserNames = existingUsers.Select(user => user.NormalizedUserName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingEmails = existingUsers.Select(user => user.NormalizedEmail).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existingTeamNames = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == command.CompetitionId && team.DeletedAt == null)
             .Select(team => team.NormalizedName)
             .ToArrayAsync(ct);
-        var normalizedTeamNames = command.Rows.Select(row => row.TeamName.Trim().ToUpperInvariant()).Distinct().ToArray();
-        if (existingTeamNames.Intersect(normalizedTeamNames, StringComparer.Ordinal).Any())
-            return Failure(CompetitionCredentialImportFailure.DuplicateTeam);
+        var existingTeams = existingTeamNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in command.Rows)
+        {
+            if (existingUserNames.Contains(row.UserName.Trim()))
+                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.ExistingUserName, row.UserName));
+            if (!string.IsNullOrWhiteSpace(row.Email) && existingEmails.Contains(EmailCanonicalizer.Canonicalize(row.Email)))
+                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.ExistingEmail, row.Email));
+            if (existingTeams.Contains(row.TeamName.Trim()))
+                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.ExistingTeam, row.TeamName));
+        }
+        if (issues.Count > 0)
+            return new(null, CompetitionCredentialImportFailure.InvalidRows, issues, 0, 0, 0);
 
         var batch = new CompetitionCredentialBatch
         {
@@ -91,6 +120,7 @@ public sealed class CompetitionCredentialStore(
             {
                 Id = userId,
                 UserName = row.UserName.Trim(),
+                NormalizedUserName = row.UserName.Trim().ToUpperInvariant(),
                 Email = email,
                 Kind = UserKind.Human,
                 Role = UserRole.User,
@@ -107,7 +137,7 @@ public sealed class CompetitionCredentialStore(
         foreach (var group in command.Rows.GroupBy(row => row.TeamName.Trim(), StringComparer.OrdinalIgnoreCase))
         {
             var first = group.First();
-            var track = ResolveTrack(competition, first.TrackKey);
+            var track = CompetitionCredentialImportPolicy.ResolveTrack(competition, first.TrackKey);
             if (track is null)
                 return Failure(CompetitionCredentialImportFailure.InvalidTrack);
             var captain = group.Single(row => row.Captain);
@@ -118,7 +148,7 @@ public sealed class CompetitionCredentialStore(
                 TrackKey = track.Key,
                 Name = group.Key,
                 CaptainId = usersByRow[captain.RowNumber].User.Id,
-                InvitationToken = CreateInvitationToken(),
+                InvitationToken = InvitationTokenGenerator.Create(),
                 RegistrationStatus = TeamRegistrationStatus.Approved,
                 RegisteredAt = command.Now,
                 Members = group.Select(row => new TeamMember
@@ -147,6 +177,9 @@ public sealed class CompetitionCredentialStore(
                     CompetitionId = competition.Id,
                     UserId = user.User.Id,
                     TeamId = team.Id,
+                    FullName = OptionalText(row.FullName),
+                    StudentNumber = OptionalText(row.StudentNumber),
+                    School = OptionalText(row.School),
                     PasswordCiphertext = secrets.Protect(
                         user.Password,
                         PlatformSecretPurpose.CompetitionCredentialPassword,
@@ -161,6 +194,8 @@ public sealed class CompetitionCredentialStore(
 
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        markCommitted();
+        await publisher.FlushCommittedMessagesAsync();
         return new(batch.Id, CompetitionCredentialImportFailure.None, [], usersByRow.Count,
             batch.Credentials.Select(value => value.TeamId).Distinct().Count(), batch.Credentials.Count);
     }
@@ -173,7 +208,6 @@ public sealed class CompetitionCredentialStore(
             return null;
         var batch = await db.CompetitionCredentialBatches.AsNoTracking()
             .Include(value => value.Credentials)
-            .ThenInclude(value => value.Batch)
             .SingleOrDefaultAsync(value => value.Id == request.BatchId && value.CompetitionId == request.CompetitionId, ct);
         if (batch is null)
             return null;
@@ -200,7 +234,8 @@ public sealed class CompetitionCredentialStore(
                     team.Name,
                     team.CaptainId == user.Id,
                     team.TrackKey,
-                    secrets.Unprotect(value.PasswordCiphertext, PlatformSecretPurpose.CompetitionCredentialPassword, batch.Id, user.Id));
+                    secrets.Unprotect(value.PasswordCiphertext, PlatformSecretPurpose.CompetitionCredentialPassword, batch.Id, user.Id),
+                    value.FullName, value.StudentNumber, value.School);
             }).ToArray());
     }
 
@@ -283,74 +318,17 @@ public sealed class CompetitionCredentialStore(
         return new(CompetitionCredentialImportFailure.None, password);
     }
 
-    private static CompetitionTrackDefinition? ResolveTrack(Competition competition, string? requestedKey)
-    {
-        var tracks = CompetitionTrackConfiguration.FromPersisted(competition.Mode, competition.Tracks);
-        if (!competition.TracksEnabled)
-            return tracks.DefaultTrack;
-        var key = CompetitionTrackConfiguration.NormalizeKey(requestedKey);
-        if (key is null)
-            return null;
-        var track = tracks.Find(key);
-        return track is { IsInternal: false } ? track : null;
-    }
-
-    private static List<CompetitionCredentialImportIssue> ValidateRows(
-        IReadOnlyList<CompetitionCredentialImportRow> rows,
-        Competition competition)
-    {
-        var issues = new List<CompetitionCredentialImportIssue>();
-        var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var emails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var teams = new Dictionary<string, (int Count, int Captains, string? TrackKey)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in rows)
-        {
-            var username = row.UserName.Trim();
-            if (username.Length is < 3 or > 64 || !username.All(value => char.IsAsciiLetterOrDigit(value) || value is '_' or '-'))
-                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.MissingValue, "username"));
-            if (!users.Add(username))
-                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.DuplicateUserName, username));
-            if (!string.IsNullOrWhiteSpace(row.Email))
-            {
-                var email = EmailCanonicalizer.Canonicalize(row.Email);
-                if (!new EmailAddressAttribute().IsValid(email))
-                    issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.MissingValue, "email"));
-                else if (!emails.Add(email))
-                    issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.DuplicateEmail, email));
-            }
-            var name = row.TeamName.Trim();
-            if (ResolveTrack(competition, row.TrackKey) is null)
-                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.InvalidTrackKey, row.TrackKey ?? string.Empty));
-            teams.TryGetValue(name, out var summary);
-            if (summary.Count > 0 && !string.Equals(summary.TrackKey, row.TrackKey, StringComparison.OrdinalIgnoreCase))
-                issues.Add(new(row.RowNumber, CompetitionCredentialImportIssueCode.InvalidTrackKey, name));
-            teams[name] = (summary.Count + 1, summary.Captains + (row.Captain ? 1 : 0), row.TrackKey);
-        }
-        foreach (var team in teams)
-        {
-            if (team.Value.Captains != 1)
-                issues.Add(new(0, CompetitionCredentialImportIssueCode.TeamCaptainConflict, team.Key));
-            if (team.Value.Count > competition.MaxTeamMembers)
-                issues.Add(new(0, CompetitionCredentialImportIssueCode.TeamMemberLimitExceeded, team.Key));
-        }
-        return issues;
-    }
-
     private static CompetitionCredentialImportResult Failure(CompetitionCredentialImportFailure failure) =>
         new(null, failure, [], 0, 0, 0);
 
     private static string GeneratePassword()
     {
         Span<char> password = stackalloc char[16];
-        for (var index = 0; index < password.Length; index++)
+        password[0] = PasswordInitialAlphabet[RandomNumberGenerator.GetInt32(PasswordInitialAlphabet.Length)];
+        for (var index = 1; index < password.Length; index++)
             password[index] = PasswordAlphabet[RandomNumberGenerator.GetInt32(PasswordAlphabet.Length)];
         return new string(password);
     }
 
-    private static string CreateInvitationToken()
-    {
-        Span<byte> bytes = stackalloc byte[20];
-        RandomNumberGenerator.Fill(bytes);
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string? OptionalText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

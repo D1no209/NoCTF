@@ -6334,6 +6334,9 @@ export type NoCtfApplicationCompetitionsCredentialsCompetitionCredentialDownload
     captain?: boolean;
     trackKey?: string;
     password?: string;
+    fullName?: string | null;
+    studentNumber?: string | null;
+    school?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse = {
@@ -6342,13 +6345,19 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetit
     createdTeams?: number;
     createdCredentials?: number;
     issues?: Array<NoCtfapiEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse>;
+    code?: NoCtfApplicationCompetitionsCredentialsCompetitionCredentialImportFailure;
+    message?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsCompetitionCredentialImportIssueResponse = {
-    code?: string;
+    code?: NoCtfApplicationCompetitionsCredentialsCompetitionCredentialImportIssueCode;
     rowNumber?: number;
     message?: string;
 };
+
+export type NoCtfApplicationCompetitionsCredentialsCompetitionCredentialImportIssueCode = 'MissingColumn' | 'MissingValue' | 'InvalidBoolean' | 'InvalidTrackKey' | 'DuplicateUserName' | 'DuplicateEmail' | 'DuplicateTeam' | 'TeamCaptainConflict' | 'TeamMemberLimitExceeded' | 'InvalidValue' | 'ValueTooLong' | 'DuplicateColumn' | 'UnsupportedFile' | 'InvalidFile' | 'ExistingUserName' | 'ExistingEmail' | 'ExistingTeam';
+
+export type NoCtfApplicationCompetitionsCredentialsCompetitionCredentialImportFailure = 'None' | 'CompetitionNotFound' | 'CompetitionDeleted' | 'CompetitionFinished' | 'Forbidden' | 'EmptyFile' | 'InvalidRows' | 'DuplicateUserName' | 'DuplicateEmail' | 'DuplicateTeam' | 'TeamMemberLimitExceeded' | 'InvalidTrack' | 'UserNameConflict' | 'EmailConflict' | 'TransactionConflict' | 'CredentialNotFound';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsRequest = {
     file?: Blob | File | null;
@@ -20334,6 +20343,26 @@ export type AdminDownloadCompetitionCredentialBatchPdfErrors = {
     404: unknown;
 };
 
+export type AdminDownloadCompetitionCredentialTemplateData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/credential-batches/import-template.csv';
+};
+
+export type AdminDownloadCompetitionCredentialTemplateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
 export type AdminGetCompetitionCredentialBatchData = {
     body?: never;
     path: {
@@ -20390,6 +20419,11 @@ export type AdminImportCompetitionCredentialsErrors = {
      * Forbidden
      */
     403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCredentialsImportCompetitionCredentialsResponse;
 };
 
 export type AdminImportCompetitionCredentialsError = AdminImportCompetitionCredentialsErrors[keyof AdminImportCompetitionCredentialsErrors];

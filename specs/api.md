@@ -371,6 +371,7 @@ GET  /api/v1/admin/competitions/{competitionId}/teams
 GET  /api/v1/admin/competitions/{competitionId}/teams/{teamId}
 GET  /api/v1/admin/competitions/{competitionId}/credential-batches
 POST /api/v1/admin/competitions/{competitionId}/credential-batches/import
+GET  /api/v1/admin/competitions/{competitionId}/credential-batches/import-template.csv
 GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}
 GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/download
 GET  /api/v1/admin/competitions/{competitionId}/credential-batches/{batchId}/print.pdf

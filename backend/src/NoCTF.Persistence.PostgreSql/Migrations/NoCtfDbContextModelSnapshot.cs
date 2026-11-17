@@ -2763,6 +2763,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("FullName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("full_name");
+
                     b.Property<byte[]>("PasswordCiphertext")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -2775,6 +2780,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int>("PasswordVersion")
                         .HasColumnType("integer")
                         .HasColumnName("password_version");
+
+                    b.Property<string>("School")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("school");
+
+                    b.Property<string>("StudentNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("student_number");
 
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid")

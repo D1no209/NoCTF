@@ -35,4 +35,7 @@
     <PackageReference Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" />
     <PackageReference Include="ZiggyCreatures.FusionCache.Serialization.SystemTextJson" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Competitions/Credentials/Fonts/SarasaUiSC-Regular.ttf" LogicalName="NoCTF.Credentials.SarasaUiSC-Regular.ttf" />
+  </ItemGroup>
 </Project>

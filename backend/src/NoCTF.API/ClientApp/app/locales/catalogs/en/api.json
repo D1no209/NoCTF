@@ -794,5 +794,10 @@
   "api.validation.range": "{field} must be between {minimum} and {maximum}.",
   "api.validation.required": "{field} is required.",
   "api.verifyEmail.title.emailVerificationFailed": "Email verification failed.",
-  "api.liveSolo.submissionActionUnsupported": "This question does not accept this submission action."
+  "api.liveSolo.submissionActionUnsupported": "This question does not accept this submission action.",
+  "api.credentials.importRejected": "The entire import was rejected. Correct the listed rows and import again.",
+  "api.credentials.importConflict": "Concurrent changes prevented the import. No accounts were created. Retry to check for conflicts.",
+  "api.credentials.importEmpty": "The file contains no participants.",
+  "api.credentials.importFinished": "This competition has finished and cannot accept imported teams.",
+  "api.credentials.fileRequired": "Select a non-empty CSV, XLS or XLSX file up to 10 MB."
 }

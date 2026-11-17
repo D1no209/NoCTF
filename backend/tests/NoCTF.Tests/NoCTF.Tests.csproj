@@ -22,6 +22,7 @@
     <ProjectReference Include="../../tools/NoCTF.CurrentImport/NoCTF.CurrentImport.csproj" />
     <None Update="Fixtures/Docker/config.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/Capabilities/*.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/Credentials/*.xlsx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />

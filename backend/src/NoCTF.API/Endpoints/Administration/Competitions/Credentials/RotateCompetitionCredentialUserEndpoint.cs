@@ -22,6 +22,8 @@ public sealed class RotateCompetitionCredentialUserEndpoint(
 
     public override async Task<Results<Ok<RotateCompetitionCredentialUserResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(CancellationToken ct)
     {
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        HttpContext.Response.Headers.Pragma = "no-cache";
         var result = await rotate.ExecuteAsync(new(
             Route<Guid>("competitionId"), Route<Guid>("userId"), user.UserId, clock.GetUtcNow()), ct);
         return result.Failure switch

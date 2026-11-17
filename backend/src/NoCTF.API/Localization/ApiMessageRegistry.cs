@@ -5,6 +5,11 @@ namespace NoCTF.API.Localization;
 
 public enum ApiMessageId
 {
+    CredentialImportRejected,
+    CredentialImportConflict,
+    CredentialImportEmpty,
+    CredentialImportFinished,
+    CredentialImportFileRequired,
     FixExecutionFailed,
     FixExecutionTimedOut,
     FixExecutionUncertain,
@@ -810,6 +815,11 @@ public static partial class ApiMessages
 {
     public static string Key(ApiMessageId id) => id switch
     {
+        ApiMessageId.CredentialImportRejected => "api.credentials.importRejected",
+        ApiMessageId.CredentialImportConflict => "api.credentials.importConflict",
+        ApiMessageId.CredentialImportEmpty => "api.credentials.importEmpty",
+        ApiMessageId.CredentialImportFinished => "api.credentials.importFinished",
+        ApiMessageId.CredentialImportFileRequired => "api.credentials.fileRequired",
         ApiMessageId.FixExecutionFailed => "api.gameplayFacts.fix.executionFailed",
         ApiMessageId.FixExecutionTimedOut => "api.gameplayFacts.fix.executionTimedOut",
         ApiMessageId.FixExecutionUncertain => "api.gameplayFacts.fix.executionUncertain",

@@ -8,7 +8,10 @@ public sealed record CompetitionCredentialImportRow(
     string? Email,
     string TeamName,
     bool Captain,
-    string? TrackKey);
+    string? TrackKey,
+    string? FullName = null,
+    string? StudentNumber = null,
+    string? School = null);
 
 public sealed record CompetitionCredentialImportCommand(
     Guid CompetitionId,
@@ -48,7 +51,15 @@ public enum CompetitionCredentialImportIssueCode
     DuplicateEmail,
     DuplicateTeam,
     TeamCaptainConflict,
-    TeamMemberLimitExceeded
+    TeamMemberLimitExceeded,
+    InvalidValue,
+    ValueTooLong,
+    DuplicateColumn,
+    UnsupportedFile,
+    InvalidFile,
+    ExistingUserName,
+    ExistingEmail,
+    ExistingTeam
 }
 
 public sealed record CompetitionCredentialImportIssue(
@@ -71,7 +82,10 @@ public sealed record CompetitionCredentialDownloadRow(
     string TeamName,
     bool Captain,
     string TrackKey,
-    string Password);
+    string Password,
+    string? FullName = null,
+    string? StudentNumber = null,
+    string? School = null);
 
 public sealed record CompetitionCredentialBatchView(
     Guid BatchId,
