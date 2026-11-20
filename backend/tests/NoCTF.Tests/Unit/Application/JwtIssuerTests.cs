@@ -170,4 +170,39 @@ public class JwtIssuerTests
 
         await Assert.That(issuer.ValidateRefresh(access.Token)).IsNull();
     }
+
+    [Test]
+    [Arguments(-1, false)]
+    [Arguments(0, true)]
+    [Arguments(2591999, true)]
+    [Arguments(2592000, false)]
+    [Arguments(2592001, false)]
+    public async Task ValidateRefresh_UsesTheInjectedClockForLifetimeBoundaries(int elapsedSeconds, bool valid)
+    {
+        var options = Options.Create(new AuthenticationTokenOptions { SigningKey = new string('x', 32) });
+        var issuedAt = DateTimeOffset.Parse("2030-01-01T00:00:00Z");
+        var user = new AuthenticatedUser(Guid.NewGuid(), "alice", UserRole.User, UserKind.Human, 1);
+        var issuer = new JwtIssuer(options, new FakeTimeProvider(issuedAt));
+        var refresh = issuer.IssueRefresh(user, MfaTestSupport.Primary(issuedAt));
+        var validator = new JwtIssuer(options, new FakeTimeProvider(issuedAt.AddSeconds(elapsedSeconds)));
+
+        await Assert.That(validator.ValidateRefresh(refresh.Token) is not null).IsEqualTo(valid);
+    }
+
+    [Test]
+    public async Task ValidateRefresh_RejectsSignedTokenWithoutExpiration()
+    {
+        var options = Options.Create(new AuthenticationTokenOptions { SigningKey = new string('x', 32) });
+        var now = DateTimeOffset.Parse("2030-01-01T00:00:00Z");
+        var issuer = new JwtIssuer(options, new FakeTimeProvider(now));
+        var user = new AuthenticatedUser(Guid.NewGuid(), "alice", UserRole.User, UserKind.Human, 1);
+        var refresh = new JwtSecurityTokenHandler().ReadJwtToken(issuer.IssueRefresh(user, MfaTestSupport.Primary(now)).Token);
+        var token = new JwtSecurityToken(options.Value.Issuer, options.Value.RefreshAudience,
+            refresh.Claims.Where(claim => claim.Type != JwtRegisteredClaimNames.Exp),
+            notBefore: now.UtcDateTime, expires: null,
+            signingCredentials: new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Value.SigningKey!)), SecurityAlgorithms.HmacSha256));
+
+        await Assert.That(issuer.ValidateRefresh(new JwtSecurityTokenHandler().WriteToken(token))).IsNull();
+    }
 }

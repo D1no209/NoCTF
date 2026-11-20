@@ -88,6 +88,12 @@ public sealed class JwtIssuer(
                     ValidAudience = options.RefreshAudience,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
+                    LifetimeValidator = (notBefore, expires, _, _) =>
+                    {
+                        var now = timeProvider.GetUtcNow().UtcDateTime;
+                        return expires is { } expiration && expiration > now
+                            && (notBefore is null || notBefore <= now);
+                    },
                     ClockSkew = TimeSpan.Zero
                 }, out _);
             if (!string.Equals(principal.FindFirstValue("token_type"), "refresh", StringComparison.Ordinal))
