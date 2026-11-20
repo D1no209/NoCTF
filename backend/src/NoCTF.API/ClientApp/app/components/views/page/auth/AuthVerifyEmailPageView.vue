@@ -14,7 +14,6 @@ const { isLoggedIn, configuration, state, message, resendPending, resendDone, em
         <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
         <span class="animate-blink text-primary">_</span>
       </NuxtLink>
-      <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card>
       <CardHeader>

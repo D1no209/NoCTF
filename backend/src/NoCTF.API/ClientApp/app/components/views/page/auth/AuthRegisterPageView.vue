@@ -14,18 +14,15 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
         <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
         <span class="animate-blink text-primary">_</span>
       </NuxtLink>
-      <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card v-if="registered" class="auth-card">
       <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10">
-        <CardTitle>{{ $t('common.label.registrationSuccessful') }}</CardTitle>
-        <CardDescription>
-          {{ registered.requiresEmailVerification
-            ? registered.verificationEmailQueued
-              ? $t('common.authRegister.description.verificationEmailQueuedCheck')
-              : $t('common.authRegister.description.verificationEmailQueuedYet')
-            : $t('common.authRegister.label.nowLog') }}
+        <CardTitle><h1>{{ $t('common.label.registrationSuccessful') }}</h1></CardTitle>
+        <CardDescription v-if="registered.requiresEmailVerification">
+          {{ registered.verificationEmailQueued
+            ? $t('common.authRegister.description.verificationEmailQueuedCheck')
+            : $t('common.authRegister.description.verificationEmailQueuedYet') }}
         </CardDescription>
       </CardHeader>
       <CardContent v-if="registered.requiresEmailVerification" class="relative z-10 space-y-3">
@@ -49,7 +46,7 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
     <Card v-else class="auth-card">
       <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
-        <CardTitle class="text-xl font-semibold">{{ $t('common.label.createAccount') }}</CardTitle>
+        <CardTitle class="text-xl font-semibold"><h1>{{ $t('common.label.createAccount') }}</h1></CardTitle>
       </CardHeader>
       <CardContent class="relative z-10">
         <UiForm @submit.prevent="submit">
@@ -83,8 +80,7 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
         </UiForm>
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
-        {{ $t('common.label.alreadyAccount') }}
-        <NuxtLink :to="loginTarget" class="ml-1 underline">{{ $t('common.label.logDirectly') }}</NuxtLink>
+        <NuxtLink :to="loginTarget" class="underline">{{ $t('common.label.logDirectly') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

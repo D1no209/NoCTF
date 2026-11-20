@@ -22,16 +22,10 @@ const { ArrowRight, configuration, isLoggedIn, competitionsError, loadCompetitio
 
       <div class="home-hero-content relative z-10 mx-auto grid w-full items-center gap-12 px-6 py-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
         <div class="flex max-w-2xl flex-col items-start gap-6">
-          <p class="font-mono text-sm text-primary md:text-base">
-            {{ $t('common.label.welcome') }} {{ configuration?.name ?? $t('common.label.noctf') }}<span class="animate-blink">_</span>
-          </p>
           <h1 class="text-display text-4xl md:text-6xl">
             {{ configuration?.name ?? $t('common.label.noctf') }}
           </h1>
-          <p v-if="configuration?.description" class="max-w-xl text-lg text-muted-foreground">
-            {{ configuration.description }}
-          </p>
-          <div class="mt-2 flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3">
             <Button size="lg" as-child>
               <NuxtLink to="/competitions"> {{ $t('common.label.browseCompetitions') }} <ArrowRight data-icon="inline-end" />
               </NuxtLink>

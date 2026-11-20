@@ -14,13 +14,11 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
         <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
         <span class="animate-blink text-primary">_</span>
       </NuxtLink>
-      <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <!-- Complete with token -->
     <Card v-if="token">
       <CardHeader>
-        <CardTitle>{{ $t('common.label.setNewPassword') }}</CardTitle>
-        <CardDescription>{{ $t('common.authPassword.description.enterNewPasswordComplete') }}</CardDescription>
+        <CardTitle><h1>{{ $t('common.label.setNewPassword') }}</h1></CardTitle>
       </CardHeader>
       <CardContent>
         <Alert v-if="completed" class="mb-4">
@@ -56,8 +54,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
     <!-- Request reset email -->
     <Card v-else>
       <CardHeader>
-        <CardTitle>{{ $t('common.label.resetPassword') }}</CardTitle>
-        <CardDescription>{{ $t('common.authPassword.description.enterRegisteredEmailWe') }}</CardDescription>
+        <CardTitle><h1>{{ $t('common.label.resetPassword') }}</h1></CardTitle>
       </CardHeader>
       <CardContent>
         <Alert v-if="requested" class="mb-4">
@@ -69,7 +66,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
               <AlertDescription>{{ $message(error) }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="email">{{ $t('common.label.email') }}</FieldLabel>
+              <FieldLabel for="email">{{ $t('common.authPassword.label.registeredEmail') }}</FieldLabel>
               <Input id="email" v-model="email" type="email" autocomplete="email" required />
             </Field>
             <Field>

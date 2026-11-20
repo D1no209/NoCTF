@@ -14,12 +14,11 @@ const { authArtwork, passkeys, configuration, loginName, password, error, pendin
         <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
         <span class="animate-blink text-primary">_</span>
       </NuxtLink>
-      <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card class="auth-card">
       <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
-        <CardTitle class="text-xl font-semibold">{{ $t('auth.login.action') }}</CardTitle>
+        <CardTitle class="text-xl font-semibold"><h1>{{ $t('auth.login.action') }}</h1></CardTitle>
       </CardHeader>
       <CardContent class="relative z-10">
         <UiForm @submit.prevent="submit">
@@ -62,11 +61,7 @@ const { authArtwork, passkeys, configuration, loginName, password, error, pendin
           <Alert v-if="passkeys.error" variant="destructive"><AlertDescription>{{ $message(passkeys.error) }}</AlertDescription></Alert>
         </template>
         <template v-if="ssoLoading || ssoProviders.length">
-          <div class="my-5 flex items-center gap-3" aria-hidden="true">
-            <Separator class="flex-1" />
-            <span class="text-xs text-muted-foreground">{{ $t('sso.orUseSingleSignOn') }}</span>
-            <Separator class="flex-1" />
-          </div>
+          <Separator class="my-5" decorative />
           <div class="flex flex-col gap-2">
             <Skeleton v-if="ssoLoading" class="h-10 w-full" />
             <template v-else>
@@ -96,8 +91,7 @@ const { authArtwork, passkeys, configuration, loginName, password, error, pendin
         </template>
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
-        {{ $t('common.authLogin.description.donTAccountYet') }}
-        <NuxtLink to="/auth/register" class="ml-1 underline">{{ $t('common.label.registerNow') }}</NuxtLink>
+        <NuxtLink to="/auth/register" class="underline">{{ $t('common.label.registerNow') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

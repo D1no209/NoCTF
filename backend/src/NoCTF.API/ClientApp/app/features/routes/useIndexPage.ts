@@ -8,6 +8,7 @@ import { executeHomeTerminalInput, homeTerminalCommands, homeTerminalIdentity, t
 /** Owns state, effects and commands for IndexPage. */
 export function useIndexPage() {
   const { configuration } = usePlatform()
+  useSeoMeta({ description: () => configuration.value?.description ?? undefined })
 
   const { isLoggedIn, user } = useAuth()
 
