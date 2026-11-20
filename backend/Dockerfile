@@ -26,9 +26,9 @@ RUN export ASPNETCORE_ENVIRONMENT=Production \
     Runner__Provider=Docker \
     && dotnet run --no-build -c Release --project src/NoCTF.Host/NoCTF.Host.csproj -- codegen delete \
     && dotnet run --no-build -c Release --project src/NoCTF.Host/NoCTF.Host.csproj -- codegen write \
-    > /tmp/noctf-codegen.log 2>&1 \
-    && cat /tmp/noctf-codegen.log \
-    && ! grep -q '^ERROR:' /tmp/noctf-codegen.log
+    > /src/backend/artifacts/noctf-codegen.log 2>&1 \
+    && cat /src/backend/artifacts/noctf-codegen.log \
+    && ! grep -q '^ERROR:' /src/backend/artifacts/noctf-codegen.log
 RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.10@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime
