@@ -246,7 +246,6 @@ public sealed class PatchUploadStore(
             return new(PatchUploadSaveState.DefenseTargetNotReady);
         var verificationDeadline = NoCTF.Application.Challenges.Capabilities.FixExecutionBudget.CalculateDeadline(uploadedAt, null,
             configuration.PatchTimeoutSeconds, configuration.Checker.TimeoutSeconds);
-        verificationDeadline = verificationDeadline.AddTicks(-(verificationDeadline.Ticks % TimeSpan.TicksPerMicrosecond));
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,

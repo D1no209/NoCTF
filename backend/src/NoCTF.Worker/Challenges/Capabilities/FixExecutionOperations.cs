@@ -195,7 +195,6 @@ internal static partial class BackendMessageOperations
             configuration.PatchTimeoutSeconds,
             configuration.Checker.TimeoutSeconds);
         if (fact.FixExecution is { } accepted && accepted.Deadline < deadline) deadline = accepted.Deadline;
-        deadline = deadline.AddTicks(-(deadline.Ticks % TimeSpan.TicksPerMicrosecond));
         if (deadline <= now)
         {
             await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
