@@ -12,7 +12,6 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
       <section v-if="!isDeleted" id="competition-poster-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('common.label.competitionPoster') }}</CardTitle>
-        <CardDescription>{{ $t('administration.label.competitionPosterManagementDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="grid min-w-0 gap-5 lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)] lg:items-start">
         <CoverImage

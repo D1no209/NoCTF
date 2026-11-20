@@ -25,7 +25,6 @@
   "runtime.platformRuntimes.label.searchCompetitionChallengeTeam": "搜索赛事、题目或队伍",
   "runtime.label.sources": "来源(全部)",
   "runtime.label.competitionContainers": "赛事容器",
-  "runtime.platformRuntimes.description.activeContainersSearchCompetition": "仅显示活动容器，可按赛事、题目或来源队伍搜索。",
   "runtime.label.resourcesLifecycle": "资源与生命周期",
   "runtime.label.alternateRoundAwd": "按轮次轮换(AWD)",
   "runtime.label.timeoutSeconds": "操作超时(秒)",

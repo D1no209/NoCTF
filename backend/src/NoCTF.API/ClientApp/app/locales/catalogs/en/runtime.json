@@ -25,7 +25,6 @@
   "runtime.platformRuntimes.label.searchCompetitionChallengeTeam": "Search competition, challenge or team",
   "runtime.label.sources": "All sources",
   "runtime.label.competitionContainers": "Competition containers",
-  "runtime.platformRuntimes.description.activeContainersSearchCompetition": "Active containers only. Search by competition, challenge or attributed team.",
   "runtime.label.resourcesLifecycle": "Resources & lifecycle",
   "runtime.label.alternateRoundAwd": "Alternate by round (AWD)",
   "runtime.label.timeoutSeconds": "Operation timeout (seconds)",

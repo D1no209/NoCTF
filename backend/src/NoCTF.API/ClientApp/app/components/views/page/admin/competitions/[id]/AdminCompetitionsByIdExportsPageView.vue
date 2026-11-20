@@ -32,7 +32,6 @@ const { canWrite, eventsFrom, eventsTo, exportingEvents, exportEvents, includePr
       <section id="competition-archive-export" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('administration.label.competitionArchive') }}</CardTitle>
-        <CardDescription>{{ $t('administration.competitionsBy.description.generateCompetitionSData') }}</CardDescription>
       </CardHeader>
       <CardContent class="flex flex-col gap-4">
         <div v-if="canWrite" class="flex flex-wrap items-end gap-3">

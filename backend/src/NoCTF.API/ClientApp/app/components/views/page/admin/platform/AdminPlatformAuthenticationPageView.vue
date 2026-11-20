@@ -17,8 +17,7 @@ const { Plus, RotateCw, FlaskConical, MfaPlatformSettings, configuration, loadin
     <template v-else-if="configuration">
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('sso.authenticationSettings') }}</CardTitle>
-          <CardDescription>{{ $t('sso.authenticationSettingsDescription') }}</CardDescription>
+          <CardTitle><h2>{{ $t('sso.authenticationSettings') }}</h2></CardTitle>
         </CardHeader>
         <CardContent>
           <UiForm class="flex flex-col gap-5" @submit.prevent="saveGlobal">
@@ -39,11 +38,8 @@ const { Plus, RotateCw, FlaskConical, MfaPlatformSettings, configuration, loadin
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>{{ $t('sso.identityProviders') }}</CardTitle>
-            <CardDescription>{{ $t('sso.identityProvidersDescription') }}</CardDescription>
-          </div>
+        <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-4">
+          <CardTitle><h2>{{ $t('sso.identityProviders') }}</h2></CardTitle>
           <Button @click="openCreateProvider"><Plus data-icon="inline-start" />{{ $t('sso.addProvider') }}</Button>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
@@ -88,7 +84,7 @@ const { Plus, RotateCw, FlaskConical, MfaPlatformSettings, configuration, loadin
       <DialogContent class="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{{ providerForm.id ? $t('sso.editProvider') : $t('sso.addProvider') }}</DialogTitle>
-          <DialogDescription>{{ $t('sso.providerFormDescription') }}</DialogDescription>
+          <DialogDescription>{{ $t(providerForm.id ? 'sso.identityProvidersDescription' : 'sso.providerFormDescription') }}</DialogDescription>
         </DialogHeader>
         <ScrollSurface axis="y" class="max-h-[68vh] pr-3">
         <UiForm class="flex flex-col gap-5" @submit.prevent="saveProvider">

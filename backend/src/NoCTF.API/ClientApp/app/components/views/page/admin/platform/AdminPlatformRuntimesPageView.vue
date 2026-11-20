@@ -19,7 +19,6 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
     <Card>
       <CardHeader class="sr-only">
         <CardTitle>{{ $t('common.label.applyFilters') }}</CardTitle>
-        <CardDescription>{{ $t('runtime.platformRuntimes.description.activeContainersSearchCompetition') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <UiForm @submit.prevent="applyFilters">
