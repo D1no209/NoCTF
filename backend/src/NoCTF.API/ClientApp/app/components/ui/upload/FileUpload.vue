@@ -4,7 +4,7 @@ import { Upload, X } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ accept?: string; multiple?: boolean; disabled?: boolean; id?: string; required?: boolean; pending?: boolean; progress?: number | null; error?: UiMessage | null }>()
+const props = defineProps<{ accept?: string; multiple?: boolean; disabled?: boolean; id?: string; label?: string; descriptionId?: string; required?: boolean; pending?: boolean; progress?: number | null; error?: UiMessage | null }>()
 const emit = defineEmits<{ change: [event: Event] }>()
 const input = ref<HTMLInputElement | null>(null)
 const files = ref<File[]>([])
@@ -38,7 +38,7 @@ defineExpose({ click: choose })
 <template>
   <div data-slot="file-upload" v-bind="$attrs" :data-dragging="dragging || undefined" :data-disabled="disabled || undefined" @dragover.prevent="dragging = !disabled" @dragleave="dragging = false" @drop.prevent="drop">
     <input ref="input" type="file" class="hidden" tabindex="-1" aria-hidden="true" :accept="accept" :multiple="multiple" :disabled="blocked" :required="required" :aria-label="$t('upload.choose')" @change="changed">
-    <Button :id="id" type="button" variant="outline" :disabled="blocked" @click="choose"><Upload data-icon="inline-start" />{{ $t('upload.choose') }}</Button>
+    <Button :id="id" type="button" variant="outline" :disabled="blocked" :aria-describedby="descriptionId" @click="choose"><Upload data-icon="inline-start" />{{ label ?? $t('upload.choose') }}</Button>
     <p class="text-sm text-muted-foreground">{{ $t('upload.drop') }}</p>
     <ul v-if="files.length" class="flex flex-col gap-2">
       <li v-for="(file, index) in files" :key="`${file.name}-${index}`" class="flex items-center gap-2 border-t pt-2">

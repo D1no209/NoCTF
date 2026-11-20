@@ -26,7 +26,7 @@
   "challengeNavigator.searchPlaceholder": "搜索题目（正则）",
   "challengeNavigator.invalidRegex": "正则表达式无效，请检查搜索语法。",
   "terminal.challengeSolved": "Challenge is Solved ！",
-  "terminal.flagPlaceholder": "Type Your Flag ~~",
+  "terminal.flagPlaceholder": "输入 Flag",
   "challenges.flagSubmit.description.judgingEndpointReturnedValid": "判题接口未返回有效结果，请重试。",
   "challenges.label.latestJudgement": "最近一次判定",
   "challenges.label.judgementReceived": "请求未得到判定",

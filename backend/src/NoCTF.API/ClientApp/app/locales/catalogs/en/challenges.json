@@ -26,7 +26,7 @@
   "challengeNavigator.searchPlaceholder": "Search names (regex)",
   "challengeNavigator.invalidRegex": "Invalid regular expression. Check the search syntax.",
   "terminal.challengeSolved": "Challenge is Solved ！",
-  "terminal.flagPlaceholder": "Type Your Flag ~~",
+  "terminal.flagPlaceholder": "Flag",
   "challenges.flagSubmit.description.judgingEndpointReturnedValid": "The judging endpoint returned no valid result. Please retry.",
   "challenges.label.latestJudgement": "Latest judgement",
   "challenges.label.judgementReceived": "No judgement received",

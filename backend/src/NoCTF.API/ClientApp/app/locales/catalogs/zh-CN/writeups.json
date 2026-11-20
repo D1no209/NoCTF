@@ -1,7 +1,6 @@
 {
   "writeups.label.download": "下载",
   "writeUp.previewEmpty": "选择一份题解以在线查看",
-  "writeUp.participantDescription": "提交队伍当前的 PDF 题解，队伍成员均可更新，文件上限 {size}。",
   "writeUp.submitted": "已提交",
   "writeUp.notSubmitted": "未提交",
   "writeUp.replacePdf": "更换 PDF",

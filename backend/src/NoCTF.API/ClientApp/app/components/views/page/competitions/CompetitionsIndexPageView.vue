@@ -26,7 +26,7 @@ const { Plus, isAdministrator, loading, error, load, counts, group, selected, se
             <component :is="CompetitionOverview" :key="selected.id" :competition="selected" @audience-changed="load" />
           </MotionSwap>
         </Card>
-        <Empty v-else class="min-h-72 border"><EmptyHeader><EmptyTitle>{{ missing ? $t('competitionBrowser.notFound') : $t('competitionBrowser.choose') }}</EmptyTitle><EmptyDescription>{{ $t('competitionBrowser.selectionHint') }}</EmptyDescription></EmptyHeader></Empty>
+        <Empty v-else class="min-h-72 border"><EmptyHeader><EmptyTitle>{{ missing ? $t('competitionBrowser.notFound') : $t('competitionBrowser.choose') }}</EmptyTitle><EmptyDescription v-if="missing">{{ $t('competitionBrowser.selectionHint') }}</EmptyDescription></EmptyHeader></Empty>
       </section>
     </div>
     <component v-if="isAdministrator" :is="CreateCompetitionDialog" :open="createOpen" @update:open="setCreateOpen" @created="handleCompetitionCreated" />

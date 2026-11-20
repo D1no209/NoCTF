@@ -1,7 +1,6 @@
 {
   "writeups.label.download": "Download",
   "writeUp.previewEmpty": "Select a WriteUp to preview it",
-  "writeUp.participantDescription": "Submit the team's current PDF WriteUp. Any team member may update it, up to {size}.",
   "writeUp.submitted": "Submitted",
   "writeUp.notSubmitted": "Not submitted",
   "writeUp.replacePdf": "Replace PDF",

@@ -20,13 +20,12 @@ const { activeTab, singleEnabled, MySingleWriteUps, BookOpen, Download, Eye, Fil
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
             <FileText class="size-6 text-primary" />
-            <CardTitle>{{ $t('writeUp.myWriteUp') }}</CardTitle>
+            <CardTitle><h2>{{ $t('writeUp.myWriteUp') }}</h2></CardTitle>
           </div>
           <Badge v-if="writeUp" variant="default">{{ $t('writeUp.submitted') }}</Badge>
           <Badge v-else-if="submissionClosed" variant="destructive">{{ $t('writeUp.submissionClosed') }}</Badge>
           <Badge v-else variant="secondary">{{ $t('writeUp.notSubmitted') }}</Badge>
         </div>
-        <CardDescription>{{ $t('writeUp.participantDescription', { size: formatBytes(maximumWriteUpBytes) }) }}</CardDescription>
       </CardHeader>
       <CardContent class="flex min-h-0 flex-col gap-5">
         <Alert v-if="loadError" variant="destructive">
@@ -52,16 +51,17 @@ const { activeTab, singleEnabled, MySingleWriteUps, BookOpen, Download, Eye, Fil
           </Alert>
           <UiForm v-if="!submissionClosed" validation="feature" class="flex flex-col gap-3" @submit.prevent="submit">
             <Field>
-              <FieldLabel for="team-writeup-file">{{ writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf') }}</FieldLabel>
               <FileUpload
                 :key="uploadInputKey"
                 id="team-writeup-file"
+                :label="writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf')"
+                description-id="team-writeup-file-requirements"
                 accept="application/pdf,.pdf"
                 :pending="uploadPending"
                 :error="uploadError"
                 @change="selectFile"
               />
-              <FieldDescription>{{ $t('writeUp.pdfRequirement', { size: formatBytes(maximumWriteUpBytes) }) }}</FieldDescription>
+              <FieldDescription id="team-writeup-file-requirements">{{ $t('writeUp.pdfRequirement', { size: formatBytes(maximumWriteUpBytes) }) }}</FieldDescription>
             </Field>
             <div>
               <Button type="submit" :disabled="!selectedFile || uploadPending">
